@@ -52,7 +52,8 @@ function parseBoolean(value, fallback = false) {
   return fallback;
 }
 
-const host = process.env.TASKFLOW_BACKEND_HOST || process.env.HOST || "127.0.0.1";
+const isRender = parseBoolean(process.env.RENDER, false) || Boolean(process.env.RENDER_EXTERNAL_URL);
+const host = process.env.TASKFLOW_BACKEND_HOST || process.env.HOST || (isRender ? "0.0.0.0" : "127.0.0.1");
 const port = parseInteger(process.env.TASKFLOW_BACKEND_PORT || process.env.PORT, 8787);
 const appId = process.env.TASKFLOW_APP_ID || process.env.VITE_APP_ID || "taskflow-local";
 
@@ -65,7 +66,10 @@ export const backendConfig = {
   port,
   appId,
   appName: process.env.TASKFLOW_APP_NAME || "Charcoal Peak Taskflow",
-  publicAppUrl: process.env.TASKFLOW_PUBLIC_APP_URL || "http://127.0.0.1:5173",
+  publicAppUrl:
+    process.env.TASKFLOW_PUBLIC_APP_URL ||
+    process.env.RENDER_EXTERNAL_URL ||
+    "http://127.0.0.1:5173",
   dbFile:
     process.env.TASKFLOW_DB_FILE || resolve(projectRoot, "backend", "data", "taskflow.sqlite"),
   sessionCookieName: process.env.TASKFLOW_SESSION_COOKIE_NAME || "taskflow_session",
@@ -92,4 +96,3 @@ export function getGoogleRedirectUrl(config = backendConfig) {
 export function getDeletedTaskRetentionMs(config = backendConfig) {
   return config.deletedTaskRetentionDays * 24 * 60 * 60 * 1000;
 }
-

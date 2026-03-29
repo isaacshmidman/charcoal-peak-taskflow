@@ -1,7 +1,9 @@
 // @ts-check
 import http from "node:http";
+import { createReadStream, existsSync, statSync } from "node:fs";
+import { extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { backendConfig } from "./config.js";
+import { backendConfig, projectRoot } from "./config.js";
 import { closeDatabase, getDatabase } from "./db.js";
 import { HttpError, getRequestUrl, readJsonBody, redirect, sendError, sendJson } from "./http.js";
 import {
@@ -19,6 +21,20 @@ import {
   listEntityRecords,
   updateEntityRecord,
 } from "./store.js";
+
+const distRoot = resolve(projectRoot, "dist");
+const CONTENT_TYPES = {
+  ".css": "text/css; charset=utf-8",
+  ".html": "text/html; charset=utf-8",
+  ".ico": "image/x-icon",
+  ".js": "text/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".map": "application/json; charset=utf-8",
+  ".png": "image/png",
+  ".svg": "image/svg+xml; charset=utf-8",
+  ".txt": "text/plain; charset=utf-8",
+  ".webmanifest": "application/manifest+json; charset=utf-8",
+};
 
 function parsePath(pathname) {
   const segments = pathname.split("/").filter(Boolean);
@@ -58,6 +74,41 @@ function ensureAppId(appId, config) {
   if (appId !== config.appId) {
     throw new HttpError(404, "Unknown app id.", "unknown_app");
   }
+}
+
+function resolveStaticFile(requestPathname) {
+  if (!existsSync(distRoot)) return null;
+
+  const pathname = decodeURIComponent(requestPathname || "/");
+  const requestedPath = pathname === "/" ? "/index.html" : pathname;
+  const candidate = resolve(distRoot, `.${requestedPath}`);
+
+  if (!candidate.startsWith(distRoot)) {
+    return null;
+  }
+
+  if (existsSync(candidate) && statSync(candidate).isFile()) {
+    return candidate;
+  }
+
+  if (!extname(pathname)) {
+    const spaEntry = resolve(distRoot, "index.html");
+    if (existsSync(spaEntry)) {
+      return spaEntry;
+    }
+  }
+
+  return null;
+}
+
+function serveStaticFile(response, filePath) {
+  const extension = extname(filePath);
+  const contentType = CONTENT_TYPES[extension] || "application/octet-stream";
+  response.writeHead(200, {
+    "Content-Type": contentType,
+    "Cache-Control": extension === ".html" ? "no-store" : "public, max-age=31536000, immutable",
+  });
+  createReadStream(filePath).pipe(response);
 }
 
 /**
@@ -110,6 +161,14 @@ export function createRequestHandler(config = backendConfig, db = getDatabase(co
     try {
       const requestUrl = getRequestUrl(request);
       const segments = parsePath(requestUrl.pathname);
+
+      if (!requestUrl.pathname.startsWith("/api")) {
+        const staticFile = resolveStaticFile(requestUrl.pathname);
+        if (staticFile) {
+          serveStaticFile(response, staticFile);
+          return;
+        }
+      }
 
       if (requestUrl.pathname === "/health" || requestUrl.pathname === "/api/health") {
         sendJson(response, 200, { ok: true, app_id: config.appId });

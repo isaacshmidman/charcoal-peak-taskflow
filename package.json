@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "vite",
     "dev:open": "vite --open",
+    "start": "node backend/server.js",
     "backend:start": "node backend/server.js",
     "backend:dev": "node --watch backend/server.js",
     "backend:import": "node backend/import-base44-exports.js",

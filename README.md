@@ -165,3 +165,36 @@ Useful commands:
 ```
 
 Imported SQLite data lives in `backend/data/` and is ignored by git so your local data stays local.
+
+## Simple Production Launch
+
+The easiest production path for this repo is to deploy it as a single Node web service that serves both:
+
+- the built frontend from `dist/`
+- the API from `/api`
+
+That keeps auth and cookies on the same origin and avoids cross-origin setup.
+
+### Render + Custom Domain
+
+This repo includes [render.yaml](/Users/isaacshmidman/Documents/New%20project/render.yaml) so you can deploy it on Render as one service.
+
+High-level flow:
+
+1. Push your branch to GitHub.
+2. In Render, create a Blueprint or Web Service from the repo.
+3. Keep the included persistent disk mounted at `/opt/render/project/src/backend/data` so the SQLite database survives deploys.
+4. Set:
+
+```bash
+TASKFLOW_PUBLIC_APP_URL=https://your-domain.com
+TASKFLOW_GOOGLE_CLIENT_ID=your_google_client_id
+TASKFLOW_GOOGLE_CLIENT_SECRET=your_google_client_secret
+TASKFLOW_GOOGLE_REDIRECT_URL=https://your-domain.com/api/apps/auth/google/callback
+```
+
+5. After Render gives you a `onrender.com` URL, add your own domain in the Render dashboard.
+6. Create the matching DNS record at your registrar.
+7. Update your Google OAuth redirect URI to the final custom-domain callback URL.
+
+If you are starting from exported Base44 data, import it once after the first deploy by running the same CSV import command against the deployed service shell or before first launch locally and copying the SQLite file into the persistent disk location.

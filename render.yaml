@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: charcoal-peak-taskflow
+    runtime: node
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    autoDeploy: true
+    disk:
+      name: taskflow-data
+      mountPath: /opt/render/project/src/backend/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: 22.14.0
+      - key: TASKFLOW_APP_ID
+        value: 69b71a4b57ba76a74090fc6e
+      - key: TASKFLOW_ALLOW_ANY_PASSWORD
+        value: "true"
+      - key: TASKFLOW_DELETED_TASK_RETENTION_DAYS
+        value: "7"
