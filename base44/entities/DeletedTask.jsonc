@@ -1,0 +1,109 @@
+{
+  "name": "DeletedTask",
+  "type": "object",
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "description": "Original task id"
+    },
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "priority_id": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
+    },
+    "task_type": {
+      "type": "string"
+    },
+    "recurrence": {
+      "type": "string"
+    },
+    "recurrence_days": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      }
+    },
+    "recurrence_end_date": {
+      "type": "string"
+    },
+    "due_date": {
+      "type": "string"
+    },
+    "task_time": {
+      "type": "string"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "completed_at": {
+      "type": "string"
+    },
+    "deleted_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the task was deleted"
+    },
+    "was_completed": {
+      "type": "boolean",
+      "description": "Whether the task was done when deleted"
+    },
+    "subtasks": {
+      "type": "array",
+      "description": "Snapshot of subtasks at time of deletion",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "due_date": {
+            "type": "string"
+          },
+          "task_time": {
+            "type": "string"
+          },
+          "completed_at": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "title",
+    "deleted_at"
+  ],
+  "rls": {
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "read": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "created_by": "{{user.email}}"
+    },
+    "delete": {
+      "created_by": "{{user.email}}"
+    },
+    "write": {
+      "created_by": "{{user.email}}"
+    }
+  }
+}

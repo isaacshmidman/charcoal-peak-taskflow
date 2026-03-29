@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/_env.sh"
+
+if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
+  exec npm "$@"
+fi
+
+local_node_dir="$(find_local_node_dir || true)"
+if [[ -n "$local_node_dir" ]]; then
+  export PATH="$local_node_dir/bin:$PATH"
+  exec "$local_node_dir/bin/node" "$local_node_dir/lib/node_modules/npm/bin/npm-cli.js" "$@"
+fi
+
+cat >&2 <<EOF
+Node.js was not found.
+
+Install a system Node.js runtime matching .nvmrc, or run:
+  ./scripts/bootstrap-node.sh
+EOF
+exit 1

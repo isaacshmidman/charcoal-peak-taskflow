@@ -1,0 +1,143 @@
+const isE2EMode = import.meta.env.MODE === "e2e";
+const STORAGE_KEY = "__taskflow_e2e_backend__";
+
+const clone = (value) => JSON.parse(JSON.stringify(value));
+
+const persistBackend = (backend) => {
+  if (typeof window === "undefined" || !backend) return;
+
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      publicSettings: backend.publicSettings,
+      state: backend.state,
+      counters: backend.counters,
+      lastRedirectToLogin: backend.lastRedirectToLogin,
+      lastLogout: backend.lastLogout,
+      lastToken: backend.lastToken,
+    }));
+  } catch {}
+};
+
+const toComparableValue = (value) => {
+  if (typeof value === "string") {
+    const parsed = Date.parse(value);
+    return Number.isNaN(parsed) ? value.toLowerCase() : parsed;
+  }
+  return value ?? "";
+};
+
+const sortRecords = (records, sortParam) => {
+  if (!sortParam) return [...records];
+
+  const isDescending = sortParam.startsWith("-");
+  const field = isDescending ? sortParam.slice(1) : sortParam;
+
+  return [...records].sort((leftRecord, rightRecord) => {
+    const left = toComparableValue(leftRecord[field]);
+    const right = toComparableValue(rightRecord[field]);
+
+    if (left < right) return isDescending ? 1 : -1;
+    if (left > right) return isDescending ? -1 : 1;
+    return 0;
+  });
+};
+
+const createIdFactory = () => {
+  let current = 1;
+  return (prefix) => `${prefix}-${current++}`;
+};
+
+export function getE2EBackend() {
+  if (!isE2EMode || typeof window === "undefined") return null;
+  const backend = window.__TASKFLOW_E2E_BACKEND__ || null;
+
+  if (!backend) return null;
+  persistBackend(backend);
+  return backend;
+}
+
+export function createE2EBase44Client() {
+  const backend = getE2EBackend();
+  if (!backend) return null;
+
+  const nextId = createIdFactory();
+  const createEntityStore = (key, createCounter, updateCounter, deleteCounter) => ({
+    async list(sort) {
+      return clone(sortRecords(backend.state[key], sort));
+    },
+    async get(id) {
+      return clone(backend.state[key].find((record) => String(record.id) === String(id)) || null);
+    },
+    async create(data) {
+      const now = new Date().toISOString();
+      const created = {
+        ...data,
+        id: data.id || nextId(key.slice(0, -1)),
+        created_date: data.created_date || now,
+        updated_date: data.updated_date || now,
+      };
+      backend.state[key].unshift(created);
+      if (createCounter) backend.counters[createCounter] += 1;
+      persistBackend(backend);
+      return clone(created);
+    },
+    async update(id, data) {
+      const index = backend.state[key].findIndex((record) => String(record.id) === String(id));
+      if (index === -1) {
+        throw Object.assign(new Error("Not found"), { status: 404 });
+      }
+
+      backend.state[key][index] = {
+        ...backend.state[key][index],
+        ...data,
+        updated_date: new Date().toISOString(),
+      };
+      if (updateCounter) backend.counters[updateCounter] += 1;
+      persistBackend(backend);
+      return clone(backend.state[key][index]);
+    },
+    async delete(id) {
+      const index = backend.state[key].findIndex((record) => String(record.id) === String(id));
+      if (index !== -1) {
+        backend.state[key].splice(index, 1);
+      }
+      if (deleteCounter) backend.counters[deleteCounter] += 1;
+      persistBackend(backend);
+      return { success: true };
+    },
+  });
+
+  return {
+    entities: {
+      Task: createEntityStore("tasks", "taskCreates", "taskUpdates", "taskDeletes"),
+      Priority: createEntityStore("priorities", null, null, null),
+      DeletedTask: createEntityStore("deletedTasks", "deletedTaskCreates", "deletedTaskUpdates", "deletedTaskDeletes"),
+      SavedTag: createEntityStore("savedTags", "savedTagCreates", null, null),
+    },
+    auth: {
+      async me() {
+        if (!backend.state.currentUser) {
+          throw Object.assign(new Error("Unauthorized"), { status: 401 });
+        }
+        return clone(backend.state.currentUser);
+      },
+      redirectToLogin(nextUrl) {
+        backend.lastRedirectToLogin = nextUrl || true;
+        persistBackend(backend);
+      },
+      logout(redirectUrl) {
+        backend.lastLogout = redirectUrl || true;
+        persistBackend(backend);
+      },
+      setToken(token) {
+        backend.lastToken = token;
+        persistBackend(backend);
+      },
+    },
+    cleanup() {},
+    setToken(token) {
+      backend.lastToken = token;
+      persistBackend(backend);
+    },
+  };
+}
