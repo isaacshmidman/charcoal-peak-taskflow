@@ -1,9 +1,10 @@
 // @ts-nocheck
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { useAuth } from "@/lib/AuthContext";
-import { base44 } from "@/api/base44Client";
+import { apiClient } from "@/api/apiClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { isOnline, queuePriorityMutation, queueTagMutation } from "@/lib/offlineCache";
+import { isRecoverableConnectionError } from "@/lib/network";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Trash2, X, Tag, Check, LogOut, ArrowUp, ArrowDown, ChevronRight } from "lucide-react";
@@ -142,8 +143,17 @@ export default function Settings() {
   const [navOrder, setNavOrder] = useState(getSavedNavOrder);
   const [showRecentlyDeleted, setShowRecentlyDeleted] = useState(false);
   const scrollPosRef = useRef(0);
+  const pendingScrollRestoreRef = useRef(null);
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+
+  useLayoutEffect(() => {
+    if (showRecentlyDeleted || pendingScrollRestoreRef.current === null) return;
+
+    window.scrollTo({ top: pendingScrollRestoreRef.current, left: 0, behavior: "auto" });
+    pendingScrollRestoreRef.current = null;
+  }, [showRecentlyDeleted]);
+
   const moveNav = (idx, dir) => {
     const reordered = [...navOrder];
     const newIdx = idx + dir;
@@ -156,7 +166,7 @@ export default function Settings() {
 
   const { data: priorities = [], isSuccess: prioritiesLoaded } = useQuery({
     queryKey: ["priorities"],
-    queryFn: () => base44.entities.Priority.list("order", 50)
+    queryFn: () => apiClient.entities.Priority.list("order", 50)
   });
 
   // Keep orderedPriorities in sync with the query cache (covers both fetched and optimistic updates)
@@ -180,7 +190,7 @@ export default function Settings() {
 
   const { data: savedTags = [] } = useQuery({
     queryKey: ["savedTags"],
-    queryFn: () => base44.entities.SavedTag.list("name", 100)
+    queryFn: () => apiClient.entities.SavedTag.list("name", 100)
   });
 
   const invalidatePriorities = () => queryClient.invalidateQueries({ queryKey: ["priorities"] });
@@ -202,10 +212,20 @@ export default function Settings() {
       // Always add optimistically first so the UI never flickers
       applyPriority((current) => [...current, optimistic]);
       if (isOnline()) {
-        const result = await base44.entities.Priority.create(data);
-        // Replace optimistic entry with the real server record
-        applyPriority((current) => current.map((p) => p.id === optimisticId ? { ...p, ...result } : p));
-        return result;
+        try {
+          const result = await apiClient.entities.Priority.create(data);
+          // Replace optimistic entry with the real server record
+          applyPriority((current) => current.map((p) => p.id === optimisticId ? { ...p, ...result } : p));
+          return result;
+        } catch (error) {
+          if (isRecoverableConnectionError(error)) {
+            queuePriorityMutation({ type: 'create', data: { ...data, _offlineId: optimisticId } });
+            return optimistic;
+          }
+
+          applyPriority((current) => current.filter((p) => p.id !== optimisticId));
+          throw error;
+        }
       } else {
         queuePriorityMutation({ type: 'create', data: { ...data, _offlineId: optimisticId } });
         return optimistic;
@@ -218,8 +238,12 @@ export default function Settings() {
       applyPriority((current) => current.map((p) => p.id === id ? { ...p, ...data } : p));
       if (isOnline()) {
         try {
-          await base44.entities.Priority.update(id, data);
-        } catch {
+          await apiClient.entities.Priority.update(id, data);
+        } catch (error) {
+          if (isRecoverableConnectionError(error)) {
+            queuePriorityMutation({ type: 'update', id, data });
+            return;
+          }
           invalidatePriorities();
         }
       } else {
@@ -233,8 +257,12 @@ export default function Settings() {
       applyPriority((current) => current.filter((p) => p.id !== id));
       if (isOnline() && !String(id).startsWith('offline_')) {
         try {
-          await base44.entities.Priority.delete(id);
-        } catch {
+          await apiClient.entities.Priority.delete(id);
+        } catch (error) {
+          if (isRecoverableConnectionError(error)) {
+            queuePriorityMutation({ type: 'delete', id });
+            return;
+          }
           invalidatePriorities();
         }
       } else if (!String(id).startsWith('offline_')) {
@@ -257,9 +285,19 @@ export default function Settings() {
       const optimistic = { id: `offline_${Date.now()}`, name, created_date: new Date().toISOString() };
       applyTag((current) => [...current, optimistic]);
       if (isOnline()) {
-        const result = await base44.entities.SavedTag.create({ name });
-        invalidateTags(); // replaces optimistic with real record
-        return result;
+        try {
+          const result = await apiClient.entities.SavedTag.create({ name });
+          invalidateTags(); // replaces optimistic with real record
+          return result;
+        } catch (error) {
+          if (isRecoverableConnectionError(error)) {
+            queueTagMutation({ type: 'create', name });
+            return optimistic;
+          }
+
+          applyTag((current) => current.filter((tag) => tag.id !== optimistic.id));
+          throw error;
+        }
       } else {
         queueTagMutation({ type: 'create', name });
         return optimistic;
@@ -272,8 +310,12 @@ export default function Settings() {
       applyTag((current) => current.filter((t) => t.id !== id));
       if (isOnline() && !String(id).startsWith('offline_')) {
         try {
-          await base44.entities.SavedTag.delete(id);
-        } catch {
+          await apiClient.entities.SavedTag.delete(id);
+        } catch (error) {
+          if (isRecoverableConnectionError(error)) {
+            queueTagMutation({ type: 'delete', id });
+            return;
+          }
           invalidateTags();
         }
       } else if (!String(id).startsWith('offline_')) {
@@ -319,8 +361,8 @@ export default function Settings() {
     return (
       <div className="max-w-xl">
         <RecentlyDeleted onBack={() => {
+          pendingScrollRestoreRef.current = scrollPosRef.current;
           setShowRecentlyDeleted(false);
-          setTimeout(() => window.scrollTo({ top: scrollPosRef.current, behavior: "instant" }), 0);
         }} />
       </div>
     );
@@ -499,7 +541,7 @@ export default function Settings() {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={() => base44.auth.logout()}>Log out</AlertDialogAction>
+              <AlertDialogAction onClick={() => logout()}>Log out</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

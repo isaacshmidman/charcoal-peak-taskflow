@@ -1,4 +1,13 @@
 import { QueryClient } from '@tanstack/react-query';
+import { loadFromCache } from '@/lib/offlineCache';
+
+const SEED_KEYS = ['tasks', 'priorities', 'savedTags', 'deletedTasks'];
+const EMPTY_CACHE_VALUES = {
+	tasks: [],
+	priorities: [],
+	savedTags: [],
+	deletedTasks: [],
+};
 
 export const queryClientInstance = new QueryClient({
 	defaultOptions: {
@@ -15,21 +24,17 @@ export const queryClientInstance = new QueryClient({
 	},
 });
 
+export function syncOfflineQueryCache() {
+	for (const key of SEED_KEYS) {
+		try {
+			const data = loadFromCache(key);
+			queryClientInstance.setQueryData([key], data ?? EMPTY_CACHE_VALUES[key]);
+		} catch {
+			queryClientInstance.setQueryData([key], EMPTY_CACHE_VALUES[key]);
+		}
+	}
+}
+
 // Synchronously seed the query cache from localStorage BEFORE any component mounts.
 // This prevents the 1-frame skeleton flash when cached data is available.
-const SEED_KEYS = ['tasks', 'priorities', 'savedTags', 'deletedTasks'];
-const STORAGE_KEYS = {
-	tasks: 'taskflow_offline_tasks',
-	priorities: 'taskflow_offline_priorities',
-	savedTags: 'taskflow_offline_savedTags',
-	deletedTasks: 'taskflow_offline_deletedTasks',
-};
-for (const key of SEED_KEYS) {
-	try {
-		const raw = localStorage.getItem(STORAGE_KEYS[key]);
-		if (raw) {
-			const data = JSON.parse(raw);
-			queryClientInstance.setQueryData([key], data);
-		}
-	} catch {}
-}
+syncOfflineQueryCache();

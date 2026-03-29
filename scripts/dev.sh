@@ -8,4 +8,4 @@ if [[ ! -d "$PROJECT_ROOT/node_modules" ]]; then
   "$SCRIPT_DIR/setup.sh"
 fi
 
-"$SCRIPT_DIR/npmw" run dev
+TASKFLOW_USE_EMBEDDED_BACKEND="${TASKFLOW_USE_EMBEDDED_BACKEND:-1}" "$SCRIPT_DIR/npmw" run dev:open

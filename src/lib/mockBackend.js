@@ -7,14 +7,19 @@ const persistBackend = (backend) => {
   if (typeof window === "undefined" || !backend) return;
 
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      publicSettings: backend.publicSettings,
-      state: backend.state,
-      counters: backend.counters,
-      lastRedirectToLogin: backend.lastRedirectToLogin,
-      lastLogout: backend.lastLogout,
-      lastToken: backend.lastToken,
-    }));
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        publicSettings: backend.publicSettings,
+        state: backend.state,
+        counters: backend.counters,
+        lastRedirectToLogin: backend.lastRedirectToLogin,
+        lastLoginProvider: backend.lastLoginProvider,
+        lastLoginFromUrl: backend.lastLoginFromUrl,
+        lastLogout: backend.lastLogout,
+        lastToken: backend.lastToken,
+      })
+    );
   } catch {}
 };
 
@@ -56,7 +61,7 @@ export function getE2EBackend() {
   return backend;
 }
 
-export function createE2EBase44Client() {
+export function createE2EApiClient() {
   const backend = getE2EBackend();
   if (!backend) return null;
 
@@ -121,11 +126,30 @@ export function createE2EBase44Client() {
         }
         return clone(backend.state.currentUser);
       },
+      async loginWithEmailPassword(email, _password) {
+        const token = `mock-token-${Date.now()}`;
+        const user = {
+          id: backend.state.currentUser?.id || "mock-user",
+          email,
+          role: "user",
+        };
+        backend.state.currentUser = user;
+        backend.lastToken = token;
+        persistBackend(backend);
+        return { access_token: token, user: clone(user) };
+      },
+      loginWithProvider(provider, fromUrl = "/") {
+        backend.lastLoginProvider = provider;
+        backend.lastLoginFromUrl = fromUrl;
+        persistBackend(backend);
+      },
       redirectToLogin(nextUrl) {
         backend.lastRedirectToLogin = nextUrl || true;
         persistBackend(backend);
       },
-      logout(redirectUrl) {
+      async logout(redirectUrl) {
+        backend.state.currentUser = null;
+        backend.lastToken = null;
         backend.lastLogout = redirectUrl || true;
         persistBackend(backend);
       },
@@ -133,6 +157,9 @@ export function createE2EBase44Client() {
         backend.lastToken = token;
         persistBackend(backend);
       },
+    },
+    async getPublicSettings() {
+      return clone(backend.publicSettings);
     },
     cleanup() {},
     setToken(token) {

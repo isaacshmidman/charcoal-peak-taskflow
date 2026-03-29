@@ -16,6 +16,7 @@ tools
 dist
 dist-ssr
 *.local
+backend/data/
 
 # Editor directories and files
 .vscode/*

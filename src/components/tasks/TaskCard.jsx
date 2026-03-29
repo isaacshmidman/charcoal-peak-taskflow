@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
@@ -65,7 +65,6 @@ export default function TaskCard({
   const [dateOpen, setDateOpen] = useState(false);
   const [optimisticDone, setOptimisticDone] = useState(false);
   const [optimisticUndone, setOptimisticUndone] = useState(false);
-  const suppressReset = useRef(false);
   const [swipeX, setSwipeX] = useState(0);
   const [swiping, setSwiping] = useState(false);
   const swipeStartX = useRef(null);
@@ -83,10 +82,9 @@ export default function TaskCard({
 
   // Reset optimistic state whenever the server/cache status changes
   useEffect(() => {
-    if (suppressReset.current) { suppressReset.current = false; return; }
     setOptimisticDone(false);
     setOptimisticUndone(false);
-  }, [task.id, task.status, task.due_date]);
+  }, [task.id, task.status, task.due_date, task.completed_at]);
 
   // Auto-expand subtasks when new ones are added
   const prevSubtaskCount = useRef(subtasks.length);
@@ -101,7 +99,6 @@ export default function TaskCard({
   const priority = priorities.find((p) => p.id === task.priority_id);
 
   const handleToggle = () => {
-    suppressReset.current = true;
     if (task.status !== "done") setOptimisticDone(true);
     else setOptimisticUndone(true);
     onToggleDone(task);

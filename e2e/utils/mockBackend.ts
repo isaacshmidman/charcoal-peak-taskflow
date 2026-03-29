@@ -19,6 +19,13 @@ export interface MockController {
     savedTags: EntityRecord[];
     currentUser: EntityRecord | null;
   }>;
+  getMeta: () => Promise<{
+    lastLoginProvider: string | null;
+    lastLoginFromUrl: string | null;
+    lastRedirectToLogin: string | boolean | null;
+    lastLogout: string | boolean | null;
+    lastToken: string | null;
+  }>;
   getCounters: () => Promise<{
     taskCreates: number;
     taskUpdates: number;
@@ -30,7 +37,7 @@ export interface MockController {
   }>;
 }
 
-export async function installBase44Mocks(page: Page, initialState: MockState = {}): Promise<MockController> {
+export async function installMockBackend(page: Page, initialState: MockState = {}): Promise<MockController> {
   await page.route("**/api/apps/*/analytics/**", async (route) => {
     await route.fulfill({
       status: 204,
@@ -40,6 +47,12 @@ export async function installBase44Mocks(page: Page, initialState: MockState = {
   });
 
   await page.addInitScript(({ state, storageKey }) => {
+    const defaultUser = {
+      id: "mock-user",
+      email: "demo@example.com",
+      role: "user",
+    };
+
     const stored = window.localStorage.getItem(storageKey);
     const backend = stored
       ? JSON.parse(stored)
@@ -54,7 +67,7 @@ export async function installBase44Mocks(page: Page, initialState: MockState = {
             priorities: state.priorities ?? [],
             deletedTasks: state.deletedTasks ?? [],
             savedTags: state.savedTags ?? [],
-            currentUser: state.currentUser ?? null,
+            currentUser: state.currentUser === undefined ? defaultUser : state.currentUser,
           },
           counters: {
             taskCreates: 0,
@@ -75,6 +88,14 @@ export async function installBase44Mocks(page: Page, initialState: MockState = {
     getState: () =>
       page.evaluate(() => ({
         ...window.__TASKFLOW_E2E_BACKEND__.state,
+      })),
+    getMeta: () =>
+      page.evaluate(() => ({
+        lastLoginProvider: window.__TASKFLOW_E2E_BACKEND__.lastLoginProvider ?? null,
+        lastLoginFromUrl: window.__TASKFLOW_E2E_BACKEND__.lastLoginFromUrl ?? null,
+        lastRedirectToLogin: window.__TASKFLOW_E2E_BACKEND__.lastRedirectToLogin ?? null,
+        lastLogout: window.__TASKFLOW_E2E_BACKEND__.lastLogout ?? null,
+        lastToken: window.__TASKFLOW_E2E_BACKEND__.lastToken ?? null,
       })),
     getCounters: () =>
       page.evaluate(() => ({

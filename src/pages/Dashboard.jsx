@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { useState, useMemo } from "react";
-import { base44 } from "@/api/base44Client";
+import { apiClient } from "@/api/apiClient";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { useOfflineMutation } from "@/hooks/useOfflineMutation";
@@ -32,12 +32,12 @@ export default function Dashboard() {
 
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ["tasks"],
-    queryFn: () => base44.entities.Task.list("-created_date", 200),
+    queryFn: () => apiClient.entities.Task.list("-created_date", 200),
   });
 
   const { data: priorities = [] } = useQuery({
     queryKey: ["priorities"],
-    queryFn: () => base44.entities.Priority.list("order", 50),
+    queryFn: () => apiClient.entities.Priority.list("order", 50),
   });
 
   const priorityOrderMap = useMemo(() => {

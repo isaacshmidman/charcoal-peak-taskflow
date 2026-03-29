@@ -1,9 +1,9 @@
 // @ts-nocheck
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { createAxiosClient } from "@base44/sdk/dist/utils/axios-client";
-import { base44 } from "@/api/base44Client";
-import { appParams } from "@/lib/app-params";
-import { getE2EBackend } from "@/lib/e2eBackend";
+import { apiClient } from "@/api/apiClient";
+import { appConfig, getStoredAccessToken, getStoredLocalSession, removeAccessToken, removeLocalSession, saveLocalSession } from "@/lib/app-config";
+import { syncOfflineQueryCache } from "@/lib/query-client";
+import { isRecoverableConnectionError } from "@/lib/network";
 
 const AuthContext = createContext();
 
@@ -15,33 +15,50 @@ export const AuthProvider = ({ children }) => {
   const [authError, setAuthError] = useState(null);
   const [appPublicSettings, setAppPublicSettings] = useState(null);
 
+  const syncStoredToken = useCallback(() => {
+    const token = getStoredAccessToken() || appConfig.token;
+    if (token) {
+      apiClient.setToken(token, false);
+    }
+    return token;
+  }, []);
+
   const checkUserAuth = useCallback(async ({ manageLoading = true } = {}) => {
     if (manageLoading) setIsLoadingAuth(true);
 
     try {
-      const currentUser = await base44.auth.me();
+      const currentUser = await apiClient.auth.me();
       setUser(currentUser);
       setIsAuthenticated(true);
       setAuthError(null);
-      return currentUser;
+      saveLocalSession(currentUser);
+      syncOfflineQueryCache();
+      return { currentUser, errorType: null };
     } catch (error) {
       console.error("User auth check failed:", error);
       setUser(null);
       setIsAuthenticated(false);
 
       if (error.status === 401 || error.status === 403) {
+        if (navigator.onLine) {
+          apiClient.setToken(null, false);
+          removeAccessToken();
+          removeLocalSession();
+          syncOfflineQueryCache();
+        }
         setAuthError({
           type: "auth_required",
           message: "Authentication required",
         });
+        return { currentUser: null, errorType: "auth_required" };
       } else {
+        const errorType = isRecoverableConnectionError(error) ? "offline" : "unknown";
         setAuthError({
-          type: "unknown",
+          type: errorType,
           message: error.message || "Failed to authenticate",
         });
+        return { currentUser: null, errorType };
       }
-
-      return null;
     } finally {
       if (manageLoading) setIsLoadingAuth(false);
     }
@@ -53,42 +70,19 @@ export const AuthProvider = ({ children }) => {
     setAuthError(null);
 
     try {
-      const e2eBackend = getE2EBackend();
-      if (e2eBackend) {
-        setAppPublicSettings(
-          e2eBackend.publicSettings || {
-            id: "public-settings",
-            name: "Taskflow E2E",
-            app_id: appParams.appId,
-          }
-        );
-
-        if (appParams.token) {
-          await checkUserAuth({ manageLoading: false });
-        } else {
-          setUser(null);
-          setIsAuthenticated(false);
-        }
-        return;
-      }
-
-      const appClient = createAxiosClient({
-        baseURL: "/api/apps/public",
-        headers: {
-          "X-App-Id": appParams.appId,
-        },
-        token: appParams.token,
-        interceptResponses: true,
-      });
-
-      const publicSettings = await appClient.get(`/prod/public-settings/by-id/${appParams.appId}`);
+      const publicSettings = await apiClient.getPublicSettings();
       setAppPublicSettings(publicSettings);
 
-      if (appParams.token) {
-        await checkUserAuth({ manageLoading: false });
-      } else {
-        setUser(null);
-        setIsAuthenticated(false);
+      syncStoredToken();
+      const { currentUser, errorType } = await checkUserAuth({ manageLoading: false });
+      if (!currentUser && errorType === "offline") {
+        const cachedSession = getStoredLocalSession();
+        if (cachedSession) {
+          syncOfflineQueryCache();
+          setUser(cachedSession);
+          setIsAuthenticated(true);
+          setAuthError(null);
+        }
       }
     } catch (appError) {
       console.error("App state check failed:", appError);
@@ -103,9 +97,17 @@ export const AuthProvider = ({ children }) => {
         } else {
           setAuthError({ type: reason, message: appError.message });
         }
-      } else if (!navigator.onLine) {
-        setUser(null);
-        setIsAuthenticated(false);
+      } else if (isRecoverableConnectionError(appError)) {
+        const cachedSession = getStoredLocalSession();
+        if (cachedSession) {
+          syncOfflineQueryCache();
+          setUser(cachedSession);
+          setIsAuthenticated(true);
+          setAuthError(null);
+        } else {
+          setUser(null);
+          setIsAuthenticated(false);
+        }
       } else {
         setAuthError({
           type: "unknown",
@@ -116,25 +118,91 @@ export const AuthProvider = ({ children }) => {
       setIsLoadingPublicSettings(false);
       setIsLoadingAuth(false);
     }
-  }, [checkUserAuth]);
+  }, [checkUserAuth, syncStoredToken]);
+
+  const completeLogin = useCallback(async (token) => {
+    if (token) {
+      apiClient.setToken(token);
+    } else {
+      syncStoredToken();
+    }
+
+    const result = await checkUserAuth({ manageLoading: false });
+    return result.currentUser;
+  }, [checkUserAuth, syncStoredToken]);
+
+  const loginWithEmailPassword = useCallback(async (email, password) => {
+    setAuthError(null);
+    setIsLoadingAuth(true);
+    const normalizedEmail = email.trim().toLowerCase();
+
+    try {
+      const response = await apiClient.auth.loginWithEmailPassword(normalizedEmail, password);
+      const currentUser = await completeLogin(response?.access_token);
+      if (!currentUser) {
+        throw new Error("Sign-in failed");
+      }
+      saveLocalSession(currentUser);
+      setUser(currentUser);
+      setIsAuthenticated(true);
+      return response;
+    } catch (error) {
+      if (isRecoverableConnectionError(error)) {
+        const cachedSession = getStoredLocalSession();
+        const offlineUser =
+          cachedSession?.email?.toLowerCase() === normalizedEmail
+            ? cachedSession
+            : {
+                id: cachedSession?.id || `offline-${normalizedEmail || Date.now()}`,
+                email: normalizedEmail,
+                role: cachedSession?.role || "member",
+                auth_provider: "offline-local",
+              };
+
+        saveLocalSession(offlineUser);
+        syncOfflineQueryCache();
+        setUser(offlineUser);
+        setIsAuthenticated(true);
+        setAuthError(null);
+        return { access_token: null, user: offlineUser, offline: true };
+      }
+
+      setUser(null);
+      setIsAuthenticated(false);
+      setAuthError({
+        type: error.status === 401 || error.status === 403 ? "auth_required" : "unknown",
+        message: error.message || "Sign-in failed",
+      });
+      throw error;
+    } finally {
+      setIsLoadingAuth(false);
+    }
+  }, [completeLogin]);
 
   useEffect(() => {
     checkAppState();
   }, [checkAppState]);
 
-  const logout = (shouldRedirect = true) => {
+  const logout = async (shouldRedirect = true) => {
     setUser(null);
     setIsAuthenticated(false);
+    setAuthError(null);
+    removeLocalSession();
+    syncOfflineQueryCache();
 
+    const loginUrl = new URL("/login", window.location.origin).toString();
     if (shouldRedirect) {
-      base44.auth.logout(window.location.href);
+      await apiClient.auth.logout(loginUrl);
+      window.location.href = loginUrl;
     } else {
-      base44.auth.logout();
+      await apiClient.auth.logout(false);
     }
   };
 
-  const navigateToLogin = useCallback(() => {
-    base44.auth.redirectToLogin(window.location.href);
+  const navigateToLogin = useCallback((nextUrl = window.location.href) => {
+    const loginUrl = new URL("/login", window.location.origin);
+    loginUrl.searchParams.set("next", nextUrl);
+    window.location.href = loginUrl.toString();
   }, []);
 
   return (
@@ -147,6 +215,8 @@ export const AuthProvider = ({ children }) => {
         authError,
         appPublicSettings,
         logout,
+        completeLogin,
+        loginWithEmailPassword,
         navigateToLogin,
         checkAppState,
       }}

@@ -1,9 +1,12 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { isOnline, queueMutation, dequeueOfflineCreate, updateQueuedCreate } from '@/lib/offlineCache';
-import { base44 } from '@/api/base44Client';
+import { apiClient } from '@/api/apiClient';
 import { useDeletedTasks } from '@/hooks/useDeletedTasks';
+import { isRecoverableConnectionError } from '@/lib/network';
 import { format } from 'date-fns';
 import { getNextRecurringDueDate } from '@/lib/recurrence';
+
+const createOptimisticId = (prefix) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
 /**
  * @typedef {import("@/types/tasks").DeleteSnapshot} DeleteSnapshot
@@ -38,15 +41,20 @@ export function useOfflineMutation() {
    * @returns {Promise<TaskRecord>}
    */
   const createTask = async (data) => {
-    const optimisticId = `offline_${Date.now()}`;
+    const optimisticId = createOptimisticId('offline');
     const optimistic = { ...data, id: optimisticId, created_date: new Date().toISOString(), updated_date: new Date().toISOString() };
     applyToCache((current) => [optimistic, ...current]);
     if (isOnline()) {
       try {
-        const result = await base44.entities.Task.create(data);
+        const result = await apiClient.entities.Task.create(data);
         applyToCache((current) => current.map(t => t.id === optimisticId ? { ...t, id: result.id } : t));
         return result;
-      } catch {
+      } catch (error) {
+        if (isRecoverableConnectionError(error)) {
+          queueMutation({ type: 'create', data: { ...data, _offlineId: optimisticId } });
+          return optimistic;
+        }
+
         applyToCache((current) => current.filter(t => t.id !== optimisticId));
         return optimistic;
       }
@@ -66,8 +74,12 @@ export function useOfflineMutation() {
     );
     if (isOnline() && !String(id).startsWith('offline_')) {
       try {
-        await base44.entities.Task.update(id, data);
-      } catch {
+        await apiClient.entities.Task.update(id, data);
+      } catch (error) {
+        if (isRecoverableConnectionError(error)) {
+          queueMutation({ type: 'update', id, data });
+          return;
+        }
         invalidate();
       }
     } else if (String(id).startsWith('offline_')) {
@@ -83,35 +95,100 @@ export function useOfflineMutation() {
    * @returns {Promise<DeleteSnapshot>}
    */
   const deleteTask = async (id, { skipDeletedRecord = false } = {}) => {
+    const [deletion] = await deleteTasks([id], { skipDeletedRecord });
+    return deletion || { task: undefined, subtasks: [], deletedRecordId: null };
+  };
+
+  /**
+   * @param {string[]} ids
+   * @param {{ skipDeletedRecord?: boolean }} [options]
+   * @returns {Promise<DeleteSnapshot[]>}
+   */
+  const deleteTasks = async (ids, { skipDeletedRecord = false } = {}) => {
+    const normalizedIds = [...new Set(ids.filter(Boolean).map(String))];
+    if (normalizedIds.length === 0) return [];
+
     /** @type {TaskRecord[]} */
     const current = queryClient.getQueryData(['tasks']) || [];
-    const task = current.find(t => t.id === id);
-    const subtasks = current.filter(t => t.parent_id === id);
-    const subtaskIds = subtasks.filter(t => !String(t.id).startsWith('offline_')).map(t => t.id);
-    const offlineSubtaskIds = subtasks.filter(t => String(t.id).startsWith('offline_')).map(t => t.id);
-    let deletedRecordId = null;
+    const targetIdSet = new Set(normalizedIds);
+    const deletions = normalizedIds.map((id) => {
+      const task = current.find((item) => String(item.id) === id);
+      const subtasks = current.filter((item) => String(item.parent_id) === id);
 
-    // Record deletion into Recently Deleted (only for top-level tasks, not subtasks)
-    if (task?.id && !task.parent_id && !skipDeletedRecord) {
-      deletedRecordId = await recordDeletion(/** @type {TaskRecord & { id: string }} */ (task), subtasks);
-    }
+      return {
+        task,
+        subtasks,
+        deletedRecordId: null,
+        subtaskIds: subtasks.filter((item) => !String(item.id).startsWith('offline_')).map((item) => String(item.id)),
+        offlineSubtaskIds: subtasks.filter((item) => String(item.id).startsWith('offline_')).map((item) => String(item.id)),
+      };
+    });
 
-    // Remove task and all its subtasks from cache immediately
-    applyToCache((c) => c.filter(t => t.id !== id && t.parent_id !== id));
+    const removedIds = new Set([
+      ...normalizedIds,
+      ...deletions.flatMap((deletion) => deletion.subtasks.map((subtask) => String(subtask.id))),
+    ]);
 
-    if (String(id).startsWith('offline_')) {
-      dequeueOfflineCreate(id);
-      offlineSubtaskIds.forEach(sid => dequeueOfflineCreate(sid));
-    } else if (isOnline()) {
-      await Promise.all(subtaskIds.map(sid => base44.entities.Task.delete(sid).catch(() => {})));
-      await base44.entities.Task.delete(id).catch(() => {});
-      invalidate();
+    const deletedRecordPromises = deletions.map(async (deletion) => {
+      if (deletion.task?.id && !deletion.task.parent_id && !skipDeletedRecord) {
+        deletion.deletedRecordId = await recordDeletion(
+          /** @type {TaskRecord & { id: string }} */ (deletion.task),
+          deletion.subtasks
+        );
+      }
+    });
+
+    applyToCache((cache) =>
+      cache.filter(
+        (task) => !removedIds.has(String(task.id)) && !targetIdSet.has(String(task.parent_id))
+      )
+    );
+
+    const onlineDeleteIds = new Set();
+    const queuedDeleteIds = [];
+
+    deletions.forEach((deletion, index) => {
+      const taskId = normalizedIds[index];
+
+      if (taskId.startsWith('offline_')) {
+        dequeueOfflineCreate(taskId);
+        deletion.offlineSubtaskIds.forEach((subtaskId) => dequeueOfflineCreate(subtaskId));
+        return;
+      }
+
+      if (isOnline()) {
+        onlineDeleteIds.add(taskId);
+        deletion.subtaskIds.forEach((subtaskId) => onlineDeleteIds.add(subtaskId));
+        return;
+      }
+
+      deletion.subtaskIds.forEach((subtaskId) => queuedDeleteIds.push(subtaskId));
+      queuedDeleteIds.push(taskId);
+    });
+
+    if (onlineDeleteIds.size > 0) {
+      let didFail = false;
+      await Promise.all(
+        [...onlineDeleteIds].map((taskId) =>
+          apiClient.entities.Task.delete(taskId).catch((error) => {
+            if (isRecoverableConnectionError(error)) {
+              queueMutation({ type: 'delete', id: taskId });
+              return;
+            }
+            didFail = true;
+          })
+        )
+      );
+      if (didFail) {
+        invalidate();
+      }
     } else {
-      subtaskIds.forEach(sid => queueMutation({ type: 'delete', id: sid }));
-      queueMutation({ type: 'delete', id });
+      queuedDeleteIds.forEach((taskId) => queueMutation({ type: 'delete', id: taskId }));
     }
 
-    return { task, subtasks, deletedRecordId };
+    await Promise.all(deletedRecordPromises);
+
+    return deletions.map(({ task, subtasks, deletedRecordId }) => ({ task, subtasks, deletedRecordId }));
   };
 
   /**
@@ -159,5 +236,5 @@ export function useOfflineMutation() {
     return deleteTask(task.id);
   };
 
-  return { createTask, updateTask, deleteTask, completeRecurringTask, skipRecurringTask };
+  return { createTask, updateTask, deleteTask, deleteTasks, completeRecurringTask, skipRecurringTask };
 }

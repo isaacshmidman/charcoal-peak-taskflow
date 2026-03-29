@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { useState, useMemo, useEffect, useRef } from "react";
-import { base44 } from "@/api/base44Client";
+import { apiClient } from "@/api/apiClient";
 import { useQuery } from "@tanstack/react-query";
 import { useOfflineMutation } from "@/hooks/useOfflineMutation";
 import { useDeleteWithUndo } from "@/hooks/useDeleteWithUndo";
@@ -14,6 +14,7 @@ import {
 import CompactTaskCard from "@/components/tasks/CompactTaskCard";
 import TaskForm from "@/components/tasks/TaskForm";
 import MultiSortPanel from "@/components/tasks/MultiSortPanel";
+import RecurringDeleteDialog from "@/components/tasks/RecurringDeleteDialog";
 
 function GroupColumn({ title, subtitle, tasks, priorities, priorityOrderMap, onToggleDone, onEdit, onDelete, onUpdate, accent, wide, sorts }) {
   const compareFn = (a, b, sortValue) => {
@@ -109,25 +110,26 @@ export default function Groupings() {
   });
   const [search, setSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
+  const [recurringDeleteTask, setRecurringDeleteTask] = useState(null);
   const todayColRef = useRef(null);
   const scrollContainerRef = useRef(null);
 
-  const { createTask, updateTask, deleteTask, completeRecurringTask } = useOfflineMutation();
+  const { createTask, updateTask, deleteTask, completeRecurringTask, skipRecurringTask } = useOfflineMutation();
   const deleteWithUndo = useDeleteWithUndo(deleteTask, createTask);
 
   const { data: tasks = [] } = useQuery({
     queryKey: ["tasks"],
-    queryFn: () => base44.entities.Task.list("-created_date", 500),
+    queryFn: () => apiClient.entities.Task.list("-created_date", 500),
   });
 
   const { data: priorities = [] } = useQuery({
     queryKey: ["priorities"],
-    queryFn: () => base44.entities.Priority.list("order", 50),
+    queryFn: () => apiClient.entities.Priority.list("order", 50),
   });
 
   const { data: savedTags = [] } = useQuery({
     queryKey: ["savedTags"],
-    queryFn: () => base44.entities.SavedTag.list("name", 100),
+    queryFn: () => apiClient.entities.SavedTag.list("name", 100),
   });
 
   const priorityOrderMap = useMemo(() => {
@@ -152,7 +154,14 @@ export default function Groupings() {
   };
 
   const handleEdit = (task) => { setEditingTask(task); setAddSubtaskParent(null); setShowForm(true); };
-  const handleDelete = (task) => deleteWithUndo(task, { isSubtask: !!task.parent_id });
+  const handleDelete = (task) => {
+    if (task.task_type === "recurring" && !task.parent_id) {
+      setRecurringDeleteTask(task);
+      return;
+    }
+
+    deleteWithUndo(task, { isSubtask: !!task.parent_id });
+  };
   const handleUpdate = (task, changes) => updateTask(task.id, changes);
 
   const today = startOfDay(new Date());
@@ -334,6 +343,20 @@ export default function Groupings() {
             }
           }
           setEditingTask(null); setAddSubtaskParent(null);
+        }}
+      />
+
+      <RecurringDeleteDialog
+        open={!!recurringDeleteTask}
+        onOpenChange={(open) => { if (!open) setRecurringDeleteTask(null); }}
+        task={recurringDeleteTask}
+        onDeleteThis={() => {
+          skipRecurringTask(recurringDeleteTask);
+          setRecurringDeleteTask(null);
+        }}
+        onDeleteAll={() => {
+          deleteWithUndo(recurringDeleteTask, {});
+          setRecurringDeleteTask(null);
         }}
       />
     </div>

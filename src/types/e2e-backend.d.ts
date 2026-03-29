@@ -21,6 +21,8 @@ declare global {
         savedTagCreates: number;
       };
       lastRedirectToLogin?: string | boolean;
+      lastLoginProvider?: string;
+      lastLoginFromUrl?: string;
       lastLogout?: string | boolean;
       lastToken?: string;
     };

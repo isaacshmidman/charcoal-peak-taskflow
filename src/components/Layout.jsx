@@ -58,7 +58,7 @@ export default function Layout() {
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-100">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <Link to={defaultNav} className="flex items-center gap-2.5">
-            <img src="https://media.base44.com/images/public/69b71a4b57ba76a74090fc6e/aebfa87b2_android-chrome-512x512.png" alt="Taskflow" className="w-7 h-7 rounded-lg" />
+            <img src="/taskflow-logo.png" alt="Taskflow" className="w-7 h-7 rounded-lg object-cover" />
             <span className="text-sm font-semibold text-slate-900">Taskflow</span>
           </Link>
 

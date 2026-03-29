@@ -1,5 +1,5 @@
 {
-  "name": "base44-app",
+  "name": "taskflow-app",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,6 +9,10 @@
   },
   "scripts": {
     "dev": "vite",
+    "dev:open": "vite --open",
+    "backend:start": "node backend/server.js",
+    "backend:dev": "node --watch backend/server.js",
+    "backend:import": "node backend/import-base44-exports.js",
     "build": "vite build",
     "lint": "eslint . --quiet",
     "lint:fix": "eslint . --fix",
@@ -23,8 +27,6 @@
     "verify:all": "npm run verify && npm run test:e2e"
   },
   "dependencies": {
-    "@base44/sdk": "^0.8.23",
-    "@base44/vite-plugin": "^1.0.6",
     "@hello-pangea/dnd": "^17.0.0",
     "@hookform/resolvers": "^4.1.2",
     "@radix-ui/react-accordion": "^1.2.3",

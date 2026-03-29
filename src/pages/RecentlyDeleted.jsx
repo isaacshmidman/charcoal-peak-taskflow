@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { useState, useMemo, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { apiClient } from "@/api/apiClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Trash2, Search, RotateCcw, CheckSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,13 @@ import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useDeletedTasks } from "@/hooks/useDeletedTasks";
 import { useOfflineMutation } from "@/hooks/useOfflineMutation";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import MultiSortPanel from "@/components/tasks/MultiSortPanel";
 
 const RETENTION_OPTIONS = [
@@ -39,11 +46,12 @@ const colorBg = {
 export default function RecentlyDeleted({ onBack } = {}) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { updateDeletedTask, permanentlyDelete, purgeExpired } = useDeletedTasks();
+  const { updateDeletedTask, permanentlyDelete, permanentlyDeleteMany, purgeExpired } = useDeletedTasks();
   const { createTask } = useOfflineMutation();
 
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
+  const [showEmptyDialog, setShowEmptyDialog] = useState(false);
   const [sorts, setSorts] = useState(() => {
     try {
       const parsed = JSON.parse(localStorage.getItem("sorts_deleted") || '["deleted_desc"]').filter(Boolean);
@@ -75,12 +83,12 @@ export default function RecentlyDeleted({ onBack } = {}) {
 
   const { data: rawDeletedTasks = [] } = useQuery({
     queryKey: ["deletedTasks"],
-    queryFn: () => base44.entities.DeletedTask.list("-deleted_at", 500),
+    queryFn: () => apiClient.entities.DeletedTask.list("-deleted_at", 500),
   });
 
   const { data: priorities = [] } = useQuery({
     queryKey: ["priorities"],
-    queryFn: () => base44.entities.Priority.list("order", 50),
+    queryFn: () => apiClient.entities.Priority.list("order", 50),
   });
 
   const priorityMap = useMemo(() => {
@@ -172,6 +180,11 @@ export default function RecentlyDeleted({ onBack } = {}) {
     await permanentlyDelete(record.id);
   };
 
+  const handleEmptyRecentlyDeleted = async () => {
+    setShowEmptyDialog(false);
+    await permanentlyDeleteMany(rawDeletedTasks.map((record) => record.id));
+  };
+
   const sortOptions = [
     { value: "deleted_desc", label: "Deleted: newest first" },
     { value: "deleted_asc", label: "Deleted: oldest first" },
@@ -221,6 +234,32 @@ export default function RecentlyDeleted({ onBack } = {}) {
             <Search className="w-4 h-4" />
           </Button>
           <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} extraOptions={sortOptions} />
+          {rawDeletedTasks.length > 0 && (
+            <Dialog open={showEmptyDialog} onOpenChange={setShowEmptyDialog}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 text-red-400 hover:text-red-600 hover:bg-red-50"
+                title="Empty recently deleted"
+                onClick={() => setShowEmptyDialog(true)}
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Empty Recently Deleted?</DialogTitle>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setShowEmptyDialog(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="button" className="bg-red-600 hover:bg-red-700" onClick={handleEmptyRecentlyDeleted}>
+                    Empty
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
       </div>
 

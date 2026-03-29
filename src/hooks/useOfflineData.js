@@ -1,8 +1,19 @@
 // @ts-nocheck
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { saveToCache, getPendingMutations, clearPendingMutations, getPendingPriorityMutations, clearPendingPriorityMutations, getPendingTagMutations, clearPendingTagMutations, getPendingDeletedTaskMutations, clearPendingDeletedTaskMutations, updateDeletedTasksCache } from '@/lib/offlineCache';
-import { base44 } from '@/api/base44Client';
+import {
+  saveToCache,
+  getPendingMutations,
+  setPendingMutations,
+  getPendingPriorityMutations,
+  setPendingPriorityMutations,
+  getPendingTagMutations,
+  setPendingTagMutations,
+  getPendingDeletedTaskMutations,
+  setPendingDeletedTaskMutations,
+  updateDeletedTasksCache,
+} from '@/lib/offlineCache';
+import { apiClient } from '@/api/apiClient';
 
 const CACHE_KEYS = ['tasks', 'priorities', 'savedTags', 'deletedTasks'];
 
@@ -13,6 +24,8 @@ const CACHE_KEYS = ['tasks', 'priorities', 'savedTags', 'deletedTasks'];
  */
 export function useOfflineData() {
   const queryClient = useQueryClient();
+  const replayInFlightRef = useRef(false);
+  const replayRequestedRef = useRef(false);
 
   // Persist to localStorage whenever query data actually changes (API fetches + optimistic setQueryData).
   useEffect(() => {
@@ -30,129 +43,171 @@ export function useOfflineData() {
   // Replay pending mutations when coming back online
   useEffect(() => {
     const handleOnline = async () => {
-      // --- Task mutations ---
-      const pending = getPendingMutations();
-      const idRemap = {};
-      for (const m of pending) {
-        try {
-          if (m.type === 'create') {
-            const dataToSend = { ...m.data };
-            delete dataToSend._offlineId;
-            if (dataToSend.parent_id && idRemap[dataToSend.parent_id]) {
-              dataToSend.parent_id = idRemap[dataToSend.parent_id];
-            }
-            const result = await base44.entities.Task.create(dataToSend);
-            if (result?.id && m.data._offlineId) {
-              idRemap[m.data._offlineId] = result.id;
-              queryClient.setQueryData(['tasks'], (old = []) =>
-                old.map(t => {
-                  if (t.id === m.data._offlineId) return { ...t, id: result.id };
-                  if (t.parent_id === m.data._offlineId) return { ...t, parent_id: result.id };
-                  return t;
-                })
-              );
-            }
-          } else if (m.type === 'update') {
-            const resolvedId = idRemap[m.id] || m.id;
-            if (!String(resolvedId).startsWith('offline_')) {
-              await base44.entities.Task.update(resolvedId, m.data);
-            }
-          } else if (m.type === 'delete') {
-            if (!String(m.id).startsWith('offline_')) {
-              await base44.entities.Task.delete(m.id).catch(() => {});
-            }
-          }
-        } catch {}
-      }
-      if (pending.length) {
-        clearPendingMutations();
-        queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      if (replayInFlightRef.current) {
+        replayRequestedRef.current = true;
+        return;
       }
 
-      // --- Priority mutations ---
-      const pendingPriorities = getPendingPriorityMutations();
-      const priorityIdRemap = {};
-      for (const m of pendingPriorities) {
-        try {
-          if (m.type === 'create') {
-            const dataToSend = { ...m.data };
-            delete dataToSend._offlineId;
-            const result = await base44.entities.Priority.create(dataToSend);
-            if (result?.id && m.data?._offlineId) {
-              priorityIdRemap[m.data._offlineId] = result.id;
-              queryClient.setQueryData(['priorities'], (old = []) =>
-                old.map(p => p.id === m.data._offlineId ? { ...p, id: result.id } : p)
-              );
-            }
-          } else if (m.type === 'update') {
-            const resolvedId = priorityIdRemap[m.id] || m.id;
-            if (!String(resolvedId).startsWith('offline_')) {
-              await base44.entities.Priority.update(resolvedId, m.data);
-            }
-          } else if (m.type === 'delete') {
-            const resolvedId = priorityIdRemap[m.id] || m.id;
-            if (!String(resolvedId).startsWith('offline_')) {
-              await base44.entities.Priority.delete(resolvedId).catch(() => {});
-            }
-          }
-        } catch {}
-      }
-      if (pendingPriorities.length) {
-        clearPendingPriorityMutations();
-        queryClient.invalidateQueries({ queryKey: ['priorities'] });
-      }
+      replayInFlightRef.current = true;
 
-      // --- Tag mutations ---
-      const pendingTags = getPendingTagMutations();
-      for (const m of pendingTags) {
-        try {
-          if (m.type === 'create') await base44.entities.SavedTag.create({ name: m.name });
-          else if (m.type === 'delete') await base44.entities.SavedTag.delete(m.id).catch(() => {});
-        } catch {}
-      }
-      if (pendingTags.length) {
-        clearPendingTagMutations();
-        queryClient.invalidateQueries({ queryKey: ['savedTags'] });
-      }
-
-      // --- DeletedTask mutations ---
-      const pendingDeleted = getPendingDeletedTaskMutations();
-      const deletedIdRemap = {};
-      for (const m of pendingDeleted) {
-        try {
-          if (m.type === 'create') {
-            const dataToSend = { ...m.data };
-            const offlineId = dataToSend._offlineId;
-            delete dataToSend._offlineId;
-            const result = await base44.entities.DeletedTask.create(dataToSend);
-            if (result?.id && offlineId) {
-              deletedIdRemap[offlineId] = result.id;
-              // Update local cache with real id
-              const cached = queryClient.getQueryData(['deletedTasks']) || [];
-              const updated = cached.map(r => r.id === offlineId ? { ...r, id: result.id } : r);
-              queryClient.setQueryData(['deletedTasks'], updated);
-              updateDeletedTasksCache(updated);
+      try {
+        // --- Task mutations ---
+        const pending = getPendingMutations();
+        const idRemap = {};
+        const remainingTaskMutations = [];
+        for (const m of pending) {
+          try {
+            if (m.type === 'create') {
+              const dataToSend = { ...m.data };
+              delete dataToSend._offlineId;
+              if (dataToSend.parent_id && idRemap[dataToSend.parent_id]) {
+                dataToSend.parent_id = idRemap[dataToSend.parent_id];
+              }
+              const result = await apiClient.entities.Task.create(dataToSend);
+              if (result?.id && m.data._offlineId) {
+                idRemap[m.data._offlineId] = result.id;
+                queryClient.setQueryData(['tasks'], (old = []) =>
+                  old.map(t => {
+                    if (t.id === m.data._offlineId) return { ...t, id: result.id };
+                    if (t.parent_id === m.data._offlineId) return { ...t, parent_id: result.id };
+                    return t;
+                  })
+                );
+              }
+            } else if (m.type === 'update') {
+              const resolvedId = idRemap[m.id] || m.id;
+              if (!String(resolvedId).startsWith('offline_')) {
+                await apiClient.entities.Task.update(resolvedId, m.data);
+              }
+            } else if (m.type === 'delete') {
+              if (!String(m.id).startsWith('offline_')) {
+                await apiClient.entities.Task.delete(m.id);
+              }
             }
-          } else if (m.type === 'update') {
-            const resolvedId = deletedIdRemap[m.id] || m.id;
-            if (!String(resolvedId).startsWith('offline_')) {
-              await base44.entities.DeletedTask.update(resolvedId, m.data);
-            }
-          } else if (m.type === 'delete') {
-            const resolvedId = deletedIdRemap[m.id] || m.id;
-            if (!String(resolvedId).startsWith('offline_')) {
-              await base44.entities.DeletedTask.delete(resolvedId).catch(() => {});
-            }
+          } catch {
+            remainingTaskMutations.push(m);
           }
-        } catch {}
+        }
+        if (pending.length) {
+          setPendingMutations(remainingTaskMutations);
+          queryClient.invalidateQueries({ queryKey: ['tasks'] });
+        }
+
+        // --- Priority mutations ---
+        const pendingPriorities = getPendingPriorityMutations();
+        const priorityIdRemap = {};
+        const remainingPriorityMutations = [];
+        for (const m of pendingPriorities) {
+          try {
+            if (m.type === 'create') {
+              const dataToSend = { ...m.data };
+              delete dataToSend._offlineId;
+              const result = await apiClient.entities.Priority.create(dataToSend);
+              if (result?.id && m.data?._offlineId) {
+                priorityIdRemap[m.data._offlineId] = result.id;
+                queryClient.setQueryData(['priorities'], (old = []) =>
+                  old.map(p => p.id === m.data._offlineId ? { ...p, id: result.id } : p)
+                );
+              }
+            } else if (m.type === 'update') {
+              const resolvedId = priorityIdRemap[m.id] || m.id;
+              if (!String(resolvedId).startsWith('offline_')) {
+                await apiClient.entities.Priority.update(resolvedId, m.data);
+              }
+            } else if (m.type === 'delete') {
+              const resolvedId = priorityIdRemap[m.id] || m.id;
+              if (!String(resolvedId).startsWith('offline_')) {
+                await apiClient.entities.Priority.delete(resolvedId);
+              }
+            }
+          } catch {
+            remainingPriorityMutations.push(m);
+          }
+        }
+        if (pendingPriorities.length) {
+          setPendingPriorityMutations(remainingPriorityMutations);
+          queryClient.invalidateQueries({ queryKey: ['priorities'] });
+        }
+
+        // --- Tag mutations ---
+        const pendingTags = getPendingTagMutations();
+        const remainingTagMutations = [];
+        for (const m of pendingTags) {
+          try {
+            if (m.type === 'create') await apiClient.entities.SavedTag.create({ name: m.name });
+            else if (m.type === 'delete') await apiClient.entities.SavedTag.delete(m.id);
+          } catch {
+            remainingTagMutations.push(m);
+          }
+        }
+        if (pendingTags.length) {
+          setPendingTagMutations(remainingTagMutations);
+          queryClient.invalidateQueries({ queryKey: ['savedTags'] });
+        }
+
+        // --- DeletedTask mutations ---
+        const pendingDeleted = getPendingDeletedTaskMutations();
+        const deletedIdRemap = {};
+        const remainingDeletedTaskMutations = [];
+        for (const m of pendingDeleted) {
+          try {
+            if (m.type === 'create') {
+              const dataToSend = { ...m.data };
+              const offlineId = dataToSend._offlineId;
+              delete dataToSend._offlineId;
+              const result = await apiClient.entities.DeletedTask.create(dataToSend);
+              if (result?.id && offlineId) {
+                deletedIdRemap[offlineId] = result.id;
+                // Update local cache with real id
+                const cached = queryClient.getQueryData(['deletedTasks']) || [];
+                const updated = cached.map(r => r.id === offlineId ? { ...r, id: result.id } : r);
+                queryClient.setQueryData(['deletedTasks'], updated);
+                updateDeletedTasksCache(updated);
+              }
+            } else if (m.type === 'update') {
+              const resolvedId = deletedIdRemap[m.id] || m.id;
+              if (!String(resolvedId).startsWith('offline_')) {
+                await apiClient.entities.DeletedTask.update(resolvedId, m.data);
+              }
+            } else if (m.type === 'delete') {
+              const resolvedId = deletedIdRemap[m.id] || m.id;
+              if (!String(resolvedId).startsWith('offline_')) {
+                await apiClient.entities.DeletedTask.delete(resolvedId);
+              }
+            }
+          } catch {
+            remainingDeletedTaskMutations.push(m);
+          }
+        }
+        if (pendingDeleted.length) {
+          setPendingDeletedTaskMutations(remainingDeletedTaskMutations);
+          queryClient.invalidateQueries({ queryKey: ['deletedTasks'] });
+        }
+      } finally {
+        replayInFlightRef.current = false;
+        if (replayRequestedRef.current) {
+          replayRequestedRef.current = false;
+          void handleOnline();
+        }
       }
-      if (pendingDeleted.length) {
-        clearPendingDeletedTaskMutations();
-        queryClient.invalidateQueries({ queryKey: ['deletedTasks'] });
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && navigator.onLine) {
+        void handleOnline();
       }
     };
 
     window.addEventListener('online', handleOnline);
-    return () => window.removeEventListener('online', handleOnline);
+    window.addEventListener('focus', handleOnline);
+    document.addEventListener('visibilitychange', handleVisibility);
+    if (navigator.onLine) {
+      void handleOnline();
+    }
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('focus', handleOnline);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [queryClient]);
 }

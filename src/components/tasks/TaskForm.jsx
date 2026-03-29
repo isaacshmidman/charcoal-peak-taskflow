@@ -1,8 +1,9 @@
 // @ts-nocheck
 import { useState, useEffect, useRef } from "react";
-import { base44 } from "@/api/base44Client";
+import { apiClient } from "@/api/apiClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { isOnline, queueTagMutation } from "@/lib/offlineCache";
+import { isRecoverableConnectionError } from "@/lib/network";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -56,13 +57,13 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
   // Priorities — sorted by order so dropdown always reflects latest order from Settings
   const { data: rawPriorities = [] } = useQuery({
     queryKey: ["priorities"],
-    queryFn: () => base44.entities.Priority.list("order", 50),
+    queryFn: () => apiClient.entities.Priority.list("order", 50),
   });
   const priorities = [...rawPriorities].sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
 
   const { data: savedTags = [] } = useQuery({
     queryKey: ["savedTags"],
-    queryFn: () => base44.entities.SavedTag.list("name", 100),
+    queryFn: () => apiClient.entities.SavedTag.list("name", 100),
   });
 
   // Auto-save new tags to SavedTag (both online and offline)
@@ -74,7 +75,13 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
     const optimistic = newTags.map(name => ({ id: `offline_tag_${Date.now()}_${name}`, name, created_date: now }));
     queryClient.setQueryData(["savedTags"], (old = []) => [...old, ...optimistic]);
     if (isOnline()) {
-      newTags.forEach(name => base44.entities.SavedTag.create({ name }));
+      newTags.forEach((name) => {
+        apiClient.entities.SavedTag.create({ name }).catch((error) => {
+          if (isRecoverableConnectionError(error)) {
+            queueTagMutation({ type: "create", name });
+          }
+        });
+      });
       setTimeout(() => queryClient.invalidateQueries({ queryKey: ["savedTags"] }), 600);
     } else {
       newTags.forEach(name => queueTagMutation({ type: "create", name }));
@@ -477,6 +484,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                     variant="ghost"
                     size="icon"
                     className="text-red-400 hover:text-red-600 hover:bg-red-50"
+                    data-testid="task-form-delete"
                     onClick={() => { onDelete(task); onOpenChange(false); }}
                   >
                     <Trash2 className="w-4 h-4" />

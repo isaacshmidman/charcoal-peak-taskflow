@@ -2,27 +2,62 @@
  * Simple offline cache using localStorage.
  * Stores tasks and priorities so the app can render when offline.
  */
+import { appConfig, getStoredLocalSession } from "@/lib/app-config";
 
 const KEYS = {
   tasks: 'taskflow_offline_tasks',
   priorities: 'taskflow_offline_priorities',
   savedTags: 'taskflow_offline_savedTags',
   deletedTasks: 'taskflow_offline_deletedTasks',
+  publicSettings: 'taskflow_public_settings',
   pendingMutations: 'taskflow_pending_mutations',
   pendingPriorityMutations: 'taskflow_pending_priority_mutations',
   pendingTagMutations: 'taskflow_pending_tag_mutations',
   pendingDeletedTaskMutations: 'taskflow_pending_deleted_task_mutations',
 };
 
+const SCOPED_KEYS = new Set([
+  'tasks',
+  'priorities',
+  'savedTags',
+  'deletedTasks',
+  'publicSettings',
+  'pendingMutations',
+  'pendingPriorityMutations',
+  'pendingTagMutations',
+  'pendingDeletedTaskMutations',
+]);
+
+function getScopeSuffix() {
+  const session = getStoredLocalSession();
+  const appId = String(appConfig.appId || localStorage.getItem("taskflow_app_id") || "default_app").trim();
+  const userKey = String(session?.email || session?.id || "guest").trim().toLowerCase();
+  return `${appId}::${userKey}`;
+}
+
+function resolveStorageKey(key) {
+  const baseKey = KEYS[key];
+  if (!baseKey) {
+    throw new Error(`Unknown offline cache key: ${key}`);
+  }
+
+  if (!SCOPED_KEYS.has(key)) return baseKey;
+  return `${baseKey}::${getScopeSuffix()}`;
+}
+
+function getLegacyStorageKey(key) {
+  return KEYS[key];
+}
+
 export function saveToCache(key, data) {
   try {
-    localStorage.setItem(KEYS[key], JSON.stringify(data));
+    localStorage.setItem(resolveStorageKey(key), JSON.stringify(data));
   } catch {}
 }
 
 export function loadFromCache(key) {
   try {
-    const raw = localStorage.getItem(KEYS[key]);
+    const raw = localStorage.getItem(resolveStorageKey(key)) ?? localStorage.getItem(getLegacyStorageKey(key));
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -38,7 +73,7 @@ export function queueMutation(mutation) {
   try {
     const pending = loadFromCache('pendingMutations') || [];
     pending.push({ ...mutation, queuedAt: Date.now() });
-    localStorage.setItem(KEYS.pendingMutations, JSON.stringify(pending));
+    localStorage.setItem(resolveStorageKey('pendingMutations'), JSON.stringify(pending));
   } catch {}
 }
 
@@ -47,7 +82,13 @@ export function getPendingMutations() {
 }
 
 export function clearPendingMutations() {
-  localStorage.removeItem(KEYS.pendingMutations);
+  localStorage.removeItem(resolveStorageKey('pendingMutations'));
+}
+
+export function setPendingMutations(mutations) {
+  try {
+    localStorage.setItem(resolveStorageKey('pendingMutations'), JSON.stringify(mutations));
+  } catch {}
 }
 
 // Remove a queued offline create by its _offlineId (used when user deletes an unsaved task)
@@ -55,7 +96,7 @@ export function dequeueOfflineCreate(offlineId) {
   try {
     const pending = loadFromCache('pendingMutations') || [];
     const updated = pending.filter(m => !(m.type === 'create' && m.data?._offlineId === offlineId));
-    localStorage.setItem(KEYS.pendingMutations, JSON.stringify(updated));
+    localStorage.setItem(resolveStorageKey('pendingMutations'), JSON.stringify(updated));
   } catch {}
 }
 
@@ -69,7 +110,7 @@ export function updateQueuedCreate(offlineId, newData) {
       }
       return m;
     });
-    localStorage.setItem(KEYS.pendingMutations, JSON.stringify(updated));
+    localStorage.setItem(resolveStorageKey('pendingMutations'), JSON.stringify(updated));
   } catch {}
 }
 
@@ -80,7 +121,7 @@ export function queuePriorityMutation(mutation) {
   try {
     const pending = loadFromCache('pendingPriorityMutations') || [];
     pending.push({ ...mutation, queuedAt: Date.now() });
-    localStorage.setItem(KEYS.pendingPriorityMutations, JSON.stringify(pending));
+    localStorage.setItem(resolveStorageKey('pendingPriorityMutations'), JSON.stringify(pending));
   } catch {}
 }
 
@@ -89,7 +130,13 @@ export function getPendingPriorityMutations() {
 }
 
 export function clearPendingPriorityMutations() {
-  localStorage.removeItem(KEYS.pendingPriorityMutations);
+  localStorage.removeItem(resolveStorageKey('pendingPriorityMutations'));
+}
+
+export function setPendingPriorityMutations(mutations) {
+  try {
+    localStorage.setItem(resolveStorageKey('pendingPriorityMutations'), JSON.stringify(mutations));
+  } catch {}
 }
 
 
@@ -99,7 +146,7 @@ export function queueTagMutation(mutation) {
   try {
     const pending = loadFromCache('pendingTagMutations') || [];
     pending.push({ ...mutation, queuedAt: Date.now() });
-    localStorage.setItem(KEYS.pendingTagMutations, JSON.stringify(pending));
+    localStorage.setItem(resolveStorageKey('pendingTagMutations'), JSON.stringify(pending));
   } catch {}
 }
 
@@ -108,7 +155,13 @@ export function getPendingTagMutations() {
 }
 
 export function clearPendingTagMutations() {
-  localStorage.removeItem(KEYS.pendingTagMutations);
+  localStorage.removeItem(resolveStorageKey('pendingTagMutations'));
+}
+
+export function setPendingTagMutations(mutations) {
+  try {
+    localStorage.setItem(resolveStorageKey('pendingTagMutations'), JSON.stringify(mutations));
+  } catch {}
 }
 
 // Queue deleted task mutations for replay when back online
@@ -116,7 +169,7 @@ export function queueDeletedTaskMutation(mutation) {
   try {
     const pending = loadFromCache('pendingDeletedTaskMutations') || [];
     pending.push({ ...mutation, queuedAt: Date.now() });
-    localStorage.setItem(KEYS.pendingDeletedTaskMutations, JSON.stringify(pending));
+    localStorage.setItem(resolveStorageKey('pendingDeletedTaskMutations'), JSON.stringify(pending));
   } catch {}
 }
 
@@ -125,7 +178,13 @@ export function getPendingDeletedTaskMutations() {
 }
 
 export function clearPendingDeletedTaskMutations() {
-  localStorage.removeItem(KEYS.pendingDeletedTaskMutations);
+  localStorage.removeItem(resolveStorageKey('pendingDeletedTaskMutations'));
+}
+
+export function setPendingDeletedTaskMutations(mutations) {
+  try {
+    localStorage.setItem(resolveStorageKey('pendingDeletedTaskMutations'), JSON.stringify(mutations));
+  } catch {}
 }
 
 // Recently deleted: save a deleted task record to the local cache
@@ -133,7 +192,7 @@ export function saveDeletedTaskToCache(record) {
   try {
     const existing = loadFromCache('deletedTasks') || [];
     existing.unshift(record);
-    localStorage.setItem(KEYS.deletedTasks, JSON.stringify(existing));
+    localStorage.setItem(resolveStorageKey('deletedTasks'), JSON.stringify(existing));
   } catch {}
 }
 
@@ -145,12 +204,12 @@ export function removeDeletedTaskFromCache(id) {
   try {
     const existing = loadFromCache('deletedTasks') || [];
     const updated = existing.filter(r => r.id !== id);
-    localStorage.setItem(KEYS.deletedTasks, JSON.stringify(updated));
+    localStorage.setItem(resolveStorageKey('deletedTasks'), JSON.stringify(updated));
   } catch {}
 }
 
 export function updateDeletedTasksCache(records) {
   try {
-    localStorage.setItem(KEYS.deletedTasks, JSON.stringify(records));
+    localStorage.setItem(resolveStorageKey('deletedTasks'), JSON.stringify(records));
   } catch {}
 }

@@ -1,13 +1,11 @@
+import { Button } from "@/components/ui/button";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 /**
  * @typedef {import("@/types/tasks").TaskRecord} TaskRecord
@@ -24,32 +22,41 @@ import {
  */
 export default function RecurringDeleteDialog({ open, onOpenChange, task, onDeleteThis, onDeleteAll }) {
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Delete recurring reminder?</AlertDialogTitle>
-          <AlertDialogDescription>
-            "{task?.title}" is a recurring task. Would you like to delete just this reminder, or this and all future reminders?
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            className="bg-orange-500 hover:bg-orange-600 text-white"
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Delete Recurring Task</DialogTitle>
+          <DialogDescription className="sr-only">
+            Choose whether to delete only this occurrence of {task?.title || "this recurring task"} or all future occurrences.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full h-auto py-2 text-center whitespace-normal"
+            onClick={() => onOpenChange(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            className="w-full h-auto py-2 text-center whitespace-normal bg-orange-500 hover:bg-orange-600 text-white"
             data-testid="recurring-delete-this"
             onClick={() => { onDeleteThis(); onOpenChange(false); }}
           >
-            Delete this reminder only
-          </AlertDialogAction>
-          <AlertDialogAction
-            className="bg-red-600 hover:bg-red-700 text-white"
+            Delete This Task Only
+          </Button>
+          <Button
+            type="button"
+            className="w-full h-auto py-2 text-center whitespace-normal bg-red-600 hover:bg-red-700 text-white"
             data-testid="recurring-delete-all"
             onClick={() => { onDeleteAll(); onOpenChange(false); }}
           >
-            Delete all future reminders
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+            Delete All Future Tasks
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

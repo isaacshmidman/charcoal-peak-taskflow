@@ -3,8 +3,11 @@
  * Handles creating, restoring, and permanently deleting records, with full offline support.
  */
 import { useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { apiClient } from '@/api/apiClient';
 import { isOnline, queueDeletedTaskMutation, updateDeletedTasksCache } from '@/lib/offlineCache';
+import { isRecoverableConnectionError } from '@/lib/network';
+
+const createOptimisticId = (prefix) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
 /**
  * @typedef {import("@/types/tasks").DeletedTaskRecord} DeletedTaskRecord
@@ -14,6 +17,34 @@ import { isOnline, queueDeletedTaskMutation, updateDeletedTasksCache } from '@/l
 
 export function useDeletedTasks() {
   const queryClient = useQueryClient();
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['deletedTasks'] });
+
+  /**
+   * @param {Omit<DeletedTaskRecord, "id">} record
+   * @returns {Promise<string>}
+   */
+  const createDeletedRecord = async (record) => {
+    const optimisticId = createOptimisticId('offline');
+    const optimisticRecord = { ...record, id: optimisticId };
+
+    applyToCache(current => [optimisticRecord, ...current]);
+
+    if (isOnline()) {
+      try {
+        const result = await apiClient.entities.DeletedTask.create(record);
+        applyToCache(current => current.map(r => r.id === optimisticId ? { ...r, id: result.id } : r));
+        return result.id;
+      } catch (error) {
+        if (isRecoverableConnectionError(error)) {
+          queueDeletedTaskMutation({ type: 'create', data: { ...record, _offlineId: optimisticId } });
+        }
+      }
+    } else {
+      queueDeletedTaskMutation({ type: 'create', data: { ...record, _offlineId: optimisticId } });
+    }
+
+    return optimisticId;
+  };
 
   /**
    * @param {(current: DeletedTaskRecord[]) => DeletedTaskRecord[]} fn
@@ -72,25 +103,18 @@ export function useDeletedTasks() {
       ),
     };
 
-    const optimisticId = `offline_${Date.now()}`;
-    const optimisticRecord = { ...record, id: optimisticId };
+    return createDeletedRecord(record);
+  };
 
-    // Add to cache immediately
-    applyToCache(current => [optimisticRecord, ...current]);
-
-    if (isOnline()) {
-      try {
-        const result = await base44.entities.DeletedTask.create(record);
-        applyToCache(current => current.map(r => r.id === optimisticId ? { ...r, id: result.id } : r));
-        return result.id;
-      } catch {
-        // keep optimistic
-      }
-    } else {
-      queueDeletedTaskMutation({ type: 'create', data: { ...record, _offlineId: optimisticId } });
-    }
-
-    return optimisticId;
+  /**
+   * Restore a previously removed deleted-task record.
+   *
+   * @param {DeletedTaskRecord} record
+   * @returns {Promise<string>}
+   */
+  const restoreDeletedRecord = async (record) => {
+    const { id: _ignoredId, ...recordData } = record;
+    return createDeletedRecord(recordData);
   };
 
   /**
@@ -102,13 +126,54 @@ export function useDeletedTasks() {
 
     if (isOnline() && !String(id).startsWith('offline_')) {
       try {
-        await base44.entities.DeletedTask.update(id, data);
-      } catch {
-        queryClient.invalidateQueries({ queryKey: ['deletedTasks'] });
+        await apiClient.entities.DeletedTask.update(id, data);
+      } catch (error) {
+        if (isRecoverableConnectionError(error)) {
+          queueDeletedTaskMutation({ type: 'update', id, data });
+          return;
+        }
+        invalidate();
       }
     } else if (!String(id).startsWith('offline_')) {
       queueDeletedTaskMutation({ type: 'update', id, data });
     }
+  };
+
+  /**
+   * Permanently remove many deleted task records from Recently Deleted.
+   *
+   * @param {string[]} ids
+   */
+  const permanentlyDeleteMany = async (ids) => {
+    const normalizedIds = [...new Set(ids.filter(Boolean).map(String))];
+    if (normalizedIds.length === 0) return;
+
+    const idSet = new Set(normalizedIds);
+    applyToCache(current => current.filter(r => !idSet.has(String(r.id))));
+
+    if (isOnline()) {
+      const onlineIds = normalizedIds.filter(id => !id.startsWith('offline_'));
+      let didFail = false;
+      await Promise.all(
+        onlineIds.map(id =>
+          apiClient.entities.DeletedTask.delete(id).catch((error) => {
+            if (isRecoverableConnectionError(error)) {
+              queueDeletedTaskMutation({ type: 'delete', id });
+              return;
+            }
+            didFail = true;
+          })
+        )
+      );
+      if (didFail) {
+        invalidate();
+      }
+      return;
+    }
+
+    normalizedIds
+      .filter(id => !id.startsWith('offline_'))
+      .forEach(id => queueDeletedTaskMutation({ type: 'delete', id }));
   };
 
   /**
@@ -117,14 +182,7 @@ export function useDeletedTasks() {
    * @param {string} id
    */
   const permanentlyDelete = async (id) => {
-    // Remove from cache immediately — this also updates the query data key
-    applyToCache(current => current.filter(r => r.id !== id));
-    if (isOnline() && !String(id).startsWith('offline_')) {
-      await base44.entities.DeletedTask.delete(id).catch(() => {});
-      queryClient.invalidateQueries({ queryKey: ['deletedTasks'] });
-    } else if (!String(id).startsWith('offline_')) {
-      queueDeletedTaskMutation({ type: 'delete', id });
-    }
+    await permanentlyDeleteMany([id]);
   };
 
   /**
@@ -142,5 +200,5 @@ export function useDeletedTasks() {
     }
   };
 
-  return { recordDeletion, updateDeletedTask, permanentlyDelete, purgeExpired };
+  return { recordDeletion, restoreDeletedRecord, updateDeletedTask, permanentlyDelete, permanentlyDeleteMany, purgeExpired };
 }

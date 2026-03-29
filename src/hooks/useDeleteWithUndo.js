@@ -8,6 +8,82 @@ import { useDeletedTasks } from "@/hooks/useDeletedTasks";
  */
 
 /**
+ * @param {TaskRecord} task
+ * @param {Partial<TaskCreateInput>} [overrides]
+ * @returns {TaskCreateInput}
+ */
+export function buildTaskPayload(task, overrides = {}) {
+  /** @type {TaskCreateInput} */
+  const payload = {
+    title: task.title || "",
+    description: task.description || "",
+    priority_id: task.priority_id || "",
+    status: task.status || "todo",
+    task_type: task.task_type || "one_time",
+    recurrence: task.recurrence || "none",
+    recurrence_days: task.recurrence_days || [],
+    recurrence_end_date: task.recurrence_end_date || "",
+    due_date: task.due_date || "",
+    task_time: task.task_time || "",
+    tags: task.tags || [],
+    completed_at: task.completed_at || "",
+    ...overrides,
+  };
+
+  if (payload.parent_id === undefined && task.parent_id) {
+    payload.parent_id = task.parent_id;
+  }
+
+  if (task.order != null && payload.order === undefined) {
+    payload.order = task.order;
+  }
+
+  return payload;
+}
+
+/**
+ * @param {DeleteSnapshot} deletion
+ * @param {{
+ *   createTask: (data: TaskCreateInput) => Promise<TaskRecord | undefined>,
+ *   permanentlyDelete?: (id: string) => Promise<unknown>,
+ * }} options
+ */
+export async function restoreDeletionSnapshot({ task, subtasks = [], deletedRecordId }, { createTask, permanentlyDelete }) {
+  if (!task || !createTask) return;
+
+  if (task.parent_id) {
+    await createTask(buildTaskPayload(task));
+    return;
+  }
+
+  const restoredTask = await createTask(buildTaskPayload(task));
+  const restoredParentId = restoredTask?.id;
+
+  if (restoredParentId) {
+    for (const subtask of [...subtasks].sort((a, b) => (a.order ?? 999) - (b.order ?? 999))) {
+      await createTask(buildTaskPayload(subtask, { parent_id: restoredParentId }));
+    }
+  }
+
+  if (deletedRecordId && permanentlyDelete) {
+    await permanentlyDelete(deletedRecordId);
+  }
+}
+
+/**
+ * @param {DeleteSnapshot[]} deletions
+ * @param {{
+ *   createTask: (data: TaskCreateInput) => Promise<TaskRecord | undefined>,
+ *   permanentlyDelete?: (id: string) => Promise<unknown>,
+ * }} options
+ */
+export async function restoreDeletionSnapshots(deletions, { createTask, permanentlyDelete }) {
+  for (const deletion of deletions) {
+    await restoreDeletionSnapshot(deletion, { createTask, permanentlyDelete });
+  }
+}
+
+/**
  * Returns a deleteWithUndo(task, { isSubtask }) function.
  * - Shows a toast with the task/subtask name and an Undo button
  * - Undo re-creates the deleted record(s), so the restore survives refetches
@@ -17,74 +93,6 @@ import { useDeletedTasks } from "@/hooks/useDeletedTasks";
  */
 export function useDeleteWithUndo(deleteTask, createTask) {
   const { permanentlyDelete } = useDeletedTasks();
-
-  /**
-   * @param {TaskRecord} task
-   * @param {Partial<TaskCreateInput>} [overrides]
-   * @returns {TaskCreateInput}
-   */
-  const buildTaskPayload = (task, overrides = {}) => {
-    /** @type {TaskCreateInput} */
-    const payload = {
-      title: task.title || "",
-      description: task.description || "",
-      priority_id: task.priority_id || "",
-      status: task.status || "todo",
-      task_type: task.task_type || "one_time",
-      recurrence: task.recurrence || "none",
-      recurrence_days: task.recurrence_days || [],
-      recurrence_end_date: task.recurrence_end_date || "",
-      due_date: task.due_date || "",
-      task_time: task.task_time || "",
-      tags: task.tags || [],
-      completed_at: task.completed_at || "",
-      ...overrides,
-    };
-
-    if (payload.parent_id === undefined && task.parent_id) {
-      payload.parent_id = task.parent_id;
-    }
-
-    if (task.order != null && payload.order === undefined) {
-      payload.order = task.order;
-    }
-
-    return payload;
-  };
-
-  /**
-   * @param {DeleteSnapshot} deletion
-   */
-  const restoreDeletion = async ({ task, subtasks = [], deletedRecordId }) => {
-    if (!task || !createTask) return;
-
-    if (task.parent_id) {
-      await createTask(buildTaskPayload(task));
-      return;
-    }
-
-    const restoredTask = await createTask(buildTaskPayload(task));
-    const restoredParentId = restoredTask?.id;
-
-    if (restoredParentId) {
-      for (const subtask of [...subtasks].sort((a, b) => (a.order ?? 999) - (b.order ?? 999))) {
-        await createTask(buildTaskPayload(subtask, { parent_id: restoredParentId }));
-      }
-    }
-
-    if (deletedRecordId) {
-      await permanentlyDelete(deletedRecordId);
-    }
-  };
-
-  /**
-   * @param {DeleteSnapshot[]} deletions
-   */
-  const restoreMany = async (deletions) => {
-    for (const deletion of deletions) {
-      await restoreDeletion(deletion);
-    }
-  };
 
   /**
    * @param {TaskRecord & { id: string }} task
@@ -99,7 +107,7 @@ export function useDeleteWithUndo(deleteTask, createTask) {
 
     showDeleteToast({
       label,
-      onUndo: () => restoreMany([deletion]),
+      onUndo: () => restoreDeletionSnapshots([deletion], { createTask, permanentlyDelete }),
     });
 
     return deletion;
@@ -120,7 +128,7 @@ export function useDeleteWithUndo(deleteTask, createTask) {
     const defaultLabel = `${tasks.length} task${tasks.length === 1 ? "" : "s"} deleted`;
     showDeleteToast({
       label: label || defaultLabel,
-      onUndo: () => restoreMany(deletions),
+      onUndo: () => restoreDeletionSnapshots(deletions, { createTask, permanentlyDelete }),
     });
 
     return deletions;

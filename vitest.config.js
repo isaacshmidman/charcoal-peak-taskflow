@@ -1,16 +1,16 @@
 import { mergeConfig } from "vite";
 import { defineConfig } from "vitest/config";
-import viteConfig from "./vite.config.js";
+import { createViteConfig } from "./vite.shared.js";
 
 export default mergeConfig(
-  viteConfig,
+  createViteConfig(),
   defineConfig({
     test: {
       environment: "jsdom",
       globals: true,
       setupFiles: ["./src/test/setup.js"],
       css: false,
-      include: ["src/**/*.{test,spec}.{js,jsx,ts,tsx}"],
+      include: ["src/**/*.{test,spec}.{js,jsx,ts,tsx}", "backend/**/*.{test,spec}.js"],
       exclude: ["e2e/**", "playwright.config.ts"],
       coverage: {
         provider: "v8",
