@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Full Dev (Vite + Backend)",
+      "runtimeExecutable": "/Users/isaacshmidman/Documents/New project/tools/node-v22.14.0-darwin-arm64/bin/node",
+      "runtimeArgs": ["node_modules/.bin/vite", "--host", "127.0.0.1"],
+      "port": 5173
+    },
+    {
+      "name": "Frontend Only (Vite)",
+      "runtimeExecutable": "/Users/isaacshmidman/Documents/New project/tools/node-v22.14.0-darwin-arm64/bin/node",
+      "runtimeArgs": ["node_modules/.bin/vite", "--host", "127.0.0.1"],
+      "port": 5173
+    },
+    {
+      "name": "Backend Only (Node)",
+      "runtimeExecutable": "/Users/isaacshmidman/Documents/New project/tools/node-v22.14.0-darwin-arm64/bin/node",
+      "runtimeArgs": ["--watch", "backend/server.js"],
+      "port": 8787
+    }
+  ]
+}
