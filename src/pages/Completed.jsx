@@ -46,17 +46,12 @@ export default function Completed() {
   };
 
   const { updateTask, deleteTask, deleteTasks, createTask } = useOfflineMutation();
-  const { permanentlyDelete, permanentlyDeleteMany, restoreDeletedRecord, updateDeletedTask } = useDeletedTasks();
+  const { permanentlyDelete, permanentlyDeleteMany, updateDeletedTask } = useDeletedTasks();
   const deleteWithUndo = useDeleteWithUndo(deleteTask, createTask);
 
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ["tasks"],
     queryFn: () => apiClient.entities.Task.list("-completed_at", 500),
-  });
-
-  const { data: deletedTasks = [] } = useQuery({
-    queryKey: ["deletedTasks"],
-    queryFn: () => apiClient.entities.DeletedTask.list("-deleted_at", 500),
   });
 
   const { data: priorities = [] } = useQuery({
@@ -90,11 +85,11 @@ export default function Completed() {
   }, []);
 
   const completedItems = useMemo(() => {
-    const liveItems = buildCompletedItems({ tasks, deletedTasks, search, sorts, priorityOrderMap });
+    const liveItems = buildCompletedItems({ tasks, search, sorts, priorityOrderMap });
     const liveIds = new Set(liveItems.map((item) => item.id));
     const visibleUndoingItems = undoingItems.filter((item) => !liveIds.has(item.id));
     return sortCompletedItems([...liveItems, ...visibleUndoingItems], sorts, priorityOrderMap);
-  }, [deletedTasks, priorityOrderMap, search, sorts, tasks, undoingItems]);
+  }, [priorityOrderMap, search, sorts, tasks, undoingItems]);
 
   const handleUncompleteTask = (task) => {
     const itemId = `task:${task.id}`;
@@ -296,8 +291,9 @@ export default function Completed() {
         }}
         onSubmit={async (data, subtaskTitles = []) => {
           await updateTask(editingTask.id, data);
+          const existingSubCount = (subtaskMap[editingTask.id] || []).length;
           for (let index = 0; index < subtaskTitles.length; index += 1) {
-            await createTask({ title: subtaskTitles[index], status: "todo", task_type: "one_time", parent_id: editingTask.id, order: index });
+            await createTask({ title: subtaskTitles[index], status: "todo", task_type: "one_time", parent_id: editingTask.id, order: existingSubCount + index });
           }
           setEditingTask(null);
         }}

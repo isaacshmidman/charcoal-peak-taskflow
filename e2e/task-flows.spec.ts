@@ -292,7 +292,7 @@ test("delete all future reminders removes the series and undo restores it across
   await expect(taskCardByTitle(page, "Series task")).toBeVisible();
 });
 
-test("completing a recurring task advances it and records the completed snapshot", async ({ page }) => {
+test("completing a recurring task advances it and creates a completed snapshot", async ({ page }) => {
   const api = await installMockBackend(page, {
     tasks: [
       recurringTask(),
@@ -315,13 +315,21 @@ test("completing a recurring task advances it and records the completed snapshot
 
   await expect(taskCardByTitle(page, "Series task")).toHaveCount(0);
   const state = await api.getState();
-  expect(state.deletedTasks).toHaveLength(1);
-  expect(state.deletedTasks[0].title).toBe("Series task");
-  expect(state.tasks.find((task) => task.id === "series-1")?.due_date).toBe(formatDateOffset(1));
 
-  await page.goto("/RecentlyDeleted");
+  // A one_time snapshot with status "done" should have been created as a live task
+  const snapshot = state.tasks.find(
+    (t) => t.task_type === "one_time" && t.status === "done" && t.title === "Series task"
+  );
+  expect(snapshot).toBeTruthy();
+
+  // The recurring task should be advanced to the next day
+  expect(state.tasks.find((t) => t.id === "series-1")?.due_date).toBe(formatDateOffset(1));
+
+  // Snapshot is visible on the Completed page
+  await page.goto("/Completed");
   await expect(page.getByText("Series task")).toBeVisible();
 
+  // Recurring task is still visible on Active (with tomorrow's date)
   await page.goto("/Active");
   await expect(taskCardByTitle(page, "Series task")).toBeVisible();
 });

@@ -46,7 +46,7 @@ const defaultTask = {
   subtask_titles: [],
 };
 
-export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete, parentId, existingSubtasks = [], onToggleSubtask, onDeleteSubtask, onEditSubtask }) {
+export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete, parentId, existingSubtasks = [], onToggleSubtask, onDeleteSubtask, onEditSubtask, defaultDueDate }) {
   const [form, setForm] = useState(defaultTask);
   const [tagInput, setTagInput] = useState("");
   const [tagInputFocused, setTagInputFocused] = useState(false);
@@ -101,8 +101,8 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
       // Default to the middle priority by order
       const mid = Math.floor(priorities.length / 2);
       const defaultPriority = priorities[mid] || priorities[0] || null;
-      const todayStr = format(new Date(), "yyyy-MM-dd");
-      setForm({ ...defaultTask, priority_id: defaultPriority?.id || "", parent_id: parentId || "", due_date: todayStr });
+      const dueDate = defaultDueDate ?? format(new Date(), "yyyy-MM-dd");
+      setForm({ ...defaultTask, priority_id: defaultPriority?.id || "", parent_id: parentId || "", due_date: dueDate });
       setShowEndDate(false);
     }
     setTagInput("");

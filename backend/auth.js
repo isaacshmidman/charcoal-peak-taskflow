@@ -79,6 +79,12 @@ export function clearSessionCookie(config) {
   return serializeCookie(config.sessionCookieName, "", { maxAge: 0 });
 }
 
+export function purgeExpiredAuthRecords(db) {
+  const now = new Date().toISOString();
+  db.prepare("DELETE FROM sessions WHERE expires_at <= ?").run(now);
+  db.prepare("DELETE FROM oauth_states WHERE expires_at <= ?").run(now);
+}
+
 export function getAuthorizedSession(db, config, request, appId) {
   const authorization = request.headers.authorization || "";
   const token = authorization.startsWith("Bearer ") ? authorization.slice("Bearer ".length).trim() : "";
@@ -318,24 +324,44 @@ export function loginWithEmailPassword(db, config, request, { appId, email, pass
     throw new HttpError(400, "Email and password are required.", "credentials_required");
   }
 
+  if (config.allowAnyPassword) {
+    // Open-access dev mode: auto-create users, accept any password
+    const user = findOrCreateUserByEmail(db, config, {
+      appId,
+      email: normalizedEmail,
+      fullName: normalizedEmail.split("@")[0],
+      provider: "local",
+    });
+
+    const session = createSession(db, config, request, { appId, user, provider: "local" });
+    return {
+      user,
+      access_token: session.accessToken,
+      expires_at: session.expiresAt,
+      session_cookie: session.sessionCookie,
+    };
+  }
+
+  // Strict mode: require existing user, verify password
   const existing = findUserByEmail(db, appId, normalizedEmail);
-  if (!config.allowAnyPassword && existing?.password_hash && !verifyPassword(password, existing.password_hash)) {
+  if (!existing) {
     throw new HttpError(401, "Invalid email or password.", "invalid_credentials");
   }
 
-  if (!config.allowAnyPassword && existing && !existing.password_hash) {
-    const passwordHash = hashPassword(password);
-    db.prepare("UPDATE users SET password_hash = ?, updated_date = ? WHERE id = ?").run(
-      passwordHash,
-      new Date().toISOString(),
-      existing.id
-    );
+  if (!existing.password_hash) {
+    // User exists (e.g. via Google or import) but has no password set.
+    // Reject — they must use their original auth provider or have an admin set a password.
+    throw new HttpError(401, "This account does not use password login. Sign in with your original provider.", "password_not_set");
+  }
+
+  if (!verifyPassword(password, existing.password_hash)) {
+    throw new HttpError(401, "Invalid email or password.", "invalid_credentials");
   }
 
   const user = findOrCreateUserByEmail(db, config, {
     appId,
     email: normalizedEmail,
-    fullName: normalizedEmail.split("@")[0],
+    fullName: existing.full_name || normalizedEmail.split("@")[0],
     provider: "local",
   });
 

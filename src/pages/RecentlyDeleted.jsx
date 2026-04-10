@@ -2,6 +2,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { apiClient } from "@/api/apiClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/lib/AuthContext";
 import { ArrowLeft, Trash2, Search, RotateCcw, CheckSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +47,7 @@ const colorBg = {
 export default function RecentlyDeleted({ onBack } = {}) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { appPublicSettings } = useAuth();
   const { updateDeletedTask, permanentlyDelete, permanentlyDeleteMany, purgeExpired } = useDeletedTasks();
   const { createTask } = useOfflineMutation();
 
@@ -59,9 +61,16 @@ export default function RecentlyDeleted({ onBack } = {}) {
     }
     catch { return ["deleted_desc"]; }
   });
-  const [retentionDays, setRetentionDays] = useState(
-    () => localStorage.getItem("deletedTaskRetentionDays") || "7"
-  );
+  const [retentionDays, setRetentionDays] = useState(() => {
+    const stored = localStorage.getItem("deletedTaskRetentionDays");
+    if (stored) return stored;
+    const serverDefault = appPublicSettings?.deleted_task_retention_days;
+    if (serverDefault) {
+      localStorage.setItem("deletedTaskRetentionDays", String(serverDefault));
+      return String(serverDefault);
+    }
+    return "7";
+  });
 
   const handleSortsChange = (s) => {
     setSorts(s);
@@ -130,10 +139,8 @@ export default function RecentlyDeleted({ onBack } = {}) {
     }
   };
 
-  // Filter out completion records — those are recurring task completion
-  // history and belong only on the Completed page, not Recently Deleted.
   const userDeletedTasks = useMemo(
-    () => rawDeletedTasks.filter(t => !t.is_completion_record),
+    () => rawDeletedTasks,
     [rawDeletedTasks]
   );
 

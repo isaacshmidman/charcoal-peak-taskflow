@@ -4,7 +4,7 @@
  */
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/api/apiClient';
-import { isOnline, queueDeletedTaskMutation, updateDeletedTasksCache } from '@/lib/offlineCache';
+import { isOnline, queueDeletedTaskMutation, dequeueDeletedTaskCreate, updateDeletedTasksCache } from '@/lib/offlineCache';
 import { isRecoverableConnectionError } from '@/lib/network';
 
 const createOptimisticId = (prefix) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -109,17 +109,6 @@ export function useDeletedTasks() {
   };
 
   /**
-   * Restore a previously removed deleted-task record.
-   *
-   * @param {DeletedTaskRecord} record
-   * @returns {Promise<string>}
-   */
-  const restoreDeletedRecord = async (record) => {
-    const { id: _ignoredId, ...recordData } = record;
-    return createDeletedRecord(recordData);
-  };
-
-  /**
    * @param {string} id
    * @param {Partial<DeletedTaskRecord>} data
    */
@@ -152,6 +141,11 @@ export function useDeletedTasks() {
 
     const idSet = new Set(normalizedIds);
     applyToCache(current => current.filter(r => !idSet.has(String(r.id))));
+
+    // Dequeue any offline creates before attempting server deletes
+    normalizedIds
+      .filter(id => id.startsWith('offline_'))
+      .forEach(id => dequeueDeletedTaskCreate(id));
 
     if (isOnline()) {
       const onlineIds = normalizedIds.filter(id => !id.startsWith('offline_'));
@@ -202,5 +196,5 @@ export function useDeletedTasks() {
     }
   };
 
-  return { recordDeletion, restoreDeletedRecord, updateDeletedTask, permanentlyDelete, permanentlyDeleteMany, purgeExpired };
+  return { recordDeletion, updateDeletedTask, permanentlyDelete, permanentlyDeleteMany, purgeExpired };
 }

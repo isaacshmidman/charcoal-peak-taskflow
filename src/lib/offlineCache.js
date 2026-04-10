@@ -116,6 +116,33 @@ export function updateQueuedCreate(offlineId, newData) {
 
 
 
+// Remove a queued offline priority create by its _offlineId
+export function dequeuePriorityCreate(offlineId) {
+  try {
+    const pending = loadFromCache('pendingPriorityMutations') || [];
+    const updated = pending.filter(m => !(m.type === 'create' && m.data?._offlineId === offlineId));
+    localStorage.setItem(resolveStorageKey('pendingPriorityMutations'), JSON.stringify(updated));
+  } catch {}
+}
+
+// Remove a queued offline tag create by its name (tags queue by name, not _offlineId)
+export function dequeueTagCreate(name) {
+  try {
+    const pending = loadFromCache('pendingTagMutations') || [];
+    const updated = pending.filter(m => !(m.type === 'create' && m.name === name));
+    localStorage.setItem(resolveStorageKey('pendingTagMutations'), JSON.stringify(updated));
+  } catch {}
+}
+
+// Remove a queued offline deleted-task create by its _offlineId
+export function dequeueDeletedTaskCreate(offlineId) {
+  try {
+    const pending = loadFromCache('pendingDeletedTaskMutations') || [];
+    const updated = pending.filter(m => !(m.type === 'create' && m.data?._offlineId === offlineId));
+    localStorage.setItem(resolveStorageKey('pendingDeletedTaskMutations'), JSON.stringify(updated));
+  } catch {}
+}
+
 // Queue priority mutations for replay when back online
 export function queuePriorityMutation(mutation) {
   try {

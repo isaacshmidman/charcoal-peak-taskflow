@@ -83,16 +83,11 @@ const writeCachedEntityList = (entityName, value) => {
 
 const normalizeBaseUrl = (value) => (value || "").replace(/\/$/, "");
 
-const resolveAppOrigin = () => {
+const resolveApiOrigin = () => {
   const configuredBaseUrl = normalizeBaseUrl(appConfig.apiBaseUrl);
   if (configuredBaseUrl) return configuredBaseUrl;
   if (typeof window !== "undefined") return window.location.origin;
   return "http://localhost";
-};
-
-const resolveApiOrigin = () => {
-  if (typeof window !== "undefined") return window.location.origin;
-  return resolveAppOrigin();
 };
 
 const buildApiUrl = (path, query = undefined) => {

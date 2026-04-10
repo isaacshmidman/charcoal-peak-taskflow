@@ -257,8 +257,9 @@ export default function Today() {
         onSubmit={async (data, subtaskTitles = []) => {
           if (editingTask) {
             await updateTask(editingTask.id, data);
+            const existingSubCount = (subtaskMap[editingTask.id] || []).length;
             for (let i = 0; i < subtaskTitles.length; i++) {
-              await createTask({ title: subtaskTitles[i], status: "todo", task_type: "one_time", parent_id: editingTask.id, order: i });
+              await createTask({ title: subtaskTitles[i], status: "todo", task_type: "one_time", parent_id: editingTask.id, order: existingSubCount + i });
             }
           } else {
             const created = await createTask(data);

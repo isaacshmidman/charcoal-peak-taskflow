@@ -1,5 +1,4 @@
 /**
- * @typedef {import("@/types/tasks").DeletedTaskRecord} DeletedTaskRecord
  * @typedef {import("@/types/tasks").TaskRecord} TaskRecord
  */
 
@@ -18,21 +17,7 @@
  */
 
 /**
- * @typedef {{
- *   kind: "recurring-record",
- *   id: string,
- *   title: string,
- *   tags: string[],
- *   dueDate: string,
- *   completedAt: string,
- *   priorityId: string,
- *   recurrence: string,
- *   record: DeletedTaskRecord & { id: string },
- * }} CompletedRecurringRecordItem
- */
-
-/**
- * @typedef {CompletedTaskItem | CompletedRecurringRecordItem} CompletedItem
+ * @typedef {CompletedTaskItem} CompletedItem
  */
 
 /**
@@ -121,7 +106,6 @@ export function sortCompletedItems(items, sorts, priorityOrderMap) {
 /**
  * @param {{
  *   tasks?: TaskRecord[],
- *   deletedTasks?: DeletedTaskRecord[],
  *   search?: string,
  *   sorts?: string[],
  *   priorityOrderMap?: Record<string, number>,
@@ -130,7 +114,6 @@ export function sortCompletedItems(items, sorts, priorityOrderMap) {
  */
 export function buildCompletedItems({
   tasks = [],
-  deletedTasks = [],
   search = "",
   sorts = ["date_desc"],
   priorityOrderMap = {},
@@ -142,25 +125,7 @@ export function buildCompletedItems({
     .filter((task) => task.status === "done" && !task.parent_id && task.id)
     .map((task) => buildCompletedTaskItem(/** @type {TaskRecord & { id: string }} */ (task)));
 
-  /** @type {CompletedRecurringRecordItem[]} */
-  const recurringCompletionHistory = deletedTasks
-    .filter((record) => record.is_completion_record && record.id)
-    .map((record) => {
-      const completedRecord = /** @type {DeletedTaskRecord & { id: string }} */ (record);
-      return {
-        kind: "recurring-record",
-        id: `recurring-record:${completedRecord.id}`,
-        title: completedRecord.title || "",
-        tags: completedRecord.tags || [],
-        dueDate: completedRecord.due_date || "",
-        completedAt: completedRecord.completed_at || completedRecord.deleted_at || "",
-        priorityId: completedRecord.priority_id || "",
-        recurrence: completedRecord.recurrence || "",
-        record: completedRecord,
-      };
-    });
-
-  const filtered = [...completedTasks, ...recurringCompletionHistory].filter((item) => {
+  const filtered = completedTasks.filter((item) => {
     if (!normalizedSearch) return true;
 
     return item.title.toLowerCase().includes(normalizedSearch) || item.tags.some((tag) => tag.toLowerCase().includes(normalizedSearch));

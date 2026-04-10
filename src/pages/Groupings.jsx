@@ -326,6 +326,7 @@ export default function Groupings() {
         onOpenChange={(o) => { setShowForm(o); if (!o) { setEditingTask(null); setAddSubtaskParent(null); } }}
         task={editingTask}
         parentId={addSubtaskParent?.id}
+        defaultDueDate=""
         existingSubtasks={editingTask ? (tasks.filter(t => t.parent_id === editingTask.id).sort((a, b) => (a.order ?? 999) - (b.order ?? 999))) : []}
         onToggleSubtask={(sub) => updateTask(sub.id, { status: sub.status === "done" ? "todo" : "done", completed_at: sub.status === "done" ? "" : new Date().toISOString() })}
         onDeleteSubtask={(sub) => deleteWithUndo(sub, { isSubtask: true })}
@@ -333,8 +334,9 @@ export default function Groupings() {
         onSubmit={async (data, subtaskTitles = []) => {
           if (editingTask) {
             await updateTask(editingTask.id, data);
+            const existingSubCount = tasks.filter(t => t.parent_id === editingTask.id).length;
             for (let i = 0; i < subtaskTitles.length; i++) {
-              await createTask({ title: subtaskTitles[i], status: "todo", task_type: "one_time", parent_id: editingTask.id, order: i });
+              await createTask({ title: subtaskTitles[i], status: "todo", task_type: "one_time", parent_id: editingTask.id, order: existingSubCount + i });
             }
           } else {
             const created = await createTask(data);

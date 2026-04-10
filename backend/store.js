@@ -575,6 +575,16 @@ export function deleteEntityRecord(db, { entityName, appId, user, id }) {
     appId,
     ...scope.params(user)
   );
+
+  // Cascade: when deleting a Task, also remove its subtasks
+  if (entityName === "Task") {
+    db.prepare(`DELETE FROM ${definition.table} WHERE parent_id = ? AND app_id = ?${scope.clause}`).run(
+      id,
+      appId,
+      ...scope.params(user)
+    );
+  }
+
   return { success: true };
 }
 

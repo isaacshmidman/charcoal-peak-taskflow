@@ -5,7 +5,6 @@ import { queryClientInstance } from "@/lib/query-client";
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import { loadFromCache } from "@/lib/offlineCache";
 import { sanitizeNavRoute } from "@/lib/navigation";
-import UserNotRegisteredError from "@/components/UserNotRegisteredError";
 import Layout from "@/components/Layout";
 import PageNotFound from "./lib/PageNotFound";
 import Active from "@/pages/Active";
@@ -51,7 +50,6 @@ const AuthenticatedApp = () => {
   }
 
   if (authError) {
-    if (authError.type === "user_not_registered") return <UserNotRegisteredError />;
     if (authError.type === "auth_required" && !isOffline && !isAuthRoute) return null;
     if (authError.type !== "auth_required") {
       return (

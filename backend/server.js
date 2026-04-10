@@ -12,6 +12,7 @@ import {
   destroySession,
   getGoogleAuthUrl,
   loginWithEmailPassword,
+  purgeExpiredAuthRecords,
   requireAuthenticatedUser,
 } from "./auth.js";
 import {
@@ -66,7 +67,6 @@ function getPublicSettings(config) {
       google: config.googleMode === "oauth",
     },
     deleted_task_retention_days: config.deletedTaskRetentionDays,
-    allow_any_password_login: config.allowAnyPassword,
   };
 }
 
@@ -148,6 +148,9 @@ export function createTaskflowServer(config = backendConfig) {
 
 export function createRequestHandler(config = backendConfig, db = getDatabase(config)) {
   return async (request, response) => {
+    const requestOrigin = request.headers.origin || "";
+    const allowedOrigin = requestOrigin || config.publicAppUrl || "*";
+    response.setHeader("Access-Control-Allow-Origin", allowedOrigin);
     response.setHeader("Access-Control-Allow-Credentials", "true");
     response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-App-Id, X-Origin-URL");
     response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
@@ -171,6 +174,7 @@ export function createRequestHandler(config = backendConfig, db = getDatabase(co
       }
 
       if (requestUrl.pathname === "/health" || requestUrl.pathname === "/api/health") {
+        purgeExpiredAuthRecords(db);
         sendJson(response, 200, { ok: true, app_id: config.appId });
         return;
       }

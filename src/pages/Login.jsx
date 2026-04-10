@@ -35,7 +35,7 @@ export default function Login() {
   const isOffline = typeof navigator !== "undefined" && !navigator.onLine;
 
   const hasSession = Boolean(isAuthenticated);
-  const googleEnabled = !isOffline && appPublicSettings?.auth_providers?.google !== false;
+  const googleEnabled = !isOffline && appPublicSettings?.auth_providers?.google === true;
 
   const nextUrl = useMemo(() => {
     const params = new URLSearchParams(location.search);

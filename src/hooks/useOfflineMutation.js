@@ -222,11 +222,11 @@ export function useOfflineMutation() {
       completed_at: now,
     });
 
-    // Copy subtasks to the snapshot (preserving their done/todo states)
-    if (snapshot?.id) {
-      for (let i = 0; i < subtasks.length; i++) {
-        const sub = subtasks[i];
-        await createTask({
+    // Copy subtasks to the snapshot in parallel (safe: synchronous cache
+    // updates run before any await, so each sees the prior additions)
+    if (snapshot?.id && subtasks.length > 0) {
+      await Promise.all(subtasks.map((sub, i) =>
+        createTask({
           title: sub.title,
           description: sub.description || '',
           status: sub.status || 'todo',
@@ -236,19 +236,18 @@ export function useOfflineMutation() {
           completed_at: sub.completed_at || '',
           parent_id: snapshot.id,
           order: i,
-        });
-      }
+        })
+      ));
     }
 
     if (nextDate) {
       const nextDateStr = format(nextDate, 'yyyy-MM-dd');
-      await updateTask(task.id, { due_date: nextDateStr, status: 'todo', completed_at: '' });
-      // Reset subtasks to todo for the next instance
-      for (const sub of subtasks) {
-        if (sub.id && sub.status === 'done') {
-          await updateTask(sub.id, { status: 'todo', completed_at: '' });
-        }
-      }
+      // Advance recurring task and reset done subtasks in parallel
+      await Promise.all([
+        updateTask(task.id, { due_date: nextDateStr, status: 'todo', completed_at: '' }),
+        ...subtasks.filter(sub => sub.id && sub.status === 'done')
+          .map(sub => updateTask(sub.id, { status: 'todo', completed_at: '' })),
+      ]);
       return;
     }
 

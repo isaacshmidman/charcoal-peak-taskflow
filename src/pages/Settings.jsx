@@ -3,7 +3,7 @@ import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { apiClient } from "@/api/apiClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { isOnline, queuePriorityMutation, queueTagMutation } from "@/lib/offlineCache";
+import { isOnline, queuePriorityMutation, queueTagMutation, dequeuePriorityCreate, dequeueTagCreate } from "@/lib/offlineCache";
 import { isRecoverableConnectionError } from "@/lib/network";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -174,20 +174,6 @@ export default function Settings() {
     setOrderedPriorities([...priorities].sort((a, b) => a.order - b.order));
   }, [priorities]);
 
-  useEffect(() => {
-    if (!prioritiesLoaded) return;
-    if (priorities.length === 0) {
-      const defaults = [
-      { name: "High", color: "red", order: 1 },
-      { name: "Medium", color: "orange", order: 2 },
-      { name: "Low", color: "green", order: 3 }];
-
-      // Use the offline-aware mutation so defaults are seeded even when offline
-      defaults.forEach((p) => createPriorityMutation.mutate(p));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prioritiesLoaded, priorities.length]);
-
   const { data: savedTags = [] } = useQuery({
     queryKey: ["savedTags"],
     queryFn: () => apiClient.entities.SavedTag.list("name", 100)
@@ -255,7 +241,11 @@ export default function Settings() {
   const deletePriorityMutation = useMutation({
     mutationFn: async (id) => {
       applyPriority((current) => current.filter((p) => p.id !== id));
-      if (isOnline() && !String(id).startsWith('offline_')) {
+      if (String(id).startsWith('offline_')) {
+        dequeuePriorityCreate(id);
+        return;
+      }
+      if (isOnline()) {
         try {
           await apiClient.entities.Priority.delete(id);
         } catch (error) {
@@ -265,7 +255,7 @@ export default function Settings() {
           }
           invalidatePriorities();
         }
-      } else if (!String(id).startsWith('offline_')) {
+      } else {
         queuePriorityMutation({ type: 'delete', id });
       }
     }
@@ -307,8 +297,15 @@ export default function Settings() {
 
   const deleteTagMutation = useMutation({
     mutationFn: async (id) => {
-      applyTag((current) => current.filter((t) => t.id !== id));
-      if (isOnline() && !String(id).startsWith('offline_')) {
+      // Look up the tag name before removing from cache so we can dequeue by name
+      const current = queryClient.getQueryData(['savedTags']) || [];
+      const tagToDelete = current.find((t) => t.id === id);
+      applyTag((list) => list.filter((t) => t.id !== id));
+      if (String(id).startsWith('offline_')) {
+        if (tagToDelete?.name) dequeueTagCreate(tagToDelete.name);
+        return;
+      }
+      if (isOnline()) {
         try {
           await apiClient.entities.SavedTag.delete(id);
         } catch (error) {
@@ -318,7 +315,7 @@ export default function Settings() {
           }
           invalidateTags();
         }
-      } else if (!String(id).startsWith('offline_')) {
+      } else {
         queueTagMutation({ type: 'delete', id });
       }
     }
