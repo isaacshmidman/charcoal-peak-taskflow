@@ -130,9 +130,16 @@ export default function RecentlyDeleted({ onBack } = {}) {
     }
   };
 
+  // Filter out completion records — those are recurring task completion
+  // history and belong only on the Completed page, not Recently Deleted.
+  const userDeletedTasks = useMemo(
+    () => rawDeletedTasks.filter(t => !t.is_completion_record),
+    [rawDeletedTasks]
+  );
+
   const displayedTasks = useMemo(() => {
     const q = search.toLowerCase();
-    const filtered = rawDeletedTasks.filter(t => {
+    const filtered = userDeletedTasks.filter(t => {
       if (!q) return true;
       return t.title?.toLowerCase().includes(q) || t.tags?.some(tag => tag.toLowerCase().includes(q));
     });
@@ -143,7 +150,7 @@ export default function RecentlyDeleted({ onBack } = {}) {
       }
       return 0;
     });
-  }, [rawDeletedTasks, search, sorts]);
+  }, [userDeletedTasks, search, sorts]);
 
   const handleRestore = async (record) => {
     // Re-create the task
@@ -182,7 +189,7 @@ export default function RecentlyDeleted({ onBack } = {}) {
 
   const handleEmptyRecentlyDeleted = async () => {
     setShowEmptyDialog(false);
-    await permanentlyDeleteMany(rawDeletedTasks.map((record) => record.id));
+    await permanentlyDeleteMany(userDeletedTasks.map((record) => record.id));
   };
 
   const sortOptions = [
@@ -234,7 +241,7 @@ export default function RecentlyDeleted({ onBack } = {}) {
             <Search className="w-4 h-4" />
           </Button>
           <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} extraOptions={sortOptions} />
-          {rawDeletedTasks.length > 0 && (
+          {userDeletedTasks.length > 0 && (
             <Dialog open={showEmptyDialog} onOpenChange={setShowEmptyDialog}>
               <Button
                 variant="ghost"

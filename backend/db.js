@@ -141,7 +141,8 @@ export function createDatabase(config = backendConfig) {
       updated_date TEXT NOT NULL,
       created_by_id TEXT,
       created_by TEXT,
-      is_sample INTEGER NOT NULL DEFAULT 0
+      is_sample INTEGER NOT NULL DEFAULT 0,
+      is_completion_record INTEGER NOT NULL DEFAULT 0
     );
 
     CREATE INDEX IF NOT EXISTS idx_users_app_email ON users(app_id, email);
@@ -154,6 +155,13 @@ export function createDatabase(config = backendConfig) {
     CREATE INDEX IF NOT EXISTS idx_priorities_owner ON priorities(app_id, created_by_id, created_by);
     CREATE INDEX IF NOT EXISTS idx_saved_tags_owner ON saved_tags(app_id, created_by_id, created_by);
   `);
+
+  // Migration: add is_completion_record column to existing databases
+  try {
+    db.exec(`ALTER TABLE deleted_tasks ADD COLUMN is_completion_record INTEGER NOT NULL DEFAULT 0`);
+  } catch {
+    // Column already exists — ignore
+  }
 
   ensureAppSettings(db, config);
   return db;

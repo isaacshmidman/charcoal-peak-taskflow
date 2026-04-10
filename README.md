@@ -166,35 +166,66 @@ Useful commands:
 
 Imported SQLite data lives in `backend/data/` and is ignored by git so your local data stays local.
 
-## Simple Production Launch
+## Production Deployment (Self-Hosted)
 
-The easiest production path for this repo is to deploy it as a single Node web service that serves both:
+Taskflow is designed to run as a single Docker container serving both the built frontend and the API on the same origin. The included `Dockerfile` and `docker-compose.yml` target a ZimaOS NAS with Cloudflare Tunnel for secure public access.
 
-- the built frontend from `dist/`
-- the API from `/api`
+### Prerequisites
 
-That keeps auth and cookies on the same origin and avoids cross-origin setup.
+- A machine running Docker (ZimaOS, any Linux, etc.)
+- A domain (e.g. peaktaskflow.com) with DNS managed by Cloudflare
+- A Cloudflare Tunnel token (free, from Zero Trust dashboard)
+- Google OAuth credentials (from Google Cloud Console)
 
-### Render + Custom Domain
+### Setup
 
-This repo includes [render.yaml](/Users/isaacshmidman/Documents/New%20project/render.yaml) so you can deploy it on Render as one service.
-
-High-level flow:
-
-1. Push your branch to GitHub.
-2. In Render, create a Blueprint or Web Service from the repo.
-3. Keep the included persistent disk mounted at `/opt/render/project/src/backend/data` so the SQLite database survives deploys.
-4. Set:
+1. Clone the repo on your server:
 
 ```bash
-TASKFLOW_PUBLIC_APP_URL=https://your-domain.com
-TASKFLOW_GOOGLE_CLIENT_ID=your_google_client_id
-TASKFLOW_GOOGLE_CLIENT_SECRET=your_google_client_secret
-TASKFLOW_GOOGLE_REDIRECT_URL=https://your-domain.com/api/apps/auth/google/callback
+git clone https://github.com/isaacshmidman/charcoal-peak-taskflow.git
+cd charcoal-peak-taskflow
 ```
 
-5. After Render gives you a `onrender.com` URL, add your own domain in the Render dashboard.
-6. Create the matching DNS record at your registrar.
-7. Update your Google OAuth redirect URI to the final custom-domain callback URL.
+2. Copy the environment template and fill in your secrets:
 
-If you are starting from exported Base44 data, import it once after the first deploy by running the same CSV import command against the deployed service shell or before first launch locally and copying the SQLite file into the persistent disk location.
+```bash
+cp .env.production.example .env
+```
+
+3. Start everything:
+
+```bash
+docker compose up -d --build
+```
+
+This starts two containers:
+- **taskflow** — your app (Node.js + SQLite)
+- **cloudflared** — Cloudflare Tunnel (routes peaktaskflow.com to the app)
+
+### Data Persistence
+
+SQLite data is stored on the host at `/DATA/AppData/taskflow/data/` (ZimaOS convention) and mounted into the container. Data survives container rebuilds and restarts.
+
+### Updating
+
+After pushing code changes to GitHub:
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+### Importing Base44 Data
+
+To import CSV exports from Base44 into the production database:
+
+```bash
+docker compose exec taskflow node backend/import-base44-exports.js \
+  --tasks "/app/backend/data/Task Export.csv" \
+  --deleted-tasks "/app/backend/data/DeletedTask Export.csv" \
+  --priorities "/app/backend/data/Priority Export.csv" \
+  --saved-tags "/app/backend/data/Saved Tags Export.csv" \
+  --replace
+```
+
+Copy CSV files into `/DATA/AppData/taskflow/data/` on the host first so the container can see them.

@@ -192,8 +192,8 @@ export function useOfflineMutation() {
   };
 
   /**
-   * Complete a recurring task: mark current instance as done (move to Recently Deleted as completed)
-   * and create a new instance at the next recurrence date.
+   * Complete a recurring task: create a one-time snapshot of the completed
+   * instance as a live task, then advance the recurring task to the next date.
    *
    * @param {TaskRecord & { id: string }} task
    */
@@ -201,16 +201,54 @@ export function useOfflineMutation() {
     const nextDate = getNextRecurringDueDate(task);
     const now = new Date().toISOString();
 
-    // Record the completed instance into Recently Deleted
     /** @type {TaskRecord[]} */
     const current = queryClient.getQueryData(['tasks']) || [];
     const subtasks = current.filter(t => t.parent_id === task.id);
-    const completedSnapshot = { ...task, status: 'done', completed_at: now };
-    await recordDeletion(completedSnapshot, subtasks);
+
+    // Create a one-time snapshot of this completed instance as a regular live task.
+    // Since it's one_time, re-completing it later just toggles done/todo — no duplicates.
+    const snapshot = await createTask({
+      title: task.title,
+      description: task.description || '',
+      priority_id: task.priority_id || '',
+      status: 'done',
+      task_type: 'one_time',
+      recurrence: 'none',
+      recurrence_days: [],
+      recurrence_end_date: '',
+      due_date: task.due_date || '',
+      task_time: task.task_time || '',
+      tags: task.tags || [],
+      completed_at: now,
+    });
+
+    // Copy subtasks to the snapshot (preserving their done/todo states)
+    if (snapshot?.id) {
+      for (let i = 0; i < subtasks.length; i++) {
+        const sub = subtasks[i];
+        await createTask({
+          title: sub.title,
+          description: sub.description || '',
+          status: sub.status || 'todo',
+          task_type: 'one_time',
+          due_date: sub.due_date || '',
+          task_time: sub.task_time || '',
+          completed_at: sub.completed_at || '',
+          parent_id: snapshot.id,
+          order: i,
+        });
+      }
+    }
 
     if (nextDate) {
       const nextDateStr = format(nextDate, 'yyyy-MM-dd');
       await updateTask(task.id, { due_date: nextDateStr, status: 'todo', completed_at: '' });
+      // Reset subtasks to todo for the next instance
+      for (const sub of subtasks) {
+        if (sub.id && sub.status === 'done') {
+          await updateTask(sub.id, { status: 'todo', completed_at: '' });
+        }
+      }
       return;
     }
 

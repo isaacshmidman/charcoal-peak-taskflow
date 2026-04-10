@@ -144,7 +144,7 @@ export function buildCompletedItems({
 
   /** @type {CompletedRecurringRecordItem[]} */
   const recurringCompletionHistory = deletedTasks
-    .filter((record) => record.was_completed && record.task_type === "recurring" && record.id)
+    .filter((record) => record.is_completion_record && record.id)
     .map((record) => {
       const completedRecord = /** @type {DeletedTaskRecord & { id: string }} */ (record);
       return {

@@ -49,6 +49,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     ...createViteConfig({ apiBaseUrl: env.VITE_API_BASE_URL || "", useEmbeddedApi }),
+    optimizeDeps: { force: true },
     plugins: [
       react(),
       ...(useEmbeddedApi ? [createEmbeddedBackendPlugin({ appId: env.VITE_APP_ID || backendConfig.appId })] : []),

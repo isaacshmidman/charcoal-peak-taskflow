@@ -1,15 +1,13 @@
 // @ts-nocheck
 import { useEffect, useMemo, useRef, useState } from "react";
-import { format } from "date-fns";
 import { AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
-import { Search, Trash2, CheckSquare } from "lucide-react";
+import { Search, Trash2 } from "lucide-react";
 import { apiClient } from "@/api/apiClient";
 import { restoreDeletionSnapshots, useDeleteWithUndo } from "@/hooks/useDeleteWithUndo";
 import { useDeletedTasks } from "@/hooks/useDeletedTasks";
 import { useOfflineMutation } from "@/hooks/useOfflineMutation";
 import { buildCompletedItems, buildCompletedTaskItem, sortCompletedItems } from "@/lib/completedItems";
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { showDeleteToast } from "@/components/tasks/DeleteToast";
@@ -23,41 +21,6 @@ import {
 import TaskCard from "@/components/tasks/TaskCard";
 import TaskForm from "@/components/tasks/TaskForm";
 import MultiSortPanel from "@/components/tasks/MultiSortPanel";
-
-const colorBg = {
-  red: "bg-red-50 border-red-100",
-  orange: "bg-orange-50 border-orange-100",
-  yellow: "bg-yellow-50 border-yellow-100",
-  green: "bg-green-50 border-green-100",
-  blue: "bg-blue-50 border-blue-100",
-  violet: "bg-violet-50 border-violet-100",
-  pink: "bg-pink-50 border-pink-100",
-  teal: "bg-teal-50 border-teal-100",
-  cyan: "bg-cyan-50 border-cyan-100",
-  rose: "bg-rose-50 border-rose-100",
-  slate: "bg-slate-50 border-slate-100",
-};
-
-const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-function buildRecurrenceShortLabel(record) {
-  if (record.task_type !== "recurring" || !record.recurrence || record.recurrence === "none") return null;
-  if (record.recurrence === "custom_days" && record.recurrence_days?.length) {
-    return record.recurrence_days.map((day) => DAY_LABELS[day]).join(", ");
-  }
-
-  const labels = {
-    daily: "Daily",
-    weekdays: "Weekdays",
-    weekly: "Weekly",
-    biweekly: "Biweekly",
-    monthly: "Monthly",
-    quarterly: "Quarterly",
-    yearly: "Yearly",
-  };
-
-  return labels[record.recurrence] || "Repeat";
-}
 
 export default function Completed() {
   const [editingTask, setEditingTask] = useState(null);
@@ -83,7 +46,7 @@ export default function Completed() {
   };
 
   const { updateTask, deleteTask, deleteTasks, createTask } = useOfflineMutation();
-  const { permanentlyDelete, permanentlyDeleteMany, restoreDeletedRecord } = useDeletedTasks();
+  const { permanentlyDelete, permanentlyDeleteMany, restoreDeletedRecord, updateDeletedTask } = useDeletedTasks();
   const deleteWithUndo = useDeleteWithUndo(deleteTask, createTask);
 
   const { data: tasks = [], isLoading } = useQuery({
@@ -167,25 +130,44 @@ export default function Completed() {
     const liveTaskItems = completedItems.filter((item) => item.kind === "task");
     const recurringRecordItems = completedItems.filter((item) => item.kind === "recurring-record");
     const taskDeletions = await deleteTasks(liveTaskItems.map((item) => item.task.id));
-    await permanentlyDeleteMany(recurringRecordItems.map((item) => item.record.id));
+    // Move recurring completion records to Recently Deleted (flip the flag)
+    await Promise.all(recurringRecordItems.map((item) => updateDeletedTask(item.record.id, { is_completion_record: false })));
 
     if (completedItems.length > 0) {
       showDeleteToast({
         label: `${completedItems.length} completed item${completedItems.length === 1 ? "" : "s"} deleted`,
         onUndo: async () => {
           await restoreDeletionSnapshots(taskDeletions, { createTask, permanentlyDelete });
-          await Promise.all(recurringRecordItems.map((item) => restoreDeletedRecord(item.record)));
+          await Promise.all(recurringRecordItems.map((item) => updateDeletedTask(item.record.id, { is_completion_record: true })));
         },
       });
     }
   };
 
   const handleDeleteRecurringCompletion = async (record) => {
-    await permanentlyDelete(record.id);
+    // Move to Recently Deleted by clearing the completion record flag
+    await updateDeletedTask(record.id, { is_completion_record: false });
     showDeleteToast({
       label: `Completed instance "${record.title || "Untitled task"}" was deleted`,
-      onUndo: () => restoreDeletedRecord(record),
+      onUndo: () => updateDeletedTask(record.id, { is_completion_record: true }),
     });
+  };
+
+  // Uncomplete a legacy recurring completion record: restore as a live one-time task
+  const handleUncompleteRecurringRecord = async (record) => {
+    await createTask({
+      title: record.title,
+      description: record.description || '',
+      priority_id: record.priority_id || '',
+      status: 'todo',
+      task_type: 'one_time',
+      recurrence: 'none',
+      due_date: record.due_date || '',
+      task_time: record.task_time || '',
+      tags: record.tags || [],
+      completed_at: '',
+    });
+    await permanentlyDelete(record.id);
   };
 
   return (
@@ -252,8 +234,28 @@ export default function Completed() {
       ) : (
         <div className="space-y-2">
           <AnimatePresence mode="popLayout">
-            {completedItems.map((item) =>
-              item.kind === "task" ? (
+            {completedItems.map((item) => {
+              if (item.kind === "recurring-record") {
+                // Legacy completion record — render with TaskCard using a pseudo-task
+                const pseudoTask = {
+                  ...item.record,
+                  status: "done",
+                  task_type: "one_time",
+                  completed_at: item.record.completed_at || item.record.deleted_at,
+                };
+                return (
+                  <TaskCard
+                    key={item.id}
+                    task={pseudoTask}
+                    priorities={priorities}
+                    subtasks={[]}
+                    onToggleDone={() => handleUncompleteRecurringRecord(item.record)}
+                    onDelete={() => handleDeleteRecurringCompletion(item.record)}
+                    hideMenu
+                  />
+                );
+              }
+              return (
                 <TaskCard
                   key={item.id}
                   task={item.task}
@@ -267,15 +269,8 @@ export default function Completed() {
                   onDelete={(task) => deleteWithUndo(task, { isSubtask: !!task.parent_id })}
                   hideMenu
                 />
-              ) : (
-                <RecurringCompletionCard
-                  key={item.id}
-                  record={item.record}
-                  priorities={priorities}
-                  onDelete={() => handleDeleteRecurringCompletion(item.record)}
-                />
-              )
-            )}
+              );
+            })}
           </AnimatePresence>
         </div>
       )}
@@ -307,60 +302,6 @@ export default function Completed() {
           setEditingTask(null);
         }}
       />
-    </div>
-  );
-}
-
-function RecurringCompletionCard({ record, priorities, onDelete }) {
-  const priority = priorities.find((item) => item.id === record.priority_id);
-  const recurrenceLabel = buildRecurrenceShortLabel(record);
-  const completedDate = record.completed_at || record.deleted_at;
-  const cardBg = priority ? colorBg[priority.color] || colorBg.slate : "bg-white border-slate-100";
-
-  return (
-    <div className={cn("rounded-xl border flex overflow-hidden opacity-60", cardBg)}>
-      <div className="flex-1 min-w-0 px-3 py-2.5">
-        <div className="flex items-start gap-2">
-          <div className="shrink-0 w-7 h-7 rounded-md border-2 flex items-center justify-center bg-slate-900 border-slate-900 text-white">
-            <CheckSquare className="w-3.5 h-3.5 text-white" />
-          </div>
-
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-slate-400 line-through truncate">{record.title}</p>
-
-            <div className="flex flex-wrap items-center gap-1.5 mt-1">
-              {completedDate && (
-                <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
-                  Completed {format(new Date(completedDate), "MMM d, yyyy")}
-                </span>
-              )}
-              {record.due_date && (
-                <span className="text-[10px] text-slate-400">
-                  Due {format(new Date(`${record.due_date}T00:00:00`), "MMM d")}
-                </span>
-              )}
-              {recurrenceLabel && (
-                <span className="text-[10px] font-medium text-slate-500 bg-white/80 border border-slate-200 px-1.5 py-0.5 rounded">
-                  {recurrenceLabel}
-                </span>
-              )}
-              {record.tags?.slice(0, 2).map((tag) => (
-                <span key={tag} className="text-[10px] font-medium text-slate-400 bg-white/70 px-1.5 py-0.5 rounded border border-slate-200">
-                  {tag}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <button
-            onClick={onDelete}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
-            title="Delete completed instance"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

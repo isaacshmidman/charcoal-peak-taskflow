@@ -1,0 +1,16 @@
+node_modules
+dist
+tools
+backend/data
+.vite
+.git
+.github
+.claude
+.env*
+!.env.example
+!.env.backend.example
+*.md
+playwright-report
+test-results
+tests
+*.sqlite

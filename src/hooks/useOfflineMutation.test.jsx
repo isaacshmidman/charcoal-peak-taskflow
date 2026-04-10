@@ -8,6 +8,9 @@ const deleteTaskApi = vi.fn();
 const recordDeletion = vi.fn();
 const queueMutation = vi.fn();
 
+// Default: createTask succeeds and returns a task with an ID
+taskCreateApi.mockImplementation(async (data) => ({ ...data, id: `task_${Date.now()}` }));
+
 vi.mock("@/api/apiClient", () => ({
   apiClient: {
     entities: {
@@ -137,7 +140,7 @@ describe("useOfflineMutation", () => {
     expect(queryClient.getQueryData(["tasks"])).toEqual([]);
   });
 
-  it("records the completed recurring instance and advances the due date", async () => {
+  it("creates a one-time snapshot and advances the recurring task due date", async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -158,7 +161,8 @@ describe("useOfflineMutation", () => {
         id: "subtask-1",
         title: "Child",
         parent_id: "task-1",
-        status: "todo",
+        status: "done",
+        completed_at: "2026-03-28T10:00:00.000Z",
       },
     ]);
 
@@ -179,23 +183,27 @@ describe("useOfflineMutation", () => {
       completed_at: "",
     });
 
-    expect(recordDeletion).toHaveBeenCalledWith(
+    // Should NOT call recordDeletion — uses createTask for snapshot instead
+    expect(recordDeletion).not.toHaveBeenCalled();
+
+    // Should create a one-time snapshot task
+    expect(taskCreateApi).toHaveBeenCalledWith(
       expect.objectContaining({
-        id: "task-1",
+        title: "Recurring",
         status: "done",
-      }),
-      [
-        expect.objectContaining({
-          id: "subtask-1",
-        }),
-      ]
+        task_type: "one_time",
+        due_date: "2026-03-28",
+      })
     );
+
+    // Should advance the recurring task
     expect(updateTaskApi).toHaveBeenCalledWith("task-1", {
       due_date: "2026-03-29",
       status: "todo",
       completed_at: "",
     });
 
+    // Recurring task should be in cache with new due date
     expect(queryClient.getQueryData(["tasks"])).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -256,7 +264,11 @@ describe("useOfflineMutation", () => {
       completed_at: "",
     });
 
-    expect(recordDeletion).toHaveBeenCalledTimes(2);
+    // Should create snapshot tasks, not recordDeletion calls
+    expect(recordDeletion).not.toHaveBeenCalled();
+    // createTask called twice for snapshots (once per completion)
+    expect(taskCreateApi.mock.calls.filter(([d]) => d.task_type === "one_time" && d.status === "done")).toHaveLength(2);
+
     expect(queryClient.getQueryData(["tasks"])).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
