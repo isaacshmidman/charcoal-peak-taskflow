@@ -64,9 +64,8 @@ export function useDeletedTasks() {
    *
    * @param {TaskRecord & { id: string }} task
    * @param {(TaskRecord & { id?: string })[]} [subtasks]
-   * @param {{ isCompletionRecord?: boolean }} [options]
    */
-  const recordDeletion = async (task, subtasks = [], { isCompletionRecord = false } = {}) => {
+  const recordDeletion = async (task, subtasks = []) => {
     const retentionDays = parseInt(localStorage.getItem('deletedTaskRetentionDays') || '7', 10);
     const deletedAt = new Date().toISOString();
     const expiresAt = new Date(Date.now() + retentionDays * 24 * 60 * 60 * 1000).toISOString();
@@ -89,7 +88,6 @@ export function useDeletedTasks() {
       deleted_at: deletedAt,
       expires_at: expiresAt,
       was_completed: task.status === 'done',
-      is_completion_record: isCompletionRecord,
       subtasks: subtasks.map(
         /**
          * @returns {DeletedTaskSubtaskSnapshot}

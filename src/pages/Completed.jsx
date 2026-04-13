@@ -46,7 +46,7 @@ export default function Completed() {
   };
 
   const { updateTask, deleteTask, deleteTasks, createTask } = useOfflineMutation();
-  const { permanentlyDelete, permanentlyDeleteMany, updateDeletedTask } = useDeletedTasks();
+  const { permanentlyDelete, permanentlyDeleteMany } = useDeletedTasks();
   const deleteWithUndo = useDeleteWithUndo(deleteTask, createTask);
 
   const { data: tasks = [], isLoading } = useQuery({
@@ -123,46 +123,16 @@ export default function Completed() {
     setShowDeleteAllDialog(false);
 
     const liveTaskItems = completedItems.filter((item) => item.kind === "task");
-    const recurringRecordItems = completedItems.filter((item) => item.kind === "recurring-record");
     const taskDeletions = await deleteTasks(liveTaskItems.map((item) => item.task.id));
-    // Move recurring completion records to Recently Deleted (flip the flag)
-    await Promise.all(recurringRecordItems.map((item) => updateDeletedTask(item.record.id, { is_completion_record: false })));
 
     if (completedItems.length > 0) {
       showDeleteToast({
         label: `${completedItems.length} completed item${completedItems.length === 1 ? "" : "s"} deleted`,
         onUndo: async () => {
           await restoreDeletionSnapshots(taskDeletions, { createTask, permanentlyDelete });
-          await Promise.all(recurringRecordItems.map((item) => updateDeletedTask(item.record.id, { is_completion_record: true })));
         },
       });
     }
-  };
-
-  const handleDeleteRecurringCompletion = async (record) => {
-    // Move to Recently Deleted by clearing the completion record flag
-    await updateDeletedTask(record.id, { is_completion_record: false });
-    showDeleteToast({
-      label: `Completed instance "${record.title || "Untitled task"}" was deleted`,
-      onUndo: () => updateDeletedTask(record.id, { is_completion_record: true }),
-    });
-  };
-
-  // Uncomplete a legacy recurring completion record: restore as a live one-time task
-  const handleUncompleteRecurringRecord = async (record) => {
-    await createTask({
-      title: record.title,
-      description: record.description || '',
-      priority_id: record.priority_id || '',
-      status: 'todo',
-      task_type: 'one_time',
-      recurrence: 'none',
-      due_date: record.due_date || '',
-      task_time: record.task_time || '',
-      tags: record.tags || [],
-      completed_at: '',
-    });
-    await permanentlyDelete(record.id);
   };
 
   return (
@@ -230,26 +200,6 @@ export default function Completed() {
         <div className="space-y-2">
           <AnimatePresence mode="popLayout">
             {completedItems.map((item) => {
-              if (item.kind === "recurring-record") {
-                // Legacy completion record — render with TaskCard using a pseudo-task
-                const pseudoTask = {
-                  ...item.record,
-                  status: "done",
-                  task_type: "one_time",
-                  completed_at: item.record.completed_at || item.record.deleted_at,
-                };
-                return (
-                  <TaskCard
-                    key={item.id}
-                    task={pseudoTask}
-                    priorities={priorities}
-                    subtasks={[]}
-                    onToggleDone={() => handleUncompleteRecurringRecord(item.record)}
-                    onDelete={() => handleDeleteRecurringCompletion(item.record)}
-                    hideMenu
-                  />
-                );
-              }
               return (
                 <TaskCard
                   key={item.id}

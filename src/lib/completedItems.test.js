@@ -1,7 +1,7 @@
 import { buildCompletedItems } from "./completedItems";
 
 describe("buildCompletedItems", () => {
-  it("includes recurring completion history alongside live completed tasks", () => {
+  it("includes only done tasks without a parent_id", () => {
     const items = buildCompletedItems({
       tasks: [
         {
@@ -12,67 +12,62 @@ describe("buildCompletedItems", () => {
           completed_at: "2026-03-29T10:00:00.000Z",
           priority_id: "priority-2",
         },
-      ],
-      deletedTasks: [
         {
-          id: "deleted-1",
-          task_id: "recurring-1",
-          title: "Daily standup",
-          task_type: "recurring",
-          recurrence: "daily",
-          was_completed: true,
-          is_completion_record: true,
+          id: "task-2",
+          title: "Recurring snapshot",
+          status: "done",
+          task_type: "one_time",
           completed_at: "2026-03-29T11:00:00.000Z",
-          deleted_at: "2026-03-29T11:00:00.000Z",
-          expires_at: "2026-04-05T11:00:00.000Z",
-          subtasks: [],
-          tags: ["Work"],
           priority_id: "priority-1",
+          tags: ["Work"],
         },
         {
-          id: "deleted-2",
-          task_id: "one-time-1",
-          title: "Old completed task",
+          id: "task-3",
+          title: "Active task",
+          status: "todo",
           task_type: "one_time",
-          was_completed: true,
-          is_completion_record: false,
-          completed_at: "2026-03-29T12:00:00.000Z",
-          deleted_at: "2026-03-29T12:00:00.000Z",
-          expires_at: "2026-04-05T12:00:00.000Z",
-          subtasks: [],
+        },
+        {
+          id: "subtask-1",
+          title: "Subtask",
+          status: "done",
+          task_type: "one_time",
+          parent_id: "task-1",
         },
       ],
       sorts: ["date_desc"],
     });
 
     expect(items.map((item) => item.id)).toEqual([
-      "recurring-record:deleted-1",
+      "task:task-2",
       "task:task-1",
     ]);
   });
 
-  it("filters across titles and tags for recurring completion history", () => {
+  it("filters across titles and tags", () => {
     const items = buildCompletedItems({
-      deletedTasks: [
+      tasks: [
         {
-          id: "deleted-1",
-          task_id: "recurring-1",
+          id: "task-1",
           title: "Daily standup",
-          task_type: "recurring",
-          recurrence: "daily",
-          was_completed: true,
-          is_completion_record: true,
+          status: "done",
+          task_type: "one_time",
           completed_at: "2026-03-29T11:00:00.000Z",
-          deleted_at: "2026-03-29T11:00:00.000Z",
-          expires_at: "2026-04-05T11:00:00.000Z",
-          subtasks: [],
           tags: ["Work"],
+        },
+        {
+          id: "task-2",
+          title: "Unrelated task",
+          status: "done",
+          task_type: "one_time",
+          completed_at: "2026-03-29T12:00:00.000Z",
+          tags: [],
         },
       ],
       search: "work",
     });
 
     expect(items).toHaveLength(1);
-    expect(items[0].kind).toBe("recurring-record");
+    expect(items[0].title).toBe("Daily standup");
   });
 });
