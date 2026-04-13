@@ -61,6 +61,7 @@ export async function installMockBackend(page: Page, initialState: MockState = {
             id: "public-settings",
             name: "Taskflow E2E",
             app_id: "e2e-app",
+            auth_providers: { email_password: true, google: true },
           },
           state: {
             tasks: state.tasks ?? [],
