@@ -57,6 +57,7 @@ export default defineConfig(({ mode }) => {
         registerType: "autoUpdate",
         workbox: {
           globPatterns: ["**/*.{js,css,html,ico,png,svg}"],
+          navigateFallbackDenylist: [/^\/api\//],
         },
         manifest: false,
       }),
