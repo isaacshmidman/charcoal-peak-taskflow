@@ -173,7 +173,7 @@ Taskflow is designed to run as a single Docker container serving both the built 
 ### Prerequisites
 
 - A machine running Docker (ZimaOS, any Linux, etc.)
-- A domain (e.g. peaktaskflow.com) with DNS managed by Cloudflare
+- A domain (e.g. zephyrly.app) with DNS managed by Cloudflare
 - A Cloudflare Tunnel token (free, from Zero Trust dashboard)
 - Google OAuth credentials (from Google Cloud Console)
 
@@ -200,7 +200,7 @@ docker compose up -d --build
 
 This starts two containers:
 - **taskflow** — your app (Node.js + SQLite)
-- **cloudflared** — Cloudflare Tunnel (routes peaktaskflow.com to the app)
+- **cloudflared** — Cloudflare Tunnel (routes zephyrly.app to the app)
 
 ### Data Persistence
 

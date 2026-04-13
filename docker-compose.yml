@@ -1,6 +1,9 @@
 services:
   taskflow:
-    build: .
+    build:
+      context: .
+      args:
+        - VITE_APP_ID=${TASKFLOW_APP_ID:-69b71a4b57ba76a74090fc6e}
     restart: always
     ports:
       - "${WEBUI_PORT:-8787}:8787"
@@ -9,11 +12,11 @@ services:
     environment:
       - NODE_ENV=production
       - TASKFLOW_APP_ID=${TASKFLOW_APP_ID:-69b71a4b57ba76a74090fc6e}
-      - TASKFLOW_PUBLIC_APP_URL=${TASKFLOW_PUBLIC_APP_URL:-https://peaktaskflow.com}
+      - TASKFLOW_PUBLIC_APP_URL=${TASKFLOW_PUBLIC_APP_URL:-https://zephyrly.app}
       - TASKFLOW_SESSION_SECRET=${TASKFLOW_SESSION_SECRET}
       - TASKFLOW_GOOGLE_CLIENT_ID=${TASKFLOW_GOOGLE_CLIENT_ID}
       - TASKFLOW_GOOGLE_CLIENT_SECRET=${TASKFLOW_GOOGLE_CLIENT_SECRET}
-      - TASKFLOW_GOOGLE_REDIRECT_URL=${TASKFLOW_GOOGLE_REDIRECT_URL:-https://peaktaskflow.com/api/apps/auth/google/callback}
+      - TASKFLOW_GOOGLE_REDIRECT_URL=${TASKFLOW_GOOGLE_REDIRECT_URL:-https://zephyrly.app/api/apps/auth/google/callback}
       - TASKFLOW_ALLOW_ANY_PASSWORD=${TASKFLOW_ALLOW_ANY_PASSWORD:-false}
       - TASKFLOW_DELETED_TASK_RETENTION_DAYS=${TASKFLOW_DELETED_TASK_RETENTION_DAYS:-7}
     healthcheck:

@@ -1,6 +1,9 @@
 # ── Build stage ──────────────────────────────────────────────
 FROM node:22.14.0-slim AS build
 
+ARG VITE_APP_ID=69b71a4b57ba76a74090fc6e
+ENV VITE_APP_ID=$VITE_APP_ID
+
 WORKDIR /app
 
 # Install dependencies first (layer caching — only re-runs when lockfile changes)
