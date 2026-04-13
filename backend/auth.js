@@ -40,7 +40,7 @@ function parseCookies(header = "") {
   }, /** @type {Record<string, string>} */ ({}));
 }
 
-function serializeCookie(name, value, { maxAge = 0, httpOnly = true } = {}) {
+function serializeCookie(name, value, { maxAge = 0, httpOnly = true, secure = false } = {}) {
   const attributes = [
     `${name}=${encodeURIComponent(value)}`,
     "Path=/",
@@ -49,6 +49,7 @@ function serializeCookie(name, value, { maxAge = 0, httpOnly = true } = {}) {
   ];
 
   if (httpOnly) attributes.push("HttpOnly");
+  if (secure) attributes.push("Secure");
   return attributes.join("; ");
 }
 
@@ -76,7 +77,7 @@ function getRequestIpAddress(request) {
 }
 
 export function clearSessionCookie(config) {
-  return serializeCookie(config.sessionCookieName, "", { maxAge: 0 });
+  return serializeCookie(config.sessionCookieName, "", { maxAge: 0, secure: config.publicAppUrl?.startsWith("https") });
 }
 
 export function purgeExpiredAuthRecords(db) {
@@ -193,6 +194,7 @@ export function createSession(db, config, request, { appId, user, provider = "lo
     accessToken,
     sessionCookie: serializeCookie(config.sessionCookieName, sessionToken, {
       maxAge: config.sessionTtlDays * 24 * 60 * 60,
+      secure: config.publicAppUrl?.startsWith("https"),
     }),
     expiresAt: expiresAt.toISOString(),
   };
