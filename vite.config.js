@@ -1,6 +1,5 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv } from "vite";
-import { VitePWA } from "vite-plugin-pwa";
 import { backendConfig } from "./backend/config.js";
 import { closeDatabase } from "./backend/db.js";
 import { createRequestHandler } from "./backend/server.js";
@@ -53,16 +52,6 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       ...(useEmbeddedApi ? [createEmbeddedBackendPlugin({ appId: env.VITE_APP_ID || backendConfig.appId })] : []),
-      VitePWA({
-        registerType: "autoUpdate",
-        workbox: {
-          globPatterns: ["**/*.{js,css,html,ico,png,svg}"],
-          navigateFallbackDenylist: [/^\/api\//],
-          skipWaiting: true,
-          clientsClaim: true,
-        },
-        manifest: false,
-      }),
     ],
   };
 });

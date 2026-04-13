@@ -1,4 +1,4 @@
-const CACHE_NAME = 'taskflow-v2';
+const CACHE_NAME = 'taskflow-v3';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -41,18 +41,31 @@ if (isLocalhost) {
     const { request } = event;
     const url = new URL(request.url);
 
-    // For API requests, use network-first with localStorage fallback handled in app
+    // NEVER intercept /api requests.
+    // For navigation requests (e.g. OAuth login redirects), the browser must
+    // handle the 302 natively so it actually navigates to the external domain.
+    // For non-navigation API calls, the app handles errors itself.
+    // By not calling event.respondWith(), the browser uses its default behavior.
     if (url.pathname.startsWith('/api')) {
+      return;
+    }
+
+    // Skip cross-origin requests entirely
+    if (url.origin !== self.location.origin) {
+      return;
+    }
+
+    // For navigation requests (HTML pages), serve index.html from cache (SPA fallback)
+    if (request.mode === 'navigate') {
       event.respondWith(
-        fetch(request).catch(() => new Response(JSON.stringify({ offline: true }), {
-          status: 503,
-          headers: { 'Content-Type': 'application/json' },
-        }))
+        caches.match('/index.html').then((cached) => {
+          return cached || fetch(request);
+        })
       );
       return;
     }
 
-    // For everything else: cache-first, then network
+    // For same-origin assets: cache-first, then network
     event.respondWith(
       caches.match(request).then((cached) => {
         if (cached) return cached;

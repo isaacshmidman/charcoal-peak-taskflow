@@ -224,8 +224,14 @@ export function createRequestHandler(config = backendConfig, db = getDatabase(co
         const appId = requestUrl.searchParams.get("app_id") || config.appId;
         ensureAppId(appId, config);
         const fromUrl = requestUrl.searchParams.get("from_url") || `${config.publicAppUrl}/Today`;
+        const wantsJson = (request.headers.accept || "").includes("application/json");
         try {
-          redirect(response, getGoogleAuthUrl(db, config, { appId, fromUrl }));
+          const authUrl = getGoogleAuthUrl(db, config, { appId, fromUrl });
+          if (wantsJson) {
+            sendJson(response, 200, { redirect_url: authUrl });
+          } else {
+            redirect(response, authUrl);
+          }
         } catch (error) {
           if (error instanceof HttpError && error.code === "google_not_configured") {
             const loginUrl = new URL("/login", config.publicAppUrl);

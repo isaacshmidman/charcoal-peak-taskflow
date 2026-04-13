@@ -272,7 +272,7 @@ const liveApiClient = {
 
       return response;
     },
-    loginWithProvider(provider, fromUrl = "/") {
+    async loginWithProvider(provider, fromUrl = "/") {
       if (typeof window === "undefined") return;
 
       const authPath =
@@ -280,12 +280,36 @@ const liveApiClient = {
           ? `/apps/${appConfig.appId}/auth/sso/login`
           : `/apps/auth${provider && provider !== "google" ? `/${provider}` : ""}/login`;
 
-      // Start auth from the current app origin so local dev uses the Vite /api proxy
-      // and production stays on the same deployed origin.
-      window.location.href = buildApiUrl(authPath, {
+      const loginUrl = buildApiUrl(authPath, {
         app_id: appConfig.appId,
         from_url: new URL(fromUrl, window.location.origin).toString(),
       });
+
+      // Fetch the OAuth redirect URL as JSON instead of navigating to /api.
+      // This completely bypasses service worker navigation interception —
+      // older cached service workers intercept navigation requests to /api
+      // and serve index.html instead of letting the 302 reach Google.
+      // By using fetch() + Accept: application/json, the SW's fetch handler
+      // passes the request through to the network, and we navigate directly
+      // to the Google URL returned in the JSON response.
+      try {
+        const response = await fetch(loginUrl, {
+          headers: { Accept: "application/json" },
+          credentials: "include",
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.redirect_url) {
+            window.location.href = data.redirect_url;
+            return;
+          }
+        }
+      } catch {
+        // Network error or SW interference — fall through to direct navigation
+      }
+
+      // Fallback: direct navigation (works once the fixed SW is active)
+      window.location.href = loginUrl;
     },
     async logout(redirectUrl) {
       currentToken = null;
