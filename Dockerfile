@@ -8,7 +8,7 @@ WORKDIR /app
 
 # Install dependencies first (layer caching — only re-runs when lockfile changes)
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --loglevel=error
 
 # Copy source and build the frontend
 COPY . .
@@ -21,7 +21,7 @@ WORKDIR /app
 
 # Copy package files and install production deps only
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev --loglevel=error
 
 # Copy built frontend from build stage
 COPY --from=build /app/dist ./dist
