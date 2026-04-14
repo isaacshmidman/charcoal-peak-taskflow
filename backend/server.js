@@ -101,12 +101,22 @@ function resolveStaticFile(requestPathname) {
   return null;
 }
 
+function getCacheControl(filePath) {
+  const base = filePath.split("/").pop() || "";
+  // Service worker and HTML must never be cached — browsers need fresh copies
+  // to detect SW updates and pick up new app versions.
+  if (base === "sw.js" || base === "registerSW.js" || base.endsWith(".html")) {
+    return "no-store";
+  }
+  return "public, max-age=31536000, immutable";
+}
+
 function serveStaticFile(response, filePath) {
   const extension = extname(filePath);
   const contentType = CONTENT_TYPES[extension] || "application/octet-stream";
   response.writeHead(200, {
     "Content-Type": contentType,
-    "Cache-Control": extension === ".html" ? "no-store" : "public, max-age=31536000, immutable",
+    "Cache-Control": getCacheControl(filePath),
   });
   createReadStream(filePath).pipe(response);
 }
