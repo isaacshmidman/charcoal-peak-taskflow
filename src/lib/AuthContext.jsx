@@ -70,11 +70,12 @@ export const AuthProvider = ({ children }) => {
     setAuthError(null);
 
     try {
-      const publicSettings = await apiClient.getPublicSettings();
-      setAppPublicSettings(publicSettings);
-
       syncStoredToken();
-      const { currentUser, errorType } = await checkUserAuth({ manageLoading: false });
+      const [publicSettings, { currentUser, errorType }] = await Promise.all([
+        apiClient.getPublicSettings(),
+        checkUserAuth({ manageLoading: false }),
+      ]);
+      setAppPublicSettings(publicSettings);
       if (!currentUser && errorType === "offline") {
         const cachedSession = getStoredLocalSession();
         if (cachedSession) {
