@@ -12,7 +12,7 @@ RUN npm ci --loglevel=error
 
 # Copy source and build the frontend
 COPY . .
-RUN npm run build
+RUN rm -rf dist && npm run build
 
 # ── Production stage ─────────────────────────────────────────
 FROM node:22.14.0-slim
