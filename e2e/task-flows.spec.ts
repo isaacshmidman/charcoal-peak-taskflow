@@ -343,7 +343,7 @@ test("offline task creation is replayed and survives a reload when connectivity 
   });
 
   await page.goto("/Today");
-  await expect(page.getByText("Nothing due today")).toBeVisible();
+  await expect(page.getByText("Clear skies. Add something when you're ready.")).toBeVisible();
 
   await context.setOffline(true);
 
