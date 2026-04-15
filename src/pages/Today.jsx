@@ -195,8 +195,11 @@ export default function Today() {
         </div>
       ) : todayAndPast.length === 0 ? (
         <div className="py-14 text-center">
-          <p className="text-xs text-slate-400">Nothing due today — enjoy the breathing room! 🌿</p>
-          <p className="text-xs text-slate-400 mt-1">Tap "New Task" to add something.</p>
+          {tasks.some((t) => !t.parent_id && t.status !== "done") ? (
+            <p className="text-xs text-slate-400">Everything's in flow. Enjoy the stillness.</p>
+          ) : (
+            <p className="text-xs text-slate-400">Clear skies. Add something when you're ready.</p>
+          )}
         </div>
       ) : (
         <div className="space-y-2">

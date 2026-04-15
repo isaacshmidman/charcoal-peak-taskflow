@@ -168,6 +168,30 @@ Useful commands:
 
 Imported SQLite data lives in `backend/data/` and is ignored by git so your local data stays local.
 
+## Offline Mode
+
+Taskflow is designed to stay useful when the network drops. Everything the user touches regularly keeps working offline; only things that require a round-trip to a remote server are disabled.
+
+**Works offline:**
+
+- Creating, editing, completing, and deleting tasks and subtasks
+- Reordering subtasks and skipping/completing recurring tasks
+- Soft-deleting into Recently Deleted and restoring from it
+- Priority CRUD (create/rename/reorder/delete) from the Settings page
+- SavedTag CRUD from the Settings page
+- Reading any previously-fetched data — task lists, priorities, tags, recently-deleted history
+- Navigating between pages — the service worker serves the cached `index.html` shell
+
+**How it works (one-line version):** every mutation goes through `useOfflineMutation` (tasks), `useDeletedTasks` (deleted tasks), or the Settings queues (priorities/tags). Each hook applies the change optimistically to the React Query cache, persists the cache to `localStorage`, and — if the network call fails or the browser is offline — pushes a replay record onto a per-entity queue. `useOfflineData` mounts once at the app root and drains those queues when any of the following fire: the `online` event, the `focus` event, `visibilitychange → visible`, or the initial mount if `navigator.onLine` is already true. ID remapping handles optimistic `offline_*` IDs so parent/subtask references resolve correctly after replay.
+
+**Does NOT work offline (by design):**
+
+- **Sign-in / Google OAuth** — requires a live round-trip. If the session cookie is still valid the app loads straight into the cached shell; if it expires while offline, you'll see the login screen until you reconnect.
+- **Conflict resolution across devices** — last write wins. Editing the same task on two offline devices will collapse to whichever mutation replays last.
+- **Fetching data the app has never seen** — the offline cache only contains data you loaded at least once while online.
+
+If you find a user-facing action that isn't in either list, it probably isn't wired through the offline queue yet — please file an issue.
+
 ## Production Deployment (Self-Hosted)
 
 Taskflow is designed to run as a single Docker container serving both the built frontend and the API on the same origin. The included `Dockerfile` and `docker-compose.yml` target a ZimaOS NAS with Cloudflare Tunnel for secure public access.

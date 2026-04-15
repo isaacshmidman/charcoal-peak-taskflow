@@ -200,7 +200,11 @@ export default function Active() {
         </div>
       ) : activeTasks.length === 0 ? (
         <div className="py-14 text-center">
-          <p className="text-xs text-slate-400">You're all caught up! ✨ Tap "New Task" to add something.</p>
+          {topLevelTasks.length === 0 ? (
+            <p className="text-xs text-slate-400">Clear skies. Add something when you're ready.</p>
+          ) : (
+            <p className="text-xs text-slate-400">Everything's in flow. Enjoy the stillness.</p>
+          )}
         </div>
       ) : (
         <div className="space-y-2">

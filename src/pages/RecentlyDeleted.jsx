@@ -294,7 +294,7 @@ export default function RecentlyDeleted({ onBack } = {}) {
 
       {displayedTasks.length === 0 ? (
         <div className="py-14 text-center">
-          <p className="text-xs text-slate-400">No recently deleted tasks</p>
+          <p className="text-xs text-slate-400">No recently deleted tasks.</p>
         </div>
       ) : (
         <div className="space-y-2">

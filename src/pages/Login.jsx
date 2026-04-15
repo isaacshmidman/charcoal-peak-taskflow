@@ -95,11 +95,11 @@ export default function Login() {
           <Lock className="w-5 h-5" />
         </div>
 
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Welcome back to Taskflow</h1>
-        <p className="mt-2 text-sm leading-6 text-slate-500">
-          {emailPasswordEnabled
-            ? "Enter any email and password below, or keep using Google."
-            : "Sign in with your Google account to continue."}
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 leading-snug">
+          Your work doesn't stop when you close the app. Neither do we.
+        </h1>
+        <p className="mt-3 text-sm leading-6 text-slate-500">
+          Sign in to pick up where you left off.
         </p>
 
         {emailPasswordEnabled ? (
