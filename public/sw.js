@@ -1,4 +1,4 @@
-const CACHE_NAME = 'taskflow-v3';
+const CACHE_NAME = 'taskflow-v4';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -55,28 +55,67 @@ if (isLocalhost) {
       return;
     }
 
-    // For navigation requests (HTML pages), serve index.html from cache (SPA fallback)
+    // For navigation requests (HTML pages): network-first, cache as offline fallback.
+    // Cache-first for HTML causes stale JS bundle references after deploys — the
+    // cached index.html points at bundle hashes that no longer exist, and the app
+    // never hydrates. By always trying the network first we pick up fresh deploys
+    // immediately; the cached copy is only served when offline.
     if (request.mode === 'navigate') {
       event.respondWith(
-        caches.match('/index.html').then((cached) => {
-          return cached || fetch(request);
+        (async () => {
+          try {
+            const response = await fetch(request);
+            if (response.ok) {
+              const clone = response.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', clone));
+            }
+            return response;
+          } catch {
+            const cached = await caches.match('/index.html');
+            return cached || new Response('Offline', { status: 503, statusText: 'Offline' });
+          }
+        })()
+      );
+      return;
+    }
+
+    // For hashed build assets (e.g. /assets/index-ABCD1234.js) — cache-first since
+    // the hash in the filename guarantees the content never changes.
+    // For other same-origin assets — network-first with cache fallback, so
+    // unhashed resources (like icons or manifest.json) pick up updates.
+    const isHashedBuildAsset = /\/assets\/.+-[A-Za-z0-9]{8,}\.(?:js|css|woff2?|ttf|otf|png|jpg|jpeg|svg|webp|gif)$/.test(url.pathname);
+
+    if (isHashedBuildAsset) {
+      event.respondWith(
+        caches.match(request).then((cached) => {
+          if (cached) return cached;
+          return fetch(request).then((response) => {
+            if (response.ok) {
+              const clone = response.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+            }
+            return response;
+          });
         })
       );
       return;
     }
 
-    // For same-origin assets: cache-first, then network
     event.respondWith(
-      caches.match(request).then((cached) => {
-        if (cached) return cached;
-        return fetch(request).then((response) => {
+      (async () => {
+        try {
+          const response = await fetch(request);
           if (response.ok) {
             const clone = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
           }
           return response;
-        });
-      })
+        } catch {
+          const cached = await caches.match(request);
+          if (cached) return cached;
+          throw new Error('Network unavailable and no cache entry');
+        }
+      })()
     );
   });
 }
