@@ -140,7 +140,7 @@ export function createTaskflowServer(config = backendConfig) {
     start() {
       return new Promise((resolve) => {
         server.listen(config.port, config.host, () => {
-          console.log(`Taskflow backend listening on http://${config.host}:${config.port}`);
+          console.log(`Zephyrly backend listening on http://${config.host}:${config.port}`);
           resolve(server);
         });
       });

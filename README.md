@@ -1,6 +1,6 @@
-# Charcoal Peak Taskflow
+# Zephyrly
 
-Taskflow is a task manager with offline-aware task mutations, recurring reminders, recently deleted recovery, customizable navigation/priorities, and a local first-party backend that no longer depends on Base44 infrastructure.
+Zephyrly (internal repo name: `charcoal-peak-taskflow`) is a calm task manager with offline-aware task mutations, recurring reminders, recently deleted recovery, customizable navigation/priorities, and a local first-party backend that no longer depends on Base44 infrastructure.
 
 ## Requirements
 
@@ -170,7 +170,7 @@ Imported SQLite data lives in `backend/data/` and is ignored by git so your loca
 
 ## Offline Mode
 
-Taskflow is designed to stay useful when the network drops. Everything the user touches regularly keeps working offline; only things that require a round-trip to a remote server are disabled.
+Zephyrly is designed to stay useful when the network drops. Everything the user touches regularly keeps working offline; only things that require a round-trip to a remote server are disabled.
 
 **Works offline:**
 
@@ -194,7 +194,7 @@ If you find a user-facing action that isn't in either list, it probably isn't wi
 
 ## Production Deployment (Self-Hosted)
 
-Taskflow is designed to run as a single Docker container serving both the built frontend and the API on the same origin. The included `Dockerfile` and `docker-compose.yml` target a ZimaOS NAS with Cloudflare Tunnel for secure public access.
+Zephyrly is designed to run as a single Docker container serving both the built frontend and the API on the same origin. The included `Dockerfile` and `docker-compose.yml` target a ZimaOS NAS with Cloudflare Tunnel for secure public access.
 
 ### Prerequisites
 

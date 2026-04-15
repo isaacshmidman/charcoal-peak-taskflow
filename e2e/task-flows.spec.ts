@@ -62,7 +62,7 @@ test("delete this reminder only skips to the next recurring instance", async ({ 
   await expect(card).toBeVisible();
 
   await swipeTaskCard(page, card);
-  await expect(page.getByText("Delete Recurring Task")).toBeVisible();
+  await expect(page.getByText("Delete recurring task")).toBeVisible();
   await page.getByTestId("recurring-delete-this").click();
 
   await expect(card).toHaveCount(0);
@@ -121,9 +121,9 @@ test("delete dialogs close when clicking outside without deleting anything", asy
 
   await page.goto("/Today");
   await swipeTaskCard(page, taskCardByTitle(page, "Series task"));
-  await expect(page.getByText("Delete Recurring Task")).toBeVisible();
+  await expect(page.getByText("Delete recurring task")).toBeVisible();
   await page.mouse.click(10, 10);
-  await expect(page.getByText("Delete Recurring Task")).toHaveCount(0);
+  await expect(page.getByText("Delete recurring task")).toHaveCount(0);
   await expect(taskCardByTitle(page, "Series task")).toBeVisible();
 
   await page.goto("/Completed");
@@ -261,9 +261,9 @@ test("groupings uses the recurring delete confirmation before removing a recurri
   await page.getByText("Series task").click();
   await page.getByTestId("task-form-delete").click();
 
-  await expect(page.getByText("Delete Recurring Task")).toBeVisible();
+  await expect(page.getByText("Delete recurring task")).toBeVisible();
   await page.getByTestId("recurring-delete-all").click();
-  await expect(page.getByText("Delete Recurring Task")).toHaveCount(0);
+  await expect(page.getByText("Delete recurring task")).toHaveCount(0);
 
   const state = await api.getState();
   expect(state.tasks).toHaveLength(0);

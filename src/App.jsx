@@ -55,7 +55,7 @@ const AuthenticatedApp = () => {
       return (
         <div className="fixed inset-0 flex items-center justify-center px-4">
           <div className="max-w-sm w-full bg-white border border-slate-200 rounded-2xl p-6 text-center shadow-sm">
-            <h1 className="text-base font-semibold text-slate-900">Couldn&apos;t load Taskflow</h1>
+            <h1 className="text-base font-semibold text-slate-900">Couldn&apos;t load Zephyrly</h1>
             <p className="text-sm text-slate-500 mt-2">{authError.message || "Something went wrong while loading the app."}</p>
             <button
               onClick={() => checkAppState()}

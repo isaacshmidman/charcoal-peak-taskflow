@@ -65,7 +65,7 @@ export const backendConfig = {
   host,
   port,
   appId,
-  appName: process.env.TASKFLOW_APP_NAME || "Charcoal Peak Taskflow",
+  appName: process.env.TASKFLOW_APP_NAME || "Zephyrly",
   publicAppUrl:
     process.env.TASKFLOW_PUBLIC_APP_URL ||
     "http://127.0.0.1:5173",

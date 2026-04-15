@@ -68,7 +68,7 @@ export default function AuthCallback() {
         </div>
         <h1 className="mt-5 text-xl font-semibold text-slate-900">Finishing sign-in</h1>
         <p className="mt-2 text-sm text-slate-500">
-          We&apos;re connecting your Google session and bringing you back into Taskflow.
+          We&apos;re connecting your Google session and bringing you back into Zephyrly.
         </p>
       </div>
     </div>

@@ -58,8 +58,8 @@ export default function Layout() {
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-100">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <Link to={defaultNav} className="flex items-center gap-2.5">
-            <img src="/taskflow-logo.png" alt="Taskflow" className="w-7 h-7 rounded-lg object-cover" />
-            <span className="text-sm font-semibold text-slate-900">Taskflow</span>
+            <img src="/taskflow-logo.png" alt="Zephyrly" className="w-7 h-7 rounded-lg object-cover" />
+            <span className="text-sm font-semibold text-slate-900">Zephyrly</span>
           </Link>
 
           <nav className="hidden sm:flex items-center gap-0.5">
