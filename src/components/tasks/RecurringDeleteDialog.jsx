@@ -1,4 +1,3 @@
-import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -23,38 +22,37 @@ import {
 export default function RecurringDeleteDialog({ open, onOpenChange, task, onDeleteThis, onDeleteAll }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Delete Recurring Task</DialogTitle>
+          <DialogTitle>Delete recurring task</DialogTitle>
           <DialogDescription className="sr-only">
             Choose whether to delete only this occurrence of {task?.title || "this recurring task"} or all future occurrences.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-          <Button
+        <div className="flex flex-col gap-3 pt-2">
+          <button
             type="button"
-            variant="outline"
-            className="w-full h-auto py-2 text-center whitespace-normal"
-            onClick={() => onOpenChange(false)}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            className="w-full h-auto py-2 text-center whitespace-normal bg-orange-500 hover:bg-orange-600 text-white"
             data-testid="recurring-delete-this"
             onClick={() => { onDeleteThis(); onOpenChange(false); }}
+            className="w-full h-12 rounded-xl bg-orange-400 hover:bg-orange-500 text-white text-sm font-medium shadow-sm transition-colors"
           >
-            Delete This Task Only
-          </Button>
-          <Button
+            Delete this task only
+          </button>
+          <button
             type="button"
-            className="w-full h-auto py-2 text-center whitespace-normal bg-red-600 hover:bg-red-700 text-white"
             data-testid="recurring-delete-all"
             onClick={() => { onDeleteAll(); onOpenChange(false); }}
+            className="w-full h-12 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-medium shadow-sm transition-colors"
           >
-            Delete All Future Tasks
-          </Button>
+            Delete this and all future tasks
+          </button>
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            className="w-full h-12 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium shadow-sm transition-colors"
+          >
+            Cancel
+          </button>
         </div>
       </DialogContent>
     </Dialog>

@@ -119,10 +119,10 @@ const ENTITY_DEFINITIONS = {
 };
 
 const DEFAULT_PRIORITIES = [
-  { name: "Low", color: "green", order: 0 },
-  { name: "Normal", color: "blue", order: 1 },
-  { name: "High", color: "orange", order: 2 },
-  { name: "Urgent", color: "red", order: 3 },
+  { name: "Urgent", color: "red", order: 0 },
+  { name: "High", color: "orange", order: 1 },
+  { name: "Normal", color: "blue", order: 2 },
+  { name: "Low", color: "green", order: 3 },
 ];
 
 function toIsoString(value, fallback = "") {

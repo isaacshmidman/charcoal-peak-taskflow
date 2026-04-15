@@ -146,7 +146,12 @@ describe("taskflow backend contract", () => {
 
     expect(prioritiesResult.statusCode).toBe(200);
     expect(prioritiesResult.body).toHaveLength(4);
-    expect(prioritiesResult.body[0].name).toBe("Low");
+    expect(prioritiesResult.body.map((p) => p.name)).toEqual([
+      "Urgent",
+      "High",
+      "Normal",
+      "Low",
+    ]);
 
     const logoutResult = await invoke("/api/apps/auth/logout", {
       headers: {

@@ -250,8 +250,9 @@ export default function TaskCard({
         )}
         style={swiping ? { transform: `translateX(${swipeX}px)`, transition: "none" } : { transform: "translateX(0)", transition: "transform 0.2s ease" }}
       >
-        {/* Overdue left bar */}
-        {isOverdue && <div className="w-1 shrink-0 bg-red-400 rounded-l-xl" />}
+        {/* Overdue left bar — always reserve 4px so non-overdue and overdue rows align */}
+        <div className={cn("w-1 shrink-0 rounded-l-xl", isOverdue ? "bg-red-400" : "bg-transparent")} />
+
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 px-3 py-2.5">

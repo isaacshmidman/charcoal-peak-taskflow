@@ -17,6 +17,7 @@ import { Calendar as CalendarIcon, X, Plus, Trash2, CheckSquare } from "lucide-r
 
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useOutsideClick } from "@/hooks/useOutsideClick";
 
 const toDateStr = (date) => format(date, "yyyy-MM-dd");
 const fromDateStr = (str) => new Date(str + "T00:00:00");
@@ -527,6 +528,9 @@ function TimeInput({ value, onChange }) {
   const [open, setOpen] = useState(false);
   const listRef = useRef(null);
   const selectedRef = useRef(null);
+  const containerRef = useRef(null);
+
+  useOutsideClick(containerRef, () => setOpen(false), open);
 
   useEffect(() => {
     if (open && selectedRef.current) {
@@ -535,7 +539,7 @@ function TimeInput({ value, onChange }) {
   }, [open]);
 
   return (
-    <div className="relative w-36">
+    <div ref={containerRef} className="relative w-36">
       <button
         type="button"
         onClick={() => setOpen(!open)}

@@ -228,11 +228,15 @@ export default function Groupings() {
     centerToday();
   }, []);
 
-  // Re-center once tasks have loaded and columns are rendered
+  // Re-center once tasks have loaded and columns are rendered — runs exactly
+  // once on the first non-empty load so completing a task later doesn't reset
+  // the user's scroll position.
+  const hasCenteredOnLoadRef = useRef(false);
   useEffect(() => {
-    if (tasks.length > 0) {
-      requestAnimationFrame(centerToday);
-    }
+    if (hasCenteredOnLoadRef.current) return;
+    if (tasks.length === 0) return;
+    hasCenteredOnLoadRef.current = true;
+    requestAnimationFrame(centerToday);
   }, [tasks.length]);
 
   const columns = [

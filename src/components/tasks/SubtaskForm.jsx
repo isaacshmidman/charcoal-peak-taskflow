@@ -10,6 +10,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarIcon, Trash2 } from "lucide-react";
 import { format } from "date-fns";
+import { useOutsideClick } from "@/hooks/useOutsideClick";
 
 /**
  * @typedef {import("@/types/tasks").TaskCreateInput} TaskCreateInput
@@ -175,6 +176,9 @@ const TIME_SLOTS = generateTimeSlots();
 function TimeInput({ value, onChange }) {
   const [open, setOpen] = useState(false);
   const selectedRef = useRef(/** @type {HTMLButtonElement | null} */ (null));
+  const containerRef = useRef(/** @type {HTMLDivElement | null} */ (null));
+
+  useOutsideClick(containerRef, () => setOpen(false), open);
 
   useEffect(() => {
     if (open && selectedRef.current) {
@@ -183,7 +187,7 @@ function TimeInput({ value, onChange }) {
   }, [open]);
 
   return (
-    <div className="relative w-36">
+    <div ref={containerRef} className="relative w-36">
       <button
         type="button"
         onClick={() => setOpen(!open)}
