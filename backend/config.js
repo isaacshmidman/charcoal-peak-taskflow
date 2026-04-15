@@ -77,7 +77,7 @@ export const backendConfig = {
     process.env.TASKFLOW_DELETED_TASK_RETENTION_DAYS,
     7
   ),
-  allowAnyPassword: parseBoolean(process.env.TASKFLOW_ALLOW_ANY_PASSWORD, true),
+  allowAnyPassword: parseBoolean(process.env.TASKFLOW_ALLOW_ANY_PASSWORD, false),
   googleClientId,
   googleClientSecret,
   googleMode:

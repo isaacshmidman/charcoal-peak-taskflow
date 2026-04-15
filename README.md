@@ -119,6 +119,8 @@ Backend:
 ```bash
 TASKFLOW_BACKEND_PORT=8787
 TASKFLOW_APP_ID=your_app_id
+# DEV ONLY — accepts any password, auto-creates users on login.
+# Leave unset or set to false in production.
 TASKFLOW_ALLOW_ANY_PASSWORD=true
 ```
 
