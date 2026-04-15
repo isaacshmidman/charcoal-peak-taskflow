@@ -36,6 +36,7 @@ export default function Login() {
 
   const hasSession = Boolean(isAuthenticated);
   const googleEnabled = !isOffline && appPublicSettings?.auth_providers?.google === true;
+  const emailPasswordEnabled = appPublicSettings?.auth_providers?.email_password === true;
 
   const nextUrl = useMemo(() => {
     const params = new URLSearchParams(location.search);
@@ -96,64 +97,72 @@ export default function Login() {
 
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Welcome back to Taskflow</h1>
         <p className="mt-2 text-sm leading-6 text-slate-500">
-          Enter any email and password below, or keep using Google.
+          {emailPasswordEnabled
+            ? "Enter any email and password below, or keep using Google."
+            : "Sign in with your Google account to continue."}
         </p>
 
-        <form className="mt-6 space-y-3" onSubmit={handleEmailPasswordSignIn}>
-          <label className="block">
-            <span className="text-xs font-medium text-slate-500">Email</span>
-            <div className="mt-1 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 h-12">
-              <Mail className="w-4 h-4 text-slate-400 shrink-0" />
-              <input
-                data-testid="login-email"
-                type="text"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="Enter any email"
-                className="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
-                autoComplete="username"
-              />
+        {emailPasswordEnabled ? (
+          <>
+            <form className="mt-6 space-y-3" onSubmit={handleEmailPasswordSignIn}>
+              <label className="block">
+                <span className="text-xs font-medium text-slate-500">Email</span>
+                <div className="mt-1 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 h-12">
+                  <Mail className="w-4 h-4 text-slate-400 shrink-0" />
+                  <input
+                    data-testid="login-email"
+                    type="text"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    placeholder="Enter any email"
+                    className="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
+                    autoComplete="username"
+                  />
+                </div>
+              </label>
+
+              <label className="block">
+                <span className="text-xs font-medium text-slate-500">Password</span>
+                <div className="mt-1 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 h-12">
+                  <KeyRound className="w-4 h-4 text-slate-400 shrink-0" />
+                  <input
+                    data-testid="login-password"
+                    type="password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    placeholder="Enter any password"
+                    className="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
+                    autoComplete="current-password"
+                  />
+                </div>
+              </label>
+
+              {loginError ? <p className="text-sm text-red-600">{loginError}</p> : null}
+
+              <button
+                type="submit"
+                data-testid="login-submit"
+                disabled={isLoadingAuth}
+                className="w-full h-12 rounded-2xl bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isLoadingAuth ? "Signing in..." : "Sign In"}
+              </button>
+            </form>
+
+            <div className="mt-5 flex items-center gap-3 text-xs text-slate-400">
+              <div className="h-px flex-1 bg-slate-200" />
+              <span>or</span>
+              <div className="h-px flex-1 bg-slate-200" />
             </div>
-          </label>
-
-          <label className="block">
-            <span className="text-xs font-medium text-slate-500">Password</span>
-            <div className="mt-1 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 h-12">
-              <KeyRound className="w-4 h-4 text-slate-400 shrink-0" />
-              <input
-                data-testid="login-password"
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="Enter any password"
-                className="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
-                autoComplete="current-password"
-              />
-            </div>
-          </label>
-
-          {loginError ? <p className="text-sm text-red-600">{loginError}</p> : null}
-
-          <button
-            type="submit"
-            data-testid="login-submit"
-            disabled={isLoadingAuth}
-            className="w-full h-12 rounded-2xl bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {isLoadingAuth ? "Signing in..." : "Sign In"}
-          </button>
-        </form>
-
-        <div className="mt-5 flex items-center gap-3 text-xs text-slate-400">
-          <div className="h-px flex-1 bg-slate-200" />
-          <span>or</span>
-          <div className="h-px flex-1 bg-slate-200" />
-        </div>
+          </>
+        ) : (
+          loginError ? <p className="mt-6 text-sm text-red-600">{loginError}</p> : null
+        )}
 
         <button
           onClick={handleGoogleSignIn}
           disabled={!googleEnabled}
-          className="mt-5 w-full h-12 rounded-2xl border border-slate-200 bg-white text-slate-900 text-sm font-medium hover:bg-slate-50 inline-flex items-center justify-center gap-3 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          className={`${emailPasswordEnabled ? "mt-5" : "mt-6"} w-full h-12 rounded-2xl border border-slate-200 bg-white text-slate-900 text-sm font-medium hover:bg-slate-50 inline-flex items-center justify-center gap-3 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed`}
         >
           <svg viewBox="0 0 24 24" className="w-5 h-5" aria-hidden="true">
             <path fill="#EA4335" d="M12 10.2v3.9h5.4c-.2 1.3-1.7 3.9-5.4 3.9-3.2 0-5.8-2.7-5.8-6s2.6-6 5.8-6c1.8 0 3 .8 3.7 1.5l2.5-2.4C16.6 3.6 14.5 2.7 12 2.7 6.9 2.7 2.8 6.9 2.8 12s4.1 9.3 9.2 9.3c5.3 0 8.8-3.7 8.8-8.9 0-.6-.1-1-.1-1.4H12Z" />
@@ -169,8 +178,12 @@ export default function Login() {
             {googleEnabled
               ? "Google sign-in will bring you right back to this app automatically."
               : isOffline
-                ? "Google sign-in needs an internet connection. Email and password login still works offline."
-                : "Google sign-in is currently disabled on this backend. Email and password login still works."}
+                ? emailPasswordEnabled
+                  ? "Google sign-in needs an internet connection. Email and password login still works offline."
+                  : "Google sign-in needs an internet connection. Reconnect to sign in."
+                : emailPasswordEnabled
+                  ? "Google sign-in is currently disabled on this backend. Email and password login still works."
+                  : "Google sign-in is currently disabled on this backend. Contact the administrator for access."}
           </p>
           <p className="mt-2 text-[11px] text-slate-400 break-all">
             Return target: {nextUrl}

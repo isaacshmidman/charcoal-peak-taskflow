@@ -63,7 +63,11 @@ function getPublicSettings(config) {
     app_id: config.appId,
     name: config.appName,
     auth_providers: {
-      email_password: true,
+      // Email/password login is only meaningful when open-access mode is on,
+      // since there is no real signup flow — accounts are auto-created on login.
+      // When allowAnyPassword is false, the frontend hides the form and the
+      // backend rejects attempts (no user has a password_hash set).
+      email_password: config.allowAnyPassword === true,
       google: config.googleMode === "oauth",
     },
     deleted_task_retention_days: config.deletedTaskRetentionDays,
