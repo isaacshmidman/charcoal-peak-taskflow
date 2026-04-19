@@ -135,9 +135,9 @@ test("delete dialogs close when clicking outside without deleting anything", asy
 
   await page.goto("/RecentlyDeleted");
   await page.getByTitle("Empty recently deleted").click();
-  await expect(page.getByText("Empty Recently Deleted?")).toBeVisible();
+  await expect(page.getByText("Permanently Delete all Recently Deleted tasks?")).toBeVisible();
   await page.mouse.click(10, 10);
-  await expect(page.getByText("Empty Recently Deleted?")).toHaveCount(0);
+  await expect(page.getByText("Permanently Delete all Recently Deleted tasks?")).toHaveCount(0);
 
   const state = await api.getState();
   expect(state.tasks.find((task) => task.id === "series-1")).toBeTruthy();
