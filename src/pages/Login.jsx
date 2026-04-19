@@ -91,6 +91,16 @@ export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-md rounded-[28px] border border-slate-200/80 bg-white/95 backdrop-blur p-8 shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
+        <div className="flex items-center gap-2.5 mb-6">
+          <img
+            src="/zephyrly-logo.png"
+            alt="Zephyrly"
+            className="w-10 h-10 rounded-xl object-cover"
+          />
+          <span className="text-2xl font-semibold tracking-tight text-slate-900">
+            Zephyrly
+          </span>
+        </div>
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900 leading-snug">
           Your work doesn't stop when you close the app. Neither do we.
         </h1>
