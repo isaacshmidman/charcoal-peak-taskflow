@@ -56,6 +56,7 @@ const ENTITY_DEFINITIONS = {
     defaults: {
       description: "",
       priority_id: "",
+      priority_color: "",
       status: "todo",
       task_type: "one_time",
       recurrence: "none",
@@ -75,6 +76,7 @@ const ENTITY_DEFINITIONS = {
       "title",
       "description",
       "priority_id",
+      "priority_color",
       "status",
       "task_type",
       "recurrence",

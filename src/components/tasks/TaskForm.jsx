@@ -18,6 +18,7 @@ import { Calendar as CalendarIcon, X, Plus, Trash2, CheckSquare } from "lucide-r
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useOutsideClick } from "@/hooks/useOutsideClick";
+import { getNextRecurrenceDate } from "@/lib/recurrence";
 
 const toDateStr = (date) => format(date, "yyyy-MM-dd");
 const fromDateStr = (str) => new Date(str + "T00:00:00");
@@ -53,6 +54,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
   const [tagInputFocused, setTagInputFocused] = useState(false);
   const [showEndDate, setShowEndDate] = useState(false);
   const [subtaskInput, setSubtaskInput] = useState("");
+  const [dayError, setDayError] = useState(false);
   const queryClient = useQueryClient();
 
   // Priorities — sorted by order so dropdown always reflects latest order from Settings
@@ -108,12 +110,21 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
     }
     setTagInput("");
     setSubtaskInput("");
+    setDayError(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task, open, prioritiesKey]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!form.title.trim()) return;
+    if (
+      form.task_type === "recurring" &&
+      form.recurrence === "custom_days" &&
+      (form.recurrence_days || []).length === 0
+    ) {
+      setDayError(true);
+      return;
+    }
     const data = { ...form };
     if (parentId && !task) data.parent_id = parentId;
     if (data.task_type !== "recurring") { data.recurrence = "none"; data.recurrence_days = []; data.recurrence_end_date = ""; }
@@ -141,6 +152,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
     const days = form.recurrence_days || [];
     const updated = days.includes(day) ? days.filter(d => d !== day) : [...days, day];
     setForm({ ...form, recurrence_days: updated.sort((a, b) => a - b) });
+    setDayError(false);
   };
 
   const addTag = (tagName) => {
@@ -232,14 +244,20 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
               <div className="space-y-3">
                 <div>
                   <Label className="text-xs font-semibold text-slate-900 mb-1.5 block">Repeats</Label>
-                  <Select value={form.recurrence} onValueChange={(v) => setForm({ ...form, recurrence: v })}>
+                  <Select
+                    value={form.recurrence}
+                    onValueChange={(v) => {
+                      setForm({ ...form, recurrence: v });
+                      if (v !== "custom_days") setDayError(false);
+                    }}
+                  >
                     <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="daily">Daily</SelectItem>
                       <SelectItem value="weekdays">Weekdays (Mon–Fri)</SelectItem>
                       <SelectItem value="custom_days">Custom days of week</SelectItem>
                       <SelectItem value="weekly">Weekly</SelectItem>
-                      <SelectItem value="biweekly">Every 2 weeks</SelectItem>
+                      <SelectItem value="biweekly">Biweekly</SelectItem>
                       <SelectItem value="monthly">Monthly</SelectItem>
                       <SelectItem value="quarterly">Quarterly</SelectItem>
                       <SelectItem value="yearly">Yearly</SelectItem>
@@ -260,8 +278,11 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                             onClick={() => toggleRecurrenceDay(day.value)}
                             title={day.fullLabel}
                             className={cn(
-                              "w-9 h-9 rounded-full text-xs font-semibold transition-all",
-                              selected ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                              "w-9 h-9 rounded-full text-xs font-semibold transition-all border-2",
+                              selected
+                                ? "bg-slate-900 text-white border-slate-900"
+                                : "bg-slate-100 text-slate-500 hover:bg-slate-200 border-transparent",
+                              dayError && "border-red-500"
                             )}
                           >
                             {day.label}
@@ -278,8 +299,23 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                     <Select
                       value={showEndDate ? "until" : "indefinite"}
                       onValueChange={(v) => {
-                        if (v === "indefinite") { setShowEndDate(false); setForm({ ...form, recurrence_end_date: "" }); }
-                        else { setShowEndDate(true); }
+                        if (v === "indefinite") {
+                          setShowEndDate(false);
+                          setForm({ ...form, recurrence_end_date: "" });
+                        } else {
+                          setShowEndDate(true);
+                          // Default end date to the next occurrence — user can override via the picker.
+                          if (!form.recurrence_end_date) {
+                            const next = getNextRecurrenceDate({
+                              due_date: form.due_date,
+                              recurrence: form.recurrence,
+                              recurrence_days: form.recurrence_days,
+                            });
+                            if (next) {
+                              setForm((f) => ({ ...f, recurrence_end_date: toDateStr(next) }));
+                            }
+                          }
+                        }
                       }}
                     >
                       <SelectTrigger className={cn("h-9", showEndDate ? "flex-1" : "w-full")}><SelectValue /></SelectTrigger>
@@ -394,7 +430,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                     </div>
                   )}
                 </div>
-                <Button type="button" variant="outline" size="sm" onClick={() => addTag()} className="h-9 px-3">
+                <Button type="button" size="sm" onClick={() => addTag()} className="h-9 px-3 bg-slate-900 hover:bg-slate-800 text-white">
                   <Plus className="w-4 h-4" />
                 </Button>
               </div>
@@ -423,7 +459,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                     onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSubtask(); } }}
                     className=""
                   />
-                  <Button type="button" variant="outline" size="sm" onClick={addSubtask} className="h-9 px-3">
+                  <Button type="button" size="sm" onClick={addSubtask} className="h-9 px-3 bg-slate-900 hover:bg-slate-800 text-white">
                     <Plus className="w-4 h-4" />
                   </Button>
                 </div>

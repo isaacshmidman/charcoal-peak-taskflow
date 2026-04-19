@@ -446,12 +446,13 @@ export default function TaskCard({
 
 // Shows badge when there's space (xs+), dot on very small screens
 function RecurrenceBadge({ label }) {
-  const isShort = label.length <= 15;
+  // "Sun, Mon, Tue, Wed, Thu, Fri, Sat" is 30 chars — keep the chip visible for full weekly lists.
+  const isShort = label.length <= 32;
   if (isShort) {
     return (
       <>
         <span className="xs:hidden w-2 h-2 rounded-full bg-violet-600 shrink-0 inline-block" title={label} />
-        <span className="hidden xs:inline text-[10px] font-medium text-violet-600 bg-violet-50 border border-violet-200 px-1.5 py-0.5 rounded max-w-[120px] truncate shrink-0">
+        <span className="hidden xs:inline text-[10px] font-medium text-violet-600 bg-violet-50 border border-violet-200 px-1.5 py-0.5 rounded max-w-[240px] truncate shrink-0">
           {label}
         </span>
       </>

@@ -47,6 +47,7 @@ export interface DeletedTaskRecord {
   title: string;
   description?: string;
   priority_id?: string;
+  priority_color?: string;
   status?: TaskStatus;
   task_type?: TaskType;
   recurrence?: RecurrenceType;

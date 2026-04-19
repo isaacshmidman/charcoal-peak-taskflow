@@ -64,11 +64,13 @@ export function useDeletedTasks() {
    *
    * @param {TaskRecord & { id: string }} task
    * @param {(TaskRecord & { id?: string })[]} [subtasks]
+   * @param {{ id: string, color?: string }[]} [priorities] - Live priorities list, used to snapshot the color at delete time.
    */
-  const recordDeletion = async (task, subtasks = []) => {
+  const recordDeletion = async (task, subtasks = [], priorities = []) => {
     const retentionDays = parseInt(localStorage.getItem('deletedTaskRetentionDays') || '7', 10);
     const deletedAt = new Date().toISOString();
     const expiresAt = new Date(Date.now() + retentionDays * 24 * 60 * 60 * 1000).toISOString();
+    const snapshotPriority = priorities.find((p) => p.id === task.priority_id);
 
     /** @type {DeletedTaskRecord} */
     const record = {
@@ -76,6 +78,7 @@ export function useDeletedTasks() {
       title: task.title,
       description: task.description || '',
       priority_id: task.priority_id || '',
+      priority_color: snapshotPriority?.color || '',
       status: task.status || 'todo',
       task_type: task.task_type || 'one_time',
       recurrence: task.recurrence || 'none',

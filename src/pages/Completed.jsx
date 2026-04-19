@@ -14,7 +14,6 @@ import { showDeleteToast } from "@/components/tasks/DeleteToast";
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -176,18 +175,26 @@ export default function Completed() {
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
-              <DialogContent>
+              <DialogContent className="max-w-md">
                 <DialogHeader>
                   <DialogTitle>Delete all completed tasks?</DialogTitle>
                 </DialogHeader>
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setShowDeleteAllDialog(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="button" className="bg-red-600 hover:bg-red-700" onClick={deleteAll}>
+                <div className="flex flex-col gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => { deleteAll(); setShowDeleteAllDialog(false); }}
+                    className="w-full h-12 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-medium shadow-sm transition-colors"
+                  >
                     Delete all
-                  </Button>
-                </DialogFooter>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteAllDialog(false)}
+                    className="w-full h-12 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium shadow-sm transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </DialogContent>
             </Dialog>
           )}

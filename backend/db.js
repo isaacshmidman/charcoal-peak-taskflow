@@ -124,6 +124,7 @@ export function createDatabase(config = backendConfig) {
       title TEXT NOT NULL,
       description TEXT,
       priority_id TEXT,
+      priority_color TEXT NOT NULL DEFAULT '',
       status TEXT NOT NULL DEFAULT 'todo',
       task_type TEXT NOT NULL DEFAULT 'one_time',
       recurrence TEXT NOT NULL DEFAULT 'none',
@@ -159,6 +160,14 @@ export function createDatabase(config = backendConfig) {
   // Migration: add is_completion_record column to existing databases
   try {
     db.exec(`ALTER TABLE deleted_tasks ADD COLUMN is_completion_record INTEGER NOT NULL DEFAULT 0`);
+  } catch {
+    // Column already exists — ignore
+  }
+
+  // Migration: snapshot the priority color onto deleted tasks so the Recently Deleted
+  // card keeps its color even if the priority is later renamed or deleted in Settings.
+  try {
+    db.exec(`ALTER TABLE deleted_tasks ADD COLUMN priority_color TEXT NOT NULL DEFAULT ''`);
   } catch {
     // Column already exists — ignore
   }

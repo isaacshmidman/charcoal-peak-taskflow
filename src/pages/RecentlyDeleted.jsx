@@ -16,7 +16,6 @@ import { useOfflineMutation } from "@/hooks/useOfflineMutation";
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -259,18 +258,26 @@ export default function RecentlyDeleted({ onBack } = {}) {
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
-              <DialogContent>
+              <DialogContent className="max-w-md">
                 <DialogHeader>
-                  <DialogTitle>Empty Recently Deleted?</DialogTitle>
+                  <DialogTitle>Permanently Delete all Recently Deleted tasks?</DialogTitle>
                 </DialogHeader>
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setShowEmptyDialog(false)}>
+                <div className="flex flex-col gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={handleEmptyRecentlyDeleted}
+                    className="w-full h-12 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-medium shadow-sm transition-colors"
+                  >
+                    Delete all
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowEmptyDialog(false)}
+                    className="w-full h-12 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium shadow-sm transition-colors"
+                  >
                     Cancel
-                  </Button>
-                  <Button type="button" className="bg-red-600 hover:bg-red-700" onClick={handleEmptyRecentlyDeleted}>
-                    Empty
-                  </Button>
-                </DialogFooter>
+                  </button>
+                </div>
               </DialogContent>
             </Dialog>
           )}
@@ -317,7 +324,8 @@ export default function RecentlyDeleted({ onBack } = {}) {
 
 function DeletedTaskCard({ record, priorityMap, onRestore, onDelete }) {
   const priority = priorityMap[record.priority_id];
-  const cardBg = priority ? colorBg[priority.color] || colorBg.slate : "bg-white border-slate-100";
+  const colorKey = priority?.color || record.priority_color || "slate";
+  const cardBg = colorBg[colorKey] || colorBg.slate;
   const isDone = record.was_completed;
 
   const deletedDate = record.deleted_at ? format(new Date(record.deleted_at), "MMM d, yyyy") : "";
