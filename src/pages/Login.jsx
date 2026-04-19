@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { KeyRound, Lock, Mail } from "lucide-react";
+import { KeyRound, Mail } from "lucide-react";
 import { apiClient } from "@/api/apiClient";
 import { useAuth } from "@/lib/AuthContext";
 import { sanitizeNavRoute } from "@/lib/navigation";
@@ -89,12 +89,8 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,#f8fafc_0%,#eef2ff_35%,#f8fafc_100%)] flex items-center justify-center px-4">
+    <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-md rounded-[28px] border border-slate-200/80 bg-white/95 backdrop-blur p-8 shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
-        <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center mb-5 shadow-sm">
-          <Lock className="w-5 h-5" />
-        </div>
-
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900 leading-snug">
           Your work doesn't stop when you close the app. Neither do we.
         </h1>

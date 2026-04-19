@@ -67,24 +67,33 @@ function getSavedNavOrder() {
   return DEFAULT_NAV_ORDER;
 }
 
-function PriorityRow({ p, idx, total, onDelete, onUpdate, onMoveUp, onMoveDown }) {
-  const [editing, setEditing] = useState(false);
+function PriorityRow({ p, idx, total, isEditing, onStartEdit, onStopEdit, onDelete, onUpdate, onMoveUp, onMoveDown }) {
   const [editName, setEditName] = useState(p.name);
   const [editColor, setEditColor] = useState(p.color);
 
+  // When this row becomes the active edit target, seed the draft fields from the current priority.
+  // When another row steals the edit, this effect resets its draft back to the saved values so the
+  // next time this row is opened we don't show stale input.
+  useEffect(() => {
+    if (isEditing) {
+      setEditName(p.name);
+      setEditColor(p.color);
+    }
+  }, [isEditing, p.name, p.color]);
+
   const save = () => {
     if (editName.trim()) onUpdate(p.id, { name: editName.trim(), color: editColor });
-    setEditing(false);
+    onStopEdit();
   };
 
-  if (editing) {
+  if (isEditing) {
     return (
       <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2.5">
         <span className={cn("w-3 h-3 rounded-full shrink-0", colorDot[editColor] || colorDot.slate)} />
         <Input
           value={editName}
           onChange={(e) => setEditName(e.target.value)}
-          onKeyDown={(e) => {if (e.key === "Enter") save();if (e.key === "Escape") setEditing(false);}}
+          onKeyDown={(e) => {if (e.key === "Enter") save();if (e.key === "Escape") onStopEdit();}}
           className="h-7 text-sm flex-1 border-0 border-b rounded-none px-0 focus-visible:ring-0"
           autoFocus />
         
@@ -105,7 +114,7 @@ function PriorityRow({ p, idx, total, onDelete, onUpdate, onMoveUp, onMoveDown }
         <Button size="icon" variant="ghost" className="h-7 w-7 text-emerald-600" onClick={save}>
           <Check className="w-3.5 h-3.5" />
         </Button>
-        <Button size="icon" variant="ghost" className="h-7 w-7 text-slate-400" onClick={() => setEditing(false)}>
+        <Button size="icon" variant="ghost" className="h-7 w-7 text-slate-400" onClick={onStopEdit}>
           <X className="w-3.5 h-3.5" />
         </Button>
       </div>);
@@ -115,7 +124,7 @@ function PriorityRow({ p, idx, total, onDelete, onUpdate, onMoveUp, onMoveDown }
   return (
     <div
       className="flex items-center gap-3 bg-white border border-slate-100 rounded-xl px-3 py-2.5 hover:border-slate-200 transition-colors"
-      onDoubleClick={() => {setEditName(p.name);setEditColor(p.color);setEditing(true);}}>
+      onDoubleClick={onStartEdit}>
       
       <div className="flex flex-col gap-0.5">
         <button onClick={onMoveUp} disabled={idx === 0} className="disabled:opacity-20 text-slate-300 hover:text-slate-500 transition-colors">
@@ -140,6 +149,7 @@ export default function Settings() {
   const [newPriorityColor, setNewPriorityColor] = useState("slate");
   const [newTagName, setNewTagName] = useState("");
   const [orderedPriorities, setOrderedPriorities] = useState([]);
+  const [editingPriorityId, setEditingPriorityId] = useState(null);
   const [navOrder, setNavOrder] = useState(getSavedNavOrder);
   const [showRecentlyDeleted, setShowRecentlyDeleted] = useState(false);
   const scrollPosRef = useRef(0);
@@ -423,6 +433,9 @@ export default function Settings() {
             p={p}
             idx={idx}
             total={sorted.length}
+            isEditing={editingPriorityId === p.id}
+            onStartEdit={() => setEditingPriorityId(p.id)}
+            onStopEdit={() => setEditingPriorityId((current) => (current === p.id ? null : current))}
             onDelete={(id) => deletePriorityMutation.mutate(id)}
             onUpdate={(id, data) => updatePriorityMutation.mutate({ id, data })}
             onMoveUp={() => movePriority(idx, -1)}

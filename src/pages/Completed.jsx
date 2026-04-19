@@ -155,7 +155,13 @@ export default function Completed() {
               }}
             />
           )}
-          <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-400 hover:text-slate-700" onClick={() => setShowSearch(!showSearch)}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 text-slate-400 hover:text-slate-700"
+            onMouseDown={(event) => { if (showSearch) event.preventDefault(); }}
+            onClick={() => { if (showSearch) setSearch(""); setShowSearch((v) => !v); }}
+          >
             <Search className="w-4 h-4" />
           </Button>
           <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} />

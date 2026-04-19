@@ -83,7 +83,14 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
+    /* Calm yellow-to-white gradient fixed to the viewport.
+       White at the top, soft amber at the very bottom, transition
+       centred around the 1/3-from-bottom mark (≈67% from top). */
+    background: linear-gradient(to bottom, #ffffff 0%, #ffffff 30%, #fef9c3 100%);
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    min-height: 100vh;
   }
 
   input,
