@@ -131,7 +131,8 @@ export function useOfflineMutation() {
 
     // Snapshot the live priority list at delete time so Recently Deleted keeps the card
     // color even if the priority is later renamed or deleted in Settings.
-    const snapshotPriorities = queryClient.getQueryData(['priorities']) || [];
+    const snapshotPriorities =
+      /** @type {{ id: string, color?: string }[]} */ (queryClient.getQueryData(['priorities']) || []);
 
     const deletedRecordPromises = deletions.map(async (deletion) => {
       if (deletion.task?.id && !deletion.task.parent_id && !skipDeletedRecord) {
