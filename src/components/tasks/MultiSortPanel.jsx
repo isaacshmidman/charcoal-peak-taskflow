@@ -2,184 +2,184 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Sliders, X } from "lucide-react";
+import { Sliders, X, Plus, ChevronRight, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * @typedef {import("@/types/tasks").SortOption} SortOption
+ * @typedef {{ value: string, label: string, scope?: string }} SortOption
  */
 
-/** @type {(SortOption & { group: string })[]} */
-const SORT_OPTIONS = [
-{ value: "date_asc", label: "Date (oldest first)", group: "date" },
-{ value: "date_desc", label: "Date (newest first)", group: "date" },
-{ value: "priority_asc", label: "Priority (high → low)", group: "priority" },
-{ value: "priority_desc", label: "Priority (low → high)", group: "priority" },
-{ value: "tag_az", label: "Tag (A–Z)", group: "tag" },
-{ value: "recurrence", label: "Recurrence type", group: "recurrence" }];
+/** @type {SortOption[]} */
+export const SORT_OPTIONS = [
+  { value: "none", label: "None" },
+  { value: "date_asc", label: "Date: Oldest → Newest" },
+  { value: "date_desc", label: "Date: Newest → Oldest" },
+  { value: "deleted_asc", label: "Deleted: Oldest → Newest", scope: "deleted" },
+  { value: "deleted_desc", label: "Deleted: Newest → Oldest", scope: "deleted" },
+  { value: "completed_first", label: "Completed First" },
+  { value: "uncompleted_first", label: "Uncompleted First" },
+  { value: "priority_asc", label: "Priority: Highest → Lowest" },
+  { value: "priority_desc", label: "Priority: Lowest → Highest" },
+  { value: "tag_az", label: "Tag: A → Z" },
+  { value: "recurrence", label: "Recurrence Type" },
+];
 
+const MAX_SORTS = 5;
+
+function ordinal(n) {
+  const tens = n % 100;
+  if (tens >= 11 && tens <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1: return `${n}st`;
+    case 2: return `${n}nd`;
+    case 3: return `${n}rd`;
+    default: return `${n}th`;
+  }
+}
 
 /**
  * @param {{
  *   sorts: string[],
  *   onSortsChange: (sorts: string[]) => void,
- *   extraOptions?: SortOption[],
+ *   page?: string,
  * }} props
  */
-export default function MultiSortPanel({ sorts, onSortsChange, extraOptions = [] }) {
+export default function MultiSortPanel({ sorts, onSortsChange, page = "default" }) {
   const [open, setOpen] = useState(false);
+  const [expandedIndex, setExpandedIndex] = useState(0);
 
-  const ALL_OPTIONS = [...SORT_OPTIONS, ...extraOptions.map(o => ({ ...o, group: o.group || o.value }))];
+  const availableOptions = SORT_OPTIONS.filter((opt) => !opt.scope || opt.scope === page);
+  const labelFor = (value) =>
+    SORT_OPTIONS.find((o) => o.value === value)?.label || "None";
 
-  // Get the groups already in use
-  const usedGroups = new Set(sorts.map((s) => ALL_OPTIONS.find((o) => o.value === s)?.group).filter(Boolean));
-  const usedValues = new Set(sorts);
-
-  /**
-   * @param {number} index
-   */
-  const getAvailableOptions = (index) => {
-    const otherSorts = sorts.filter((_, i) => i !== index);
-    const otherGroups = new Set(otherSorts.map((s) => ALL_OPTIONS.find((o) => o.value === s)?.group));
-
-    return ALL_OPTIONS.map((opt) => ({
-      ...opt,
-      disabled: otherGroups.has(opt.group)
-    }));
-  };
-
-  /**
-   * @param {number} index
-   * @param {string} value
-   */
-  const handleSetSort = (index, value) => {
-    const newSorts = [...sorts];
-    newSorts[index] = value;
-    onSortsChange(newSorts);
-  };
-
-  const handleAddSort = () => {
-    if (sorts.length < 3) {
-      const nextOption = ALL_OPTIONS.find((opt) => !usedGroups.has(opt.group) && !usedValues.has(opt.value));
-      if (nextOption) {
-        onSortsChange([...sorts, nextOption.value]);
-      }
+  const setSortAt = (index, value) => {
+    const next = [...sorts];
+    next[index] = value;
+    onSortsChange(next);
+    // Collapse this row; auto-advance to next row if its value is "none"
+    const nextIndex = index + 1;
+    if (next[nextIndex] && next[nextIndex] === "none") {
+      setExpandedIndex(nextIndex);
+    } else {
+      setExpandedIndex(-1);
     }
   };
 
-  /**
-   * @param {number} index
-   */
-  const handleRemoveSort = (index) => {
-    onSortsChange(sorts.filter((_, i) => i !== index));
+  const removeSortAt = (index) => {
+    const next = sorts.filter((_, i) => i !== index);
+    onSortsChange(next.length ? next : ["none"]);
+    setExpandedIndex(-1);
+  };
+
+  const addSort = () => {
+    if (sorts.length >= MAX_SORTS) return;
+    const next = [...sorts, "none"];
+    onSortsChange(next);
+    setExpandedIndex(next.length - 1);
+  };
+
+  const toggleRow = (index) => {
+    setExpandedIndex((cur) => (cur === index ? -1 : index));
   };
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
+    <DropdownMenu
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        if (v) setExpandedIndex(0);
+      }}
+    >
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
           size="icon"
           className="h-9 w-9 text-slate-400 hover:text-slate-700"
-          title="Multi-level sorting">
-          
+          title="Multi-level sorting"
+        >
           <Sliders className="w-4 h-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80 p-4">
-        <div className="space-y-3">
-          {/* Primary Sort (always required) */}
-          <div>
-            <p className="text-slate-900 mb-2 text-xs font-semibold">Primary Sort</p>
-            <SortSelect
-              value={sorts[0] || "date_asc"}
-              onChange={(val) => handleSetSort(0, val)}
-              options={getAvailableOptions(0)} />
-            
-          </div>
-
-          {/* Secondary Sort (optional) */}
-          {sorts.length > 1 &&
-          <div>
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold text-slate-900">Secondary Sort</p>
-                <button
-                onClick={() => handleRemoveSort(1)}
-                className="text-xs text-slate-400 hover:text-red-400 active:text-red-400">
-                
-                  <X className="w-3.5 h-3.5" />
-                </button>
+      <DropdownMenuContent
+        align="end"
+        className="w-80 p-3 max-h-[calc(100vh-6rem)] overflow-y-auto"
+      >
+        <div className="space-y-2">
+          {sorts.map((value, index) => {
+            const isExpanded = expandedIndex === index;
+            const usedInOtherRows = new Set(
+              sorts.map((v, i) => (i === index ? null : v)).filter((v) => v && v !== "none")
+            );
+            return (
+              <div key={index} className="rounded-lg border border-slate-100 bg-white">
+                <div className="flex items-center gap-1 px-2 py-1.5">
+                  <button
+                    type="button"
+                    onClick={() => toggleRow(index)}
+                    className="flex-1 flex items-center gap-2 text-left"
+                  >
+                    {isExpanded ? (
+                      <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+                    )}
+                    <span className="text-xs font-semibold text-slate-900">
+                      {ordinal(index + 1)} Sort:
+                    </span>
+                    <span className="text-xs text-slate-500 truncate">{labelFor(value)}</span>
+                  </button>
+                  {sorts.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeSortAt(index)}
+                      className="p-1 text-slate-300 hover:text-red-400 transition-colors"
+                      title="Remove sort"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+                {isExpanded && (
+                  <div className="px-2 pb-2 space-y-1">
+                    {availableOptions.map((opt) => {
+                      const isSelected = value === opt.value;
+                      const isUsedElsewhere = opt.value !== "none" && usedInOtherRows.has(opt.value);
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => !isUsedElsewhere && setSortAt(index, opt.value)}
+                          disabled={isUsedElsewhere}
+                          className={cn(
+                            "w-full text-left px-3 py-1.5 text-xs rounded transition-colors",
+                            isSelected
+                              ? "bg-slate-900 text-white font-medium"
+                              : isUsedElsewhere
+                                ? "text-slate-300 cursor-not-allowed opacity-40 bg-slate-50"
+                                : "text-slate-900 hover:bg-slate-100"
+                          )}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-              <SortSelect
-              value={sorts[1]}
-              onChange={(val) => handleSetSort(1, val)}
-              options={getAvailableOptions(1)} />
-            
-            </div>
-          }
+            );
+          })}
 
-          {/* Tertiary Sort (optional) */}
-          {sorts.length > 2 &&
-          <div>
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold text-slate-900">Tertiary Sort</p>
-                <button
-                onClick={() => handleRemoveSort(2)}
-                className="text-xs text-slate-400 hover:text-red-400 active:text-red-400">
-                
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-              <SortSelect
-              value={sorts[2]}
-              onChange={(val) => handleSetSort(2, val)}
-              options={getAvailableOptions(2)} />
-            
-            </div>
-          }
-
-          {/* Add more sorts button */}
-          {sorts.length < 3 &&
-          <button
-            onClick={handleAddSort}
-            className="w-full text-xs text-slate-400 py-1.5 mt-2 rounded border border-dashed border-slate-200">
-            
-              + Add sort
+          {sorts.length < MAX_SORTS && (
+            <button
+              type="button"
+              onClick={addSort}
+              className="w-full text-xs text-slate-500 hover:text-slate-900 py-2 flex items-center justify-center gap-2 rounded border border-dashed border-slate-200 hover:border-slate-300 transition-colors"
+            >
+              <Plus className="w-4 h-4" /> Add sort
             </button>
-          }
+          )}
         </div>
       </DropdownMenuContent>
-    </DropdownMenu>);
-
-}
-
-/**
- * @param {{
- *   value: string,
- *   onChange: (value: string) => void,
- *   options: (SortOption & { group?: string, disabled?: boolean })[],
- * }} props
- */
-function SortSelect({ value, onChange, options }) {
-  return (
-    <div className="space-y-1.5">
-      {options.map((opt) =>
-      <button
-        key={opt.value}
-        onClick={() => !opt.disabled && onChange(opt.value)}
-        disabled={opt.disabled}
-        className={cn(
-          "w-full text-left px-3 py-1.5 text-xs rounded transition-colors",
-          value && value === opt.value ?
-          "bg-slate-900 text-white font-medium" :
-          opt.disabled ?
-          "text-slate-300 cursor-not-allowed bg-slate-50" :
-          "text-slate-900 hover:bg-slate-100"
-        )}>
-        
-          {opt.label}
-        </button>
-      )}
-    </div>);
-
+    </DropdownMenu>
+  );
 }

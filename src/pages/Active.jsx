@@ -3,9 +3,10 @@ import { useState, useMemo } from "react";
 import { apiClient } from "@/api/apiClient";
 import { useQuery } from "@tanstack/react-query";
 import { useOfflineMutation } from "@/hooks/useOfflineMutation";
-import { useDeleteWithUndo } from "@/hooks/useDeleteWithUndo";
+import { formatDeleteLabel, useDeleteWithUndo } from "@/hooks/useDeleteWithUndo";
+import { showDeleteToast } from "@/components/tasks/DeleteToast";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { AnimatedSearchInput } from "@/components/ui/animated-search-input";
 import { Plus, Search } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import TaskCard from "@/components/tasks/TaskCard";
@@ -142,6 +143,11 @@ export default function Active() {
         if (!ra && rb) return 1;
         if (ra && !rb) return -1;
         return ra.localeCompare(rb);
+      case "completed_first":
+        return (a.status === "done" ? 0 : 1) - (b.status === "done" ? 0 : 1);
+      case "uncompleted_first":
+        return (a.status !== "done" ? 0 : 1) - (b.status !== "done" ? 0 : 1);
+      case "none":
       default:
         return 0;
     }
@@ -172,16 +178,12 @@ export default function Active() {
           <p className="text-xs text-slate-400 mt-0.5">{activeTasks.length} task{activeTasks.length !== 1 ? "s" : ""}</p>
         </div>
         <div className="flex items-center gap-2">
-          {showSearch && (
-            <Input
-              placeholder="Search..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-40"
-              autoFocus
-              onBlur={() => { if (!search) setShowSearch(false); }}
-            />
-          )}
+          <AnimatedSearchInput
+            open={showSearch}
+            value={search}
+            onChange={setSearch}
+            onClose={() => setShowSearch(false)}
+          />
           <Button
             variant="ghost"
             size="icon"
@@ -191,7 +193,7 @@ export default function Active() {
           >
             <Search className="w-4 h-4" />
           </Button>
-          <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} />
+          <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} page="active" />
           <Button onClick={() => { setEditingTask(null); setAddSubtaskParent(null); setShowForm(true); }} className="bg-slate-900 hover:bg-slate-800 h-9 gap-1.5">
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">New Task</span>
@@ -269,7 +271,15 @@ export default function Active() {
         open={!!recurringDeleteTask}
         onOpenChange={(o) => { if (!o) setRecurringDeleteTask(null); }}
         task={recurringDeleteTask}
-        onDeleteThis={() => { skipRecurringTask(recurringDeleteTask); setRecurringDeleteTask(null); }}
+        onDeleteThis={() => {
+          const target = recurringDeleteTask;
+          skipRecurringTask(target);
+          showDeleteToast({
+            label: formatDeleteLabel({ scenario: "recurring_instance", title: target?.title || "" }),
+            hideUndo: true,
+          });
+          setRecurringDeleteTask(null);
+        }}
         onDeleteAll={() => { deleteWithUndo(recurringDeleteTask, {}); setRecurringDeleteTask(null); }}
       />
     </div>

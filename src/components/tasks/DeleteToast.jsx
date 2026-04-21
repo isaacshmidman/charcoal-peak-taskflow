@@ -8,8 +8,8 @@ import { AnimatePresence, motion } from "framer-motion";
 
 let _setToast = null;
 
-export function showDeleteToast({ label, onUndo }) {
-  if (_setToast) _setToast({ label, onUndo, id: Date.now() });
+export function showDeleteToast({ label, onUndo, hideUndo = false }) {
+  if (_setToast) _setToast({ label, onUndo, hideUndo: hideUndo || !onUndo, id: Date.now() });
 }
 
 export default function DeleteToast() {
@@ -40,13 +40,15 @@ export default function DeleteToast() {
             data-testid="delete-toast"
           >
             <span className="text-xs font-medium text-white">{toast.label}</span>
-            <button
-              onClick={() => { toast.onUndo(); setToast(null); }}
-              className="text-xs font-semibold text-slate-400 underline underline-offset-2 shrink-0"
-              data-testid="delete-toast-undo"
-            >
-              Undo
-            </button>
+            {!toast.hideUndo && (
+              <button
+                onClick={() => { toast.onUndo?.(); setToast(null); }}
+                className="text-xs font-semibold text-yellow-300 hover:text-yellow-200 transition-colors shrink-0"
+                data-testid="delete-toast-undo"
+              >
+                Undo
+              </button>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

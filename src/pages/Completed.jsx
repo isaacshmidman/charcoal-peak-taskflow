@@ -4,12 +4,12 @@ import { AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { Search, Trash2 } from "lucide-react";
 import { apiClient } from "@/api/apiClient";
-import { restoreDeletionSnapshots, useDeleteWithUndo } from "@/hooks/useDeleteWithUndo";
+import { formatDeleteLabel, restoreDeletionSnapshots, useDeleteWithUndo } from "@/hooks/useDeleteWithUndo";
 import { useDeletedTasks } from "@/hooks/useDeletedTasks";
 import { useOfflineMutation } from "@/hooks/useOfflineMutation";
 import { buildCompletedItems, buildCompletedTaskItem, sortCompletedItems } from "@/lib/completedItems";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { AnimatedSearchInput } from "@/components/ui/animated-search-input";
 import { showDeleteToast } from "@/components/tasks/DeleteToast";
 import {
   Dialog,
@@ -90,7 +90,17 @@ export default function Completed() {
     return sortCompletedItems([...liveItems, ...visibleUndoingItems], sorts, priorityOrderMap);
   }, [priorityOrderMap, search, sorts, tasks, undoingItems]);
 
-  const handleUncompleteTask = (task) => {
+  const handleToggleDone = (task) => {
+    // Subtask: toggle its status independently — do not touch parent.
+    if (task.parent_id) {
+      const next = task.status === "done" ? "todo" : "done";
+      updateTask(task.id, {
+        status: next,
+        completed_at: next === "done" ? new Date().toISOString() : "",
+      });
+      return;
+    }
+
     const itemId = `task:${task.id}`;
     const undoingTask = {
       ...task,
@@ -126,7 +136,7 @@ export default function Completed() {
 
     if (completedItems.length > 0) {
       showDeleteToast({
-        label: `${completedItems.length} completed item${completedItems.length === 1 ? "" : "s"} deleted`,
+        label: formatDeleteLabel({ scenario: "task_bulk", count: completedItems.length }),
         onUndo: async () => {
           await restoreDeletionSnapshots(taskDeletions, { createTask, permanentlyDelete });
         },
@@ -142,18 +152,12 @@ export default function Completed() {
           <p className="text-xs text-slate-400 mt-0.5">{completedItems.length} task{completedItems.length !== 1 ? "s" : ""}</p>
         </div>
         <div className="flex items-center gap-2">
-          {showSearch && (
-            <Input
-              placeholder="Search..."
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              className="h-9 w-40 text-sm bg-white border-slate-100"
-              autoFocus
-              onBlur={() => {
-                if (!search) setShowSearch(false);
-              }}
-            />
-          )}
+          <AnimatedSearchInput
+            open={showSearch}
+            value={search}
+            onChange={setSearch}
+            onClose={() => setShowSearch(false)}
+          />
           <Button
             variant="ghost"
             size="icon"
@@ -163,7 +167,7 @@ export default function Completed() {
           >
             <Search className="w-4 h-4" />
           </Button>
-          <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} />
+          <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} page="completed" />
           {completedItems.length > 0 && (
             <Dialog open={showDeleteAllDialog} onOpenChange={setShowDeleteAllDialog}>
               <Button
@@ -219,7 +223,7 @@ export default function Completed() {
                   task={item.task}
                   priorities={priorities}
                   subtasks={subtaskMap[item.task.id] || []}
-                  onToggleDone={handleUncompleteTask}
+                  onToggleDone={handleToggleDone}
                   onEdit={(task) => {
                     setEditingTask(task);
                     setShowForm(true);

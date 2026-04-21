@@ -94,6 +94,12 @@ export function sortCompletedItems(items, sorts, priorityOrderMap) {
           if (result !== 0) return result;
           break;
         }
+        // On the Completed page all tasks are done, so completed_first/uncompleted_first
+        // have no meaningful order — treat as no-op to avoid layout surprises.
+        case "completed_first":
+        case "uncompleted_first":
+        case "none":
+          break;
         default:
           break;
       }

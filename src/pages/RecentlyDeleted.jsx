@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
 import { ArrowLeft, Trash2, Search, RotateCcw, CheckSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { AnimatedSearchInput } from "@/components/ui/animated-search-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AnimatePresence, motion } from "framer-motion";
 import { format } from "date-fns";
@@ -13,6 +13,8 @@ import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useDeletedTasks } from "@/hooks/useDeletedTasks";
 import { useOfflineMutation } from "@/hooks/useOfflineMutation";
+import { showDeleteToast } from "@/components/tasks/DeleteToast";
+import { formatDeleteLabel } from "@/hooks/useDeleteWithUndo";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import MultiSortPanel from "@/components/tasks/MultiSortPanel";
+import { colorBg } from "@/lib/colors";
 
 const RETENTION_OPTIONS = [
   { value: "7", label: "1 week" },
@@ -28,20 +31,6 @@ const RETENTION_OPTIONS = [
   { value: "180", label: "6 months" },
   { value: "365", label: "1 year" },
 ];
-
-const colorBg = {
-  red: "bg-red-50 border-red-100",
-  orange: "bg-orange-50 border-orange-100",
-  yellow: "bg-yellow-50 border-yellow-100",
-  green: "bg-green-50 border-green-100",
-  blue: "bg-blue-50 border-blue-100",
-  violet: "bg-violet-50 border-violet-100",
-  pink: "bg-pink-50 border-pink-100",
-  teal: "bg-teal-50 border-teal-100",
-  cyan: "bg-cyan-50 border-cyan-100",
-  rose: "bg-rose-50 border-rose-100",
-  slate: "bg-slate-50 border-slate-100",
-};
 
 export default function RecentlyDeleted({ onBack } = {}) {
   const navigate = useNavigate();
@@ -112,12 +101,12 @@ export default function RecentlyDeleted({ onBack } = {}) {
     switch (sortValue) {
       case "deleted_desc": return new Date(b.deleted_at) - new Date(a.deleted_at);
       case "deleted_asc": return new Date(a.deleted_at) - new Date(b.deleted_at);
-      case "completed": {
+      case "completed_first": {
         const ac = a.was_completed ? 0 : 1;
         const bc = b.was_completed ? 0 : 1;
         return ac - bc;
       }
-      case "uncompleted": {
+      case "uncompleted_first": {
         const ac = a.was_completed ? 1 : 0;
         const bc = b.was_completed ? 1 : 0;
         return ac - bc;
@@ -191,21 +180,31 @@ export default function RecentlyDeleted({ onBack } = {}) {
     }
     // Remove from recently deleted
     await permanentlyDelete(record.id);
+    showDeleteToast({
+      label: formatDeleteLabel({ scenario: "restore_single", title: record.title || "" }),
+      hideUndo: true,
+    });
+  };
+
+  const handlePermanentDelete = async (record) => {
+    await permanentlyDelete(record.id);
+    showDeleteToast({
+      label: formatDeleteLabel({ scenario: "permanent_single", title: record.title || "" }),
+      hideUndo: true,
+    });
   };
 
   const handleEmptyRecentlyDeleted = async () => {
     setShowEmptyDialog(false);
+    const count = userDeletedTasks.length;
     await permanentlyDeleteMany(userDeletedTasks.map((record) => record.id));
+    if (count > 0) {
+      showDeleteToast({
+        label: formatDeleteLabel({ scenario: "permanent_bulk", count }),
+        hideUndo: true,
+      });
+    }
   };
-
-  const sortOptions = [
-    { value: "deleted_desc", label: "Deleted: newest first" },
-    { value: "deleted_asc", label: "Deleted: oldest first" },
-    { value: "completed", label: "Completed first" },
-    { value: "uncompleted", label: "Uncompleted first" },
-    { value: "date_asc", label: "Due date: oldest first" },
-    { value: "date_desc", label: "Due date: newest first" },
-  ];
 
   return (
     <div className="space-y-5">
@@ -233,20 +232,16 @@ export default function RecentlyDeleted({ onBack } = {}) {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {searchOpen && (
-            <Input
-              autoFocus
-              placeholder="Search..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-9 w-36 text-sm"
-              onBlur={() => { if (!search) setTimeout(() => setSearchOpen(false), 100); }}
-            />
-          )}
+          <AnimatedSearchInput
+            open={searchOpen}
+            value={search}
+            onChange={setSearch}
+            onClose={() => setSearchOpen(false)}
+          />
           <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-400 hover:text-slate-700" onMouseDown={(e) => e.preventDefault()} onClick={() => setSearchOpen(!searchOpen)}>
             <Search className="w-4 h-4" />
           </Button>
-          <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} extraOptions={sortOptions} />
+          <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} page="deleted" />
           {userDeletedTasks.length > 0 && (
             <Dialog open={showEmptyDialog} onOpenChange={setShowEmptyDialog}>
               <Button
@@ -312,7 +307,7 @@ export default function RecentlyDeleted({ onBack } = {}) {
                 record={record}
                 priorityMap={priorityMap}
                 onRestore={() => handleRestore(record)}
-                onDelete={() => permanentlyDelete(record.id)}
+                onDelete={() => handlePermanentDelete(record)}
               />
             ))}
           </AnimatePresence>

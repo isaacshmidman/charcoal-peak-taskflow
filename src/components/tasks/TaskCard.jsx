@@ -17,22 +17,9 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { colorBg } from "@/lib/colors";
 
 const parseDateLocal = (str) => new Date(str + "T00:00:00");
-
-const colorBg = {
-  red: "bg-red-50 border-red-100",
-  orange: "bg-orange-50 border-orange-100",
-  yellow: "bg-yellow-50 border-yellow-100",
-  green: "bg-green-50 border-green-100",
-  blue: "bg-blue-50 border-blue-100",
-  violet: "bg-violet-50 border-violet-100",
-  pink: "bg-pink-50 border-pink-100",
-  teal: "bg-teal-50 border-teal-100",
-  cyan: "bg-cyan-50 border-cyan-100",
-  rose: "bg-rose-50 border-rose-100",
-  slate: "bg-slate-50 border-slate-100",
-};
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const toDateStr = (date) => format(date, "yyyy-MM-dd");
@@ -203,6 +190,7 @@ export default function TaskCard({
   const recurrenceLabel = buildRecurrenceShortLabel(task);
 
   const cardBg = priority ? colorBg[priority.color] || colorBg.slate : "bg-white border-slate-100";
+  const isDarkCard = priority?.color === "black";
 
   // Overdue: has a due_date, not done, and date is in the past (before today)
   const isOverdue = !isDone && task.due_date && parseDateLocal(task.due_date) < new Date(new Date().setHours(0,0,0,0));
@@ -277,8 +265,9 @@ export default function TaskCard({
               onClick={(e) => { e.stopPropagation(); if (didSwipe.current) return; onEdit(task); }}
             >
               <h3 className={cn(
-                "text-sm font-medium text-slate-900 truncate",
-                isDone && "line-through text-slate-400"
+                "text-sm font-medium truncate",
+                isDarkCard ? "text-white" : "text-slate-900",
+                isDone && "line-through opacity-50"
               )}>
                 {task.title}
               </h3>
@@ -291,7 +280,7 @@ export default function TaskCard({
                 <div className="hidden sm:flex items-center gap-1">
                   {task.tags.slice(0, 2).map((tag) => (
                     <span key={tag} className="text-[10px] font-medium text-slate-400 bg-white/70 px-1.5 py-0.5 rounded border border-slate-200">
-                      {tag}
+                      {tag.length > 20 ? `${tag.slice(0, 20)}…` : tag}
                     </span>
                   ))}
                   {task.tags.length > 2 && (

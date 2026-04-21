@@ -437,8 +437,8 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
               {form.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   {form.tags.map(tag => (
-                    <Badge key={tag} variant="secondary" className="text-xs gap-1 pr-1">
-                      {tag}
+                    <Badge key={tag} variant="secondary" className="text-xs gap-1 pr-1 max-w-full break-words whitespace-normal">
+                      <span className="break-words whitespace-normal">{tag}</span>
                       <button type="button" onClick={() => removeTag(tag)} className="text-slate-400 hover:text-red-400 transition-colors"><X className="w-3 h-3" /></button>
                     </Badge>
                   ))}
@@ -480,7 +480,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                           {sub.status === "done" && <CheckSquare className="w-2 h-2" />}
                         </button>
                         <span
-                          className={cn("cursor-pointer hover:text-slate-600", sub.status === "done" && "line-through opacity-50")}
+                          className={cn("cursor-pointer hover:text-slate-600 break-words whitespace-normal max-w-full", sub.status === "done" && "line-through opacity-50")}
                           onClick={() => onEditSubtask && onEditSubtask(sub)}
                         >
                           {sub.title}
@@ -502,7 +502,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                     {(form.subtask_titles || []).map((title, idx) => (
                       <div key={idx} className="inline-flex items-center gap-1.5 bg-secondary text-secondary-foreground rounded-full px-2.5 py-0.5 text-xs font-semibold group">
                         <div className="shrink-0 w-3.5 h-3.5 rounded border-2 border-slate-400" />
-                        <span>{title}</span>
+                        <span className="break-words whitespace-normal max-w-full">{title}</span>
                         <button type="button" onPointerDown={(e) => { e.preventDefault(); removeSubtask(idx); }} className="text-slate-400 hover:text-red-400 transition-colors">
                           <X className="w-3 h-3" />
                         </button>

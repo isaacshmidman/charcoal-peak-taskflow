@@ -24,26 +24,7 @@ import {
 import RecentlyDeleted from "@/pages/RecentlyDeleted";
 import { DEFAULT_NAV_ORDER, sanitizeNavOrder, sanitizeNavRoute } from "@/lib/navigation";
 
-const COLOR_OPTIONS = [
-{ value: "red", label: "Red", class: "bg-red-400" },
-{ value: "orange", label: "Orange", class: "bg-orange-400" },
-{ value: "yellow", label: "Yellow", class: "bg-yellow-400" },
-{ value: "green", label: "Green", class: "bg-green-400" },
-{ value: "blue", label: "Blue", class: "bg-blue-400" },
-{ value: "violet", label: "Violet", class: "bg-violet-400" },
-{ value: "pink", label: "Pink", class: "bg-pink-400" },
-{ value: "teal", label: "Teal", class: "bg-teal-400" },
-{ value: "cyan", label: "Cyan", class: "bg-cyan-400" },
-{ value: "rose", label: "Rose", class: "bg-rose-400" },
-{ value: "slate", label: "Gray", class: "bg-slate-400" }];
-
-
-const colorDot = {
-  red: "bg-red-400", orange: "bg-orange-400", yellow: "bg-yellow-400",
-  green: "bg-green-400", blue: "bg-blue-400", violet: "bg-violet-400",
-  pink: "bg-pink-400", teal: "bg-teal-400", cyan: "bg-cyan-400",
-  rose: "bg-rose-400", slate: "bg-slate-400"
-};
+import { COLOR_OPTIONS, colorDot } from "@/lib/colors";
 
 export const NAV_OPTIONS = [
 { value: "/Active", label: "All Tasks" },
@@ -135,7 +116,7 @@ function PriorityRow({ p, idx, total, isEditing, onStartEdit, onStopEdit, onDele
         </button>
       </div>
       <span className={cn("w-3 h-3 rounded-full shrink-0", colorDot[p.color] || colorDot.slate)} />
-      <span className="text-sm font-medium text-slate-900 flex-1">{p.name}</span>
+      <span className="text-sm font-medium text-slate-900 flex-1 min-w-0 break-words whitespace-normal">{p.name}</span>
       
       <button className="text-slate-300 hover:text-red-400 transition-colors" onClick={(e) => {e.stopPropagation();onDelete(p.id);}}>
         <X className="w-3.5 h-3.5" />
@@ -366,7 +347,7 @@ export default function Settings() {
 
   if (showRecentlyDeleted) {
     return (
-      <div className="max-w-xl">
+      <div>
         <RecentlyDeleted onBack={() => {
           pendingScrollRestoreRef.current = scrollPosRef.current;
           setShowRecentlyDeleted(false);
@@ -376,10 +357,30 @@ export default function Settings() {
   }
 
   return (
-    <div className="space-y-8 max-w-xl">
-      <div>
-        <h1 className="text-base font-semibold text-slate-900">Settings</h1>
-        <p className="text-xs text-slate-400 mt-0.5">{user?.email || "..."}</p>
+    <div className="space-y-8 max-w-3xl mx-auto">
+      <div className="flex items-start justify-between gap-4">
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-2 text-slate-900 hover:text-red-400 hover:border-red-200 text-sm font-medium shrink-0">
+              <LogOut className="w-4 h-4" />
+              Log out
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Log out?</AlertDialogTitle>
+              <AlertDialogDescription>Are you sure you want to log out?</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => logout()}>Log out</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        <div className="text-right min-w-0">
+          <h1 className="text-base font-semibold text-slate-900">Settings</h1>
+          <p className="text-xs text-slate-400 mt-0.5 truncate">{user?.email || "..."}</p>
+        </div>
       </div>
 
       {/* Default nav */}
@@ -483,8 +484,8 @@ export default function Settings() {
 
           savedTags.slice(-20).map((tag, i, arr) =>
           <div key={tag.id} className={cn("flex items-center justify-between px-4 py-2", i < arr.length - 1 && "border-b border-slate-50")}>
-                <span className="text-sm font-medium text-slate-900 flex items-center gap-2">
-                  <Tag className="w-3 h-3 text-slate-900" />{tag.name}
+                <span className="text-sm font-medium text-slate-900 flex items-center gap-2 min-w-0 break-words whitespace-normal">
+                  <Tag className="w-3 h-3 text-slate-900 shrink-0" /><span className="break-words whitespace-normal">{tag.name}</span>
                 </span>
                 <button onClick={() => deleteTagMutation.mutate(tag.id)} className="text-slate-300 hover:text-red-400 transition-colors">
                   <X className="w-3.5 h-3.5" />
@@ -535,27 +536,6 @@ export default function Settings() {
         </button>
       </section>
 
-      {/* Logout */}
-      <section className="pt-2">
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button variant="outline" className="text-slate-900 hover:text-red-400 hover:border-red-200 gap-2 text-sm font-medium">
-              <LogOut className="w-4 h-4" />
-              Log out
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Log out?</AlertDialogTitle>
-              <AlertDialogDescription>Are you sure you want to log out?</AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={() => logout()}>Log out</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </section>
     </div>);
 
 }

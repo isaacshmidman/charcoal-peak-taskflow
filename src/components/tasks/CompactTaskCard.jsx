@@ -7,24 +7,13 @@ import { Button } from "@/components/ui/button";
 import { CheckSquare } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { colorBg } from "@/lib/colors";
 
 const toDateStr = (date) => format(date, "yyyy-MM-dd");
 const fromDateStr = (str) => new Date(str + "T00:00:00");
 
-const RECURRENCE_OPTIONS = [
-  { value: "none", label: "None" },
-  { value: "daily", label: "Daily" },
-  { value: "weekdays", label: "Weekdays" },
-  { value: "weekly", label: "Weekly" },
-  { value: "biweekly", label: "Biweekly" },
-  { value: "monthly", label: "Monthly" },
-  { value: "quarterly", label: "Quarterly" },
-  { value: "yearly", label: "Yearly" },
-];
-
 export default function CompactTaskCard({ task, priorities, onToggleDone, onEdit, onUpdate }) {
   const [dateOpen, setDateOpen] = useState(false);
-  const [recurrenceOpen, setRecurrenceOpen] = useState(false);
   const [optimisticDone, setOptimisticDone] = useState(false);
 
   // Reset optimistic state when the task itself changes (e.g. recurring toggle moves the date)
@@ -34,16 +23,7 @@ export default function CompactTaskCard({ task, priorities, onToggleDone, onEdit
   const priority = priorities.find(p => p.id === task.priority_id);
   const isRecurring = task.task_type === "recurring" && task.recurrence && task.recurrence !== "none";
 
-  const colorCardBg = {
-    red: "bg-red-50 border-red-200", orange: "bg-orange-50 border-orange-200",
-    yellow: "bg-yellow-50 border-yellow-200", green: "bg-green-50 border-green-200",
-    blue: "bg-blue-50 border-blue-200", violet: "bg-violet-50 border-violet-200",
-    pink: "bg-pink-50 border-pink-200", teal: "bg-teal-50 border-teal-200",
-    cyan: "bg-cyan-50 border-cyan-200", rose: "bg-rose-50 border-rose-200",
-    slate: "bg-slate-50 border-slate-200",
-  };
-
-  const cardStyle = priority ? (colorCardBg[priority.color] || colorCardBg.slate) : "bg-white border-slate-100";
+  const cardStyle = priority ? (colorBg[priority.color] || colorBg.slate) : "bg-white border-slate-100";
 
   return (
     <motion.div
@@ -78,40 +58,12 @@ export default function CompactTaskCard({ task, priorities, onToggleDone, onEdit
 
       {/* Right meta: recurrence dot + date — pushed all the way right */}
       <div className="ml-auto flex items-center gap-1.5 shrink-0">
-        {/* Recurrence dot */}
+        {/* Recurrence dot — display only, not clickable */}
         {isRecurring && (
-          <Popover open={recurrenceOpen} onOpenChange={setRecurrenceOpen}>
-            <PopoverTrigger asChild>
-              <button
-                onClick={(e) => e.stopPropagation()}
-                title={task.recurrence}
-                className="w-2 h-2 rounded-full bg-violet-600 shrink-0"
-              />
-            </PopoverTrigger>
-            <PopoverContent className="w-40 p-2" align="end" onClick={(e) => e.stopPropagation()}>
-              <p className="text-[10px] font-semibold text-slate-400 mb-1.5">Repeats</p>
-              <div className="space-y-0.5">
-                {RECURRENCE_OPTIONS.map(opt => (
-                  <button
-                    key={opt.value}
-                    onClick={() => {
-                      onUpdate && onUpdate(task, {
-                        task_type: opt.value === "none" ? "one_time" : "recurring",
-                        recurrence: opt.value === "none" ? "none" : opt.value,
-                      });
-                      setRecurrenceOpen(false);
-                    }}
-                    className={cn(
-                      "w-full text-left text-xs px-2 py-1 rounded transition-colors",
-                      task.recurrence === opt.value ? "bg-slate-900 text-white font-medium" : "text-slate-900 hover:bg-slate-50"
-                    )}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover>
+          <span
+            title={task.recurrence}
+            className="w-2 h-2 rounded-full bg-violet-600 shrink-0"
+          />
         )}
 
         {/* Date chip */}

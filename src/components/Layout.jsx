@@ -92,7 +92,7 @@ export default function Layout() {
                 "w-10 h-10 -mr-1",
                 location.pathname === "/Settings"
                   ? "text-slate-900 bg-slate-100"
-                  : "text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                  : "text-slate-400 hover:text-slate-900 hover:bg-slate-100"
               )}
             >
               <Settings className="w-4 h-4 pointer-events-none" />

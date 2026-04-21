@@ -2,6 +2,35 @@ import { showDeleteToast } from "@/components/tasks/DeleteToast";
 import { useDeletedTasks } from "@/hooks/useDeletedTasks";
 
 /**
+ * Truncate a title for inclusion in toast copy (max 50 chars).
+ * @param {string} title
+ */
+export function truncateToastTitle(title) {
+  const t = title || "";
+  return t.length > 50 ? `${t.slice(0, 49)}…` : t;
+}
+
+/**
+ * Build a toast label for a delete/restore scenario.
+ * @param {{ scenario: string, title?: string, count?: number }} opts
+ */
+export function formatDeleteLabel({ scenario, title = "", count = 0 }) {
+  const t = truncateToastTitle(title);
+  switch (scenario) {
+    case "task_single": return `Task "${t}" was deleted`;
+    case "task_bulk": return `${count} tasks deleted`;
+    case "subtask_single": return `Subtask "${t}" was deleted`;
+    case "recurring_instance": return `Recurring instance of "${t}" deleted`;
+    case "recurring_series": return `Recurring series "${t}" deleted`;
+    case "restore_single": return `"${t}" restored`;
+    case "restore_bulk": return `${count} tasks restored`;
+    case "permanent_single": return `"${t}" permanently deleted`;
+    case "permanent_bulk": return `${count} tasks permanently deleted`;
+    default: return t ? `"${t}" was deleted` : "Deleted";
+  }
+}
+
+/**
  * @typedef {import("@/types/tasks").DeleteSnapshot} DeleteSnapshot
  * @typedef {import("@/types/tasks").TaskCreateInput} TaskCreateInput
  * @typedef {import("@/types/tasks").TaskRecord} TaskRecord
@@ -98,12 +127,13 @@ export function useDeleteWithUndo(deleteTask, createTask) {
    * @param {TaskRecord & { id: string }} task
    * @param {{ isSubtask?: boolean } & Record<string, unknown>} [options]
    */
-  const deleteWithUndo = async (task, { isSubtask = false, ...deleteOptions } = {}) => {
+  const deleteWithUndo = async (task, { isSubtask = false, scenario, ...deleteOptions } = {}) => {
     const deletion = await deleteTask(task.id, deleteOptions);
-    const taskTitle = task.title || "Untitled task";
-    const label = isSubtask
-      ? `Subtask "${taskTitle}" was deleted`
-      : `Task "${taskTitle}" was deleted`;
+    const effectiveScenario = scenario
+      || (isSubtask ? "subtask_single"
+        : task.task_type === "recurring" ? "recurring_series"
+        : "task_single");
+    const label = formatDeleteLabel({ scenario: effectiveScenario, title: task.title || "Untitled task" });
 
     showDeleteToast({
       label,
@@ -125,7 +155,7 @@ export function useDeleteWithUndo(deleteTask, createTask) {
       deletions.push(await deleteTask(task.id));
     }
 
-    const defaultLabel = `${tasks.length} task${tasks.length === 1 ? "" : "s"} deleted`;
+    const defaultLabel = formatDeleteLabel({ scenario: "task_bulk", count: tasks.length });
     showDeleteToast({
       label: label || defaultLabel,
       onUndo: () => restoreDeletionSnapshots(deletions, { createTask, permanentlyDelete }),
