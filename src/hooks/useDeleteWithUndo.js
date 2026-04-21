@@ -125,7 +125,7 @@ export function useDeleteWithUndo(deleteTask, createTask) {
 
   /**
    * @param {TaskRecord & { id: string }} task
-   * @param {{ isSubtask?: boolean } & Record<string, unknown>} [options]
+   * @param {{ isSubtask?: boolean, scenario?: string } & Record<string, unknown>} [options]
    */
   const deleteWithUndo = async (task, { isSubtask = false, scenario, ...deleteOptions } = {}) => {
     const deletion = await deleteTask(task.id, deleteOptions);
