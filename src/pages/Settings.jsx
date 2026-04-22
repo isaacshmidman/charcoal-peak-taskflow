@@ -385,8 +385,7 @@ export default function Settings() {
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Log out?</AlertDialogTitle>
-              <AlertDialogDescription>Are you sure you want to log out?</AlertDialogDescription>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
