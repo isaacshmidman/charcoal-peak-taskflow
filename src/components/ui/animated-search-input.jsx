@@ -44,7 +44,7 @@ export function AnimatedSearchInput({ open, value, onChange, onClose, placeholde
     <div
       ref={wrapperRef}
       className={cn(
-        "overflow-hidden transition-all duration-200 ease-out",
+        "transition-all duration-200 ease-out",
         open
           ? "w-[min(15rem,calc(100vw-14rem))] sm:w-60 opacity-100"
           : "w-0 opacity-0"
