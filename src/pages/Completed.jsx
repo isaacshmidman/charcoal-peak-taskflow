@@ -161,6 +161,7 @@ export default function Completed() {
           <Button
             variant="ghost"
             size="icon"
+            data-search-toggle
             className="h-9 w-9 text-slate-400 hover:text-slate-700"
             onMouseDown={(event) => { if (showSearch) event.preventDefault(); }}
             onClick={() => { if (showSearch) setSearch(""); setShowSearch((v) => !v); }}

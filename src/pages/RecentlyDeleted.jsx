@@ -238,7 +238,7 @@ export default function RecentlyDeleted({ onBack } = {}) {
             onChange={setSearch}
             onClose={() => setSearchOpen(false)}
           />
-          <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-400 hover:text-slate-700" onMouseDown={(e) => e.preventDefault()} onClick={() => setSearchOpen(!searchOpen)}>
+          <Button variant="ghost" size="icon" data-search-toggle className="h-9 w-9 text-slate-400 hover:text-slate-700" onMouseDown={(e) => e.preventDefault()} onClick={() => setSearchOpen(!searchOpen)}>
             <Search className="w-4 h-4" />
           </Button>
           <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} page="deleted" />
