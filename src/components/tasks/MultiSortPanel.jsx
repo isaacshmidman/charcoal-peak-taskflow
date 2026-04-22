@@ -6,23 +6,25 @@ import { Sliders, X, Plus, ChevronRight, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * @typedef {{ value: string, label: string, scope?: string }} SortOption
+ * @typedef {{ value: string, label: string, scope?: string, group?: string }} SortOption
  */
 
 /** @type {SortOption[]} */
 export const SORT_OPTIONS = [
   { value: "none", label: "None" },
-  { value: "date_asc", label: "Date: Oldest → Newest" },
-  { value: "date_desc", label: "Date: Newest → Oldest" },
-  { value: "deleted_asc", label: "Deleted: Oldest → Newest", scope: "deleted" },
-  { value: "deleted_desc", label: "Deleted: Newest → Oldest", scope: "deleted" },
-  { value: "completed_first", label: "Completed First" },
-  { value: "uncompleted_first", label: "Uncompleted First" },
-  { value: "priority_asc", label: "Priority: Highest → Lowest" },
-  { value: "priority_desc", label: "Priority: Lowest → Highest" },
-  { value: "tag_az", label: "Tag: A → Z" },
-  { value: "recurrence", label: "Recurrence Type" },
+  { value: "date_asc", label: "Date: Oldest → Newest", group: "date" },
+  { value: "date_desc", label: "Date: Newest → Oldest", group: "date" },
+  { value: "deleted_asc", label: "Deleted: Oldest → Newest", scope: "deleted", group: "deleted" },
+  { value: "deleted_desc", label: "Deleted: Newest → Oldest", scope: "deleted", group: "deleted" },
+  { value: "completed_first", label: "Completed First", group: "completion" },
+  { value: "uncompleted_first", label: "Uncompleted First", group: "completion" },
+  { value: "priority_asc", label: "Priority: Highest → Lowest", group: "priority" },
+  { value: "priority_desc", label: "Priority: Lowest → Highest", group: "priority" },
+  { value: "tag_az", label: "Tag: A → Z", group: "tag" },
+  { value: "recurrence", label: "Recurrence Type", group: "recurrence" },
 ];
+
+const groupOf = (value) => SORT_OPTIONS.find((o) => o.value === value)?.group;
 
 const MAX_SORTS = 5;
 
@@ -46,7 +48,7 @@ function ordinal(n) {
  */
 export default function MultiSortPanel({ sorts, onSortsChange, page = "default" }) {
   const [open, setOpen] = useState(false);
-  const [expandedIndex, setExpandedIndex] = useState(0);
+  const [expandedIndex, setExpandedIndex] = useState(-1);
 
   const availableOptions = SORT_OPTIONS.filter((opt) => !opt.scope || opt.scope === page);
   const labelFor = (value) =>
@@ -56,13 +58,8 @@ export default function MultiSortPanel({ sorts, onSortsChange, page = "default" 
     const next = [...sorts];
     next[index] = value;
     onSortsChange(next);
-    // Collapse this row; auto-advance to next row if its value is "none"
-    const nextIndex = index + 1;
-    if (next[nextIndex] && next[nextIndex] === "none") {
-      setExpandedIndex(nextIndex);
-    } else {
-      setExpandedIndex(-1);
-    }
+    // Collapse this row after selection
+    setExpandedIndex(-1);
   };
 
   const removeSortAt = (index) => {
@@ -87,7 +84,7 @@ export default function MultiSortPanel({ sorts, onSortsChange, page = "default" 
       open={open}
       onOpenChange={(v) => {
         setOpen(v);
-        if (v) setExpandedIndex(0);
+        if (v) setExpandedIndex(-1);
       }}
     >
       <DropdownMenuTrigger asChild>
@@ -107,8 +104,12 @@ export default function MultiSortPanel({ sorts, onSortsChange, page = "default" 
         <div className="space-y-2">
           {sorts.map((value, index) => {
             const isExpanded = expandedIndex === index;
-            const usedInOtherRows = new Set(
-              sorts.map((v, i) => (i === index ? null : v)).filter((v) => v && v !== "none")
+            const usedGroups = new Set(
+              sorts
+                .map((v, i) => (i === index ? null : v))
+                .filter((v) => v && v !== "none")
+                .map((v) => groupOf(v))
+                .filter(Boolean)
             );
             return (
               <div key={index} className="rounded-lg border border-slate-100 bg-white">
@@ -116,17 +117,17 @@ export default function MultiSortPanel({ sorts, onSortsChange, page = "default" 
                   <button
                     type="button"
                     onClick={() => toggleRow(index)}
-                    className="flex-1 flex items-center gap-2 text-left"
+                    className="flex-1 flex items-center gap-2 text-left min-w-0"
                   >
+                    <span className="text-xs font-semibold text-slate-900 shrink-0">
+                      {ordinal(index + 1)} Sort:
+                    </span>
+                    <span className="text-xs text-slate-500 truncate flex-1">{labelFor(value)}</span>
                     {isExpanded ? (
                       <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
                     ) : (
                       <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
                     )}
-                    <span className="text-xs font-semibold text-slate-900">
-                      {ordinal(index + 1)} Sort:
-                    </span>
-                    <span className="text-xs text-slate-500 truncate">{labelFor(value)}</span>
                   </button>
                   {sorts.length > 1 && (
                     <button
@@ -143,7 +144,8 @@ export default function MultiSortPanel({ sorts, onSortsChange, page = "default" 
                   <div className="px-2 pb-2 space-y-1">
                     {availableOptions.map((opt) => {
                       const isSelected = value === opt.value;
-                      const isUsedElsewhere = opt.value !== "none" && usedInOtherRows.has(opt.value);
+                      const isUsedElsewhere =
+                        opt.value !== "none" && opt.group && usedGroups.has(opt.group) && !isSelected;
                       return (
                         <button
                           key={opt.value}

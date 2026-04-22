@@ -145,6 +145,19 @@ export default function Settings() {
     pendingScrollRestoreRef.current = null;
   }, [showRecentlyDeleted]);
 
+  // Return to main Settings (restoring scroll) when the top Settings icon is clicked
+  useEffect(() => {
+    const handler = () => {
+      setShowRecentlyDeleted((current) => {
+        if (!current) return current;
+        pendingScrollRestoreRef.current = scrollPosRef.current;
+        return false;
+      });
+    };
+    window.addEventListener("settingsNavClicked", handler);
+    return () => window.removeEventListener("settingsNavClicked", handler);
+  }, []);
+
   const moveNav = (idx, dir) => {
     const reordered = [...navOrder];
     const newIdx = idx + dir;
@@ -357,8 +370,12 @@ export default function Settings() {
   }
 
   return (
-    <div className="space-y-8 max-w-3xl mx-auto">
+    <div className="space-y-8 max-w-xl mx-auto">
       <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-base font-semibold text-slate-900">Settings</h1>
+          <p className="text-xs text-slate-400 mt-0.5 truncate">{user?.email || "..."}</p>
+        </div>
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button variant="outline" size="sm" className="gap-2 text-slate-900 hover:text-red-400 hover:border-red-200 text-sm font-medium shrink-0">
@@ -377,10 +394,6 @@ export default function Settings() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-        <div className="text-right min-w-0">
-          <h1 className="text-base font-semibold text-slate-900">Settings</h1>
-          <p className="text-xs text-slate-400 mt-0.5 truncate">{user?.email || "..."}</p>
-        </div>
       </div>
 
       {/* Default nav */}

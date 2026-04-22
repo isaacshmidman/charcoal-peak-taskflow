@@ -87,6 +87,7 @@ export default function Layout() {
             {!online && <WifiOff className="w-4 h-4 text-red-500" />}
             <Link
               to="/Settings"
+              onClick={() => window.dispatchEvent(new Event("settingsNavClicked"))}
               className={cn(
                 "flex items-center justify-center rounded-lg transition-colors",
                 "w-10 h-10 -mr-1",
