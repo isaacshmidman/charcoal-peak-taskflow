@@ -1,6 +1,6 @@
 // @ts-nocheck
-import { useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useIntegrations } from "@/hooks/useIntegrations";
 import { Loader2, AlertTriangle, Settings2, X, Star } from "lucide-react";
@@ -150,8 +150,21 @@ export default function IntegrationsPanel() {
   const [configuring, setConfiguring] = useState(/** @type {any} */ (null));
   const [showAppleConnect, setShowAppleConnect] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const params = new URLSearchParams(location.search);
   const integrationError = params.get("integration_error");
+
+  // Auto-clear the `?integration_error=...` query param after a few seconds so a
+  // stale OAuth-failure message from a previous attempt doesn't keep resurfacing
+  // on every visit to /Settings. The param is set by the backend's OAuth
+  // callback redirect; once we've shown it once, it's done its job.
+  useEffect(() => {
+    if (!integrationError) return;
+    const t = setTimeout(() => {
+      navigate(location.pathname + location.hash, { replace: true });
+    }, 8000);
+    return () => clearTimeout(t);
+  }, [integrationError, navigate, location.pathname, location.hash]);
 
   const googleRow = integrations.find((i) => i.provider === "google");
   const appleRow = integrations.find((i) => i.provider === "apple");
