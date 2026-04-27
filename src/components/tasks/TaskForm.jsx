@@ -231,7 +231,13 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
             </div>
           )}
           <form onSubmit={handleSubmit} className="space-y-4">
-          <fieldset disabled={isReadOnly} className="contents">
+          {/* `display: contents` on the fieldset hides its box, but Tailwind's
+              `space-y-*` rule on the form (`> * + * { margin-top: ... }`) only
+              targets direct DOM children — the fieldset is the form's only
+              direct child, so without re-applying spacing here the inputs
+              inside collapse together (no gap between title and description).
+              Re-applying `space-y-4` on the fieldset restores the cadence. */}
+          <fieldset disabled={isReadOnly} className="contents [&>*+*]:mt-4">
             <Input
               placeholder="What needs to be done?"
               value={form.title}
