@@ -94,6 +94,15 @@
     min-height: 100vh;
   }
 
+  /* Dark mode: warm-yellow corner glow doesn't translate well to a dark
+     palette (it just looks dirty). Replace with a deep neutral that fades
+     to a slightly lifted slate at the bottom-right so the page still has
+     directional depth without the cheerful yellow. */
+  html.dark body {
+    background: radial-gradient(circle at 100% 100%, #1f2937 0%, #111827 18%, #0b1220 50%);
+    color: hsl(0 0% 92%);
+  }
+
   input,
   textarea,
   select {

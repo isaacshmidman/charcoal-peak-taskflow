@@ -15,6 +15,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="manifest" href="/manifest.json" />
     <title>Zephyrly</title>
+    <!-- Apply the user's saved appearance BEFORE React mounts so the page
+         doesn't flash light-then-dark (FOUC) on cold loads. Mirrors the
+         logic in src/lib/ThemeProvider.jsx but inlined and synchronous. -->
+    <script>
+      (function () {
+        try {
+          var v = localStorage.getItem("appearance") || "light";
+          var dark = v === "dark" ||
+            (v === "system" && window.matchMedia &&
+             window.matchMedia("(prefers-color-scheme: dark)").matches);
+          if (dark) document.documentElement.classList.add("dark");
+        } catch (_) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

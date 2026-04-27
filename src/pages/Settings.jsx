@@ -24,6 +24,7 @@ import RecentlyDeleted from "@/pages/RecentlyDeleted";
 import IntegrationsPanel from "@/components/settings/IntegrationsPanel";
 import { useLocation } from "react-router-dom";
 import { DEFAULT_NAV_ORDER, sanitizeNavOrder, sanitizeNavRoute } from "@/lib/navigation";
+import { useTheme } from "@/lib/ThemeProvider";
 
 import { COLOR_OPTIONS, colorDot } from "@/lib/colors";
 
@@ -107,7 +108,7 @@ function PriorityRow({ p, idx, total, isEditing, onStartEdit, onStopEdit, onDele
 
   return (
     <div
-      className="flex items-center gap-3 bg-white border border-slate-100 rounded-xl px-3 py-2.5 hover:border-slate-200 transition-colors"
+      className="flex items-center gap-3 bg-white dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 rounded-xl px-3 py-2.5 hover:border-slate-200 dark:hover:border-slate-700 transition-colors"
       onDoubleClick={onStartEdit}>
       
       <div className="flex flex-col gap-0.5">
@@ -119,7 +120,7 @@ function PriorityRow({ p, idx, total, isEditing, onStartEdit, onStopEdit, onDele
         </button>
       </div>
       <span className={cn("w-3 h-3 rounded-full shrink-0", colorDot[p.color] || colorDot.slate)} />
-      <span className="text-sm font-medium text-slate-900 flex-1 min-w-0 break-words whitespace-normal">{p.name}</span>
+      <span className="text-sm font-medium text-slate-900 dark:text-slate-100 flex-1 min-w-0 break-words whitespace-normal">{p.name}</span>
       
       <button className="text-slate-300 hover:text-red-400 transition-colors" onClick={(e) => {e.stopPropagation();onDelete(p.id);}}>
         <X className="w-3.5 h-3.5" />
@@ -141,6 +142,7 @@ export default function Settings() {
   const queryClient = useQueryClient();
   const { user, logout } = useAuth();
   const location = useLocation();
+  const { appearance, setAppearance } = useTheme();
 
   // Scroll to section (e.g. from Calendar page deep link).
   useEffect(() => {
@@ -422,8 +424,8 @@ export default function Settings() {
     <div className="space-y-8 max-w-xl mx-auto">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-base font-semibold text-slate-900">Settings</h1>
-          <p className="text-xs text-slate-400 mt-0.5 truncate">{user?.email || "..."}</p>
+          <h1 className="text-base font-semibold text-slate-900 dark:text-slate-100">Settings</h1>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 truncate">{user?.email || "..."}</p>
         </div>
         <AlertDialog>
           <AlertDialogTrigger asChild>
@@ -444,34 +446,52 @@ export default function Settings() {
         </AlertDialog>
       </div>
 
+      {/* Appearance — placed first so the user can flip the theme before
+          digging into anything else. Persisted via ThemeProvider's
+          localStorage `appearance` key. Three options: System / Light / Dark.
+          Default is "light" so existing users see no change unless they opt in. */}
+      <section>
+        <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Default Appearance</h2>
+        <Select value={appearance} onValueChange={setAppearance}>
+          <SelectTrigger className="w-48 h-9 bg-white dark:bg-slate-900 dark:border-slate-700 text-sm font-medium text-slate-900 dark:text-slate-100">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="bg-white dark:bg-slate-900 dark:border-slate-700">
+            <SelectItem value="system" className="text-sm font-medium text-slate-900 dark:text-slate-100">System</SelectItem>
+            <SelectItem value="light" className="text-sm font-medium text-slate-900 dark:text-slate-100">Light</SelectItem>
+            <SelectItem value="dark" className="text-sm font-medium text-slate-900 dark:text-slate-100">Dark</SelectItem>
+          </SelectContent>
+        </Select>
+      </section>
+
       {/* Default nav */}
       <section>
         <div className="flex items-start gap-6 flex-wrap">
           <div>
-            <h2 className="text-sm font-semibold text-slate-900 mb-2">Default View</h2>
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Default View</h2>
             <Select value={selectedDefaultNav} onValueChange={saveDefaultNav}>
-              <SelectTrigger className="w-48 h-9 bg-white text-sm font-medium text-slate-900">
+              <SelectTrigger className="w-48 h-9 bg-white dark:bg-slate-900 dark:border-slate-700 text-sm font-medium text-slate-900 dark:text-slate-100">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-white">
+              <SelectContent className="bg-white dark:bg-slate-900 dark:border-slate-700">
                 {navOrder.map((path) => {
                   const opt = NAV_OPTIONS.find((o) => o.value === path);
-                  return opt ? <SelectItem key={opt.value} value={opt.value} className="text-sm font-medium text-slate-900">{opt.label}</SelectItem> : null;
+                  return opt ? <SelectItem key={opt.value} value={opt.value} className="text-sm font-medium text-slate-900 dark:text-slate-100">{opt.label}</SelectItem> : null;
                 })}
               </SelectContent>
             </Select>
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-slate-900 mb-2">Default Calendar View</h2>
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Default Calendar View</h2>
             <Select value={selectedCalendarView} onValueChange={saveDefaultCalendarView}>
-              <SelectTrigger className="w-48 h-9 bg-white text-sm font-medium text-slate-900">
+              <SelectTrigger className="w-48 h-9 bg-white dark:bg-slate-900 dark:border-slate-700 text-sm font-medium text-slate-900 dark:text-slate-100">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-white">
-                <SelectItem value="day" className="text-sm font-medium text-slate-900">Day</SelectItem>
-                <SelectItem value="week" className="text-sm font-medium text-slate-900">Week</SelectItem>
-                <SelectItem value="month" className="text-sm font-medium text-slate-900">Month</SelectItem>
-                <SelectItem value="year" className="text-sm font-medium text-slate-900">Year</SelectItem>
+              <SelectContent className="bg-white dark:bg-slate-900 dark:border-slate-700">
+                <SelectItem value="day" className="text-sm font-medium text-slate-900 dark:text-slate-100">Day</SelectItem>
+                <SelectItem value="week" className="text-sm font-medium text-slate-900 dark:text-slate-100">Week</SelectItem>
+                <SelectItem value="month" className="text-sm font-medium text-slate-900 dark:text-slate-100">Month</SelectItem>
+                <SelectItem value="year" className="text-sm font-medium text-slate-900 dark:text-slate-100">Year</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -480,11 +500,11 @@ export default function Settings() {
 
       {/* Nav Order */}
       <section>
-        <h2 className="text-sm font-semibold text-slate-900 mb-2">Navigation Order</h2>
+        <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Navigation Order</h2>
         
         <div className="space-y-2">
           {navOrder.map((path, idx) =>
-          <div key={path} className="flex items-center gap-3 bg-white border border-slate-100 rounded-xl px-3 py-2.5 hover:border-slate-200 transition-colors">
+          <div key={path} className="flex items-center gap-3 bg-white dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 rounded-xl px-3 py-2.5 hover:border-slate-200 dark:hover:border-slate-700 transition-colors">
               <div className="flex flex-col gap-0.5">
                 <button onClick={() => moveNav(idx, -1)} disabled={idx === 0} className="disabled:opacity-20 text-slate-300 hover:text-slate-500 transition-colors">
                   <ArrowUp className="w-3 h-3" />
@@ -493,7 +513,7 @@ export default function Settings() {
                   <ArrowDown className="w-3 h-3" />
                 </button>
               </div>
-              <span className="text-sm font-medium text-slate-900 flex-1">{NAV_LABELS[path]}</span>
+              <span className="text-sm font-medium text-slate-900 dark:text-slate-100 flex-1">{NAV_LABELS[path]}</span>
               
             </div>
           )}
@@ -502,7 +522,7 @@ export default function Settings() {
 
       {/* Priorities */}
       <section>
-        <h2 className="text-sm font-semibold text-slate-900 mb-2">Priority Levels</h2>
+        <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Priority Levels</h2>
         
 
         <div className="space-y-2">
@@ -553,7 +573,7 @@ export default function Settings() {
 
       {/* Tags */}
       <section>
-        <h2 className="text-sm font-semibold text-slate-900 mb-2">Tags</h2>
+        <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Tags</h2>
         
 
         <div className="border border-slate-100 rounded-xl overflow-hidden bg-white">

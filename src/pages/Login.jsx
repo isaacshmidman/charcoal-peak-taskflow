@@ -5,6 +5,29 @@ import { apiClient } from "@/api/apiClient";
 import { useAuth } from "@/lib/AuthContext";
 import { sanitizeNavRoute } from "@/lib/navigation";
 
+// Tracks which provider the user successfully signed in with last on this
+// device, so we can show a "Last used" hint on the login screen. This helps
+// users avoid creating duplicate accounts (signing up with Google when their
+// real account is email/password, or vice versa). Per-device only — not
+// synced server-side.
+const LAST_SIGNIN_KEY = "lastSignInMethod";
+
+export function recordLastSignIn(method) {
+  try { localStorage.setItem(LAST_SIGNIN_KEY, method); } catch {}
+}
+
+function readLastSignIn() {
+  try { return localStorage.getItem(LAST_SIGNIN_KEY) || ""; } catch { return ""; }
+}
+
+function LastUsedBadge() {
+  return (
+    <span className="ml-2 inline-flex items-center rounded-full bg-amber-50 dark:bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-500/30">
+      Last used
+    </span>
+  );
+}
+
 function buildDefaultReturnUrl() {
   const defaultNav = sanitizeNavRoute(localStorage.getItem("defaultNav"));
   return new URL(defaultNav, window.location.origin).toString();
@@ -33,6 +56,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const isOffline = typeof navigator !== "undefined" && !navigator.onLine;
+  const lastUsed = readLastSignIn();
 
   const hasSession = Boolean(isAuthenticated);
   const googleEnabled = !isOffline && appPublicSettings?.auth_providers?.google === true;
@@ -70,6 +94,7 @@ export default function Login() {
 
     try {
       await loginWithEmailPassword(email.trim(), password);
+      recordLastSignIn("email");
       const nextRoute = new URL(nextUrl).pathname || sanitizeNavRoute(localStorage.getItem("defaultNav"));
       navigate(nextRoute, { replace: true });
     } catch (error) {
@@ -90,21 +115,21 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="w-full max-w-md rounded-[28px] border border-slate-200/80 bg-white/95 backdrop-blur p-8 shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
+      <div className="w-full max-w-md rounded-[28px] border border-slate-200/80 dark:border-slate-700/60 bg-white/95 dark:bg-slate-900/85 backdrop-blur p-8 shadow-[0_24px_80px_rgba(15,23,42,0.08)] dark:shadow-[0_24px_80px_rgba(0,0,0,0.5)]">
         <div className="flex items-center gap-2.5 mb-6">
           <img
             src="/zephyrly-logo.png"
             alt="Zephyrly"
             className="w-10 h-10 rounded-xl object-cover"
           />
-          <span className="text-2xl font-semibold tracking-tight text-slate-900">
+          <span className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
             Zephyrly
           </span>
         </div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 leading-snug">
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 leading-snug">
           Your work doesn't stop when you close the app. Neither do we.
         </h1>
-        <p className="mt-3 text-sm leading-6 text-slate-500">
+        <p className="mt-3 text-sm leading-6 text-slate-500 dark:text-slate-400">
           Sign in to pick up where you left off.
         </p>
 
@@ -112,32 +137,32 @@ export default function Login() {
           <>
             <form className="mt-6 space-y-3" onSubmit={handleEmailPasswordSignIn}>
               <label className="block">
-                <span className="text-xs font-medium text-slate-500">Email</span>
-                <div className="mt-1 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 h-12">
-                  <Mail className="w-4 h-4 text-slate-400 shrink-0" />
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Email</span>
+                <div className="mt-1 flex items-center gap-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 px-4 h-12">
+                  <Mail className="w-4 h-4 text-slate-400 dark:text-slate-500 shrink-0" />
                   <input
                     data-testid="login-email"
                     type="text"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
                     placeholder="Enter any email"
-                    className="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
+                    className="w-full bg-transparent text-sm text-slate-900 dark:text-slate-100 outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500"
                     autoComplete="username"
                   />
                 </div>
               </label>
 
               <label className="block">
-                <span className="text-xs font-medium text-slate-500">Password</span>
-                <div className="mt-1 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 h-12">
-                  <KeyRound className="w-4 h-4 text-slate-400 shrink-0" />
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Password</span>
+                <div className="mt-1 flex items-center gap-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 px-4 h-12">
+                  <KeyRound className="w-4 h-4 text-slate-400 dark:text-slate-500 shrink-0" />
                   <input
                     data-testid="login-password"
                     type="password"
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
                     placeholder="Enter any password"
-                    className="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
+                    className="w-full bg-transparent text-sm text-slate-900 dark:text-slate-100 outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500"
                     autoComplete="current-password"
                   />
                 </div>
@@ -149,16 +174,17 @@ export default function Login() {
                 type="submit"
                 data-testid="login-submit"
                 disabled={isLoadingAuth}
-                className="w-full h-12 rounded-2xl bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="w-full h-12 rounded-2xl bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center"
               >
-                {isLoadingAuth ? "Signing in..." : "Sign In"}
+                <span>{isLoadingAuth ? "Signing in..." : "Sign In"}</span>
+                {lastUsed === "email" ? <LastUsedBadge /> : null}
               </button>
             </form>
 
-            <div className="mt-5 flex items-center gap-3 text-xs text-slate-400">
-              <div className="h-px flex-1 bg-slate-200" />
+            <div className="mt-5 flex items-center gap-3 text-xs text-slate-400 dark:text-slate-500">
+              <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
               <span>or</span>
-              <div className="h-px flex-1 bg-slate-200" />
+              <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
             </div>
           </>
         ) : (
@@ -168,7 +194,7 @@ export default function Login() {
         <button
           onClick={handleGoogleSignIn}
           disabled={!googleEnabled}
-          className={`${emailPasswordEnabled ? "mt-5" : "mt-6"} w-full h-12 rounded-2xl border border-slate-200 bg-white text-slate-900 text-sm font-medium hover:bg-slate-50 inline-flex items-center justify-center gap-3 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed`}
+          className={`${emailPasswordEnabled ? "mt-5" : "mt-6"} w-full h-12 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 text-slate-900 dark:text-slate-100 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 inline-flex items-center justify-center gap-3 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed`}
         >
           <svg viewBox="0 0 24 24" className="w-5 h-5" aria-hidden="true">
             <path fill="#EA4335" d="M12 10.2v3.9h5.4c-.2 1.3-1.7 3.9-5.4 3.9-3.2 0-5.8-2.7-5.8-6s2.6-6 5.8-6c1.8 0 3 .8 3.7 1.5l2.5-2.4C16.6 3.6 14.5 2.7 12 2.7 6.9 2.7 2.8 6.9 2.8 12s4.1 9.3 9.2 9.3c5.3 0 8.8-3.7 8.8-8.9 0-.6-.1-1-.1-1.4H12Z" />
@@ -176,11 +202,12 @@ export default function Login() {
             <path fill="#FBBC05" d="M12 21.3c2.5 0 4.6-.8 6.1-2.2l-3-2.3c-.8.6-1.9 1-3.1 1-2.4 0-4.5-1.6-5.2-3.9l-3.2 2.5c1.6 3 4.7 4.9 8.4 4.9Z" />
             <path fill="#4285F4" d="M18.1 19.1c1.8-1.7 2.7-4.1 2.7-7.1 0-.6-.1-1-.1-1.4H12v3.9h5.4c-.2 1.1-.8 2.1-1.7 2.8l3 2.3Z" />
           </svg>
-          Sign In with Google
+          <span>Sign In with Google</span>
+          {lastUsed === "google" ? <LastUsedBadge /> : null}
         </button>
 
-        <div className="mt-5 rounded-2xl bg-slate-50 border border-slate-200 px-4 py-3">
-          <p className="text-xs text-slate-500 leading-5">
+        <div className="mt-5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 px-4 py-3">
+          <p className="text-xs text-slate-500 dark:text-slate-400 leading-5">
             {googleEnabled
               ? "Google sign-in will bring you right back to this app automatically."
               : isOffline
@@ -191,7 +218,7 @@ export default function Login() {
                   ? "Google sign-in is currently disabled on this backend. Email and password login still works."
                   : "Google sign-in is currently disabled on this backend. Contact the administrator for access."}
           </p>
-          <p className="mt-2 text-[11px] text-slate-400 break-all">
+          <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500 break-all">
             Return target: {nextUrl}
           </p>
         </div>

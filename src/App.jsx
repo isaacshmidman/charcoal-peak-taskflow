@@ -3,6 +3,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter as Router, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { queryClientInstance } from "@/lib/query-client";
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
+import { ThemeProvider } from "@/lib/ThemeProvider";
 import { loadFromCache } from "@/lib/offlineCache";
 import { sanitizeNavRoute } from "@/lib/navigation";
 import Layout from "@/components/Layout";
@@ -55,12 +56,12 @@ const AuthenticatedApp = () => {
     if (authError.type !== "auth_required") {
       return (
         <div className="fixed inset-0 flex items-center justify-center px-4">
-          <div className="max-w-sm w-full bg-white border border-slate-200 rounded-2xl p-6 text-center shadow-sm">
-            <h1 className="text-base font-semibold text-slate-900">Couldn&apos;t load Zephyrly</h1>
-            <p className="text-sm text-slate-500 mt-2">{authError.message || "Something went wrong while loading the app."}</p>
+          <div className="max-w-sm w-full bg-white dark:bg-slate-900/85 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 text-center shadow-sm">
+            <h1 className="text-base font-semibold text-slate-900 dark:text-slate-100">Couldn&apos;t load Zephyrly</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">{authError.message || "Something went wrong while loading the app."}</p>
             <button
               onClick={() => checkAppState()}
-              className="mt-4 h-9 px-4 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800"
+              className="mt-4 h-9 px-4 rounded-lg bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm font-medium hover:bg-slate-800 dark:hover:bg-slate-200"
             >
               Try again
             </button>
@@ -91,13 +92,15 @@ const AuthenticatedApp = () => {
 
 function App() {
   return (
-    <AuthProvider>
-      <QueryClientProvider client={queryClientInstance}>
-        <Router>
-          <AuthenticatedApp />
-        </Router>
-      </QueryClientProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <QueryClientProvider client={queryClientInstance}>
+          <Router>
+            <AuthenticatedApp />
+          </Router>
+        </QueryClientProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 
