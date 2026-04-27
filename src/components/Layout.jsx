@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation } from "react-router-dom";
-import { ListTodo, CalendarDays, Settings, Sun, WifiOff, CheckCircle2 } from "lucide-react";
+import { ListTodo, CalendarDays, LayoutGrid, Settings, Sun, WifiOff, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { useOfflineData } from "@/hooks/useOfflineData";
@@ -8,7 +8,8 @@ import { DEFAULT_NAV_ORDER, sanitizeNavOrder, sanitizeNavRoute } from "@/lib/nav
 
 const ALL_NAV_ITEMS = {
   "/Today":     { path: "/Today",     label: "Today",     icon: Sun },
-  "/Groupings": { path: "/Groupings", label: "Groupings", icon: CalendarDays },
+  "/Groupings": { path: "/Groupings", label: "Groupings", icon: LayoutGrid },
+  "/Calendar":  { path: "/Calendar",  label: "Calendar",  icon: CalendarDays },
   "/Active":    { path: "/Active",    label: "All Tasks", icon: ListTodo },
   "/Completed": { path: "/Completed", label: "Completed", icon: CheckCircle2 },
 };
@@ -103,7 +104,7 @@ export default function Layout() {
       </header>
 
       {/* Mobile nav — raised from bottom edge for comfortable thumb reach */}
-      <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/90 backdrop-blur-xl border-t border-slate-100 px-2 pt-2 pb-5">
+      <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/90 backdrop-blur-xl border-t border-slate-100 px-1 pt-2 pb-5">
         <div className="flex justify-around">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path;
@@ -112,12 +113,12 @@ export default function Layout() {
                 key={item.path}
                 to={item.path}
                 className={cn(
-                  "flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all touch-manipulation",
+                  "flex flex-col items-center gap-0.5 px-1.5 py-1.5 rounded-lg text-[11px] font-medium transition-all touch-manipulation flex-1 min-w-0",
                   isActive ? "text-slate-900" : "text-slate-400"
                 )}
               >
                 <item.icon className="w-5 h-5" />
-                {item.label}
+                <span className="truncate max-w-full">{item.label}</span>
               </Link>
             );
           })}

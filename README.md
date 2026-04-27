@@ -168,6 +168,43 @@ Useful commands:
 
 Imported SQLite data lives in `backend/data/` and is ignored by git so your local data stays local.
 
+## Calendar Integrations
+
+Zephyrly can sync events from Google Calendar and (in a later commit) Apple Calendar into your task list. One-way for now — provider events become tasks; changes from Zephyrly back to the provider land in a follow-up commit.
+
+### One-time setup
+
+1. **Generate the encryption key** that protects OAuth tokens at rest:
+
+   ```bash
+   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+   ```
+
+   Paste the output as `INTEGRATIONS_ENCRYPTION_KEY` in `.env.backend.local` (and in Render / your prod secret store). **Never commit this value. Rotating it invalidates every existing connection — users must reconnect.**
+
+2. **Create an OAuth 2.0 client for Google Calendar** in the Google Cloud Console:
+   - Enable the "Google Calendar API" on the project
+   - On the OAuth consent screen, add the scope `.../auth/calendar.events` (marked "sensitive" — fine for testing, requires Google verification for public release)
+   - Add yourself as a test user while unverified
+   - Add the redirect URI: `http://127.0.0.1:8787/api/apps/taskflow-local/integrations/google/callback` (dev) and the equivalent production URL
+   - Paste the client id / secret into `TASKFLOW_GOOGLE_CALENDAR_CLIENT_ID` / `TASKFLOW_GOOGLE_CALENDAR_CLIENT_SECRET` (or reuse your login credentials — same vars with `TASKFLOW_GOOGLE_` prefix also work)
+
+3. Restart the backend. The Settings page's "Calendar Integrations" panel now shows a working Connect button.
+
+### How sync works
+
+- Polling every 5 min (configurable via `TASKFLOW_SYNC_INTERVAL_MS`).
+- Uses Google's incremental `syncToken` so each tick only fetches changes since the last run.
+- Tokens encrypted with AES-256-GCM using the master key above, with the row's id as AAD (so blobs can't be swapped between rows).
+- Disconnecting revokes the token at Google and deletes the row — imported tasks stay.
+
+### Security posture
+
+- Tokens never appear in logs or error messages (responses are redacted before inclusion).
+- OAuth state is bound to the user who started the flow; an attacker who steals a callback URL can't use it from another session.
+- Integration routes require an active session; missing integrations return 404 (never 403) to avoid existence leaks.
+- Encryption key is loaded once at boot; if missing, integration routes return 503 rather than silently falling back to plaintext storage.
+
 ## Offline Mode
 
 Zephyrly is designed to stay useful when the network drops. Everything the user touches regularly keeps working offline; only things that require a round-trip to a remote server are disabled.

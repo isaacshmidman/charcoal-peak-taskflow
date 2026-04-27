@@ -21,6 +21,8 @@ import {
   AlertDialogTrigger } from
 "@/components/ui/alert-dialog";
 import RecentlyDeleted from "@/pages/RecentlyDeleted";
+import IntegrationsPanel from "@/components/settings/IntegrationsPanel";
+import { useLocation } from "react-router-dom";
 import { DEFAULT_NAV_ORDER, sanitizeNavOrder, sanitizeNavRoute } from "@/lib/navigation";
 
 import { COLOR_OPTIONS, colorDot } from "@/lib/colors";
@@ -29,6 +31,7 @@ export const NAV_OPTIONS = [
 { value: "/Active", label: "All Tasks" },
 { value: "/Today", label: "Today" },
 { value: "/Groupings", label: "Groupings" },
+{ value: "/Calendar", label: "Calendar" },
 { value: "/Completed", label: "Completed" }];
 
 
@@ -36,6 +39,7 @@ const NAV_LABELS = {
   "/Active": "All Tasks",
   "/Today": "Today",
   "/Groupings": "Groupings",
+  "/Calendar": "Calendar",
   "/Completed": "Completed"
 };
 
@@ -136,6 +140,40 @@ export default function Settings() {
   const pendingScrollRestoreRef = useRef(null);
   const queryClient = useQueryClient();
   const { user, logout } = useAuth();
+  const location = useLocation();
+
+  // Scroll to section (e.g. from Calendar page deep link).
+  useEffect(() => {
+    const id = location.state?.scrollTo;
+    if (!id) return;
+    if (id === "bottom") {
+      // Content may still be loading (queries, lazy images). Re-scroll to the
+      // bottom while the document height is still growing, up to ~1.5s.
+      let cancelled = false;
+      let lastHeight = -1;
+      let attempts = 0;
+      const maxAttempts = 15;
+      const tick = () => {
+        if (cancelled) return;
+        const h = document.documentElement.scrollHeight;
+        window.scrollTo({ top: h, left: 0, behavior: attempts === 0 ? "auto" : "smooth" });
+        attempts += 1;
+        if (h !== lastHeight && attempts < maxAttempts) {
+          lastHeight = h;
+          setTimeout(tick, 100);
+        }
+      };
+      requestAnimationFrame(tick);
+      return () => { cancelled = true; };
+    }
+    const el = document.getElementById(id);
+    if (el) {
+      // Defer so the section has mounted.
+      requestAnimationFrame(() => {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+  }, [location.state]);
 
   useLayoutEffect(() => {
     if (showRecentlyDeleted || pendingScrollRestoreRef.current === null) return;
@@ -357,6 +395,18 @@ export default function Settings() {
     window.dispatchEvent(new Event("navOrderChanged"));
   };
 
+  // Default calendar view setting (day/week/month/year)
+  const CALENDAR_VIEWS = ["day", "week", "month", "year"];
+  const storedCalendarView = localStorage.getItem("defaultCalendarView");
+  const [selectedCalendarView, setSelectedCalendarView] = useState(
+    CALENDAR_VIEWS.includes(storedCalendarView) ? storedCalendarView : "month"
+  );
+  const saveDefaultCalendarView = (val) => {
+    const next = CALENDAR_VIEWS.includes(val) ? val : "month";
+    setSelectedCalendarView(next);
+    localStorage.setItem("defaultCalendarView", next);
+  };
+
   if (showRecentlyDeleted) {
     return (
       <div>
@@ -396,19 +446,36 @@ export default function Settings() {
 
       {/* Default nav */}
       <section>
-        <h2 className="text-sm font-semibold text-slate-900 mb-2">Default View</h2>
-        
-        <Select value={selectedDefaultNav} onValueChange={saveDefaultNav}>
-          <SelectTrigger className="w-48 h-9 bg-white text-sm font-medium text-slate-900">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="bg-white">
-            {navOrder.map((path) => {
-              const opt = NAV_OPTIONS.find((o) => o.value === path);
-              return opt ? <SelectItem key={opt.value} value={opt.value} className="text-sm font-medium text-slate-900">{opt.label}</SelectItem> : null;
-            })}
-          </SelectContent>
-        </Select>
+        <div className="flex items-start gap-6 flex-wrap">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900 mb-2">Default View</h2>
+            <Select value={selectedDefaultNav} onValueChange={saveDefaultNav}>
+              <SelectTrigger className="w-48 h-9 bg-white text-sm font-medium text-slate-900">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-white">
+                {navOrder.map((path) => {
+                  const opt = NAV_OPTIONS.find((o) => o.value === path);
+                  return opt ? <SelectItem key={opt.value} value={opt.value} className="text-sm font-medium text-slate-900">{opt.label}</SelectItem> : null;
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900 mb-2">Default Calendar View</h2>
+            <Select value={selectedCalendarView} onValueChange={saveDefaultCalendarView}>
+              <SelectTrigger className="w-48 h-9 bg-white text-sm font-medium text-slate-900">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-white">
+                <SelectItem value="day" className="text-sm font-medium text-slate-900">Day</SelectItem>
+                <SelectItem value="week" className="text-sm font-medium text-slate-900">Week</SelectItem>
+                <SelectItem value="month" className="text-sm font-medium text-slate-900">Month</SelectItem>
+                <SelectItem value="year" className="text-sm font-medium text-slate-900">Year</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       </section>
 
       {/* Nav Order */}
@@ -546,6 +613,8 @@ export default function Settings() {
           <ChevronRight className="w-4 h-4 text-slate-300" />
         </button>
       </section>
+
+      <IntegrationsPanel />
 
     </div>);
 

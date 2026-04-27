@@ -106,6 +106,11 @@ beforeAll(() => {
     googleClientId: "",
     googleClientSecret: "",
     googleMode: "disabled",
+    googleCalendarClientId: "",
+    googleCalendarClientSecret: "",
+    hasGoogleCalendarCredentials: false,
+    integrationsEnabled: false,
+    syncIntervalMs: 300000,
   };
 
   db = createDatabase(config);

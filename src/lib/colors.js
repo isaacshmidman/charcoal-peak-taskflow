@@ -80,3 +80,40 @@ export const colorBg = {
 export function isDarkColor(colorKey) {
   return colorKey === "black";
 }
+
+/**
+ * Parse a #RRGGBB / #RGB hex string to an `{r,g,b}` object.
+ * Returns null when the input doesn't match.
+ */
+export function parseHexColor(hex) {
+  if (typeof hex !== "string") return null;
+  const m = hex.trim().toLowerCase().match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/);
+  if (!m) return null;
+  let h = m[1];
+  if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+  return {
+    r: parseInt(h.slice(0, 2), 16),
+    g: parseInt(h.slice(2, 4), 16),
+    b: parseInt(h.slice(4, 6), 16),
+  };
+}
+
+/** Produce an `rgba(...)` string from a hex color + alpha (0..1). */
+export function hexToRgba(hex, alpha = 1) {
+  const c = parseHexColor(hex);
+  if (!c) return null;
+  const a = Math.max(0, Math.min(1, alpha));
+  return `rgba(${c.r}, ${c.g}, ${c.b}, ${a})`;
+}
+
+/**
+ * True when an arbitrary hex color is "dark" (perceptual luminance below 50%).
+ * Used to choose between light / dark text on a hex-colored surface.
+ */
+export function isHexDark(hex) {
+  const c = parseHexColor(hex);
+  if (!c) return false;
+  // Standard relative luminance approximation (sRGB).
+  const lum = (0.299 * c.r + 0.587 * c.g + 0.114 * c.b) / 255;
+  return lum < 0.55;
+}

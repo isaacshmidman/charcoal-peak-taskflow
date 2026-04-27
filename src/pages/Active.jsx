@@ -14,6 +14,8 @@ import TaskForm from "@/components/tasks/TaskForm";
 import SubtaskForm from "@/components/tasks/SubtaskForm";
 import MultiSortPanel from "@/components/tasks/MultiSortPanel";
 import RecurringDeleteDialog from "@/components/tasks/RecurringDeleteDialog";
+import { compareDueDateTime } from "@/lib/sort-helpers";
+import { excludeExternalEvents } from "@/lib/task-filters";
 
 export default function Active() {
   const [showForm, setShowForm] = useState(false);
@@ -45,6 +47,8 @@ export default function Active() {
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ["tasks"],
     queryFn: () => apiClient.entities.Task.list("-created_date", 500),
+    // Calendar-imported events live only on /Calendar.
+    select: excludeExternalEvents,
   });
 
   const { data: priorities = [] } = useQuery({
@@ -111,8 +115,6 @@ export default function Active() {
   }, [priorities]);
 
   const compareFn = (a, b, sortValue) => {
-    const da = a.due_date ? new Date(a.due_date + "T00:00:00") : null;
-    const db = b.due_date ? new Date(b.due_date + "T00:00:00") : null;
     const pa = priorityOrderMap[a.priority_id] ?? 99;
     const pb = priorityOrderMap[b.priority_id] ?? 99;
     const ta = (a.tags?.[0] || "");
@@ -122,15 +124,9 @@ export default function Active() {
 
     switch (sortValue) {
       case "date_asc":
-        if (!da && !db) return 0;
-        if (!da) return 1;
-        if (!db) return -1;
-        return da - db;
+        return compareDueDateTime(a, b, "asc");
       case "date_desc":
-        if (!da && !db) return 0;
-        if (!da) return 1;
-        if (!db) return -1;
-        return db - da;
+        return compareDueDateTime(a, b, "desc");
       case "priority_asc":
         return pa - pb;
       case "priority_desc":

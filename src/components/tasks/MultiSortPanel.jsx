@@ -6,14 +6,14 @@ import { Sliders, X, Plus, ChevronRight, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * @typedef {{ value: string, label: string, scope?: string, group?: string }} SortOption
+ * @typedef {{ value: string, label: string, scope?: string, hideOnScope?: string[], group?: string }} SortOption
  */
 
 /** @type {SortOption[]} */
 export const SORT_OPTIONS = [
   { value: "none", label: "None" },
-  { value: "date_asc", label: "Date: Oldest → Newest", group: "date" },
-  { value: "date_desc", label: "Date: Newest → Oldest", group: "date" },
+  { value: "date_asc", label: "Date: Oldest → Newest", hideOnScope: ["calendar"], group: "date" },
+  { value: "date_desc", label: "Date: Newest → Oldest", hideOnScope: ["calendar"], group: "date" },
   { value: "deleted_asc", label: "Deleted: Oldest → Newest", scope: "deleted", group: "deleted" },
   { value: "deleted_desc", label: "Deleted: Newest → Oldest", scope: "deleted", group: "deleted" },
   { value: "completed_first", label: "Completed First", group: "completion" },
@@ -50,7 +50,9 @@ export default function MultiSortPanel({ sorts, onSortsChange, page = "default" 
   const [open, setOpen] = useState(false);
   const [expandedIndex, setExpandedIndex] = useState(-1);
 
-  const availableOptions = SORT_OPTIONS.filter((opt) => !opt.scope || opt.scope === page);
+  const availableOptions = SORT_OPTIONS.filter(
+    (opt) => (!opt.scope || opt.scope === page) && (!opt.hideOnScope || !opt.hideOnScope.includes(page))
+  );
   const labelFor = (value) =>
     SORT_OPTIONS.find((o) => o.value === value)?.label || "None";
 

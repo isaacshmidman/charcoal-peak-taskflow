@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { useDeletedTasks } from "@/hooks/useDeletedTasks";
 import { useOfflineMutation } from "@/hooks/useOfflineMutation";
 import { showDeleteToast } from "@/components/tasks/DeleteToast";
+import { excludeExternalEvents } from "@/lib/task-filters";
 import { formatDeleteLabel } from "@/hooks/useDeleteWithUndo";
 import {
   Dialog,
@@ -23,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import MultiSortPanel from "@/components/tasks/MultiSortPanel";
 import { colorBg } from "@/lib/colors";
+import { compareDueDateTime } from "@/lib/sort-helpers";
 
 const RETENTION_OPTIONS = [
   { value: "7", label: "1 week" },
@@ -81,6 +83,8 @@ export default function RecentlyDeleted({ onBack } = {}) {
   const { data: rawDeletedTasks = [] } = useQuery({
     queryKey: ["deletedTasks"],
     queryFn: () => apiClient.entities.DeletedTask.list("-deleted_at", 500),
+    // Calendar-imported events shouldn't reappear in the user's trash.
+    select: excludeExternalEvents,
   });
 
   const { data: priorities = [] } = useQuery({
@@ -111,18 +115,8 @@ export default function RecentlyDeleted({ onBack } = {}) {
         const bc = b.was_completed ? 1 : 0;
         return ac - bc;
       }
-      case "date_asc": {
-        const da = a.due_date ? new Date(a.due_date + "T00:00:00") : null;
-        const db = b.due_date ? new Date(b.due_date + "T00:00:00") : null;
-        if (!da && !db) return 0; if (!da) return 1; if (!db) return -1;
-        return da - db;
-      }
-      case "date_desc": {
-        const da = a.due_date ? new Date(a.due_date + "T00:00:00") : null;
-        const db = b.due_date ? new Date(b.due_date + "T00:00:00") : null;
-        if (!da && !db) return 0; if (!da) return 1; if (!db) return -1;
-        return db - da;
-      }
+      case "date_asc": return compareDueDateTime(a, b, "asc");
+      case "date_desc": return compareDueDateTime(a, b, "desc");
       default: return 0;
     }
   };

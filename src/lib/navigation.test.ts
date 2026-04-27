@@ -11,6 +11,7 @@ describe("navigation helpers", () => {
       "/Completed",
       "/Today",
       "/Groupings",
+      "/Calendar",
       "/Active",
     ]);
   });

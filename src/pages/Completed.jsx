@@ -20,6 +20,7 @@ import {
 import TaskCard from "@/components/tasks/TaskCard";
 import TaskForm from "@/components/tasks/TaskForm";
 import MultiSortPanel from "@/components/tasks/MultiSortPanel";
+import { excludeExternalEvents } from "@/lib/task-filters";
 
 export default function Completed() {
   const [editingTask, setEditingTask] = useState(null);
@@ -51,6 +52,8 @@ export default function Completed() {
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ["tasks"],
     queryFn: () => apiClient.entities.Task.list("-completed_at", 500),
+    // Calendar-imported events live only on /Calendar.
+    select: excludeExternalEvents,
   });
 
   const { data: priorities = [] } = useQuery({

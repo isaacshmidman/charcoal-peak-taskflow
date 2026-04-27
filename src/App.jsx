@@ -12,6 +12,7 @@ import AuthCallback from "@/pages/AuthCallback.jsx";
 import Today from "@/pages/Today.jsx";
 import Completed from "@/pages/Completed.jsx";
 import Groupings from "@/pages/Groupings.jsx";
+import Calendar from "@/pages/Calendar.jsx";
 import Login from "@/pages/Login.jsx";
 import Settings from "@/pages/Settings.jsx";
 import RecentlyDeleted from "@/pages/RecentlyDeleted.jsx";
@@ -79,6 +80,7 @@ const AuthenticatedApp = () => {
         <Route path="/Today" element={<Today />} />
         <Route path="/Completed" element={<Completed />} />
         <Route path="/Groupings" element={<Groupings />} />
+        <Route path="/Calendar" element={<Calendar />} />
         <Route path="/Settings" element={<Settings />} />
         <Route path="/RecentlyDeleted" element={<RecentlyDeleted />} />
       </Route>

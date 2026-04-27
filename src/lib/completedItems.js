@@ -38,10 +38,14 @@ export function buildCompletedTaskItem(task) {
   };
 }
 
+import { compareTaskTime } from "@/lib/sort-helpers";
+
 /**
  * @param {CompletedItem} item
  */
 const getPrimaryDate = (item) => item.dueDate ? new Date(`${item.dueDate}T00:00:00`) : new Date(item.completedAt || 0);
+
+const getTaskTime = (item) => item.task?.task_time || "";
 
 /**
  * @param {CompletedItem} item
@@ -61,11 +65,15 @@ export function sortCompletedItems(items, sorts, priorityOrderMap) {
         case "date_asc": {
           const result = getPrimaryDate(a).getTime() - getPrimaryDate(b).getTime();
           if (result !== 0) return result;
+          const tieResult = compareTaskTime(getTaskTime(a), getTaskTime(b), "asc");
+          if (tieResult !== 0) return tieResult;
           break;
         }
         case "date_desc": {
           const result = getPrimaryDate(b).getTime() - getPrimaryDate(a).getTime();
           if (result !== 0) return result;
+          const tieResult = compareTaskTime(getTaskTime(a), getTaskTime(b), "desc");
+          if (tieResult !== 0) return tieResult;
           break;
         }
         case "priority_asc": {

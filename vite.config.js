@@ -49,6 +49,29 @@ export default defineConfig(({ mode }) => {
   return {
     ...createViteConfig({ apiBaseUrl: env.VITE_API_BASE_URL || "", useEmbeddedApi }),
     optimizeDeps: { force: true },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            react: ["react", "react-dom", "react-router-dom"],
+            "react-query": ["@tanstack/react-query"],
+            radix: [
+              "@radix-ui/react-alert-dialog",
+              "@radix-ui/react-dialog",
+              "@radix-ui/react-dropdown-menu",
+              "@radix-ui/react-label",
+              "@radix-ui/react-popover",
+              "@radix-ui/react-select",
+              "@radix-ui/react-slot",
+            ],
+            motion: ["framer-motion"],
+            dnd: ["@dnd-kit/core", "@dnd-kit/modifiers"],
+            "date-picker": ["react-day-picker", "date-fns"],
+            icons: ["lucide-react"],
+          },
+        },
+      },
+    },
     plugins: [
       react(),
       ...(useEmbeddedApi ? [createEmbeddedBackendPlugin({ appId: env.VITE_APP_ID || backendConfig.appId })] : []),

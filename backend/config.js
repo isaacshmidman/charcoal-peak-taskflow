@@ -61,6 +61,26 @@ const googleClientId = process.env.TASKFLOW_GOOGLE_CLIENT_ID || "";
 const googleClientSecret = process.env.TASKFLOW_GOOGLE_CLIENT_SECRET || "";
 const hasGoogleCredentials = Boolean(googleClientId && googleClientSecret);
 
+// Calendar integration credentials. These may reuse the login client (same
+// Google Cloud project, same client id/secret) — only the OAuth scopes
+// differ. If you want isolation, set separate vars.
+const googleCalendarClientId =
+  process.env.TASKFLOW_GOOGLE_CALENDAR_CLIENT_ID || googleClientId;
+const googleCalendarClientSecret =
+  process.env.TASKFLOW_GOOGLE_CALENDAR_CLIENT_SECRET || googleClientSecret;
+const hasGoogleCalendarCredentials = Boolean(
+  googleCalendarClientId && googleCalendarClientSecret
+);
+
+const integrationsEnabled = parseBoolean(
+  process.env.TASKFLOW_INTEGRATIONS_ENABLED,
+  true
+);
+const syncIntervalMs = parseInteger(
+  process.env.TASKFLOW_SYNC_INTERVAL_MS,
+  60 * 1000 // 1 minute
+);
+
 export const backendConfig = {
   host,
   port,
@@ -83,7 +103,22 @@ export const backendConfig = {
   googleMode:
     process.env.TASKFLOW_GOOGLE_MODE ||
     (hasGoogleCredentials ? "oauth" : process.env.NODE_ENV === "production" ? "disabled" : "disabled"),
+  googleCalendarClientId,
+  googleCalendarClientSecret,
+  hasGoogleCalendarCredentials,
+  integrationsEnabled,
+  syncIntervalMs,
 };
+
+export function getGoogleCalendarRedirectUrl(config = backendConfig) {
+  // Must match a redirect URI registered in Google Cloud Console. The callback
+  // hits the backend (not the Vite dev server) because the handler writes a
+  // session cookie + updates DB.
+  return (
+    process.env.TASKFLOW_GOOGLE_CALENDAR_REDIRECT_URL ||
+    `http://${config.host}:${config.port}/api/apps/${config.appId}/integrations/google/callback`
+  );
+}
 
 export function getGoogleRedirectUrl(config = backendConfig) {
   return (

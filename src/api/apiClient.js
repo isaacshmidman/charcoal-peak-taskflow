@@ -39,6 +39,17 @@ import { loadFromCache, saveToCache } from "@/lib/offlineCache";
  *   },
   *   setToken: (token: string, saveToStorage?: boolean) => void,
   *   getPublicSettings: () => Promise<any>,
+ *   integrations: {
+ *     list: () => Promise<any[]>,
+ *     connectApple: (creds: { email: string, password: string }) => Promise<any>,
+ *     connectGoogle: (fromUrl?: string) => void,
+ *     disconnect: (id: string) => Promise<any>,
+ *     sync: (id: string) => Promise<any>,
+ *     listCalendars: (id: string) => Promise<any[]>,
+ *     setCalendars: (id: string, updates: Record<string, boolean>) => Promise<any[]>,
+ *     setDefault: (id: string) => Promise<any>,
+ *     setPrimaryCalendar: (id: string, externalCalendarId: string) => Promise<any>,
+ *   },
  *   cleanup: () => void,
  * }} ApiClient
  */
@@ -345,6 +356,62 @@ const liveApiClient = {
   },
   setToken(token, saveToStorage = true) {
     liveApiClient.auth.setToken(token, saveToStorage);
+  },
+  integrations: {
+    async list() {
+      const data = await apiRequest(`/apps/${appConfig.appId}/integrations`);
+      return Array.isArray(data?.integrations) ? data.integrations : [];
+    },
+    async connectApple({ email, password }) {
+      return apiRequest(`/apps/${appConfig.appId}/integrations/apple/connect`, {
+        method: "POST",
+        body: { email, password },
+      });
+    },
+    connectGoogle(fromUrl) {
+      if (typeof window === "undefined") return;
+      const fromAbs = new URL(fromUrl || "/Settings", window.location.origin).toString();
+      const url = buildApiUrl(`/apps/${appConfig.appId}/integrations/google/connect`, {
+        from_url: fromAbs,
+      });
+      window.location.href = url;
+    },
+    async disconnect(id) {
+      return apiRequest(`/apps/${appConfig.appId}/integrations/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+    },
+    async sync(id) {
+      return apiRequest(
+        `/apps/${appConfig.appId}/integrations/${encodeURIComponent(id)}/sync`,
+        { method: "POST" }
+      );
+    },
+    async listCalendars(id) {
+      const data = await apiRequest(
+        `/apps/${appConfig.appId}/integrations/${encodeURIComponent(id)}/calendars`
+      );
+      return Array.isArray(data?.calendars) ? data.calendars : [];
+    },
+    async setCalendars(id, updates) {
+      const data = await apiRequest(
+        `/apps/${appConfig.appId}/integrations/${encodeURIComponent(id)}/calendars`,
+        { method: "PUT", body: { updates } }
+      );
+      return Array.isArray(data?.calendars) ? data.calendars : [];
+    },
+    async setDefault(id) {
+      return apiRequest(
+        `/apps/${appConfig.appId}/integrations/${encodeURIComponent(id)}/set-default`,
+        { method: "POST" }
+      );
+    },
+    async setPrimaryCalendar(id, externalCalendarId) {
+      return apiRequest(
+        `/apps/${appConfig.appId}/integrations/${encodeURIComponent(id)}/primary-calendar`,
+        { method: "POST", body: { external_calendar_id: externalCalendarId } }
+      );
+    },
   },
   async getPublicSettings() {
     try {

@@ -161,6 +161,33 @@ export function createE2EApiClient() {
     async getPublicSettings() {
       return clone(backend.publicSettings);
     },
+    integrations: {
+      async list() {
+        return [];
+      },
+      connectGoogle() {},
+      async connectApple() {
+        return { success: true };
+      },
+      async disconnect() {
+        return { success: true };
+      },
+      async sync() {
+        return { success: true };
+      },
+      async listCalendars() {
+        return [];
+      },
+      async setCalendars() {
+        return [];
+      },
+      async setDefault() {
+        return { success: true };
+      },
+      async setPrimaryCalendar() {
+        return { success: true };
+      },
+    },
     cleanup() {},
     setToken(token) {
       backend.lastToken = token;

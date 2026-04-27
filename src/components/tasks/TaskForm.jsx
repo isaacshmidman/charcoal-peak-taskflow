@@ -13,12 +13,14 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Calendar as CalendarIcon, X, Plus, Trash2, CheckSquare } from "lucide-react";
+import { Calendar as CalendarIcon, X, Plus, Trash2, CheckSquare, Lock } from "lucide-react";
+import { hexToRgba } from "@/lib/colors";
 
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useOutsideClick } from "@/hooks/useOutsideClick";
 import { getNextRecurrenceDate } from "@/lib/recurrence";
+import { parseTaskTime } from "@/lib/sort-helpers";
 
 const toDateStr = (date) => format(date, "yyyy-MM-dd");
 const fromDateStr = (str) => new Date(str + "T00:00:00");
@@ -44,17 +46,19 @@ const defaultTask = {
   recurrence_end_date: "",
   due_date: "",
   task_time: "",
+  task_end_time: "",
   tags: [],
   subtask_titles: [],
 };
 
-export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete, parentId, existingSubtasks = [], onToggleSubtask, onDeleteSubtask, onEditSubtask, defaultDueDate }) {
+export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete, parentId, existingSubtasks = [], onToggleSubtask, onDeleteSubtask, onEditSubtask, defaultDueDate, defaultTaskTime }) {
   const [form, setForm] = useState(defaultTask);
   const [tagInput, setTagInput] = useState("");
   const [tagInputFocused, setTagInputFocused] = useState(false);
   const [showEndDate, setShowEndDate] = useState(false);
   const [subtaskInput, setSubtaskInput] = useState("");
   const [dayError, setDayError] = useState(false);
+  const endTouchedRef = useRef(false);
   const queryClient = useQueryClient();
 
   // Priorities — sorted by order so dropdown always reflects latest order from Settings
@@ -98,16 +102,19 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
 
   useEffect(() => {
     if (task) {
-      setForm({ ...defaultTask, ...task, tags: task.tags || [], recurrence_days: task.recurrence_days || [], recurrence_end_date: task.recurrence_end_date || "", task_time: task.task_time || "", subtask_titles: [] });
+      setForm({ ...defaultTask, ...task, tags: task.tags || [], recurrence_days: task.recurrence_days || [], recurrence_end_date: task.recurrence_end_date || "", task_time: task.task_time || "", task_end_time: task.task_end_time || "", subtask_titles: [] });
       setShowEndDate(!!task.recurrence_end_date);
     } else {
       // Default to the middle priority by order
       const mid = Math.floor(priorities.length / 2);
       const defaultPriority = priorities[mid] || priorities[0] || null;
       const dueDate = defaultDueDate ?? format(new Date(), "yyyy-MM-dd");
-      setForm({ ...defaultTask, priority_id: defaultPriority?.id || "", parent_id: parentId || "", due_date: dueDate });
+      const timeStart = defaultTaskTime || "";
+      const timeEnd = timeStart ? addMinutes(timeStart, 60) : "";
+      setForm({ ...defaultTask, priority_id: defaultPriority?.id || "", parent_id: parentId || "", due_date: dueDate, task_time: timeStart, task_end_time: timeEnd });
       setShowEndDate(false);
     }
+    endTouchedRef.current = false;
     setTagInput("");
     setSubtaskInput("");
     setDayError(false);
@@ -178,6 +185,20 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
     .filter((tag) => !tagInput || tag.toLowerCase().includes(tagInput.toLowerCase()))
     .slice(0, 30);
 
+  // Source-aware mode flags. A "source" task came from a calendar provider
+  // (Google/Apple). Non-task source items render the calendar name instead of
+  // priority. Non-writable sources (Holidays, Birthdays) are view-only.
+  const sourceProvider = form.source_provider || task?.source_provider || null;
+  const isExternal = !!sourceProvider;
+  const isExternalEvent = isExternal && form.source_kind === "event";
+  // source_writable defaults to true for legacy rows; only treat as read-only
+  // when the field is explicitly false (0 / false / "0" all coerced).
+  const writableRaw = form.source_writable;
+  const isReadOnly =
+    isExternal && (writableRaw === false || writableRaw === 0 || writableRaw === "0");
+  const sourceCalendarName = form.source_calendar_name || "Calendar";
+  const sourceColorHex = form.source_color_hex || null;
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -188,10 +209,29 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
         >
           <DialogHeader>
             <DialogTitle className="text-sm font-semibold text-slate-900">
-              {task ? "Edit Task" : parentId ? "New Subtask" : "New Task"}
+              {isReadOnly
+                ? "View Event"
+                : isExternalEvent
+                  ? "Edit Event"
+                  : task
+                    ? "Edit Task"
+                    : parentId
+                      ? "New Subtask"
+                      : "New Task"}
             </DialogTitle>
           </DialogHeader>
+          {isReadOnly && (
+            <div className="flex items-start gap-2 rounded-md bg-slate-50 border border-slate-100 p-2 text-[11px] text-slate-500 mb-1">
+              <Lock className="w-3.5 h-3.5 mt-0.5 shrink-0 text-slate-400" />
+              <p>
+                This event comes from a read-only calendar
+                {form.source_calendar_name ? <> (<span className="font-medium">{form.source_calendar_name}</span>)</> : null}
+                {" "}so it can't be edited or deleted from Zephyrly.
+              </p>
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
+          <fieldset disabled={isReadOnly} className="contents">
             <Input
               placeholder="What needs to be done?"
               value={form.title}
@@ -209,28 +249,48 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
             />
 
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs font-semibold text-slate-900 mb-1.5 block">Priority</Label>
-                <Select value={form.priority_id} onValueChange={(v) => setForm({ ...form, priority_id: v })}>
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="Select..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {priorities.map(p => (
-                      <SelectItem key={p.id} value={p.id}>
-                        <span className="flex items-center gap-2">
-                          <span className={cn("inline-block w-2.5 h-2.5 rounded-full shrink-0", colorDotClass[p.color] || colorDotClass.slate)} />
-                          {p.name}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {isExternal ? (
+                <div>
+                  <Label className="text-xs font-semibold text-slate-900 mb-1.5 block">Calendar</Label>
+                  <div
+                    className="h-9 px-3 inline-flex items-center gap-2 w-full rounded-md border border-slate-200 bg-slate-50 text-sm text-slate-700"
+                    title={`${sourceCalendarName} (${sourceProvider})`}
+                  >
+                    <span
+                      className="inline-block w-2.5 h-2.5 rounded-full shrink-0 border border-slate-200"
+                      style={sourceColorHex ? { backgroundColor: sourceColorHex, borderColor: hexToRgba(sourceColorHex, 0.6) || undefined } : { backgroundColor: "#94a3b8" }}
+                    />
+                    <span className="truncate">{sourceCalendarName}</span>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <Label className="text-xs font-semibold text-slate-900 mb-1.5 block">Priority</Label>
+                  <Select value={form.priority_id} onValueChange={(v) => setForm({ ...form, priority_id: v })}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Select..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {priorities.map(p => (
+                        <SelectItem key={p.id} value={p.id}>
+                          <span className="flex items-center gap-2">
+                            <span className={cn("inline-block w-2.5 h-2.5 rounded-full shrink-0", colorDotClass[p.color] || colorDotClass.slate)} />
+                            {p.name}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               <div>
                 <Label className="text-xs font-semibold text-slate-900 mb-1.5 block">Type</Label>
-                <Select value={form.task_type} onValueChange={(v) => setForm({ ...form, task_type: v, recurrence: v === "recurring" ? "weekly" : form.recurrence })}>
+                <Select
+                  value={form.task_type}
+                  onValueChange={(v) => setForm({ ...form, task_type: v, recurrence: v === "recurring" ? "weekly" : form.recurrence })}
+                  disabled={isExternalEvent}
+                >
                   <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="one_time">One-time</SelectItem>
@@ -387,7 +447,15 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                     <Label className="text-xs font-semibold text-slate-900">Set time</Label>
                     <button
                       type="button"
-                      onClick={() => setForm({ ...form, task_time: form.task_time ? "" : "9:00AM" })}
+                      onClick={() => {
+                        if (form.task_time) {
+                          endTouchedRef.current = false;
+                          setForm({ ...form, task_time: "", task_end_time: "" });
+                        } else {
+                          endTouchedRef.current = false;
+                          setForm({ ...form, task_time: "9:00AM", task_end_time: "10:00AM" });
+                        }
+                      }}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${form.task_time ? "bg-slate-900" : "bg-slate-200"}`}
                     >
                       <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${form.task_time ? "translate-x-6" : "translate-x-1"}`} />
@@ -397,7 +465,26 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
               </div>
 
               {form.due_date && form.task_time && (
-                <TimeInput value={form.task_time} onChange={(v) => setForm({ ...form, task_time: v })} />
+                <div className="flex items-center gap-2">
+                  <TimeInput
+                    value={form.task_time}
+                    onChange={(v) => {
+                      setForm((f) => ({
+                        ...f,
+                        task_time: v,
+                        task_end_time: endTouchedRef.current ? f.task_end_time : addMinutes(v, 60),
+                      }));
+                    }}
+                  />
+                  <span className="text-xs font-medium text-slate-500">to</span>
+                  <TimeInput
+                    value={form.task_end_time || addMinutes(form.task_time, 60)}
+                    onChange={(v) => {
+                      endTouchedRef.current = true;
+                      setForm((f) => ({ ...f, task_end_time: v }));
+                    }}
+                  />
+                </div>
               )}
             </div>
 
@@ -513,9 +600,10 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
               </div>
             )}
 
+          </fieldset>
             <div className="flex items-center justify-between pt-2">
               <div>
-                {task && onDelete && (
+                {task && onDelete && !isReadOnly && (
                   <Button
                     type="button"
                     variant="ghost"
@@ -529,10 +617,14 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                 )}
               </div>
               <div className="flex gap-2">
-                <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-                <Button type="submit" className="bg-slate-900 hover:bg-slate-800" data-testid="task-form-submit">
-                  {task ? "Save Changes" : "Create Task"}
+                <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+                  {isReadOnly ? "Close" : "Cancel"}
                 </Button>
+                {!isReadOnly && (
+                  <Button type="submit" className="bg-slate-900 hover:bg-slate-800" data-testid="task-form-submit">
+                    {task ? "Save Changes" : "Create Task"}
+                  </Button>
+                )}
               </div>
             </div>
           </form>
@@ -559,6 +651,17 @@ function generateTimeSlots() {
 }
 
 const TIME_SLOTS = generateTimeSlots();
+
+function addMinutes(t, mins) {
+  const parsed = parseTaskTime(t);
+  if (parsed == null) return "10:00AM";
+  const total = (parsed + mins + 24 * 60) % (24 * 60);
+  const h24 = Math.floor(total / 60);
+  const m = total % 60;
+  const ampm = h24 < 12 ? "AM" : "PM";
+  const hour = h24 === 0 ? 12 : h24 > 12 ? h24 - 12 : h24;
+  return `${hour}:${String(m).padStart(2, "0")}${ampm}`;
+}
 
 function TimeInput({ value, onChange }) {
   const [open, setOpen] = useState(false);

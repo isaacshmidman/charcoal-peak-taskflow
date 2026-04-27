@@ -25,6 +25,7 @@ export interface TaskRecord {
   recurrence_end_date?: string;
   due_date?: string;
   task_time?: string;
+  task_end_time?: string;
   tags?: string[];
   completed_at?: string;
   order?: number | null;
