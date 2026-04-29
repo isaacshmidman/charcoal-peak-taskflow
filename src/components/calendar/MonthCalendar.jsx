@@ -14,7 +14,6 @@ import {
 } from "date-fns";
 import { cn } from "@/lib/utils";
 import MiniMiniTaskCard from "./MiniMiniTaskCard";
-import { compareTaskTime } from "@/lib/sort-helpers";
 
 const toDateStr = (date) => format(date, "yyyy-MM-dd");
 const fromDateStr = (str) => new Date(str + "T00:00:00");
@@ -40,10 +39,16 @@ function DayCell({
   // as today, even when their date matches the real today.
   const isToday = inMonth && isSameDay(date, today);
 
-  // Within-day final tiebreaker: sort by task_time ascending (stable).
-  const sortedTasks = useMemo(() => {
-    return [...tasks].sort((a, b) => compareTaskTime(a.task_time, b.task_time, "asc"));
-  }, [tasks]);
+  // Calendar.jsx already runs the multi-sort over `filteredTasks` and
+  // bucketing by date is order-preserving — so the ordering the user
+  // picked (priority, calendar order, all-day-first/last, etc.) is
+  // already baked into the input. We MUST NOT re-sort by time here,
+  // because that would override e.g. "All-Day First" by always pushing
+  // all-day items to the bottom of each day's stack. Calendar.jsx
+  // appends `compareTaskTime(...)` as the final tiebreaker after the
+  // multi-sort comparators, so timed tasks within a day still come out
+  // chronologically by default — we just trust that order.
+  const sortedTasks = tasks;
 
   const handleEmptyClick = (e) => {
     if (e.target !== e.currentTarget) return;

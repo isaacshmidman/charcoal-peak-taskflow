@@ -519,38 +519,23 @@ export default function Settings() {
         </Select>
       </section>
 
-      {/* Default nav */}
+      {/* Default View — only the global "where do I land on app open" pick.
+          The Default Calendar View dropdown was originally a sibling here
+          but was moved further down (under Integrations) so all
+          calendar-specific config sits together. */}
       <section>
-        <div className="flex items-start gap-6 flex-wrap">
-          <div>
-            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Default View</h2>
-            <Select value={selectedDefaultNav} onValueChange={saveDefaultNav}>
-              <SelectTrigger className="w-48 h-9 bg-white dark:bg-slate-900 dark:border-slate-700 text-sm font-medium text-slate-900 dark:text-slate-100">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-slate-900 dark:border-slate-700">
-                {navOrder.map((path) => {
-                  const opt = NAV_OPTIONS.find((o) => o.value === path);
-                  return opt ? <SelectItem key={opt.value} value={opt.value} className="text-sm font-medium text-slate-900 dark:text-slate-100">{opt.label}</SelectItem> : null;
-                })}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Default Calendar View</h2>
-            <Select value={selectedCalendarView} onValueChange={saveDefaultCalendarView}>
-              <SelectTrigger className="w-48 h-9 bg-white dark:bg-slate-900 dark:border-slate-700 text-sm font-medium text-slate-900 dark:text-slate-100">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-slate-900 dark:border-slate-700">
-                <SelectItem value="day" className="text-sm font-medium text-slate-900 dark:text-slate-100">Day</SelectItem>
-                <SelectItem value="week" className="text-sm font-medium text-slate-900 dark:text-slate-100">Week</SelectItem>
-                <SelectItem value="month" className="text-sm font-medium text-slate-900 dark:text-slate-100">Month</SelectItem>
-                <SelectItem value="year" className="text-sm font-medium text-slate-900 dark:text-slate-100">Year</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+        <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Default View</h2>
+        <Select value={selectedDefaultNav} onValueChange={saveDefaultNav}>
+          <SelectTrigger className="w-48 h-9 bg-white dark:bg-slate-900 dark:border-slate-700 text-sm font-medium text-slate-900 dark:text-slate-100">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="bg-white dark:bg-slate-900 dark:border-slate-700">
+            {navOrder.map((path) => {
+              const opt = NAV_OPTIONS.find((o) => o.value === path);
+              return opt ? <SelectItem key={opt.value} value={opt.value} className="text-sm font-medium text-slate-900 dark:text-slate-100">{opt.label}</SelectItem> : null;
+            })}
+          </SelectContent>
+        </Select>
       </section>
 
       {/* Nav Order */}
@@ -574,82 +559,6 @@ export default function Settings() {
           )}
         </div>
       </section>
-
-      {/* Calendar Order — controls (a) the order calendars sort in when
-          users pick "Calendar Order" in MultiSort on non-Calendar pages,
-          and (b) per-calendar visibility on those non-Calendar pages
-          (Today, Active, Completed, Groupings). The Calendar page itself
-          has its own visibility dropdown — this section doesn't touch it.
-          External calendar names render as plain text (read-only); only
-          Zephyrly-native and the order itself are user-editable. */}
-      {orderedCalendars.length > 0 && (
-        <section>
-          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Calendar Order</h2>
-          <p className="text-xs text-slate-400 dark:text-slate-500 mb-2">
-            Reorder for sorting, and toggle visibility on non-Calendar pages
-            (Today, All Tasks, etc.). The Calendar page has its own filter.
-          </p>
-          <div className="space-y-2">
-            {orderedCalendars.map((c, idx) => {
-              const isHidden = calendarHiddenState.has(c.key);
-              return (
-                <div
-                  key={c.key}
-                  className="flex items-center gap-3 bg-white dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 rounded-xl px-3 py-2.5 hover:border-slate-200 dark:hover:border-slate-700 transition-colors"
-                >
-                  <div className="flex flex-col gap-0.5">
-                    <button
-                      onClick={() => moveCalendar(idx, -1)}
-                      disabled={idx === 0}
-                      className="disabled:opacity-20 text-slate-300 hover:text-slate-500 transition-colors"
-                      aria-label="Move up"
-                    >
-                      <ArrowUp className="w-3 h-3" />
-                    </button>
-                    <button
-                      onClick={() => moveCalendar(idx, 1)}
-                      disabled={idx === orderedCalendars.length - 1}
-                      className="disabled:opacity-20 text-slate-300 hover:text-slate-500 transition-colors"
-                      aria-label="Move down"
-                    >
-                      <ArrowDown className="w-3 h-3" />
-                    </button>
-                  </div>
-                  {c.color ? (
-                    <span
-                      className="inline-block w-3 h-3 rounded-sm shrink-0 border border-slate-200 dark:border-slate-700"
-                      style={{ backgroundColor: c.color }}
-                      aria-hidden
-                    />
-                  ) : (
-                    <span className="inline-block w-3 h-3 shrink-0" />
-                  )}
-                  {/* Name is intentionally NOT editable — for external
-                      calendars it'd diverge from the source (and we'd
-                      have to reconcile on next sync); for the canonical
-                      "Zephyrly" bucket it's a fixed label. */}
-                  <span className="text-sm font-medium text-slate-900 dark:text-slate-100 flex-1 min-w-0 truncate">
-                    {c.label}
-                  </span>
-                  <button
-                    onClick={() => toggleCalendarHidden(c.key)}
-                    className={cn(
-                      "shrink-0 transition-colors",
-                      isHidden
-                        ? "text-slate-300 hover:text-slate-500"
-                        : "text-emerald-500 hover:text-emerald-600"
-                    )}
-                    title={isHidden ? "Hidden on non-Calendar pages" : "Visible on non-Calendar pages"}
-                    aria-label={isHidden ? "Show on non-Calendar pages" : "Hide on non-Calendar pages"}
-                  >
-                    {isHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
 
       {/* Priorities */}
       <section>
@@ -766,6 +675,97 @@ export default function Settings() {
       </section>
 
       <IntegrationsPanel />
+
+      {/* Calendar-specific config grouped right under the Integrations
+          (Connect Google / Apple) panel for a logical flow:
+            1. Connect a calendar provider
+            2. Pick which calendar view opens by default
+            3. Set order + visibility of those calendars on other pages
+          Order matches the user's mental model of "set up, then tune". */}
+      <section>
+        <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Default Calendar View</h2>
+        <Select value={selectedCalendarView} onValueChange={saveDefaultCalendarView}>
+          <SelectTrigger className="w-48 h-9 bg-white dark:bg-slate-900 dark:border-slate-700 text-sm font-medium text-slate-900 dark:text-slate-100">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="bg-white dark:bg-slate-900 dark:border-slate-700">
+            <SelectItem value="day" className="text-sm font-medium text-slate-900 dark:text-slate-100">Day</SelectItem>
+            <SelectItem value="week" className="text-sm font-medium text-slate-900 dark:text-slate-100">Week</SelectItem>
+            <SelectItem value="month" className="text-sm font-medium text-slate-900 dark:text-slate-100">Month</SelectItem>
+            <SelectItem value="year" className="text-sm font-medium text-slate-900 dark:text-slate-100">Year</SelectItem>
+          </SelectContent>
+        </Select>
+      </section>
+
+      {/* Calendar Order — controls (a) the order calendars sort in when
+          users pick "Calendar Order" in MultiSort on non-Calendar pages,
+          and (b) per-calendar visibility on those non-Calendar pages
+          (Today, Active, Completed, Groupings). The Calendar page itself
+          has its own visibility dropdown — this section doesn't touch it.
+          External calendar names render as plain text (read-only); only
+          Zephyrly-native and the order itself are user-editable. */}
+      {orderedCalendars.length > 0 && (
+        <section>
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Calendar Order</h2>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mb-2">
+            Reorder for sorting, and toggle visibility on non-Calendar pages
+            (Today, All Tasks, etc.). The Calendar page has its own filter.
+          </p>
+          <div className="space-y-2">
+            {orderedCalendars.map((c, idx) => {
+              const isHidden = calendarHiddenState.has(c.key);
+              return (
+                <div
+                  key={c.key}
+                  className="flex items-center gap-3 bg-white dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 rounded-xl px-3 py-2.5 hover:border-slate-200 dark:hover:border-slate-700 transition-colors"
+                >
+                  <div className="flex flex-col gap-0.5">
+                    <button
+                      onClick={() => moveCalendar(idx, -1)}
+                      disabled={idx === 0}
+                      className="disabled:opacity-20 text-slate-300 hover:text-slate-500 transition-colors"
+                      aria-label="Move up"
+                    >
+                      <ArrowUp className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={() => moveCalendar(idx, 1)}
+                      disabled={idx === orderedCalendars.length - 1}
+                      className="disabled:opacity-20 text-slate-300 hover:text-slate-500 transition-colors"
+                      aria-label="Move down"
+                    >
+                      <ArrowDown className="w-3 h-3" />
+                    </button>
+                  </div>
+                  {/* Solid round dot to mirror Priority Levels styling
+                      below — visual consistency. */}
+                  <span
+                    className="inline-block w-3 h-3 rounded-full shrink-0"
+                    style={{ backgroundColor: c.color || "#94a3b8" }}
+                    aria-hidden
+                  />
+                  <span className="text-sm font-medium text-slate-900 dark:text-slate-100 flex-1 min-w-0 truncate">
+                    {c.label}
+                  </span>
+                  <button
+                    onClick={() => toggleCalendarHidden(c.key)}
+                    className={cn(
+                      "shrink-0 transition-colors",
+                      isHidden
+                        ? "text-slate-300 hover:text-slate-500"
+                        : "text-emerald-500 hover:text-emerald-600"
+                    )}
+                    title={isHidden ? "Hidden on non-Calendar pages" : "Visible on non-Calendar pages"}
+                    aria-label={isHidden ? "Show on non-Calendar pages" : "Hide on non-Calendar pages"}
+                  >
+                    {isHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
     </div>);
 

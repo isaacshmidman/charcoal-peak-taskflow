@@ -118,19 +118,20 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
                   key={c.external_calendar_id}
                   className="flex items-center gap-3 px-3 py-2"
                 >
+                  {/* Solid round dot — matches the Priority Levels and
+                      Calendar Order styling in Settings, so all three
+                      lists read as the same kind of "labeled item". */}
                   <span
-                    className="inline-block w-3 h-3 rounded-sm shrink-0 border border-slate-200"
+                    className="inline-block w-3 h-3 rounded-full shrink-0"
                     style={{ backgroundColor: c.color_hex || "#94a3b8" }}
                     aria-hidden
                   />
+                  {/* Title + star get the flex-1 stretchy area; the
+                      read-only badge lives in a FIXED-WIDTH slot to the
+                      right so the toggle column is column-aligned across
+                      all rows (writable rows don't show the badge but
+                      reserve its space so the toggle doesn't shift left). */}
                   <div className="min-w-0 flex-1">
-                    {/* Title row needs `min-w-0` on the inner flex so the
-                        truncating <p> can actually shrink — without that,
-                        `truncate` is a no-op when the badge/star siblings
-                        are present and a long name pushes them off-screen
-                        (or into the toggle on the right). The badge + star
-                        get `shrink-0` so they keep their full width and
-                        the name is the only thing that ellipses. */}
                     <div className="flex items-center gap-1.5 min-w-0">
                       <p className="text-sm text-slate-900 truncate flex-1 min-w-0">
                         {c.summary || c.external_calendar_id}
@@ -154,19 +155,24 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
                           <Star className="w-3 h-3" />
                         </button>
                       ) : null}
-                      {!c.writable && (
-                        <span
-                          title="Read-only — events from this calendar can't be edited"
-                          className="shrink-0 inline-flex items-center gap-0.5 text-[10px] text-slate-400 px-1 py-0.5 rounded bg-slate-50"
-                        >
-                          <Lock className="w-2.5 h-2.5" /> read-only
-                        </span>
-                      )}
                     </div>
                     {c.description && (
                       <p className="text-[11px] text-slate-400 truncate">
                         {c.description}
                       </p>
+                    )}
+                  </div>
+                  {/* Read-only column: always present (w-20 ≈ width of the
+                      badge), so the toggle stays in the same screen-x
+                      position regardless of whether this row is writable. */}
+                  <div className="w-[5.5rem] shrink-0 flex justify-end">
+                    {!c.writable && (
+                      <span
+                        title="Read-only — events from this calendar can't be edited"
+                        className="inline-flex items-center gap-0.5 text-[10px] text-slate-400 px-1 py-0.5 rounded bg-slate-50"
+                      >
+                        <Lock className="w-2.5 h-2.5" /> read-only
+                      </span>
                     )}
                   </div>
                   <label className="inline-flex items-center cursor-pointer shrink-0">
