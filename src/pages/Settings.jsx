@@ -25,6 +25,17 @@ import IntegrationsPanel from "@/components/settings/IntegrationsPanel";
 import { useLocation } from "react-router-dom";
 import { DEFAULT_NAV_ORDER, sanitizeNavOrder, sanitizeNavRoute } from "@/lib/navigation";
 import { useTheme } from "@/lib/ThemeProvider";
+import { Eye, EyeOff } from "lucide-react";
+import {
+  deriveCalendars,
+} from "@/components/calendar/CalendarVisibilityDropdown";
+import {
+  getCalendarOrder,
+  setCalendarOrder,
+  getHiddenOnNonCalendarPages,
+  setHiddenOnNonCalendarPages,
+  mergeOrder,
+} from "@/lib/calendar-order";
 
 import { COLOR_OPTIONS, colorDot } from "@/lib/colors";
 
@@ -221,6 +232,50 @@ export default function Settings() {
     queryKey: ["savedTags"],
     queryFn: () => apiClient.entities.SavedTag.list("name", 100)
   });
+
+  // Calendar Order section — auto-discovers calendars from the task list,
+  // merges with the user's saved order (newcomers appended alphabetically),
+  // and exposes per-calendar reorder + visibility-on-non-calendar-pages.
+  const { data: tasksForCalendars = [] } = useQuery({
+    queryKey: ["tasks"],
+    queryFn: () => apiClient.entities.Task.list("-created_date", 500),
+  });
+  const discoveredCalendars = useMemo(
+    () => deriveCalendars(tasksForCalendars),
+    [tasksForCalendars]
+  );
+  // We snapshot the saved order/hidden into local state for the smooth
+  // reorder UX (immediate move on click), then write back to localStorage
+  // on each change. Other pages subscribe via subscribeCalendarOrder and
+  // re-render automatically.
+  const [calendarOrderState, setCalendarOrderState] = useState(getCalendarOrder);
+  const [calendarHiddenState, setCalendarHiddenState] = useState(
+    getHiddenOnNonCalendarPages
+  );
+  // Merge saved order with discovered calendars on every render so newly
+  // appearing calendars (after a sync) become visible in the list.
+  const orderedCalendars = useMemo(
+    () => mergeOrder(discoveredCalendars, calendarOrderState),
+    [discoveredCalendars, calendarOrderState]
+  );
+
+  const moveCalendar = (idx, dir) => {
+    const next = [...orderedCalendars];
+    const newIdx = idx + dir;
+    if (newIdx < 0 || newIdx >= next.length) return;
+    [next[idx], next[newIdx]] = [next[newIdx], next[idx]];
+    const keys = next.map((c) => c.key);
+    setCalendarOrderState(keys);
+    setCalendarOrder(keys);
+  };
+
+  const toggleCalendarHidden = (key) => {
+    const next = new Set(calendarHiddenState);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    setCalendarHiddenState(next);
+    setHiddenOnNonCalendarPages(next);
+  };
 
   const invalidatePriorities = () => queryClient.invalidateQueries({ queryKey: ["priorities"] });
   const invalidateTags = () => queryClient.invalidateQueries({ queryKey: ["savedTags"] });
@@ -519,6 +574,82 @@ export default function Settings() {
           )}
         </div>
       </section>
+
+      {/* Calendar Order — controls (a) the order calendars sort in when
+          users pick "Calendar Order" in MultiSort on non-Calendar pages,
+          and (b) per-calendar visibility on those non-Calendar pages
+          (Today, Active, Completed, Groupings). The Calendar page itself
+          has its own visibility dropdown — this section doesn't touch it.
+          External calendar names render as plain text (read-only); only
+          Zephyrly-native and the order itself are user-editable. */}
+      {orderedCalendars.length > 0 && (
+        <section>
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Calendar Order</h2>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mb-2">
+            Reorder for sorting, and toggle visibility on non-Calendar pages
+            (Today, All Tasks, etc.). The Calendar page has its own filter.
+          </p>
+          <div className="space-y-2">
+            {orderedCalendars.map((c, idx) => {
+              const isHidden = calendarHiddenState.has(c.key);
+              return (
+                <div
+                  key={c.key}
+                  className="flex items-center gap-3 bg-white dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 rounded-xl px-3 py-2.5 hover:border-slate-200 dark:hover:border-slate-700 transition-colors"
+                >
+                  <div className="flex flex-col gap-0.5">
+                    <button
+                      onClick={() => moveCalendar(idx, -1)}
+                      disabled={idx === 0}
+                      className="disabled:opacity-20 text-slate-300 hover:text-slate-500 transition-colors"
+                      aria-label="Move up"
+                    >
+                      <ArrowUp className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={() => moveCalendar(idx, 1)}
+                      disabled={idx === orderedCalendars.length - 1}
+                      className="disabled:opacity-20 text-slate-300 hover:text-slate-500 transition-colors"
+                      aria-label="Move down"
+                    >
+                      <ArrowDown className="w-3 h-3" />
+                    </button>
+                  </div>
+                  {c.color ? (
+                    <span
+                      className="inline-block w-3 h-3 rounded-sm shrink-0 border border-slate-200 dark:border-slate-700"
+                      style={{ backgroundColor: c.color }}
+                      aria-hidden
+                    />
+                  ) : (
+                    <span className="inline-block w-3 h-3 shrink-0" />
+                  )}
+                  {/* Name is intentionally NOT editable — for external
+                      calendars it'd diverge from the source (and we'd
+                      have to reconcile on next sync); for the canonical
+                      "Zephyrly" bucket it's a fixed label. */}
+                  <span className="text-sm font-medium text-slate-900 dark:text-slate-100 flex-1 min-w-0 truncate">
+                    {c.label}
+                  </span>
+                  <button
+                    onClick={() => toggleCalendarHidden(c.key)}
+                    className={cn(
+                      "shrink-0 transition-colors",
+                      isHidden
+                        ? "text-slate-300 hover:text-slate-500"
+                        : "text-emerald-500 hover:text-emerald-600"
+                    )}
+                    title={isHidden ? "Hidden on non-Calendar pages" : "Visible on non-Calendar pages"}
+                    aria-label={isHidden ? "Show on non-Calendar pages" : "Hide on non-Calendar pages"}
+                  >
+                    {isHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* Priorities */}
       <section>

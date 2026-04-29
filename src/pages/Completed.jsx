@@ -21,6 +21,7 @@ import TaskCard from "@/components/tasks/TaskCard";
 import TaskForm from "@/components/tasks/TaskForm";
 import MultiSortPanel from "@/components/tasks/MultiSortPanel";
 import { excludeExternalEvents } from "@/lib/task-filters";
+import { useCalendarOrderState } from "@/hooks/useCalendarOrder";
 
 export default function Completed() {
   const [editingTask, setEditingTask] = useState(null);
@@ -69,6 +70,9 @@ export default function Completed() {
     return map;
   }, [priorities]);
 
+  // Calendar visibility + order from Settings.
+  const { hidden: hiddenCalendars, indexByKey: calendarIndexByKey } = useCalendarOrderState();
+
   const subtaskMap = useMemo(() => {
     const map = {};
     tasks.filter((task) => task.parent_id).forEach((task) => {
@@ -87,11 +91,19 @@ export default function Completed() {
   }, []);
 
   const completedItems = useMemo(() => {
-    const liveItems = buildCompletedItems({ tasks, search, sorts, priorityOrderMap });
+    const liveItems = buildCompletedItems({
+      tasks, search, sorts, priorityOrderMap,
+      hiddenCalendars, calendarIndexByKey,
+    });
     const liveIds = new Set(liveItems.map((item) => item.id));
     const visibleUndoingItems = undoingItems.filter((item) => !liveIds.has(item.id));
-    return sortCompletedItems([...liveItems, ...visibleUndoingItems], sorts, priorityOrderMap);
-  }, [priorityOrderMap, search, sorts, tasks, undoingItems]);
+    return sortCompletedItems(
+      [...liveItems, ...visibleUndoingItems],
+      sorts,
+      priorityOrderMap,
+      calendarIndexByKey
+    );
+  }, [priorityOrderMap, search, sorts, tasks, undoingItems, hiddenCalendars, calendarIndexByKey]);
 
   const handleToggleDone = (task) => {
     // Subtask: toggle its status independently — do not touch parent.

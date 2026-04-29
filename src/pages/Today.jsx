@@ -17,6 +17,8 @@ import MultiSortPanel from "@/components/tasks/MultiSortPanel";
 import RecurringDeleteDialog from "@/components/tasks/RecurringDeleteDialog";
 import { compareDueDateTime } from "@/lib/sort-helpers";
 import { excludeExternalEvents } from "@/lib/task-filters";
+import { useCalendarOrderState } from "@/hooks/useCalendarOrder";
+import { calendarKeyForTask, compareByCalendarOrder } from "@/lib/calendar-order";
 
 export default function Today() {
   const [showForm, setShowForm] = useState(false);
@@ -62,6 +64,10 @@ export default function Today() {
     priorities.forEach(p => { map[p.id] = p.order; });
     return map;
   }, [priorities]);
+
+  // Subscribe to user-configured calendar order/visibility from Settings.
+  // Updates here re-render automatically when the user toggles or reorders.
+  const { hidden: hiddenCalendars, indexByKey: calendarIndexByKey } = useCalendarOrderState();
 
   const handleToggleDone = (task) => {
     const isDone = task.status === "done";
@@ -137,6 +143,8 @@ export default function Today() {
         return (a.status === "done" ? 0 : 1) - (b.status === "done" ? 0 : 1);
       case "uncompleted_first":
         return (a.status !== "done" ? 0 : 1) - (b.status !== "done" ? 0 : 1);
+      case "calendar_order":
+        return compareByCalendarOrder(a, b, calendarIndexByKey);
       case "none":
       default:
         return 0;
@@ -146,6 +154,13 @@ export default function Today() {
   const todayAndPast = useMemo(() => {
     const base = tasks
       .filter(t => !t.parent_id && t.status !== "done")
+      // User-hidden calendars (Settings → Calendar Order) drop out here.
+      // External events are already gone (excludeExternalEvents on the
+      // query select), so this only affects calendars whose tasks were
+      // visible by default — primarily Zephyrly + future task-style
+      // imports. Subtasks always inherit the parent's calendar via
+      // calendarKeyForTask falling back to "zephyrly".
+      .filter(t => !hiddenCalendars.has(calendarKeyForTask(t)))
       .filter(t => {
         if (!t.due_date) return false;
         const d = startOfDay(new Date(t.due_date + "T00:00:00"));
@@ -160,7 +175,7 @@ export default function Today() {
       }
       return 0;
     });
-  }, [tasks, search, priorityOrderMap, todayStart, sorts]);
+  }, [tasks, search, priorityOrderMap, todayStart, sorts, hiddenCalendars, calendarIndexByKey]);
 
   return (
     <div className="space-y-5">

@@ -16,6 +16,8 @@ import MultiSortPanel from "@/components/tasks/MultiSortPanel";
 import RecurringDeleteDialog from "@/components/tasks/RecurringDeleteDialog";
 import { compareDueDateTime } from "@/lib/sort-helpers";
 import { excludeExternalEvents } from "@/lib/task-filters";
+import { useCalendarOrderState } from "@/hooks/useCalendarOrder";
+import { calendarKeyForTask, compareByCalendarOrder } from "@/lib/calendar-order";
 
 export default function Active() {
   const [showForm, setShowForm] = useState(false);
@@ -114,6 +116,10 @@ export default function Active() {
     return map;
   }, [priorities]);
 
+  // User-controlled per-calendar visibility + ordering, configured in
+  // Settings → Calendar Order.
+  const { hidden: hiddenCalendars, indexByKey: calendarIndexByKey } = useCalendarOrderState();
+
   const compareFn = (a, b, sortValue) => {
     const pa = priorityOrderMap[a.priority_id] ?? 99;
     const pb = priorityOrderMap[b.priority_id] ?? 99;
@@ -143,6 +149,8 @@ export default function Active() {
         return (a.status === "done" ? 0 : 1) - (b.status === "done" ? 0 : 1);
       case "uncompleted_first":
         return (a.status !== "done" ? 0 : 1) - (b.status !== "done" ? 0 : 1);
+      case "calendar_order":
+        return compareByCalendarOrder(a, b, calendarIndexByKey);
       case "none":
       default:
         return 0;
@@ -153,6 +161,9 @@ export default function Active() {
     const q = search.toLowerCase();
     const filtered = topLevelTasks.filter(t => {
       if (t.status === "done") return false;
+      // Drop tasks belonging to a calendar the user has hidden in
+      // Settings → Calendar Order.
+      if (hiddenCalendars.has(calendarKeyForTask(t))) return false;
       if (!search) return true;
       return t.title?.toLowerCase().includes(q) || t.tags?.some(tag => tag.toLowerCase().includes(q));
     });
@@ -163,7 +174,7 @@ export default function Active() {
       }
       return 0;
     });
-  }, [topLevelTasks, sorts, priorityOrderMap, search]);
+  }, [topLevelTasks, sorts, priorityOrderMap, search, hiddenCalendars, calendarIndexByKey]);
 
   return (
     <div className="space-y-5">

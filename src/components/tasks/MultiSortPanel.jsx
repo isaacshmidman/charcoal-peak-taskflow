@@ -28,6 +28,10 @@ export const SORT_OPTIONS = [
   { value: "priority_desc", label: "Priority: Lowest → Highest", group: "priority" },
   { value: "tag_az", label: "Tag: A → Z", group: "tag" },
   { value: "recurrence", label: "Recurrence Type", group: "recurrence" },
+  // Sorts by the user-configured calendar order (Settings → Calendar Order).
+  // Hidden on the calendar page itself — that page shows everything by
+  // calendar already and has its own visibility dropdown.
+  { value: "calendar_order", label: "Calendar Order", hideOnScope: ["calendar"], group: "calendar_order" },
 ];
 
 const groupOf = (value) => SORT_OPTIONS.find((o) => o.value === value)?.group;
