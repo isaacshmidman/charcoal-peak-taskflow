@@ -46,6 +46,7 @@ import {
 import { buildUserForSync } from "./sync-user.js";
 import { createEntityRecord, updateEntityRecord, deleteEntityRecord } from "./store.js";
 import { suppressPush } from "./push.js";
+import { formatInTimeZone } from "date-fns-tz";
 
 // Ensure we don't run two sync cycles for the same integration simultaneously.
 const inFlight = new Set();
@@ -436,12 +437,23 @@ export function mapGoogleEventToTaskInput(event, calendarRow) {
   } else if (event.start.dateTime) {
     const startDt = new Date(event.start.dateTime);
     if (Number.isNaN(startDt.getTime())) return null;
-    due_date = toYMD(startDt);
-    task_time = toTaskTime(startDt);
+    // Format the start in the calendar's display timezone, NOT the server's
+    // local TZ. The Docker container runs in UTC, so a naive `getHours()` on
+    // a Date parsed from "2026-04-29T08:00:00-04:00" returns 12 (UTC), and
+    // an 8AM Eastern event would import as 12PM. Use the calendar row's
+    // `time_zone` (populated from Google's calendars.list `timeZone`
+    // response) — that's the calendar owner's home tz, which is what users
+    // think of as "the time on the event".
+    //   • Per-event tz override (event.start.timeZone) is intentionally
+    //     ignored: we render in the calendar's tz so all events read as a
+    //     single coherent local-day grid in Zephyrly.
+    const tz = String(calendarRow?.time_zone || "UTC") || "UTC";
+    due_date = formatYmdInTz(startDt, tz);
+    task_time = formatTaskTimeInTz(startDt, tz);
     if (event.end && event.end.dateTime) {
       const endDt = new Date(event.end.dateTime);
-      if (!Number.isNaN(endDt.getTime()) && toYMD(endDt) === due_date) {
-        task_end_time = toTaskTime(endDt);
+      if (!Number.isNaN(endDt.getTime()) && formatYmdInTz(endDt, tz) === due_date) {
+        task_end_time = formatTaskTimeInTz(endDt, tz);
       }
     }
   } else {
@@ -487,11 +499,29 @@ export function mapGoogleEventToTaskInput(event, calendarRow) {
   };
 }
 
-function toYMD(date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+// Format helpers below operate in a target timezone (the calendar's home TZ
+// from `integration_calendars.time_zone`) so events render at the wall-clock
+// time the user actually scheduled, regardless of the server's local TZ
+// (Docker containers default to UTC, so without this an 8AM Eastern event
+// would import as 12PM).
+function formatYmdInTz(date, tz) {
+  try {
+    return formatInTimeZone(date, tz || "UTC", "yyyy-MM-dd");
+  } catch {
+    return formatInTimeZone(date, "UTC", "yyyy-MM-dd");
+  }
+}
+function formatTaskTimeInTz(date, tz) {
+  // Match frontend's `H:MMAM|PM` — no leading zero on hour, uppercase AM/PM.
+  try {
+    return formatInTimeZone(date, tz || "UTC", "h:mmaaa")
+      .replace("am", "AM")
+      .replace("pm", "PM");
+  } catch {
+    return formatInTimeZone(date, "UTC", "h:mmaaa")
+      .replace("am", "AM")
+      .replace("pm", "PM");
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -726,11 +756,3 @@ async function applyAppleChangeToTasks(db, config, { integration, user, calendar
   );
 }
 
-function toTaskTime(date) {
-  // Match the frontend's `H:MMAM|PM` format (see src/lib/sort-helpers).
-  const h24 = date.getHours();
-  const m = date.getMinutes();
-  const ampm = h24 < 12 ? "AM" : "PM";
-  const hour = h24 === 0 ? 12 : h24 > 12 ? h24 - 12 : h24;
-  return `${hour}:${String(m).padStart(2, "0")}${ampm}`;
-}

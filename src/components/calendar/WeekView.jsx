@@ -165,11 +165,19 @@ export default function WeekView({
     [weekStart]
   );
 
+  // Default: all-day section starts COLLAPSED on first open (no stored
+  // preference yet). Once the user explicitly expands or collapses it the
+  // preference persists across visits. This keeps the timed grid prominent
+  // for users with long lists of all-day items they'd otherwise have to
+  // scroll past every time they switched to Week view.
   const [allDayCollapsed, setAllDayCollapsed] = useState(() => {
     try {
-      return localStorage.getItem(COLLAPSE_KEY) === "1";
+      const stored = localStorage.getItem(COLLAPSE_KEY);
+      if (stored === "1") return true;
+      if (stored === "0") return false;
+      return true; // default-collapsed for new users
     } catch {
-      return false;
+      return true;
     }
   });
   useEffect(() => {

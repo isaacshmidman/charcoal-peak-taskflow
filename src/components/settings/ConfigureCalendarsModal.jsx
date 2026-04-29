@@ -124,14 +124,21 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
                     aria-hidden
                   />
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-sm text-slate-900 truncate">
+                    {/* Title row needs `min-w-0` on the inner flex so the
+                        truncating <p> can actually shrink — without that,
+                        `truncate` is a no-op when the badge/star siblings
+                        are present and a long name pushes them off-screen
+                        (or into the toggle on the right). The badge + star
+                        get `shrink-0` so they keep their full width and
+                        the name is the only thing that ellipses. */}
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <p className="text-sm text-slate-900 truncate flex-1 min-w-0">
                         {c.summary || c.external_calendar_id}
                       </p>
                       {c.primary ? (
                         <span
                           title="Primary calendar — new tasks land here."
-                          className="inline-flex items-center text-amber-500"
+                          className="shrink-0 inline-flex items-center text-amber-500"
                         >
                           <Star className="w-3 h-3 fill-current" />
                         </span>
@@ -142,7 +149,7 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
                           aria-label="Make primary"
                           onClick={() => setPrimary(c.external_calendar_id)}
                           disabled={settingPrimary}
-                          className="inline-flex items-center text-slate-300 hover:text-amber-500 transition-colors disabled:opacity-50"
+                          className="shrink-0 inline-flex items-center text-slate-300 hover:text-amber-500 transition-colors disabled:opacity-50"
                         >
                           <Star className="w-3 h-3" />
                         </button>
@@ -150,7 +157,7 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
                       {!c.writable && (
                         <span
                           title="Read-only — events from this calendar can't be edited"
-                          className="inline-flex items-center gap-0.5 text-[10px] text-slate-400 px-1 py-0.5 rounded bg-slate-50"
+                          className="shrink-0 inline-flex items-center gap-0.5 text-[10px] text-slate-400 px-1 py-0.5 rounded bg-slate-50"
                         >
                           <Lock className="w-2.5 h-2.5" /> read-only
                         </span>

@@ -18,6 +18,12 @@ export const SORT_OPTIONS = [
   { value: "deleted_desc", label: "Deleted: Newest → Oldest", scope: "deleted", group: "deleted" },
   { value: "completed_first", label: "Completed First", group: "completion" },
   { value: "uncompleted_first", label: "Uncompleted First", group: "completion" },
+  // All-day sort is calendar-only — on the timed grid the start time
+  // already does the work. In Day/Week views it changes whether all-day
+  // entries are listed before or after timed ones; in Month/Year cells
+  // it changes where in the per-day stack they land.
+  { value: "all_day_first", label: "All-Day First", scope: "calendar", group: "all_day" },
+  { value: "all_day_last", label: "All-Day Last", scope: "calendar", group: "all_day" },
   { value: "priority_asc", label: "Priority: Highest → Lowest", group: "priority" },
   { value: "priority_desc", label: "Priority: Lowest → Highest", group: "priority" },
   { value: "tag_az", label: "Tag: A → Z", group: "tag" },

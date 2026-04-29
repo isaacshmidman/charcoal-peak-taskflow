@@ -49,6 +49,10 @@ import { AnimatedSearchInput } from "@/components/ui/animated-search-input";
 import { cn } from "@/lib/utils";
 import MultiSortPanel from "@/components/tasks/MultiSortPanel";
 import TaskForm from "@/components/tasks/TaskForm";
+import CalendarVisibilityDropdown, {
+  deriveCalendars,
+  calendarKeyForTask,
+} from "@/components/calendar/CalendarVisibilityDropdown";
 import MonthCalendar, { toDateStr } from "@/components/calendar/MonthCalendar";
 import DayView from "@/components/calendar/DayView";
 import WeekView from "@/components/calendar/WeekView";
@@ -73,6 +77,25 @@ export default function Calendar() {
   const [formDefaultTimeStart, setFormDefaultTimeStart] = useState(null);
   const [search, setSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
+
+  // Hidden calendar keys for the visibility dropdown. Default-empty Set =
+  // all calendars visible. Persisted so toggles survive a reload. We store
+  // an array (JSON-friendly) and lift it into a Set on read.
+  const [hiddenCalendars, setHiddenCalendars] = useState(() => {
+    try {
+      const raw = localStorage.getItem("calendar_hidden_calendars");
+      const arr = raw ? JSON.parse(raw) : [];
+      return new Set(Array.isArray(arr) ? arr : []);
+    } catch {
+      return new Set();
+    }
+  });
+  const handleHiddenCalendarsChange = (next) => {
+    setHiddenCalendars(next);
+    try {
+      localStorage.setItem("calendar_hidden_calendars", JSON.stringify([...next]));
+    } catch {}
+  };
 
   // Initial view uses the user's configured "Default Calendar View" (Settings),
   // defaulting to "month" when unset.
@@ -179,15 +202,36 @@ export default function Calendar() {
         return (a.status === "done" ? 0 : 1) - (b.status === "done" ? 0 : 1);
       case "uncompleted_first":
         return (a.status !== "done" ? 0 : 1) - (b.status !== "done" ? 0 : 1);
+      case "all_day_first": {
+        // "All-day" = no task_time set. We compare 0/1 booleans so all-day
+        // sorts ahead of timed; timed-vs-timed ties fall through to other
+        // sorts (and ultimately the time tiebreaker after this switch).
+        const aAllDay = !a.task_time ? 0 : 1;
+        const bAllDay = !b.task_time ? 0 : 1;
+        return aAllDay - bAllDay;
+      }
+      case "all_day_last": {
+        const aAllDay = !a.task_time ? 1 : 0;
+        const bAllDay = !b.task_time ? 1 : 0;
+        return aAllDay - bAllDay;
+      }
       case "none":
       default: return 0;
     }
   };
 
+  // Available calendars for the visibility dropdown.
+  const calendarsList = useMemo(() => deriveCalendars(tasks), [tasks]);
+
   const filteredTasks = useMemo(() => {
     const q = search.toLowerCase();
     const filtered = tasks.filter((t) => {
       if (t.parent_id) return false;
+      // Hide tasks belonging to a calendar the user has un-checked in
+      // the visibility dropdown.
+      if (hiddenCalendars.size > 0 && hiddenCalendars.has(calendarKeyForTask(t))) {
+        return false;
+      }
       if (!q) return true;
       return (
         t.title?.toLowerCase().includes(q) ||
@@ -202,7 +246,7 @@ export default function Calendar() {
       return compareTaskTime(a.task_time, b.task_time, "asc");
     });
     return sorted;
-  }, [tasks, search, sorts, priorityOrderMap]);
+  }, [tasks, search, sorts, priorityOrderMap, hiddenCalendars]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -451,6 +495,11 @@ export default function Calendar() {
           >
             <Search className="w-4 h-4" />
           </Button>
+          <CalendarVisibilityDropdown
+            calendars={calendarsList}
+            hidden={hiddenCalendars}
+            onChange={handleHiddenCalendarsChange}
+          />
           <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} page="calendar" />
           <Button
             onClick={openNewTask}
