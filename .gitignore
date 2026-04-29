@@ -33,3 +33,4 @@ backend/data/
 .vite
 playwright-report
 test-results
+.claude/

@@ -41,6 +41,7 @@ import {
   eventHrefForUid,
   newEventUid,
 } from "./providers/apple-calendar.js";
+import { taskToRruleLine } from "./recurrence-rrule.js";
 
 /** @typedef {import("node:sqlite").DatabaseSync} DB */
 
@@ -487,12 +488,20 @@ async function pushOneApple(db, integration, taskSnapshot, op) {
     deriveStableUid(taskSnapshot.id);
 
   const tz = integration.primary_calendar_timezone || "UTC";
+  // RRULE handling unifies two cases:
+  //   - Imported series (source_recurrence_rule set) → round-trip as-is.
+  //   - Native Zephyrly recurrence → derive from recurrence/recurrence_days/
+  //     recurrence_end_date via taskToRruleLine.
+  // buildVEvent expects the RRULE *value* (no "RRULE:" prefix), so strip it.
+  const rruleFullLine = taskToRruleLine(taskSnapshot);
+  const rrule = rruleFullLine ? rruleFullLine.replace(/^RRULE:/i, "") : "";
+
   const ics = buildVEvent({
     uid,
     summary: taskSnapshot.title || "(Untitled task)",
     description: taskSnapshot.description || "",
     ...buildAppleStartEnd(taskSnapshot, tz),
-    rrule: stripRrulePrefix(taskSnapshot.source_recurrence_rule || ""),
+    rrule,
   });
 
   // For an existing mapping, PUT to the same href; otherwise PUT to a new
@@ -587,9 +596,6 @@ function extractUidFromHref(href) {
   }
 }
 
-function stripRrulePrefix(rule) {
-  return String(rule || "").replace(/^RRULE:/i, "");
-}
 
 // Suppress unused-import warning if buildVEvent etc. are flagged before we
 // reference them above. (No-op at runtime.)
@@ -623,6 +629,14 @@ export function taskToEventBody(task, timeZone) {
   const summary = String(task.title || "(Untitled task)").slice(0, 200);
   const description = String(task.description || "").slice(0, 5000);
 
+  // Native recurrence → RFC 5545 RRULE. Google's REST shape expects the
+  // RRULE in the `recurrence` array (one or more lines, each starting
+  // with the property name). For tasks imported from a provider we
+  // round-trip the original `source_recurrence_rule` to avoid lossy
+  // re-encoding — see taskToRruleLine for that branch.
+  const rruleLine = taskToRruleLine(task);
+  const recurrence = rruleLine ? [rruleLine] : undefined;
+
   // All-day event — Google expects end.date to be exclusive (next day).
   if (!task.task_time) {
     return {
@@ -630,6 +644,7 @@ export function taskToEventBody(task, timeZone) {
       description,
       start: { date: task.due_date },
       end: { date: addOneDay(task.due_date) },
+      ...(recurrence ? { recurrence } : {}),
     };
   }
 
@@ -645,6 +660,7 @@ export function taskToEventBody(task, timeZone) {
     description,
     start: { dateTime: startDt, timeZone },
     end: { dateTime: endDt, timeZone },
+    ...(recurrence ? { recurrence } : {}),
   };
 }
 
