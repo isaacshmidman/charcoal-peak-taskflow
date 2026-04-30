@@ -4,7 +4,9 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/api/apiClient";
 import { useOfflineMutation } from "@/hooks/useOfflineMutation";
-import { useDeleteWithUndo } from "@/hooks/useDeleteWithUndo";
+import { useDeleteWithUndo, formatDeleteLabel } from "@/hooks/useDeleteWithUndo";
+import { showDeleteToast } from "@/components/tasks/DeleteToast";
+import RecurringDeleteDialog from "@/components/tasks/RecurringDeleteDialog";
 import {
   DndContext,
   DragOverlay,
@@ -123,8 +125,20 @@ export default function Calendar() {
     setView(v);
   };
 
-  const { createTask, updateTask, deleteTask, completeRecurringTask } = useOfflineMutation();
+  const { createTask, updateTask, deleteTask, completeRecurringTask, skipRecurringTask } = useOfflineMutation();
   const deleteWithUndo = useDeleteWithUndo(deleteTask, createTask);
+  // Calendar-page-local "are you sure (and which scope)?" prompt for
+  // recurring deletes. Mirrors Today/Active/Groupings — without it, hitting
+  // the trash on a recurring task in the Calendar nav skipped the dialog
+  // and just deleted the entire series silently.
+  const [recurringDeleteTask, setRecurringDeleteTask] = useState(null);
+  const handleDelete = (task) => {
+    if (task.task_type === "recurring" && !task.parent_id) {
+      setRecurringDeleteTask(task);
+    } else {
+      deleteWithUndo(task, { isSubtask: !!task.parent_id });
+    }
+  };
 
   const { data: tasks = [] } = useQuery({
     queryKey: ["tasks"],
@@ -663,7 +677,7 @@ export default function Calendar() {
         task={editingTask}
         defaultDueDate={formDefaultDueDate}
         defaultTaskTime={formDefaultTimeStart}
-        onDelete={(task) => deleteWithUndo(task, { isSubtask: !!task.parent_id })}
+        onDelete={handleDelete}
         onSubmit={async (data) => {
           if (editingTask) {
             await updateTask(editingTask.id, data);
@@ -671,6 +685,22 @@ export default function Calendar() {
             await createTask(data);
           }
         }}
+      />
+
+      <RecurringDeleteDialog
+        open={!!recurringDeleteTask}
+        onOpenChange={(o) => { if (!o) setRecurringDeleteTask(null); }}
+        task={recurringDeleteTask}
+        onDeleteThis={() => {
+          const target = recurringDeleteTask;
+          skipRecurringTask(target);
+          showDeleteToast({
+            label: formatDeleteLabel({ scenario: "recurring_instance", title: target?.title || "" }),
+            hideUndo: true,
+          });
+          setRecurringDeleteTask(null);
+        }}
+        onDeleteAll={() => { deleteWithUndo(recurringDeleteTask, {}); setRecurringDeleteTask(null); }}
       />
     </div>
   );
