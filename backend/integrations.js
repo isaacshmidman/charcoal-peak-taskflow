@@ -871,19 +871,88 @@ export function serializeIntegrationCalendar(row) {
  * payload is `{ [external_calendar_id]: boolean }` so the UI can submit
  * the whole list at once.
  *
+ * Disabling a calendar is treated as a HARD CLEANUP, not just a flag
+ * flip — the previous "just turn the flag off" semantics caused three
+ * user-visible bugs:
+ *
+ *   1. Imported events (source_kind='event') from the now-disabled
+ *      calendar lingered in the local DB indefinitely. They kept
+ *      showing up in the Calendar nav and the Calendar Order section
+ *      of Settings even though the user had explicitly hidden the
+ *      source.
+ *   2. external_event_map rows for that calendar still referenced
+ *      Google/Apple events that were no longer being polled. Any
+ *      local edit to a Zephyrly-native task that had been pushed to
+ *      that calendar would trigger an outbound push (because the map
+ *      row still existed), which the provider sometimes rejected,
+ *      producing a sync flap that made tasks appear/disappear in the
+ *      UI as React Query invalidated and re-fetched.
+ *   3. Re-enabling later didn't pull a fresh import because the per-
+ *      calendar sync_token was still cached, so Google reported "no
+ *      changes since last token" — but everything from before was
+ *      already gone, leading to an empty calendar.
+ *
+ * Cleanup on disable:
+ *   - DELETE imported events (tasks where source_calendar_id matches
+ *     and source_kind='event'). These were never user-authored, so
+ *     it's safe to drop them entirely.
+ *   - DELETE external_event_map rows for the calendar so push.js
+ *     stops trying to update events on the provider. Tasks the user
+ *     created in Zephyrly survive — only the link is severed.
+ *   - CLEAR sync_token so a future re-enable starts with a full
+ *     initial import instead of an empty incremental delta.
+ *
+ * Enabling is unchanged — just flip the flag, and the next sync tick
+ * picks up the calendar.
+ *
  * @param {DB} db
  * @param {string} integrationId
  * @param {Record<string, boolean>} updates
  */
 export function setEnabledCalendars(db, integrationId, updates) {
   const now = new Date().toISOString();
-  const stmt = db.prepare(
+  const integration = /** @type {any} */ (
+    db.prepare(`SELECT * FROM calendar_integrations WHERE id = ?`).get(integrationId)
+  );
+  if (!integration) return;
+
+  const enableStmt = db.prepare(
     `UPDATE integration_calendars
-     SET sync_enabled = ?, updated_date = ?
+     SET sync_enabled = 1, updated_date = ?
      WHERE integration_id = ? AND external_calendar_id = ?`
   );
-  for (const [extId, enabled] of Object.entries(updates || {})) {
-    stmt.run(enabled ? 1 : 0, now, integrationId, extId);
+  const disableStmt = db.prepare(
+    `UPDATE integration_calendars
+     SET sync_enabled = 0, sync_token = NULL, updated_date = ?
+     WHERE integration_id = ? AND external_calendar_id = ?`
+  );
+  const deleteImportedTasksStmt = db.prepare(
+    `DELETE FROM tasks
+     WHERE app_id = ?
+       AND source_provider = ?
+       AND source_calendar_id = ?
+       AND source_kind = 'event'`
+  );
+  const deleteMapsStmt = db.prepare(
+    `DELETE FROM external_event_map
+     WHERE integration_id = ? AND external_calendar_id = ?`
+  );
+
+  db.exec("BEGIN");
+  try {
+    for (const [extId, enabled] of Object.entries(updates || {})) {
+      if (enabled) {
+        enableStmt.run(now, integrationId, extId);
+      } else {
+        deleteImportedTasksStmt.run(integration.app_id, integration.provider, extId);
+        deleteMapsStmt.run(integrationId, extId);
+        disableStmt.run(now, integrationId, extId);
+      }
+    }
+    db.exec("COMMIT");
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
   }
 }
 
