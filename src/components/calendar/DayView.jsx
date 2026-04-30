@@ -205,14 +205,16 @@ export default function DayView({
 
           {/* Timed tasks */}
           <div className="absolute top-0 left-12 right-1 bottom-0">
-            {laidOutTimed.map(({ task, startMin, endMin, col, cols }) => {
+            {laidOutTimed.map(({ task, startMin, endMin, col, cols, colSpan }) => {
               const top = (startMin / 60) * HOUR_HEIGHT;
               const height = Math.max(
                 24,
                 ((endMin - startMin) / 60) * HOUR_HEIGHT
               );
-              const widthPct = 100 / cols;
-              const leftPct = col * widthPct;
+              // Width = colSpan / cols (not 1 / cols) so events expand
+              // into empty adjacent columns. See layoutTimedTasks.
+              const widthPct = ((colSpan || 1) / cols) * 100;
+              const leftPct = (col / cols) * 100;
               return (
                 <div
                   key={task.id}

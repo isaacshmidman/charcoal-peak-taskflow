@@ -88,11 +88,13 @@ function TimedColumn({ date, timedTasks, priorities, onTaskClick, onToggleDone }
         </div>
       )}
 
-      {laidOut.map(({ task, startMin, endMin, col, cols }) => {
+      {laidOut.map(({ task, startMin, endMin, col, cols, colSpan }) => {
         const top = (startMin / 60) * HOUR_HEIGHT;
         const height = Math.max(22, ((endMin - startMin) / 60) * HOUR_HEIGHT);
-        const widthPct = 100 / cols;
-        const leftPct = col * widthPct;
+        // Width = colSpan / cols (not 1 / cols) so events expand into
+        // empty adjacent columns. See layoutTimedTasks.
+        const widthPct = ((colSpan || 1) / cols) * 100;
+        const leftPct = (col / cols) * 100;
         return (
           <div
             key={task.id}
