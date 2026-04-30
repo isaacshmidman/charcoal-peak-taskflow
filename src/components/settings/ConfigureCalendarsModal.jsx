@@ -105,17 +105,27 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
+      <DialogContent className="max-w-md w-[calc(100vw-2rem)]">
+        {/* DialogContent is a CSS Grid; grid items have an intrinsic
+            `min-width: auto` ≈ `min-content`, so an unbreakable long
+            calendar name (e.g. a 50-char French class title) was blowing
+            the modal past `max-w-md`. `min-w-0` on every direct grid
+            child opts them into shrinkable behavior; the explicit
+            `w-[calc(100vw-2rem)]` cap keeps the modal within the
+            viewport on small screens.
+
+            We also wrap the description in `min-w-0 break-words` so a
+            very long URL in there can't blow the dialog either. */}
+        <DialogHeader className="min-w-0">
           <DialogTitle>Configure calendars</DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="min-w-0 break-words">
             Choose which calendars to sync with Zephyrly. The starred calendar
             receives new tasks created in Zephyrly. Read-only calendars
             (Birthdays, Holidays, etc.) appear as events that can't be edited.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="pt-1">
+        <div className="pt-1 min-w-0">
           {isLoading ? (
             <div className="flex items-center gap-2 text-xs text-slate-400 py-6 justify-center">
               <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading calendars…
@@ -134,11 +144,11 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
               No calendars found on this account.
             </p>
           ) : (
-            <ul className="max-h-80 overflow-y-auto divide-y divide-slate-100 rounded-lg border border-slate-100">
+            <ul className="min-w-0 max-h-80 overflow-y-auto divide-y divide-slate-100 rounded-lg border border-slate-100">
               {rows.map((c) => (
                 <li
                   key={c.external_calendar_id}
-                  className="flex items-center gap-3 px-3 py-2"
+                  className="flex items-center gap-3 px-3 py-2 min-w-0"
                 >
                   {/* Color swatch — solid round dot matching Priority
                       Levels styling. For writable calendars it also
@@ -212,10 +222,18 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
                       read-only badge lives in a FIXED-WIDTH slot to the
                       right so the toggle column is column-aligned across
                       all rows (writable rows don't show the badge but
-                      reserve its space so the toggle doesn't shift left). */}
-                  <div className="min-w-0 flex-1">
+                      reserve its space so the toggle doesn't shift left).
+
+                      `basis-0` is the key bit: without it `flex-1` falls
+                      back to `flex-basis: 0%` derived from content
+                      intrinsic width, so a long unbreakable name still
+                      sized this cell to fit and the modal blew past
+                      max-w-md. With basis-0 the cell starts at 0 and
+                      grows only into available space — `truncate` then
+                      actually fires on overflow. */}
+                  <div className="min-w-0 flex-1 basis-0">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <p className="text-sm text-slate-900 truncate flex-1 min-w-0">
+                      <p className="text-sm text-slate-900 truncate flex-1 min-w-0 basis-0">
                         {c.summary || c.external_calendar_id}
                       </p>
                       {c.primary ? (
