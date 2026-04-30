@@ -823,6 +823,7 @@ function formatTaskTimeInTz(date, tz) {
  *   start: { date?: string, dateTime?: string, tzid?: string },
  *   end?: { date?: string, dateTime?: string, tzid?: string },
  *   rrule?: string,
+ *   color?: string,
  * }} ev
  */
 export function buildVEvent(ev) {
@@ -872,6 +873,12 @@ export function buildVEvent(ev) {
   );
   if (ev.description) lines.push(`DESCRIPTION:${escapeIcsText(ev.description)}`);
   if (ev.rrule) lines.push(`RRULE:${ev.rrule.replace(/^RRULE:/i, "")}`);
+  // RFC 7986 §5.9 — per-event color override. iOS/macOS Calendar honors
+  // this for individual events; Apple Web (iCloud.com) is hit or miss.
+  // Spec calls for a CSS3 color name, but every implementation we've
+  // tested also accepts #RRGGBB hex, which preserves shade fidelity for
+  // the deeper Tailwind variants.
+  if (ev.color) lines.push(`COLOR:${ev.color}`);
   lines.push("END:VEVENT", "END:VCALENDAR");
   // Re-fold long lines at 75 octets per RFC 5545 §3.1.
   return lines.filter(Boolean).map(foldIcsLine).join("\r\n") + "\r\n";

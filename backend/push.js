@@ -42,6 +42,11 @@ import {
   newEventUid,
 } from "./providers/apple-calendar.js";
 import { taskToRruleLine } from "./recurrence-rrule.js";
+import {
+  lookupPriorityColor,
+  colorNameToGoogleColorId,
+  colorNameToHex,
+} from "./priority-color.js";
 
 /** @typedef {import("node:sqlite").DatabaseSync} DB */
 
@@ -323,8 +328,13 @@ async function pushOne(db, config, { op, integration, taskSnapshot }) {
     return;
   }
 
-  // Upsert path.
-  const body = taskToEventBody(taskSnapshot, tz);
+  // Upsert path. Resolve priority → Google colorId here in the caller so
+  // taskToEventBody stays a pure shape function (no DB access). Tasks
+  // without a priority, or whose priority color doesn't have a Google
+  // mapping, fall through and let the event use the calendar's default.
+  const priorityColorName = lookupPriorityColor(db, integration.app_id, taskSnapshot.priority_id);
+  const colorId = priorityColorName ? colorNameToGoogleColorId(priorityColorName) : undefined;
+  const body = taskToEventBody(taskSnapshot, tz, colorId);
   if (!body) {
     // Task no longer belongs on a calendar (e.g. user removed its due_date).
     // If we had an event, delete it; otherwise noop.
@@ -496,12 +506,19 @@ async function pushOneApple(db, integration, taskSnapshot, op) {
   const rruleFullLine = taskToRruleLine(taskSnapshot);
   const rrule = rruleFullLine ? rruleFullLine.replace(/^RRULE:/i, "") : "";
 
+  // Priority → ICS COLOR property (RFC 7986 §5.9). Apple Calendar
+  // honors per-event color overrides on iOS/macOS; iCloud.com is
+  // hit-or-miss but doesn't reject the property either way.
+  const priorityColorName = lookupPriorityColor(db, integration.app_id, taskSnapshot.priority_id);
+  const color = priorityColorName ? colorNameToHex(priorityColorName) : "";
+
   const ics = buildVEvent({
     uid,
     summary: taskSnapshot.title || "(Untitled task)",
     description: taskSnapshot.description || "",
     ...buildAppleStartEnd(taskSnapshot, tz),
     rrule,
+    color,
   });
 
   // For an existing mapping, PUT to the same href; otherwise PUT to a new
@@ -623,7 +640,7 @@ function markPushOk(db, integrationId) {
  * @param {any} task
  * @param {string} timeZone — IANA tz for timed events
  */
-export function taskToEventBody(task, timeZone) {
+export function taskToEventBody(task, timeZone, colorId) {
   if (!task || !task.due_date) return null;
 
   const summary = String(task.title || "(Untitled task)").slice(0, 200);
@@ -637,6 +654,12 @@ export function taskToEventBody(task, timeZone) {
   const rruleLine = taskToRruleLine(task);
   const recurrence = rruleLine ? [rruleLine] : undefined;
 
+  // Optional priority-derived color. Google has a fixed palette of 11
+  // colorIds (1..11); see priority-color.js for the Zephyrly→Google
+  // mapping. Omit the field entirely when no priority/no mapping so the
+  // event picks up the calendar's default color, not a hard-coded one.
+  const colorField = colorId ? { colorId: String(colorId) } : {};
+
   // All-day event — Google expects end.date to be exclusive (next day).
   if (!task.task_time) {
     return {
@@ -645,6 +668,7 @@ export function taskToEventBody(task, timeZone) {
       start: { date: task.due_date },
       end: { date: addOneDay(task.due_date) },
       ...(recurrence ? { recurrence } : {}),
+      ...colorField,
     };
   }
 
@@ -661,6 +685,7 @@ export function taskToEventBody(task, timeZone) {
     start: { dateTime: startDt, timeZone },
     end: { dateTime: endDt, timeZone },
     ...(recurrence ? { recurrence } : {}),
+    ...colorField,
   };
 }
 
