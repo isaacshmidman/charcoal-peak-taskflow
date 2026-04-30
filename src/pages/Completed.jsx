@@ -52,7 +52,7 @@ export default function Completed() {
 
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ["tasks"],
-    queryFn: () => apiClient.entities.Task.list("-completed_at", 500),
+    queryFn: () => apiClient.entities.Task.list("-completed_at", 5000),
     // Calendar-imported events live only on /Calendar.
     select: excludeExternalEvents,
   });

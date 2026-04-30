@@ -49,7 +49,7 @@ export default function Today() {
 
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ["tasks"],
-    queryFn: () => apiClient.entities.Task.list("-created_date", 500),
+    queryFn: () => apiClient.entities.Task.list("-created_date", 5000),
     // Calendar-imported events live only on /Calendar.
     select: excludeExternalEvents,
   });

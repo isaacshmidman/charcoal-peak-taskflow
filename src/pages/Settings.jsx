@@ -238,7 +238,7 @@ export default function Settings() {
   // and exposes per-calendar reorder + visibility-on-non-calendar-pages.
   const { data: tasksForCalendars = [] } = useQuery({
     queryKey: ["tasks"],
-    queryFn: () => apiClient.entities.Task.list("-created_date", 500),
+    queryFn: () => apiClient.entities.Task.list("-created_date", 5000),
   });
   const discoveredCalendars = useMemo(
     () => deriveCalendars(tasksForCalendars),

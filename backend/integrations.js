@@ -640,6 +640,24 @@ export async function disconnectIntegration(db, { appId, userId, id }) {
     }
   }
 
+  // Cleanup mirror of setEnabledCalendars's per-calendar disable, but at
+  // the integration level: drop the imported events that came from any
+  // of this integration's calendars, then drop event_map / calendar /
+  // integration rows. Without this the imported events lingered as
+  // orphans after disconnect, still cluttering the Calendar nav and the
+  // Settings → Calendar Order section.
+  //
+  // Zephyrly-native tasks that had been pushed outbound to this
+  // integration's calendars survive — only the link (event_map) is cut.
+  db.prepare(
+    `DELETE FROM tasks
+     WHERE app_id = ?
+       AND source_provider = ?
+       AND source_kind = 'event'
+       AND source_calendar_id IN (
+         SELECT external_calendar_id FROM integration_calendars WHERE integration_id = ?
+       )`
+  ).run(appId, row.provider, row.id);
   db.prepare(`DELETE FROM external_event_map WHERE integration_id = ?`).run(row.id);
   db.prepare(`DELETE FROM integration_calendars WHERE integration_id = ?`).run(row.id);
   db.prepare(`DELETE FROM calendar_integrations WHERE id = ?`).run(row.id);

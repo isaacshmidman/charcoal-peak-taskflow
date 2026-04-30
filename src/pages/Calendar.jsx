@@ -142,7 +142,7 @@ export default function Calendar() {
 
   const { data: tasks = [] } = useQuery({
     queryKey: ["tasks"],
-    queryFn: () => apiClient.entities.Task.list("-created_date", 500),
+    queryFn: () => apiClient.entities.Task.list("-created_date", 5000),
   });
   const { data: priorities = [] } = useQuery({
     queryKey: ["priorities"],
