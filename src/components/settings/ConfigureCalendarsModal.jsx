@@ -8,8 +8,25 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useIntegrationCalendars } from "@/hooks/useIntegrations";
 import { Loader2, Lock, Star } from "lucide-react";
+
+// Compact palette used for the per-calendar color swatch popover. We
+// expose the same hex tones the priority-color outbound mapping emits
+// (see backend/priority-color.js) so what users pick here matches what
+// gets pushed back as event-level colors. Brown is omitted — the
+// providers don't render it well as a calendar background.
+const CALENDAR_COLOR_SWATCHES = [
+  "#dc2626", "#ea580c", "#ca8a04", "#15803d", "#1d4ed8",
+  "#6d28d9", "#f87171", "#fb923c", "#facc15", "#4ade80",
+  "#60a5fa", "#a78bfa", "#f472b6", "#2dd4bf", "#22d3ee",
+  "#fb7185", "#94a3b8", "#0f172a",
+];
 
 /**
  * Configure-which-calendars modal for an integration.
@@ -33,7 +50,12 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
     saving,
     setPrimary,
     settingPrimary,
+    setColor,
+    settingColor,
   } = useIntegrationCalendars(integrationId, open);
+  // Track which row is currently mid-color-update so we can show a
+  // per-row spinner on the swatch instead of disabling the whole modal.
+  const [colorTargetId, setColorTargetId] = useState(/** @type {string|null} */ (null));
 
   // Local override of sync_enabled so toggling feels instant.
   const [overrides, setOverrides] = useState(/** @type {Record<string, boolean>} */ ({}));
@@ -118,14 +140,74 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
                   key={c.external_calendar_id}
                   className="flex items-center gap-3 px-3 py-2"
                 >
-                  {/* Solid round dot — matches the Priority Levels and
-                      Calendar Order styling in Settings, so all three
-                      lists read as the same kind of "labeled item". */}
-                  <span
-                    className="inline-block w-3 h-3 rounded-full shrink-0"
-                    style={{ backgroundColor: c.color_hex || "#94a3b8" }}
-                    aria-hidden
-                  />
+                  {/* Color swatch — solid round dot matching Priority
+                      Levels styling. For writable calendars it also
+                      doubles as a popover trigger that lets the user
+                      change the color on the provider. Read-only
+                      calendars render a static dot (no popover). */}
+                  {c.writable ? (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          className="shrink-0 w-3 h-3 rounded-full ring-1 ring-slate-200 hover:ring-slate-400 transition-shadow disabled:opacity-50 relative"
+                          style={{ backgroundColor: c.color_hex || "#94a3b8" }}
+                          title="Change calendar color"
+                          aria-label="Change calendar color"
+                          disabled={settingColor && colorTargetId === c.external_calendar_id}
+                        >
+                          {settingColor && colorTargetId === c.external_calendar_id && (
+                            <Loader2 className="absolute inset-0 m-auto w-2.5 h-2.5 animate-spin text-slate-700" />
+                          )}
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent align="start" className="w-auto p-2">
+                        <div className="grid grid-cols-6 gap-1.5">
+                          {CALENDAR_COLOR_SWATCHES.map((hex) => {
+                            const isCurrent =
+                              (c.color_hex || "").toLowerCase() === hex.toLowerCase();
+                            return (
+                              <button
+                                key={hex}
+                                type="button"
+                                onClick={async () => {
+                                  setColorTargetId(c.external_calendar_id);
+                                  try {
+                                    await setColor({
+                                      externalCalendarId: c.external_calendar_id,
+                                      colorHex: hex,
+                                    });
+                                  } catch {
+                                    // Hook surfaces the error in dev tools; we
+                                    // intentionally don't toast inside the
+                                    // popover (would close it on render). The
+                                    // modal stays open so the user can retry.
+                                  } finally {
+                                    setColorTargetId(null);
+                                  }
+                                }}
+                                className={
+                                  "w-6 h-6 rounded-full ring-1 transition-shadow hover:scale-110 " +
+                                  (isCurrent
+                                    ? "ring-slate-900 ring-2"
+                                    : "ring-slate-200 hover:ring-slate-400")
+                                }
+                                style={{ backgroundColor: hex }}
+                                title={hex}
+                                aria-label={`Set color ${hex}`}
+                              />
+                            );
+                          })}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  ) : (
+                    <span
+                      className="inline-block w-3 h-3 rounded-full shrink-0"
+                      style={{ backgroundColor: c.color_hex || "#94a3b8" }}
+                      aria-hidden
+                    />
+                  )}
                   {/* Title + star get the flex-1 stretchy area; the
                       read-only badge lives in a FIXED-WIDTH slot to the
                       right so the toggle column is column-aligned across

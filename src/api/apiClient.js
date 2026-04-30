@@ -49,6 +49,7 @@ import { loadFromCache, saveToCache } from "@/lib/offlineCache";
  *     setCalendars: (id: string, updates: Record<string, boolean>) => Promise<any[]>,
  *     setDefault: (id: string) => Promise<any>,
  *     setPrimaryCalendar: (id: string, externalCalendarId: string) => Promise<any>,
+ *     setCalendarColor: (id: string, externalCalendarId: string, colorHex: string) => Promise<any>,
  *   },
  *   cleanup: () => void,
  * }} ApiClient
@@ -410,6 +411,12 @@ const liveApiClient = {
       return apiRequest(
         `/apps/${appConfig.appId}/integrations/${encodeURIComponent(id)}/primary-calendar`,
         { method: "POST", body: { external_calendar_id: externalCalendarId } }
+      );
+    },
+    async setCalendarColor(id, externalCalendarId, colorHex) {
+      return apiRequest(
+        `/apps/${appConfig.appId}/integrations/${encodeURIComponent(id)}/calendar-color`,
+        { method: "POST", body: { external_calendar_id: externalCalendarId, color_hex: colorHex } }
       );
     },
   },

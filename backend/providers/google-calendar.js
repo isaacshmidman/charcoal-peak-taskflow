@@ -344,6 +344,48 @@ export async function listCalendarList(accessToken) {
 }
 
 /**
+ * Set a calendar's color for the current user. Uses Google's RGB color
+ * format (`colorRgbFormat=true`), which lets us send arbitrary `#RRGGBB`
+ * hex instead of being limited to the 24 fixed `colorId` palette. The
+ * `foregroundColor` is required when `colorRgbFormat` is on; we send a
+ * dark text color which Google contrasts against light/dark
+ * backgrounds reasonably well.
+ *
+ * The color override is stored on `calendarList` (per-user), not on the
+ * calendar itself — so it only changes what THIS user sees, leaving
+ * other share recipients unaffected.
+ *
+ * @param {string} accessToken
+ * @param {string} calendarId
+ * @param {string} hex — "#RRGGBB"
+ */
+export async function setCalendarColor(accessToken, calendarId, hex) {
+  if (!/^#[0-9a-f]{6}$/i.test(hex)) {
+    const err = /** @type {any} */ (new Error(`Invalid hex color: ${hex}`));
+    err.statusCode = 400;
+    throw err;
+  }
+  const url = `https://www.googleapis.com/calendar/v3/users/me/calendarList/${encodeURIComponent(calendarId)}?colorRgbFormat=true`;
+  const resp = await fetch(url, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      backgroundColor: hex,
+      foregroundColor: "#1f2937", // slate-800 — readable on most pastel backgrounds
+    }),
+  });
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => "");
+    const err = /** @type {any} */ (new Error(`Google calendarList color update failed (${resp.status}): ${redact(body)}`));
+    err.statusCode = resp.status;
+    throw err;
+  }
+}
+
+/**
  * Create an event on the given calendar.
  *
  * @param {string} accessToken

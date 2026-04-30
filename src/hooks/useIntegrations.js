@@ -113,6 +113,27 @@ export function useIntegrationCalendars(integrationId, enabled = true) {
     },
   });
 
+  // Set this calendar's color on the provider AND mirror locally.
+  // Server returns the refreshed calendar list so the modal repaints
+  // without an extra round-trip. Tasks query gets invalidated so the
+  // calendar swatches on cards refresh too.
+  const setColorMutation = useMutation({
+    mutationFn: (/** @type {{ externalCalendarId: string, colorHex: string }} */ args) =>
+      apiClient.integrations.setCalendarColor(
+        String(integrationId),
+        args.externalCalendarId,
+        args.colorHex
+      ),
+    onSuccess: (data) => {
+      if (Array.isArray(data?.calendars)) {
+        queryClient.setQueryData(queryKey, data.calendars);
+      } else {
+        queryClient.invalidateQueries({ queryKey });
+      }
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    },
+  });
+
   return {
     calendars: listQuery.data || [],
     isLoading: listQuery.isLoading,
@@ -123,5 +144,7 @@ export function useIntegrationCalendars(integrationId, enabled = true) {
     saving: updateMutation.isPending,
     setPrimary: setPrimaryMutation.mutateAsync,
     settingPrimary: setPrimaryMutation.isPending,
+    setColor: setColorMutation.mutateAsync,
+    settingColor: setColorMutation.isPending,
   };
 }

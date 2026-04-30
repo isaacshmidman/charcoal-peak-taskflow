@@ -34,6 +34,7 @@ import {
   setEnabledCalendars,
   setDefaultIntegration,
   setPrimaryCalendar,
+  setCalendarColor,
 } from "./integrations.js";
 import { startSyncLoop, syncIntegration } from "./sync.js";
 import { enqueueTaskPush } from "./push.js";
@@ -536,6 +537,36 @@ export function createRequestHandler(config = backendConfig, db = getDatabase(co
           sendJson(response, 200, {
             calendars: listIntegrationCalendars(db, segments[4]),
             integrations: listIntegrationsForUser(db, { appId, userId: user.id }),
+          });
+          return;
+        }
+
+        // POST /api/apps/:appId/integrations/:id/calendar-color
+        // Body: { external_calendar_id, color_hex }
+        // Updates the calendar color both on the provider (Google
+        // colorRgbFormat or Apple PROPPATCH) and in our local mirror so
+        // the UI repaints immediately. Provider failure aborts before
+        // touching local state — see setCalendarColor in integrations.js.
+        if (
+          request.method === "POST" &&
+          segments[4] &&
+          segments[5] === "calendar-color"
+        ) {
+          const body = (await readJsonBody(request)) || {};
+          const externalCalendarId = String(body.external_calendar_id || "");
+          const colorHex = String(body.color_hex || "");
+          if (!externalCalendarId) {
+            throw new HttpError(400, "external_calendar_id is required.", "invalid_request");
+          }
+          await setCalendarColor(db, config, {
+            appId,
+            userId: user.id,
+            integrationId: segments[4],
+            externalCalendarId,
+            colorHex,
+          });
+          sendJson(response, 200, {
+            calendars: listIntegrationCalendars(db, segments[4]),
           });
           return;
         }

@@ -25,8 +25,12 @@ import {
   revokeToken as revokeGoogleToken,
   getCalendarMeta as getGoogleCalendarMeta,
   listCalendarList as listGoogleCalendarList,
+  setCalendarColor as setGoogleCalendarColor,
 } from "./providers/google-calendar.js";
-import { discoverAppleCalendars } from "./providers/apple-calendar.js";
+import {
+  discoverAppleCalendars,
+  setCalendarColor as setAppleCalendarColor,
+} from "./providers/apple-calendar.js";
 
 /** @typedef {import("node:sqlite").DatabaseSync} DB */
 
@@ -172,6 +176,60 @@ export function setPrimaryCalendar(db, { appId, userId, integrationId, externalC
     db.exec("ROLLBACK");
     throw err;
   }
+}
+
+/**
+ * Update a calendar's color on the provider AND in our local mirror.
+ *
+ * Why both:
+ *   - Provider update is what the user actually sees on their other
+ *     devices (other Macs, the Google Calendar mobile app, etc.).
+ *   - Local update is for the next render of the Configure modal and
+ *     the Calendar nav swatches — without it the new color wouldn't
+ *     show until the next sync pass.
+ *
+ * Failure mode: if the provider call fails (network, permission, rate
+ * limit) we propagate the error and DON'T touch local state, so the
+ * user gets a clear error and the swatch stays in the old color until
+ * a successful retry.
+ *
+ * @param {DB} db
+ * @param {any} config
+ * @param {{ appId: string, userId: string, integrationId: string,
+ *           externalCalendarId: string, colorHex: string }} args
+ */
+export async function setCalendarColor(db, config, args) {
+  const { appId, userId, integrationId, externalCalendarId, colorHex } = args;
+  if (!/^#[0-9a-f]{6}$/i.test(colorHex)) {
+    throw new HttpError(400, "color_hex must be #RRGGBB.", "invalid_request");
+  }
+  const integration = getIntegrationForUser(db, { appId, userId, id: integrationId });
+  if (!integration) throw new HttpError(404, "Integration not found.", "not_found");
+
+  const cal = /** @type {any} */ (
+    db
+      .prepare(
+        `SELECT * FROM integration_calendars WHERE integration_id = ? AND external_calendar_id = ?`
+      )
+      .get(integrationId, externalCalendarId)
+  );
+  if (!cal) throw new HttpError(404, "Calendar not found on this integration.", "not_found");
+
+  if (integration.provider === "google") {
+    const accessToken = await getFreshAccessToken(db, config, integration);
+    await setGoogleCalendarColor(accessToken, externalCalendarId, colorHex);
+  } else if (integration.provider === "apple") {
+    const creds = getAppleCredentials(db, integration);
+    await setAppleCalendarColor(creds, externalCalendarId, colorHex);
+  } else {
+    throw new HttpError(400, `Color update not supported for provider ${integration.provider}.`, "unsupported");
+  }
+
+  // Mirror the new color locally so the UI re-paints immediately.
+  const now = new Date().toISOString();
+  db.prepare(
+    `UPDATE integration_calendars SET color_hex = ?, updated_date = ? WHERE id = ?`
+  ).run(colorHex, now, cal.id);
 }
 
 export function listIntegrationsForUser(db, { appId, userId }) {

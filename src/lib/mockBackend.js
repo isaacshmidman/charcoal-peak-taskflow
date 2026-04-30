@@ -187,6 +187,9 @@ export function createE2EApiClient() {
       async setPrimaryCalendar() {
         return { success: true };
       },
+      async setCalendarColor() {
+        return { success: true, calendars: [] };
+      },
     },
     cleanup() {},
     setToken(token) {

@@ -950,6 +950,37 @@ function stripEtag(h) {
 }
 
 /**
+ * PROPPATCH a calendar's color. iCloud uses Apple's namespaced
+ * `apple-calendar-color` property. The value is an 8-digit hex
+ * `#RRGGBBAA` — we accept a normal `#RRGGBB` and append `FF` for full
+ * alpha (transparent calendars wouldn't be useful here).
+ *
+ * @param {{ email: string, password: string, origin: string }} ctx
+ * @param {string} calendarUrl  the absolute CalDAV calendar URL
+ * @param {string} hex          "#RRGGBB"
+ */
+export async function setCalendarColor(ctx, calendarUrl, hex) {
+  if (!/^#[0-9a-f]{6}$/i.test(hex)) {
+    const err = /** @type {any} */ (new Error(`Invalid hex color: ${hex}`));
+    err.statusCode = 400;
+    throw err;
+  }
+  const value = `${hex}FF`; // RRGGBBAA — full alpha
+  const body = `<?xml version="1.0" encoding="utf-8"?>
+<D:propertyupdate xmlns:D="DAV:" xmlns:A="http://apple.com/ns/ical/">
+  <D:set>
+    <D:prop>
+      <A:calendar-color>${value}</A:calendar-color>
+    </D:prop>
+  </D:set>
+</D:propertyupdate>`;
+  await caldavRequest(ctx, "PROPPATCH", calendarUrl, {
+    headers: { "Content-Type": "application/xml; charset=utf-8" },
+    body,
+  });
+}
+
+/**
  * Build the absolute href where a new event should live: the calendar URL
  * with a `<UID>.ics` suffix. iCloud accepts arbitrary paths inside a
  * calendar collection, but using `<UID>.ics` is the universal convention.
