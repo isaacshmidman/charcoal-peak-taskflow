@@ -47,8 +47,8 @@ export default function CalendarVisibilityDropdown({ calendars, hidden, onChange
           variant="ghost"
           size="icon"
           className={cn(
-            "h-9 w-9 text-slate-400 hover:text-slate-700",
-            !allShown && "text-slate-700"
+            "h-9 w-9 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200",
+            !allShown && "text-slate-700 dark:text-slate-200"
           )}
           title="Show / hide calendars"
           aria-label="Show / hide calendars"
@@ -57,27 +57,27 @@ export default function CalendarVisibilityDropdown({ calendars, hidden, onChange
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64 p-2">
-        <div className="flex items-center justify-between px-1.5 pb-1.5 border-b border-slate-100">
-          <span className="text-xs font-semibold text-slate-700">Calendars</span>
+        <div className="flex items-center justify-between px-1.5 pb-1.5 border-b border-slate-100 dark:border-slate-800">
+          <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">Calendars</span>
           <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={showAll}
-              className="text-[11px] text-slate-500 hover:text-slate-900 px-1.5 py-0.5 rounded hover:bg-slate-100"
+              className="text-[11px] text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 px-1.5 py-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700"
             >
               All
             </button>
             <button
               type="button"
               onClick={hideAll}
-              className="text-[11px] text-slate-500 hover:text-slate-900 px-1.5 py-0.5 rounded hover:bg-slate-100"
+              className="text-[11px] text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 px-1.5 py-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700"
             >
               None
             </button>
           </div>
         </div>
         {calendars.length === 0 ? (
-          <p className="text-xs text-slate-400 px-2 py-3 text-center">
+          <p className="text-xs text-slate-400 dark:text-slate-500 px-2 py-3 text-center">
             No calendars to filter.
           </p>
         ) : (
@@ -87,7 +87,7 @@ export default function CalendarVisibilityDropdown({ calendars, hidden, onChange
               return (
                 <li key={c.key}>
                   <label
-                    className="flex items-center gap-2 px-1.5 py-1.5 rounded hover:bg-slate-50 cursor-pointer"
+                    className="flex items-center gap-2 px-1.5 py-1.5 rounded hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
                   >
                     <input
                       type="checkbox"
@@ -97,12 +97,12 @@ export default function CalendarVisibilityDropdown({ calendars, hidden, onChange
                     />
                     {c.color ? (
                       <span
-                        className="inline-block w-2.5 h-2.5 rounded-sm shrink-0 border border-slate-200"
+                        className="inline-block w-2.5 h-2.5 rounded-sm shrink-0 border border-slate-200 dark:border-slate-700"
                         style={{ backgroundColor: c.color }}
                         aria-hidden
                       />
                     ) : null}
-                    <span className="text-xs text-slate-700 truncate flex-1 min-w-0">
+                    <span className="text-xs text-slate-700 dark:text-slate-200 truncate flex-1 min-w-0">
                       {c.label}
                     </span>
                   </label>

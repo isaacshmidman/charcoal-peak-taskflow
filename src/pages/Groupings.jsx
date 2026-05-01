@@ -70,15 +70,15 @@ function GroupColumn({ title, subtitle, tasks, priorities, priorityOrderMap, onT
   }, [tasks, sorts, priorityOrderMap, calendarIndexByKey]);
 
   return (
-    <div className={`flex-shrink-0 ${wide ? "w-72" : "w-60"} flex flex-col rounded-2xl border ${accent || "border-slate-100 bg-slate-50"} overflow-hidden`}>
-      <div className={`px-3 py-2.5 border-b ${accent ? "" : "border-slate-100"}`}>
-        <p className="text-xs font-semibold text-slate-900">{title}</p>
-        {subtitle && <p className="text-[10px] text-slate-400 mt-0.5">{subtitle}</p>}
-        <p className="text-[10px] text-slate-400">{tasks.length} task{tasks.length !== 1 ? "s" : ""}</p>
+    <div className={`flex-shrink-0 ${wide ? "w-72" : "w-60"} flex flex-col rounded-2xl border ${accent || "border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50"} overflow-hidden`}>
+      <div className={`px-3 py-2.5 border-b ${accent ? "" : "border-slate-100 dark:border-slate-800"}`}>
+        <p className="text-xs font-semibold text-slate-900 dark:text-slate-100">{title}</p>
+        {subtitle && <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{subtitle}</p>}
+        <p className="text-[10px] text-slate-400 dark:text-slate-500">{tasks.length} task{tasks.length !== 1 ? "s" : ""}</p>
       </div>
       <div className="flex-1 overflow-y-auto p-2 space-y-1.5 max-h-[70vh]">
         {sorted.length === 0 ? (
-          <p className="text-[10px] text-slate-300 text-center py-6">Clear skies.</p>
+          <p className="text-[10px] text-slate-300 dark:text-slate-600 text-center py-6">Clear skies.</p>
         ) : (
           <AnimatePresence mode="popLayout">
             {sorted.map(task => (
@@ -251,21 +251,21 @@ export default function Groupings() {
   }, [tasks.length]);
 
   const columns = [
-    { key: "past", title: "Past", subtitle: "Before yesterday", tasks: groups.past, accent: "border-slate-200 bg-slate-50/80" },
+    { key: "past", title: "Past", subtitle: "Before yesterday", tasks: groups.past, accent: "border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/80" },
     { key: "yest", title: "Yesterday", subtitle: format(yesterday, "MMM d"), tasks: groups.yest, accent: "border-orange-100 bg-orange-50/50" },
     { key: "tod", title: "Today", subtitle: format(today, "MMM d"), tasks: groups.tod, accent: "border-blue-200 bg-blue-50/50", wide: true },
     { key: "tom", title: "Tomorrow", subtitle: format(tomorrow, "MMM d"), tasks: groups.tom, accent: "border-orange-100 bg-orange-50/50" },
-    { key: "next7", title: "Next 7 Days", subtitle: `${format(addDays(tomorrow, 1), "MMM d")} – ${format(nextSevenDaysEnd, "MMM d")}`, tasks: groups.next7, accent: "border-slate-200 bg-slate-50/80" },
-    { key: "future", title: "Future", subtitle: `After ${format(nextSevenDaysEnd, "MMM d")}`, tasks: groups.future, accent: "border-slate-200 bg-slate-50/80" },
-    { key: "noDue", title: "No Due Date", tasks: groups.noDue, accent: "border-slate-100 bg-slate-50/60" },
+    { key: "next7", title: "Next 7 Days", subtitle: `${format(addDays(tomorrow, 1), "MMM d")} – ${format(nextSevenDaysEnd, "MMM d")}`, tasks: groups.next7, accent: "border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/80" },
+    { key: "future", title: "Future", subtitle: `After ${format(nextSevenDaysEnd, "MMM d")}`, tasks: groups.future, accent: "border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/80" },
+    { key: "noDue", title: "No Due Date", tasks: groups.noDue, accent: "border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/60" },
   ];
 
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-base font-semibold text-slate-900">Groupings</h1>
-          <p className="text-xs text-slate-400 mt-0.5">{topLevel.length} task{topLevel.length !== 1 ? "s" : ""}</p>
+          <h1 className="text-base font-semibold text-slate-900 dark:text-slate-100">Groupings</h1>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{topLevel.length} task{topLevel.length !== 1 ? "s" : ""}</p>
         </div>
         <div className="flex items-center gap-2">
           <AnimatedSearchInput
@@ -279,7 +279,7 @@ export default function Groupings() {
             variant="ghost"
             size="icon"
             data-search-toggle
-            className="h-9 w-9 text-slate-400 hover:text-slate-700"
+            className="h-9 w-9 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
             onMouseDown={(e) => { if (showSearch) e.preventDefault(); }}
             onClick={() => { if (showSearch) setSearch(""); setShowSearch((v) => !v); }}
           >
@@ -294,7 +294,7 @@ export default function Groupings() {
       </div>
 
       {/* Date-based groups */}
-      <h2 className="text-xs font-semibold text-slate-900 mb-3">By Date</h2>
+      <h2 className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-3">By Date</h2>
       <div ref={scrollContainerRef} className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4">
         {columns.map(col => (
           <div key={col.key} ref={col.key === "tod" ? todayColRef : null}>
@@ -320,7 +320,7 @@ export default function Groupings() {
       {/* Tag-based groups */}
       {tagGroups.length > 0 && (
         <div>
-          <h2 className="text-xs font-semibold text-slate-900 mb-3">By Tag</h2>
+          <h2 className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-3">By Tag</h2>
           <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4">
             {tagGroups.map(({ tag, tasks: tagTasks }) => (
               <GroupColumn

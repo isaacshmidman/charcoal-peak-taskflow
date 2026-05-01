@@ -216,13 +216,13 @@ export default function RecentlyDeleted({ onBack } = {}) {
                 navigate("/Settings");
               }
             }}
-            className="flex items-center justify-center w-8 h-8 rounded-lg text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+            className="flex items-center justify-center w-8 h-8 rounded-lg text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
           <div>
-            <h1 className="text-base font-semibold text-slate-900">Recently Deleted</h1>
-            <p className="text-xs text-slate-400">{displayedTasks.length} task{displayedTasks.length !== 1 ? "s" : ""}</p>
+            <h1 className="text-base font-semibold text-slate-900 dark:text-slate-100">Recently Deleted</h1>
+            <p className="text-xs text-slate-400 dark:text-slate-500">{displayedTasks.length} task{displayedTasks.length !== 1 ? "s" : ""}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -232,7 +232,7 @@ export default function RecentlyDeleted({ onBack } = {}) {
             onChange={setSearch}
             onClose={() => setSearchOpen(false)}
           />
-          <Button variant="ghost" size="icon" data-search-toggle className="h-9 w-9 text-slate-400 hover:text-slate-700" onMouseDown={(e) => e.preventDefault()} onClick={() => setSearchOpen(!searchOpen)}>
+          <Button variant="ghost" size="icon" data-search-toggle className="h-9 w-9 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200" onMouseDown={(e) => e.preventDefault()} onClick={() => setSearchOpen(!searchOpen)}>
             <Search className="w-4 h-4" />
           </Button>
           <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} page="deleted" />
@@ -262,7 +262,7 @@ export default function RecentlyDeleted({ onBack } = {}) {
                   <button
                     type="button"
                     onClick={() => setShowEmptyDialog(false)}
-                    className="w-full h-12 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium shadow-sm transition-colors"
+                    className="w-full h-12 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-medium shadow-sm transition-colors"
                   >
                     Cancel
                   </button>
@@ -274,8 +274,8 @@ export default function RecentlyDeleted({ onBack } = {}) {
       </div>
 
       {/* Retention setting */}
-      <div className="flex items-center gap-3 bg-white border border-slate-100 rounded-xl px-4 py-3">
-        <span className="text-xs font-medium text-slate-500 flex-1">Keep deleted tasks for</span>
+      <div className="flex items-center gap-3 bg-white dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 rounded-xl px-4 py-3">
+        <span className="text-xs font-medium text-slate-500 dark:text-slate-400 flex-1">Keep deleted tasks for</span>
         <Select value={retentionDays} onValueChange={handleRetentionChange}>
           <SelectTrigger className="w-32 h-8 text-xs">
             <SelectValue />
@@ -290,7 +290,7 @@ export default function RecentlyDeleted({ onBack } = {}) {
 
       {displayedTasks.length === 0 ? (
         <div className="py-14 text-center">
-          <p className="text-xs text-slate-400">No recently deleted tasks.</p>
+          <p className="text-xs text-slate-400 dark:text-slate-500">No recently deleted tasks.</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -333,13 +333,13 @@ function DeletedTaskCard({ record, priorityMap, onRestore, onDelete }) {
             {/* Status indicator */}
             <div className={cn(
               "shrink-0 w-7 h-7 rounded-md border-2 flex items-center justify-center",
-              isDone ? "bg-slate-900 border-slate-900 text-white" : "border-slate-300 bg-white/80"
+              isDone ? "bg-slate-900 border-slate-900 text-white" : "border-slate-300 dark:border-slate-600 bg-white/80 dark:bg-slate-900/80"
             )}>
               {isDone && <CheckSquare className="w-3.5 h-3.5 text-white" />}
             </div>
 
             <div className="flex-1 min-w-0">
-              <p className={cn("text-sm font-medium text-slate-900 truncate", isDone && "line-through text-slate-400")}>
+              <p className={cn("text-sm font-medium text-slate-900 dark:text-slate-100 truncate", isDone && "line-through text-slate-400 dark:text-slate-500")}>
                 {record.title}
               </p>
 
@@ -349,17 +349,17 @@ function DeletedTaskCard({ record, priorityMap, onRestore, onDelete }) {
                   Deleted {deletedDate}
                 </span>
                 {record.due_date && (
-                  <span className="text-[10px] text-slate-400">
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500">
                     Due {format(new Date(record.due_date + "T00:00:00"), "MMM d")}
                   </span>
                 )}
                 {record.tags?.length > 0 && record.tags.slice(0, 2).map(tag => (
-                  <span key={tag} className="text-[10px] font-medium text-slate-400 bg-white/70 px-1.5 py-0.5 rounded border border-slate-200">
+                  <span key={tag} className="text-[10px] font-medium text-slate-400 dark:text-slate-500 bg-white/70 dark:bg-slate-900/70 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">
                     {tag}
                   </span>
                 ))}
                 {record.subtasks?.length > 0 && (
-                  <span className="text-[10px] text-slate-400">{record.subtasks.length} subtask{record.subtasks.length !== 1 ? "s" : ""}</span>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500">{record.subtasks.length} subtask{record.subtasks.length !== 1 ? "s" : ""}</span>
                 )}
               </div>
             </div>
@@ -368,14 +368,14 @@ function DeletedTaskCard({ record, priorityMap, onRestore, onDelete }) {
             <div className="flex items-center gap-1 shrink-0">
               <button
                 onClick={onRestore}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
                 title="Restore"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={onDelete}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-red-500 hover:bg-red-50 transition-colors"
                 title="Delete permanently"
               >
                 <Trash2 className="w-3.5 h-3.5" />

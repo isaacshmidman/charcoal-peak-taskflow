@@ -463,14 +463,14 @@ export default function Calendar() {
       {/* Top row: title + count + centered empty-state link + actions */}
       <div className="flex items-center justify-between gap-6">
         <div className="flex-1 min-w-0">
-          <h1 className="text-base font-semibold text-slate-900">Calendar</h1>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <h1 className="text-base font-semibold text-slate-900 dark:text-slate-100">Calendar</h1>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
             {scopedCount} task{scopedCount !== 1 ? "s" : ""}
           </p>
         </div>
         {!integrationsConnected && (
           <div className="hidden lg:flex items-center shrink-0">
-            <span className="inline-flex items-center gap-1.5 text-xs text-slate-400 leading-none whitespace-nowrap">
+            <span className="inline-flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500 leading-none whitespace-nowrap">
               Connect Calendars in
               <Button
                 type="button"
@@ -481,7 +481,7 @@ export default function Calendar() {
                     state: { scrollTo: "bottom" },
                   })
                 }
-                className="h-7 px-2 gap-1 text-xs font-medium text-slate-900 hover:bg-slate-100"
+                className="h-7 px-2 gap-1 text-xs font-medium text-slate-900 dark:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700"
               >
                 <SettingsIcon className="w-3.5 h-3.5" />
                 Settings
@@ -500,7 +500,7 @@ export default function Calendar() {
             variant="ghost"
             size="icon"
             data-search-toggle
-            className="h-9 w-9 text-slate-400 hover:text-slate-700"
+            className="h-9 w-9 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
             onMouseDown={(e) => { if (showSearch) e.preventDefault(); }}
             onClick={() => {
               if (showSearch) setSearch("");
@@ -528,7 +528,7 @@ export default function Calendar() {
       {/* Second row: range label + tz / view switcher + nav arrows */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-baseline gap-2">
-          <span className="text-sm font-medium text-slate-900">{rangeLabel}</span>
+          <span className="text-sm font-medium text-slate-900 dark:text-slate-100">{rangeLabel}</span>
         </div>
         <div className="flex items-center gap-2">
           {activeIntegration && (
@@ -538,18 +538,18 @@ export default function Calendar() {
                 size="sm"
                 onClick={handleSyncNow}
                 disabled={syncing}
-                className="h-8 px-2 gap-1 text-xs text-slate-500 hover:text-slate-900"
+                className="h-8 px-2 gap-1 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
                 title="Sync calendars now"
               >
                 <RefreshCw className={cn("w-3.5 h-3.5", syncing && "animate-spin")} />
                 <span className="hidden sm:inline">Sync</span>
               </Button>
-              <span className="text-[11px] text-slate-400 leading-none whitespace-nowrap hidden md:inline">
+              <span className="text-[11px] text-slate-400 dark:text-slate-500 leading-none whitespace-nowrap hidden md:inline">
                 {syncing ? "Syncing…" : lastSyncedLabel}
               </span>
             </div>
           )}
-          <div className="inline-flex rounded-lg border border-slate-100 bg-white p-0.5">
+          <div className="inline-flex rounded-lg border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-0.5">
             {VIEWS.map((v) => (
               <button
                 key={v}
@@ -559,7 +559,7 @@ export default function Calendar() {
                   "px-2.5 py-1 text-xs font-medium rounded-md capitalize transition-colors",
                   view === v
                     ? "bg-slate-900 text-white"
-                    : "text-slate-500 hover:text-slate-900"
+                    : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
                 )}
               >
                 {v}
@@ -570,7 +570,7 @@ export default function Calendar() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-slate-400 hover:text-slate-700"
+              className="h-8 w-8 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
               onClick={goPrev}
               title="Previous"
             >
@@ -579,7 +579,7 @@ export default function Calendar() {
             <button
               type="button"
               onClick={goToday}
-              className="text-xs font-medium text-slate-700 hover:text-slate-900 px-2 py-1 rounded hover:bg-slate-50"
+              className="text-xs font-medium text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-slate-100 px-2 py-1 rounded hover:bg-slate-50 dark:hover:bg-slate-800"
               title="Jump to today"
             >
               Today
@@ -587,7 +587,7 @@ export default function Calendar() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-slate-400 hover:text-slate-700"
+              className="h-8 w-8 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
               onClick={goNext}
               title="Next"
             >
@@ -659,7 +659,7 @@ export default function Calendar() {
       </DndContext>
 
       {timezone && (
-        <p className="text-center text-xs text-slate-400 mt-4">
+        <p className="text-center text-xs text-slate-400 dark:text-slate-500 mt-4">
           Time Zone: {timezone}
         </p>
       )}

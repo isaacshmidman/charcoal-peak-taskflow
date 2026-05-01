@@ -49,7 +49,7 @@ export default function RecurringDeleteDialog({ open, onOpenChange, task, onDele
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="w-full h-12 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium shadow-sm transition-colors"
+            className="w-full h-12 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-medium shadow-sm transition-colors"
           >
             Cancel
           </button>

@@ -181,8 +181,8 @@ export default function Active() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-base font-semibold text-slate-900">All Tasks</h1>
-          <p className="text-xs text-slate-400 mt-0.5">{activeTasks.length} task{activeTasks.length !== 1 ? "s" : ""}</p>
+          <h1 className="text-base font-semibold text-slate-900 dark:text-slate-100">All Tasks</h1>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{activeTasks.length} task{activeTasks.length !== 1 ? "s" : ""}</p>
         </div>
         <div className="flex items-center gap-2">
           <AnimatedSearchInput
@@ -195,7 +195,7 @@ export default function Active() {
             variant="ghost"
             size="icon"
             data-search-toggle
-            className="h-9 w-9 text-slate-400 hover:text-slate-700"
+            className="h-9 w-9 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
             onMouseDown={(e) => { if (showSearch) e.preventDefault(); }}
             onClick={() => { if (showSearch) setSearch(""); setShowSearch((v) => !v); }}
           >
@@ -212,14 +212,14 @@ export default function Active() {
       {/* Active tasks */}
       {isLoading ? (
         <div className="space-y-2">
-          {[1,2,3].map(i => <div key={i} className="bg-white rounded-xl border border-slate-100 h-12 animate-pulse" />)}
+          {[1,2,3].map(i => <div key={i} className="bg-white dark:bg-slate-900/60 rounded-xl border border-slate-100 dark:border-slate-800 h-12 animate-pulse" />)}
         </div>
       ) : activeTasks.length === 0 ? (
         <div className="py-14 text-center">
           {topLevelTasks.length === 0 ? (
-            <p className="text-xs text-slate-400">Clear skies. Add something when you're ready.</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500">Clear skies. Add something when you're ready.</p>
           ) : (
-            <p className="text-xs text-slate-400">Everything's in flow. Enjoy the stillness.</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500">Everything's in flow. Enjoy the stillness.</p>
           )}
         </div>
       ) : (

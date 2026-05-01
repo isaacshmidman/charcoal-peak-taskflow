@@ -23,7 +23,7 @@ export default function CompactTaskCard({ task, priorities, onToggleDone, onEdit
   const priority = priorities.find(p => p.id === task.priority_id);
   const isRecurring = task.task_type === "recurring" && task.recurrence && task.recurrence !== "none";
 
-  const cardStyle = priority ? (colorBg[priority.color] || colorBg.slate) : "bg-white border-slate-100";
+  const cardStyle = priority ? (colorBg[priority.color] || colorBg.slate) : "bg-white dark:bg-slate-900/60 border-slate-100 dark:border-slate-800";
 
   return (
     <motion.div
@@ -42,7 +42,7 @@ export default function CompactTaskCard({ task, priorities, onToggleDone, onEdit
         onClick={(e) => { e.stopPropagation(); if (task.status !== "done") setOptimisticDone(true); onToggleDone(task); }}
         className={cn(
           "shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-all",
-          isDone ? "bg-slate-900 border-slate-900 text-white" : "border-slate-300 hover:border-slate-500 bg-white/80"
+          isDone ? "bg-slate-900 border-slate-900 text-white" : "border-slate-300 dark:border-slate-600 hover:border-slate-500 bg-white/80 dark:bg-slate-900/80"
         )}
       >
         {isDone && <CheckSquare className="w-2.5 h-2.5" />}
@@ -51,7 +51,7 @@ export default function CompactTaskCard({ task, priorities, onToggleDone, onEdit
       {/* Title */}
       <span
         onClick={() => onEdit(task)}
-        className={cn("flex-1 text-xs font-medium text-slate-900 truncate cursor-pointer", isDone && "line-through text-slate-400")}
+        className={cn("flex-1 text-xs font-medium text-slate-900 dark:text-slate-100 truncate cursor-pointer", isDone && "line-through text-slate-400 dark:text-slate-500")}
       >
         {task.title}
       </span>
@@ -73,7 +73,7 @@ export default function CompactTaskCard({ task, priorities, onToggleDone, onEdit
               onClick={(e) => e.stopPropagation()}
               className={cn(
                 "text-[10px] leading-none px-1 py-0.5 rounded transition-colors",
-                task.due_date ? "text-slate-400" : "text-slate-300"
+                task.due_date ? "text-slate-400 dark:text-slate-500" : "text-slate-300 dark:text-slate-600"
               )}
             >
               {task.due_date ? format(fromDateStr(task.due_date), "MMM d") : "–"}

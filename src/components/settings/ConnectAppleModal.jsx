@@ -72,8 +72,8 @@ export default function ConnectAppleModal({ open, onOpenChange }) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="rounded-md border border-slate-100 bg-slate-50 p-2.5 text-xs text-slate-600 space-y-1.5">
-            <p className="font-medium text-slate-700">How to get an app-specific password</p>
+          <div className="rounded-md border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 p-2.5 text-xs text-slate-600 dark:text-slate-300 space-y-1.5">
+            <p className="font-medium text-slate-700 dark:text-slate-200">How to get an app-specific password</p>
             <ol className="list-decimal list-inside space-y-0.5">
               <li>
                 Sign in at{" "}
@@ -94,7 +94,7 @@ export default function ConnectAppleModal({ open, onOpenChange }) {
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-medium text-slate-700">Apple ID</label>
+            <label className="text-xs font-medium text-slate-700 dark:text-slate-200">Apple ID</label>
             <input
               type="email"
               required
@@ -102,12 +102,12 @@ export default function ConnectAppleModal({ open, onOpenChange }) {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@icloud.com"
-              className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-sm focus:border-slate-400 focus:outline-none"
+              className="w-full rounded-md border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 text-sm focus:border-slate-400 focus:outline-none"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-medium text-slate-700">App-specific password</label>
+            <label className="text-xs font-medium text-slate-700 dark:text-slate-200">App-specific password</label>
             <input
               type="password"
               required
@@ -115,9 +115,9 @@ export default function ConnectAppleModal({ open, onOpenChange }) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="xxxx-xxxx-xxxx-xxxx"
-              className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-sm font-mono focus:border-slate-400 focus:outline-none"
+              className="w-full rounded-md border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 text-sm font-mono focus:border-slate-400 focus:outline-none"
             />
-            <p className="text-[11px] text-slate-400">
+            <p className="text-[11px] text-slate-400 dark:text-slate-500">
               Your password is encrypted at rest and only used for CalDAV calls to iCloud.
             </p>
           </div>

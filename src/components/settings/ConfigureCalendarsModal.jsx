@@ -127,7 +127,7 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
 
         <div className="pt-1 min-w-0">
           {isLoading ? (
-            <div className="flex items-center gap-2 text-xs text-slate-400 py-6 justify-center">
+            <div className="flex items-center gap-2 text-xs text-slate-400 dark:text-slate-500 py-6 justify-center">
               <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading calendars…
             </div>
           ) : error ? (
@@ -140,11 +140,11 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
               </Button>
             </div>
           ) : rows.length === 0 ? (
-            <p className="text-xs text-slate-400 py-6 text-center">
+            <p className="text-xs text-slate-400 dark:text-slate-500 py-6 text-center">
               No calendars found on this account.
             </p>
           ) : (
-            <ul className="min-w-0 max-h-80 overflow-y-auto divide-y divide-slate-100 rounded-lg border border-slate-100">
+            <ul className="min-w-0 max-h-80 overflow-y-auto divide-y divide-slate-100 rounded-lg border border-slate-100 dark:border-slate-800">
               {rows.map((c) => (
                 <li
                   key={c.external_calendar_id}
@@ -167,7 +167,7 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
                           disabled={settingColor && colorTargetId === c.external_calendar_id}
                         >
                           {settingColor && colorTargetId === c.external_calendar_id && (
-                            <Loader2 className="absolute inset-0 m-auto w-2.5 h-2.5 animate-spin text-slate-700" />
+                            <Loader2 className="absolute inset-0 m-auto w-2.5 h-2.5 animate-spin text-slate-700 dark:text-slate-200" />
                           )}
                         </button>
                       </PopoverTrigger>
@@ -233,7 +233,7 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
                       actually fires on overflow. */}
                   <div className="min-w-0 flex-1 basis-0">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <p className="text-sm text-slate-900 truncate flex-1 min-w-0 basis-0">
+                      <p className="text-sm text-slate-900 dark:text-slate-100 truncate flex-1 min-w-0 basis-0">
                         {c.summary || c.external_calendar_id}
                       </p>
                       {c.primary ? (
@@ -250,14 +250,14 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
                           aria-label="Make primary"
                           onClick={() => setPrimary(c.external_calendar_id)}
                           disabled={settingPrimary}
-                          className="shrink-0 inline-flex items-center text-slate-300 hover:text-amber-500 transition-colors disabled:opacity-50"
+                          className="shrink-0 inline-flex items-center text-slate-300 dark:text-slate-600 hover:text-amber-500 transition-colors disabled:opacity-50"
                         >
                           <Star className="w-3 h-3" />
                         </button>
                       ) : null}
                     </div>
                     {c.description && (
-                      <p className="text-[11px] text-slate-400 truncate">
+                      <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate">
                         {c.description}
                       </p>
                     )}
@@ -269,7 +269,7 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
                     {!c.writable && (
                       <span
                         title="Read-only — events from this calendar can't be edited"
-                        className="inline-flex items-center gap-0.5 text-[10px] text-slate-400 px-1 py-0.5 rounded bg-slate-50"
+                        className="inline-flex items-center gap-0.5 text-[10px] text-slate-400 dark:text-slate-500 px-1 py-0.5 rounded bg-slate-50 dark:bg-slate-800/50"
                       >
                         <Lock className="w-2.5 h-2.5" /> read-only
                       </span>
@@ -282,7 +282,7 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
                       onChange={(e) => toggle(c.external_calendar_id, e.target.checked)}
                       className="sr-only peer"
                     />
-                    <span className="relative w-9 h-5 rounded-full bg-slate-200 peer-checked:bg-emerald-500 transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:rounded-full after:bg-white after:shadow after:transition-transform peer-checked:after:translate-x-4" />
+                    <span className="relative w-9 h-5 rounded-full bg-slate-200 dark:bg-slate-700 peer-checked:bg-emerald-500 transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:rounded-full after:bg-white after:shadow after:transition-transform peer-checked:after:translate-x-4" />
                   </label>
                 </li>
               ))}
@@ -291,7 +291,7 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
         </div>
 
         <div className="flex items-center justify-between pt-3">
-          <p className="text-[11px] text-slate-400">
+          <p className="text-[11px] text-slate-400 dark:text-slate-500">
             {isFetching && !isLoading ? "Refreshing…" : ""}
           </p>
           <div className="flex items-center gap-2">

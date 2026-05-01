@@ -49,13 +49,13 @@ function AllDayColumn({ dateStr, allDayTasks, priorities, onTaskClick, onToggleD
     <div
       ref={setNodeRef}
       className={cn(
-        "border border-slate-100 rounded-lg bg-white p-2 h-full",
+        "border border-slate-100 dark:border-slate-800 rounded-lg bg-white dark:bg-slate-900/60 p-2 h-full",
         isOver && "bg-blue-50/60"
       )}
     >
-      <h3 className="text-xs font-semibold text-slate-700 mb-2">All day</h3>
+      <h3 className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-2">All day</h3>
       {allDayTasks.length === 0 ? (
-        <p className="text-[11px] text-slate-400">No all-day tasks</p>
+        <p className="text-[11px] text-slate-400 dark:text-slate-500">No all-day tasks</p>
       ) : (
         <div
           className={cn(
@@ -177,16 +177,16 @@ export default function DayView({
       {/* Timed column */}
       <div
         ref={timedScrollRef}
-        className="flex-1 min-w-0 relative border border-slate-100 rounded-lg bg-white overflow-y-auto max-h-[70vh]"
+        className="flex-1 min-w-0 relative border border-slate-100 dark:border-slate-800 rounded-lg bg-white dark:bg-slate-900/60 overflow-y-auto max-h-[70vh]"
       >
         <TimedDropZone dateStr={dateStr}>
           {HOURS.map((h) => (
             <div
               key={h}
-              className="absolute left-0 right-0 border-t border-slate-100 flex"
+              className="absolute left-0 right-0 border-t border-slate-100 dark:border-slate-800 flex"
               style={{ top: h * HOUR_HEIGHT, height: HOUR_HEIGHT }}
             >
-              <div className="w-12 shrink-0 text-[10px] text-slate-400 pt-0.5 pl-1 select-none">
+              <div className="w-12 shrink-0 text-[10px] text-slate-400 dark:text-slate-500 pt-0.5 pl-1 select-none">
                 {formatHour(h)}
               </div>
               <div className="flex-1" />
@@ -247,7 +247,7 @@ export default function DayView({
         onPointerDown={startResize}
         className="hidden sm:flex w-2 cursor-col-resize items-center justify-center group shrink-0"
       >
-        <div className="w-0.5 h-8 bg-slate-200 rounded-full group-hover:bg-slate-400 transition-colors" />
+        <div className="w-0.5 h-8 bg-slate-200 dark:bg-slate-700 rounded-full group-hover:bg-slate-400 transition-colors" />
       </div>
 
       {/* All-day column — fixed width (desktop), stacks full-width on mobile */}

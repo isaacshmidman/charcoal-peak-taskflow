@@ -28,14 +28,14 @@ function ConnectedRow({
   settingDefault,
 }) {
   return (
-    <div className="rounded-lg border border-slate-100 bg-white p-3 space-y-1.5">
+    <div className="rounded-lg border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-3 space-y-1.5">
       {/* Header row: provider title + Default badge on the left, disconnect X
           on the far right. The title flex-shrinks via `truncate` so a long
           provider/account name ellipses BEFORE pushing the badge into the X. */}
       <div className="flex items-start gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <p className="text-sm font-medium text-slate-900 truncate">
+            <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
               {providerLabel(integration.provider)}
             </p>
             {integration.is_default && (
@@ -47,14 +47,14 @@ function ConnectedRow({
               </span>
             )}
           </div>
-          <p className="text-xs text-slate-400 truncate">
+          <p className="text-xs text-slate-400 dark:text-slate-500 truncate">
             {integration.external_account_email}
           </p>
         </div>
         <Button
           variant="ghost"
           size="icon"
-          className="shrink-0 h-7 w-7 text-slate-400 hover:text-red-600 hover:bg-red-50"
+          className="shrink-0 h-7 w-7 text-slate-400 dark:text-slate-500 hover:text-red-600 hover:bg-red-50"
           onClick={() => onDisconnect(integration.id)}
           disabled={isDisconnecting}
           title="Disconnect"
@@ -113,10 +113,10 @@ function ConnectedRow({
 
 function ConnectCard({ provider, onConnect, connecting, disabled }) {
   return (
-    <div className="rounded-lg border border-slate-100 bg-white p-3 flex items-center justify-between">
+    <div className="rounded-lg border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-3 flex items-center justify-between">
       <div>
-        <p className="text-sm font-medium text-slate-900">{provider.label}</p>
-        <p className="text-xs text-slate-400">
+        <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{provider.label}</p>
+        <p className="text-xs text-slate-400 dark:text-slate-500">
           {provider.comingSoon ? "Coming soon" : "Not connected"}
         </p>
       </div>
@@ -189,8 +189,8 @@ export default function IntegrationsPanel() {
   return (
     <section id="calendar-integrations" className="space-y-3">
       <div>
-        <h2 className="text-sm font-semibold text-slate-900">Calendar Integrations</h2>
-        <p className="text-xs text-slate-400 mt-0.5">
+        <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Calendar Integrations</h2>
+        <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
           Sync your tasks with Google Calendar or Apple Calendar. Connecting opens the provider's
           login — your password is never sent to Zephyrly.
         </p>
@@ -206,7 +206,7 @@ export default function IntegrationsPanel() {
         </p>
       )}
       {isLoading ? (
-        <div className="flex items-center gap-2 text-xs text-slate-400">
+        <div className="flex items-center gap-2 text-xs text-slate-400 dark:text-slate-500">
           <Loader2 className="w-3 h-3 animate-spin" /> Loading…
         </div>
       ) : (

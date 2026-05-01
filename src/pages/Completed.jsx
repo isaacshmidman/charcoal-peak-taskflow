@@ -163,8 +163,8 @@ export default function Completed() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-base font-semibold text-slate-900">Completed</h1>
-          <p className="text-xs text-slate-400 mt-0.5">{completedItems.length} task{completedItems.length !== 1 ? "s" : ""}</p>
+          <h1 className="text-base font-semibold text-slate-900 dark:text-slate-100">Completed</h1>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{completedItems.length} task{completedItems.length !== 1 ? "s" : ""}</p>
         </div>
         <div className="flex items-center gap-2">
           <AnimatedSearchInput
@@ -177,7 +177,7 @@ export default function Completed() {
             variant="ghost"
             size="icon"
             data-search-toggle
-            className="h-9 w-9 text-slate-400 hover:text-slate-700"
+            className="h-9 w-9 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
             onMouseDown={(event) => { if (showSearch) event.preventDefault(); }}
             onClick={() => { if (showSearch) setSearch(""); setShowSearch((v) => !v); }}
           >
@@ -210,7 +210,7 @@ export default function Completed() {
                   <button
                     type="button"
                     onClick={() => setShowDeleteAllDialog(false)}
-                    className="w-full h-12 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium shadow-sm transition-colors"
+                    className="w-full h-12 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-medium shadow-sm transition-colors"
                   >
                     Cancel
                   </button>
@@ -223,11 +223,11 @@ export default function Completed() {
 
       {isLoading ? (
         <div className="space-y-2">
-          {[1, 2, 3].map((i) => <div key={i} className="bg-white rounded-xl border border-slate-100 h-12 animate-pulse" />)}
+          {[1, 2, 3].map((i) => <div key={i} className="bg-white dark:bg-slate-900/60 rounded-xl border border-slate-100 dark:border-slate-800 h-12 animate-pulse" />)}
         </div>
       ) : completedItems.length === 0 ? (
         <div className="text-center py-14">
-          <p className="text-xs text-slate-400">No completed tasks.</p>
+          <p className="text-xs text-slate-400 dark:text-slate-500">No completed tasks.</p>
         </div>
       ) : (
         <div className="space-y-2">

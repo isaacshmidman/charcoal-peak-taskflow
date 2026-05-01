@@ -60,8 +60,8 @@ function DayCell({
       ref={setNodeRef}
       onClick={handleEmptyClick}
       className={cn(
-        "flex flex-col border border-slate-100 rounded-md p-1 min-h-[5.5rem] transition-colors cursor-pointer",
-        inMonth ? "bg-white" : "bg-slate-50/60",
+        "flex flex-col border border-slate-100 dark:border-slate-800 rounded-md p-1 min-h-[5.5rem] transition-colors cursor-pointer",
+        inMonth ? "bg-white dark:bg-slate-900/60" : "bg-slate-50/60 dark:bg-slate-800/60",
         isOver && "bg-blue-50 border-blue-200"
       )}
     >
@@ -75,8 +75,8 @@ function DayCell({
             isToday
               ? "bg-red-500 text-white font-semibold"
               : inMonth
-              ? "text-slate-500"
-              : "text-slate-300"
+              ? "text-slate-500 dark:text-slate-400"
+              : "text-slate-300 dark:text-slate-600"
           )}
         >
           {format(date, "d")}
@@ -156,7 +156,7 @@ export default function MonthCalendar({
 
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-7 gap-1 text-xs font-medium text-slate-500 px-0.5">
+      <div className="grid grid-cols-7 gap-1 text-xs font-medium text-slate-500 dark:text-slate-400 px-0.5">
         {weekDayLabels.map((l) => (
           <div key={l} className="text-center py-1">
             {l}

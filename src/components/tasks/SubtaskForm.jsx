@@ -62,7 +62,7 @@ export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubm
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto" onOpenAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader>
-          <DialogTitle className="text-sm font-semibold text-slate-900">
+          <DialogTitle className="text-sm font-semibold text-slate-900 dark:text-slate-100">
             {task ? "Edit Subtask" : "Add Subtask"}
           </DialogTitle>
         </DialogHeader>
@@ -86,11 +86,11 @@ export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubm
           <div className="space-y-2">
             <div className="flex items-end gap-3">
               <div className="flex-1">
-                <Label className="text-xs font-semibold text-slate-900 mb-1.5 block">Date</Label>
+                <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-1.5 block">Date</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="w-full justify-start h-9 text-sm font-normal">
-                      <CalendarIcon className="w-4 h-4 mr-2 text-slate-400" />
+                      <CalendarIcon className="w-4 h-4 mr-2 text-slate-400 dark:text-slate-500" />
                       {form.due_date ? format(fromDateStr(form.due_date), "PPP") : "No date"}
                     </Button>
                   </PopoverTrigger>
@@ -115,13 +115,13 @@ export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubm
 
               {form.due_date && (
                 <div className="flex flex-col items-center gap-1 pb-0.5">
-                  <Label className="text-xs font-semibold text-slate-900">Set time</Label>
+                  <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100">Set time</Label>
                   <button
                     type="button"
                     onClick={() => setForm({ ...form, task_time: form.task_time ? "" : "9:00AM" })}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${form.task_time ? "bg-slate-900" : "bg-slate-200"}`}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${form.task_time ? "bg-slate-900" : "bg-slate-200 dark:bg-slate-700"}`}
                   >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${form.task_time ? "translate-x-6" : "translate-x-1"}`} />
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white dark:bg-slate-900/60 shadow transition-transform duration-200 ${form.task_time ? "translate-x-6" : "translate-x-1"}`} />
                   </button>
                 </div>
               )}
@@ -191,15 +191,15 @@ function TimeInput({ value, onChange }) {
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-3 py-1.5 border border-slate-200 rounded-lg bg-white text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+        className="w-full flex items-center justify-between px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900/60 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
       >
         {value}
-        <svg className={cn("w-3.5 h-3.5 text-slate-400 transition-transform", open && "rotate-180")} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className={cn("w-3.5 h-3.5 text-slate-400 dark:text-slate-500 transition-transform", open && "rotate-180")} fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
       {open && (
-        <div className="absolute z-50 mt-1 left-0 border border-slate-200 rounded-lg overflow-hidden bg-white shadow-md w-full">
+        <div className="absolute z-50 mt-1 left-0 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden bg-white dark:bg-slate-900/60 shadow-md w-full">
           <div className="max-h-48 overflow-y-auto">
             {TIME_SLOTS.map((slot) => {
               const isSelected = slot === value;
@@ -211,7 +211,7 @@ function TimeInput({ value, onChange }) {
                 onClick={() => { onChange(slot); setOpen(false); }}
                 className={cn(
                   "w-full text-left px-3 py-1.5 text-base md:text-sm transition-colors",
-                  isSelected ? "bg-slate-900 text-white font-medium" : "text-slate-700 hover:bg-slate-50"
+                  isSelected ? "bg-slate-900 text-white font-medium" : "text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
                 )}
                 >
                 {slot}

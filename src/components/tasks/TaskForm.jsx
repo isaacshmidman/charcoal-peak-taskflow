@@ -208,7 +208,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
           data-testid="task-form-dialog"
         >
           <DialogHeader>
-            <DialogTitle className="text-sm font-semibold text-slate-900">
+            <DialogTitle className="text-sm font-semibold text-slate-900 dark:text-slate-100">
               {isReadOnly
                 ? "View Event"
                 : isExternalEvent
@@ -221,8 +221,8 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
             </DialogTitle>
           </DialogHeader>
           {isReadOnly && (
-            <div className="flex items-start gap-2 rounded-md bg-slate-50 border border-slate-100 p-2 text-[11px] text-slate-500 mb-1">
-              <Lock className="w-3.5 h-3.5 mt-0.5 shrink-0 text-slate-400" />
+            <div className="flex items-start gap-2 rounded-md bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 p-2 text-[11px] text-slate-500 dark:text-slate-400 mb-1">
+              <Lock className="w-3.5 h-3.5 mt-0.5 shrink-0 text-slate-400 dark:text-slate-500" />
               <p>
                 This event comes from a read-only calendar
                 {form.source_calendar_name ? <> (<span className="font-medium">{form.source_calendar_name}</span>)</> : null}
@@ -257,13 +257,13 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
             <div className="grid grid-cols-2 gap-3">
               {isExternal ? (
                 <div>
-                  <Label className="text-xs font-semibold text-slate-900 mb-1.5 block">Calendar</Label>
+                  <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-1.5 block">Calendar</Label>
                   <div
-                    className="h-9 px-3 inline-flex items-center gap-2 w-full rounded-md border border-slate-200 bg-slate-50 text-sm text-slate-700"
+                    className="h-9 px-3 inline-flex items-center gap-2 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-sm text-slate-700 dark:text-slate-200"
                     title={`${sourceCalendarName} (${sourceProvider})`}
                   >
                     <span
-                      className="inline-block w-2.5 h-2.5 rounded-full shrink-0 border border-slate-200"
+                      className="inline-block w-2.5 h-2.5 rounded-full shrink-0 border border-slate-200 dark:border-slate-700"
                       style={sourceColorHex ? { backgroundColor: sourceColorHex, borderColor: hexToRgba(sourceColorHex, 0.6) || undefined } : { backgroundColor: "#94a3b8" }}
                     />
                     <span className="truncate">{sourceCalendarName}</span>
@@ -271,7 +271,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                 </div>
               ) : (
                 <div>
-                  <Label className="text-xs font-semibold text-slate-900 mb-1.5 block">Priority</Label>
+                  <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-1.5 block">Priority</Label>
                   <Select value={form.priority_id} onValueChange={(v) => setForm({ ...form, priority_id: v })}>
                     <SelectTrigger className="h-9">
                       <SelectValue placeholder="Select..." />
@@ -291,7 +291,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
               )}
 
               <div>
-                <Label className="text-xs font-semibold text-slate-900 mb-1.5 block">Type</Label>
+                <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-1.5 block">Type</Label>
                 <Select
                   value={form.task_type}
                   onValueChange={(v) => setForm({ ...form, task_type: v, recurrence: v === "recurring" ? "weekly" : form.recurrence })}
@@ -309,7 +309,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
             {form.task_type === "recurring" && (
               <div className="space-y-3">
                 <div>
-                  <Label className="text-xs font-semibold text-slate-900 mb-1.5 block">Repeats</Label>
+                  <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-1.5 block">Repeats</Label>
                   <Select
                     value={form.recurrence}
                     onValueChange={(v) => {
@@ -333,7 +333,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
 
                 {form.recurrence === "custom_days" && (
                   <div>
-                    <Label className="text-xs font-semibold text-slate-900 mb-2 block">Select days</Label>
+                    <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-2 block">Select days</Label>
                     <div className="flex gap-1.5">
                       {WEEKDAYS.map((day) => {
                         const selected = (form.recurrence_days || []).includes(day.value);
@@ -347,7 +347,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                               "w-9 h-9 rounded-full text-xs font-semibold transition-all border-2",
                               selected
                                 ? "bg-slate-900 text-white border-slate-900"
-                                : "bg-slate-100 text-slate-500 hover:bg-slate-200 border-transparent",
+                                : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 border-transparent",
                               dayError && "border-red-500"
                             )}
                           >
@@ -360,7 +360,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                 )}
 
                 <div>
-                  <Label className="text-xs font-semibold text-slate-900 mb-1.5 block">Repeats until</Label>
+                  <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-1.5 block">Repeats until</Label>
                   <div className="flex items-center gap-2">
                     <Select
                       value={showEndDate ? "until" : "indefinite"}
@@ -394,7 +394,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button variant="outline" className="h-9 flex-1 justify-start text-sm font-normal">
-                            <CalendarIcon className="w-4 h-4 mr-2 text-slate-400" />
+                            <CalendarIcon className="w-4 h-4 mr-2 text-slate-400 dark:text-slate-500" />
                             {form.recurrence_end_date ? format(fromDateStr(form.recurrence_end_date), "PPP") : "Pick a date"}
                           </Button>
                         </PopoverTrigger>
@@ -422,11 +422,11 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
             <div className="space-y-2">
               <div className="flex items-end gap-3">
                 <div className="flex-1">
-                  <Label className="text-xs font-semibold text-slate-900 mb-1.5 block">Date</Label>
+                  <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-1.5 block">Date</Label>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button variant="outline" className="w-full justify-start h-9 text-sm font-normal">
-                        <CalendarIcon className="w-4 h-4 mr-2 text-slate-400" />
+                        <CalendarIcon className="w-4 h-4 mr-2 text-slate-400 dark:text-slate-500" />
                         {form.due_date ? format(fromDateStr(form.due_date), "PPP") : "No date"}
                       </Button>
                     </PopoverTrigger>
@@ -450,7 +450,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
 
                 {form.due_date && (
                   <div className="flex flex-col items-center gap-1 pb-0.5">
-                    <Label className="text-xs font-semibold text-slate-900">Set time</Label>
+                    <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100">Set time</Label>
                     <button
                       type="button"
                       onClick={() => {
@@ -462,9 +462,9 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                           setForm({ ...form, task_time: "9:00AM", task_end_time: "10:00AM" });
                         }
                       }}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${form.task_time ? "bg-slate-900" : "bg-slate-200"}`}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${form.task_time ? "bg-slate-900" : "bg-slate-200 dark:bg-slate-700"}`}
                     >
-                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${form.task_time ? "translate-x-6" : "translate-x-1"}`} />
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white dark:bg-slate-900/60 shadow transition-transform duration-200 ${form.task_time ? "translate-x-6" : "translate-x-1"}`} />
                     </button>
                   </div>
                 )}
@@ -482,7 +482,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                       }));
                     }}
                   />
-                  <span className="text-xs font-medium text-slate-500">to</span>
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">to</span>
                   <TimeInput
                     value={form.task_end_time || addMinutes(form.task_time, 60)}
                     onChange={(v) => {
@@ -496,7 +496,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
 
             {/* Tags */}
             <div>
-              <Label className="text-xs font-semibold text-slate-900 mb-1.5 block">Tags</Label>
+              <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-1.5 block">Tags</Label>
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <Input
@@ -509,13 +509,13 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                     className=""
                   />
                   {tagInputFocused && filteredSuggestions.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden max-h-40 overflow-y-auto">
+                    <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg overflow-hidden max-h-40 overflow-y-auto">
                       {filteredSuggestions.map(tag => (
                         <button
                           key={tag}
                           type="button"
                           onMouseDown={(e) => { e.preventDefault(); addTag(tag); }}
-                          className="w-full text-left text-xs font-medium px-3 py-1.5 hover:bg-slate-50 text-slate-900"
+                          className="w-full text-left text-xs font-medium px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-900 dark:text-slate-100"
                         >
                           {tag}
                         </button>
@@ -532,7 +532,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                   {form.tags.map(tag => (
                     <Badge key={tag} variant="secondary" className="text-xs gap-1 pr-1 max-w-full break-words whitespace-normal">
                       <span className="break-words whitespace-normal">{tag}</span>
-                      <button type="button" onClick={() => removeTag(tag)} className="text-slate-400 hover:text-red-400 transition-colors"><X className="w-3 h-3" /></button>
+                      <button type="button" onClick={() => removeTag(tag)} className="text-slate-400 dark:text-slate-500 hover:text-red-400 transition-colors"><X className="w-3 h-3" /></button>
                     </Badge>
                   ))}
                 </div>
@@ -542,7 +542,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
             {/* Subtasks — not shown when this form IS a subtask form */}
             {!parentId && (
               <div>
-                <Label className="text-xs font-semibold text-slate-900 mb-1.5 block">Subtasks</Label>
+                <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-1.5 block">Subtasks</Label>
 
                 <div className="flex gap-2">
                   <Input
@@ -573,7 +573,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                           {sub.status === "done" && <CheckSquare className="w-2 h-2" />}
                         </button>
                         <span
-                          className={cn("cursor-pointer hover:text-slate-600 break-words whitespace-normal max-w-full", sub.status === "done" && "line-through opacity-50")}
+                          className={cn("cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 break-words whitespace-normal max-w-full", sub.status === "done" && "line-through opacity-50")}
                           onClick={() => onEditSubtask && onEditSubtask(sub)}
                         >
                           {sub.title}
@@ -581,7 +581,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                         <button
                           type="button"
                           onPointerDown={(e) => { e.preventDefault(); onDeleteSubtask && onDeleteSubtask(sub); }}
-                          className="text-slate-400 hover:text-red-400 transition-colors"
+                          className="text-slate-400 dark:text-slate-500 hover:text-red-400 transition-colors"
                         >
                           <X className="w-3 h-3" />
                         </button>
@@ -596,7 +596,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                       <div key={idx} className="inline-flex items-center gap-1.5 bg-secondary text-secondary-foreground rounded-full px-2.5 py-0.5 text-xs font-semibold group">
                         <div className="shrink-0 w-3.5 h-3.5 rounded border-2 border-slate-400" />
                         <span className="break-words whitespace-normal max-w-full">{title}</span>
-                        <button type="button" onPointerDown={(e) => { e.preventDefault(); removeSubtask(idx); }} className="text-slate-400 hover:text-red-400 transition-colors">
+                        <button type="button" onPointerDown={(e) => { e.preventDefault(); removeSubtask(idx); }} className="text-slate-400 dark:text-slate-500 hover:text-red-400 transition-colors">
                           <X className="w-3 h-3" />
                         </button>
                       </div>
@@ -688,14 +688,14 @@ function TimeInput({ value, onChange }) {
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-3 py-1.5 border border-slate-200 rounded-lg bg-white text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+        className="w-full flex items-center justify-between px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900/60 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
       >
         {value}
-        <svg className={cn("w-3.5 h-3.5 text-slate-400 transition-transform", open && "rotate-180")} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+        <svg className={cn("w-3.5 h-3.5 text-slate-400 dark:text-slate-500 transition-transform", open && "rotate-180")} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1 left-0 border border-slate-200 rounded-lg overflow-hidden bg-white shadow-md w-full">
+        <div className="absolute z-50 mt-1 left-0 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden bg-white dark:bg-slate-900/60 shadow-md w-full">
           <div ref={listRef} className="max-h-48 overflow-y-auto">
             {TIME_SLOTS.map((slot) => {
               const isSelected = slot === value;
@@ -707,7 +707,7 @@ function TimeInput({ value, onChange }) {
                   onClick={() => { onChange(slot); setOpen(false); }}
                   className={cn(
                     "w-full text-left px-3 py-1.5 text-base md:text-sm transition-colors",
-                    isSelected ? "bg-slate-900 text-white font-medium" : "text-slate-700 hover:bg-slate-50"
+                    isSelected ? "bg-slate-900 text-white font-medium" : "text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
                   )}
                 >
                   {slot}

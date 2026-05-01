@@ -189,7 +189,7 @@ export default function TaskCard({
   const doneSubtasks = subtasks.filter((s) => s.status === "done").length;
   const recurrenceLabel = buildRecurrenceShortLabel(task);
 
-  const cardBg = priority ? colorBg[priority.color] || colorBg.slate : "bg-white border-slate-100";
+  const cardBg = priority ? colorBg[priority.color] || colorBg.slate : "bg-white dark:bg-slate-900/60 border-slate-100 dark:border-slate-800";
   const isDarkCard = priority?.color === "black";
 
   // Overdue: has a due_date, not done, and date is in the past (before today)
@@ -252,7 +252,7 @@ export default function TaskCard({
               className={cn(
                 "shrink-0 w-7 h-7 rounded-md border-2 flex items-center justify-center transition-all touch-manipulation",
                 isDone && !optimisticUndone ? "bg-slate-900 border-slate-900 text-white" :
-                "border-slate-300 hover:border-slate-500 bg-white/80"
+                "border-slate-300 dark:border-slate-600 hover:border-slate-500 bg-white/80 dark:bg-slate-900/80"
               )}
             >
               {isDone && !optimisticUndone && <CheckSquare className="w-3.5 h-3.5 text-white" />}
@@ -266,7 +266,7 @@ export default function TaskCard({
             >
               <h3 className={cn(
                 "text-sm font-medium truncate",
-                isDarkCard ? "text-white" : "text-slate-900",
+                isDarkCard ? "text-white" : "text-slate-900 dark:text-slate-100",
                 isDone && "line-through opacity-50"
               )}>
                 {task.title}
@@ -279,12 +279,12 @@ export default function TaskCard({
               {task.tags?.length > 0 && (
                 <div className="hidden sm:flex items-center gap-1">
                   {task.tags.slice(0, 2).map((tag) => (
-                    <span key={tag} className="text-[10px] font-medium text-slate-400 bg-white/70 px-1.5 py-0.5 rounded border border-slate-200">
+                    <span key={tag} className="text-[10px] font-medium text-slate-400 dark:text-slate-500 bg-white/70 dark:bg-slate-900/70 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">
                       {tag.length > 20 ? `${tag.slice(0, 20)}…` : tag}
                     </span>
                   ))}
                   {task.tags.length > 2 && (
-                    <span className="text-[10px] font-medium text-slate-400">+{task.tags.length - 2}</span>
+                    <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500">+{task.tags.length - 2}</span>
                   )}
                 </div>
               )}
@@ -300,7 +300,7 @@ export default function TaskCard({
                   {task.due_date ? (
                     <button
                       onClick={(e) => e.stopPropagation()}
-                      className="text-[11px] flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors text-slate-400 hover:bg-white/60"
+                      className="text-[11px] flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors text-slate-400 dark:text-slate-500 hover:bg-white/60"
                     >
                       <Calendar className="w-3 h-3" />
                       {dateDisplay}
@@ -308,7 +308,7 @@ export default function TaskCard({
                   ) : (
                     <button
                       onClick={(e) => e.stopPropagation()}
-                      className="text-[11px] text-slate-300 hover:text-slate-400 px-1.5 py-0.5 rounded transition-colors"
+                      className="text-[11px] text-slate-300 dark:text-slate-600 hover:text-slate-400 px-1.5 py-0.5 rounded transition-colors"
                     >
                       <Calendar className="w-3 h-3" />
                     </button>
@@ -346,7 +346,7 @@ export default function TaskCard({
             <div className="px-3 pb-2">
               <button
                 onClick={() => setSubtasksExpanded(!subtasksExpanded)}
-                className="text-[10px] text-slate-400 flex items-center gap-0.5"
+                className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center gap-0.5"
               >
                 {subtasksExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                 {doneSubtasks}/{subtasks.length} subtasks
@@ -381,10 +381,10 @@ export default function TaskCard({
                     >
                       {onReorderSubtasks && (
                         <div className="flex flex-col gap-0.5 opacity-0 group-hover/sub:opacity-100 transition-opacity">
-                          <button type="button" onClick={(e) => { e.stopPropagation(); moveSubtask(-1); }} disabled={subIdx === 0} className="disabled:opacity-20 text-slate-300 hover:text-slate-500 transition-colors">
+                          <button type="button" onClick={(e) => { e.stopPropagation(); moveSubtask(-1); }} disabled={subIdx === 0} className="disabled:opacity-20 text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400 transition-colors">
                             <ArrowUp className="w-3 h-3" />
                           </button>
-                          <button type="button" onClick={(e) => { e.stopPropagation(); moveSubtask(1); }} disabled={subIdx === subtasks.length - 1} className="disabled:opacity-20 text-slate-300 hover:text-slate-500 transition-colors">
+                          <button type="button" onClick={(e) => { e.stopPropagation(); moveSubtask(1); }} disabled={subIdx === subtasks.length - 1} className="disabled:opacity-20 text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400 transition-colors">
                             <ArrowDown className="w-3 h-3" />
                           </button>
                         </div>
@@ -394,21 +394,21 @@ export default function TaskCard({
                         onClick={(e) => { e.stopPropagation(); onToggleDone(sub); }}
                         className={cn(
                           "shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-all touch-manipulation",
-                          sub.status === "done" ? "bg-slate-900 border-slate-900 text-white" : "border-slate-300 hover:border-slate-500"
+                          sub.status === "done" ? "bg-slate-900 border-slate-900 text-white" : "border-slate-300 dark:border-slate-600 hover:border-slate-500"
                         )}
                       >
                         {sub.status === "done" && <CheckSquare className="w-2.5 h-2.5" />}
                       </button>
-                      <span className={cn("text-xs font-medium text-slate-900 flex-1 truncate", sub.status === "done" && "line-through text-slate-400")}>
+                      <span className={cn("text-xs font-medium text-slate-900 dark:text-slate-100 flex-1 truncate", sub.status === "done" && "line-through text-slate-400 dark:text-slate-500")}>
                         {sub.title}
                       </span>
                       {sub.due_date && (
-                        <span className={cn("text-[10px] shrink-0", subOverdue ? "text-red-400" : "text-slate-400")}>
+                        <span className={cn("text-[10px] shrink-0", subOverdue ? "text-red-400" : "text-slate-400 dark:text-slate-500")}>
                           {format(new Date(sub.due_date + "T00:00:00"), "MMM d")}{sub.task_time ? `, ${sub.task_time}` : ""}
                         </span>
                       )}
                       <button
-                        className="opacity-0 group-hover/sub:opacity-100 text-slate-400 hover:text-red-400 transition-colors"
+                        className="opacity-0 group-hover/sub:opacity-100 text-slate-400 dark:text-slate-500 hover:text-red-400 transition-colors"
                         onClick={(e) => { e.stopPropagation(); if (didSwipe.current) return; onDelete(sub); }}
                       >
                         <X className="w-3 h-3" />
@@ -419,7 +419,7 @@ export default function TaskCard({
                 {onAddSubtask && (
                   <button
                     onClick={() => onAddSubtask(task)}
-                    className="text-[10px] text-slate-400 hover:text-slate-600 flex items-center gap-1 mt-1 transition-colors"
+                    className="text-[10px] text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 flex items-center gap-1 mt-1 transition-colors"
                   >
                     <Plus className="w-3 h-3" /> Add subtask
                   </button>

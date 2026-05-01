@@ -103,7 +103,7 @@ export default function MultiSortPanel({ sorts, onSortsChange, page = "default" 
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9 text-slate-400 hover:text-slate-700"
+          className="h-9 w-9 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
           title="Multi-level sorting"
         >
           <Sliders className="w-4 h-4" />
@@ -124,28 +124,28 @@ export default function MultiSortPanel({ sorts, onSortsChange, page = "default" 
                 .filter(Boolean)
             );
             return (
-              <div key={index} className="rounded-lg border border-slate-100 bg-white">
+              <div key={index} className="rounded-lg border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/60">
                 <div className="flex items-center gap-1 px-2 py-1.5">
                   <button
                     type="button"
                     onClick={() => toggleRow(index)}
                     className="flex-1 flex items-center gap-2 text-left min-w-0"
                   >
-                    <span className="text-xs font-semibold text-slate-900 shrink-0">
+                    <span className="text-xs font-semibold text-slate-900 dark:text-slate-100 shrink-0">
                       {ordinal(index + 1)} Sort:
                     </span>
-                    <span className="text-xs text-slate-500 truncate flex-1">{labelFor(value)}</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400 truncate flex-1">{labelFor(value)}</span>
                     {isExpanded ? (
-                      <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+                      <ChevronDown className="w-4 h-4 text-slate-400 dark:text-slate-500 shrink-0" />
                     ) : (
-                      <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+                      <ChevronRight className="w-4 h-4 text-slate-400 dark:text-slate-500 shrink-0" />
                     )}
                   </button>
                   {sorts.length > 1 && (
                     <button
                       type="button"
                       onClick={() => removeSortAt(index)}
-                      className="p-1 text-slate-300 hover:text-red-400 transition-colors"
+                      className="p-1 text-slate-300 dark:text-slate-600 hover:text-red-400 transition-colors"
                       title="Remove sort"
                     >
                       <X className="w-3.5 h-3.5" />
@@ -169,8 +169,8 @@ export default function MultiSortPanel({ sorts, onSortsChange, page = "default" 
                             isSelected
                               ? "bg-slate-900 text-white font-medium"
                               : isUsedElsewhere
-                                ? "text-slate-300 cursor-not-allowed opacity-40 bg-slate-50"
-                                : "text-slate-900 hover:bg-slate-100"
+                                ? "text-slate-300 dark:text-slate-600 cursor-not-allowed opacity-40 bg-slate-50 dark:bg-slate-800/50"
+                                : "text-slate-900 dark:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700"
                           )}
                         >
                           {opt.label}
@@ -187,7 +187,7 @@ export default function MultiSortPanel({ sorts, onSortsChange, page = "default" 
             <button
               type="button"
               onClick={addSort}
-              className="w-full rounded-lg border border-slate-100 bg-white px-2 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 hover:border-slate-200 flex items-center justify-center gap-2 transition-colors"
+              className="w-full rounded-lg border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/60 px-2 py-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-200 dark:hover:border-slate-700 flex items-center justify-center gap-2 transition-colors"
             >
               <Plus className="w-4 h-4" /> Add sort
             </button>

@@ -83,8 +83,8 @@ export default function MiniMiniTaskCard({ task, priorities, onClick, onToggleDo
             isDone
               ? "bg-slate-900 border-slate-900 text-white"
               : dark
-                ? "border-white/60 bg-white/20 hover:bg-white/40"
-                : "border-slate-400 bg-white/80 hover:border-slate-600"
+                ? "border-white/60 bg-white/20 dark:bg-slate-900/20 hover:bg-white/40"
+                : "border-slate-400 bg-white/80 dark:bg-slate-900/80 hover:border-slate-600"
           )}
           aria-label={isDone ? "Mark incomplete" : "Mark done"}
         >
@@ -93,14 +93,14 @@ export default function MiniMiniTaskCard({ task, priorities, onClick, onToggleDo
       )}
       {isExternalEvent && !showCheckbox && (
         <CalendarDays
-          className="w-2.5 h-2.5 shrink-0 text-slate-500"
+          className="w-2.5 h-2.5 shrink-0 text-slate-500 dark:text-slate-400"
           aria-hidden
         />
       )}
       <span
         className={cn(
           "truncate flex-1",
-          dark ? "text-white" : "text-slate-900",
+          dark ? "text-white" : "text-slate-900 dark:text-slate-100",
           isDone && "line-through"
         )}
       >
