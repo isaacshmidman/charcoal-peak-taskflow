@@ -298,6 +298,48 @@ export function createDatabase(config = backendConfig) {
     // Best-effort — old DBs without the column already errored out above.
   }
 
+  // Boot-time cleanup: orphan imported events. Before
+  // disconnectIntegration learned to delete imported tasks (commit
+  // 0000be7), users who disconnected Google or Apple were left with
+  // events in their tasks table whose source calendar/integration no
+  // longer existed — they showed up in /Calendar and Settings →
+  // Calendar Order with no UI path to remove them.
+  //
+  // Self-healing query: delete any imported-event task whose
+  // (source_provider, source_calendar_id) doesn't currently match a
+  // live integration_calendars row scoped to the same app. Restricted
+  // to source_kind='event' so user-authored tasks pushed outbound
+  // (which carry source_provider but NOT source_kind='event') stay
+  // safe. Idempotent — once orphans are gone, the DELETE is a no-op.
+  try {
+    db.prepare(
+      `DELETE FROM tasks
+       WHERE source_kind = 'event'
+         AND COALESCE(source_provider, '') != ''
+         AND NOT EXISTS (
+           SELECT 1 FROM integration_calendars ic
+           JOIN calendar_integrations ci ON ci.id = ic.integration_id
+           WHERE ci.app_id = tasks.app_id
+             AND ci.provider = tasks.source_provider
+             AND ic.external_calendar_id = tasks.source_calendar_id
+         )`
+    ).run();
+    // Same idea for external_event_map rows pointing at integrations
+    // that were already torn down — leftover map rows occasionally
+    // cause push.js to retry against a no-longer-existing integration.
+    db.prepare(
+      `DELETE FROM external_event_map
+       WHERE NOT EXISTS (
+         SELECT 1 FROM calendar_integrations
+         WHERE calendar_integrations.id = external_event_map.integration_id
+       )`
+    ).run();
+  } catch {
+    // Old DBs without the source_* columns or the integrations tables
+    // can't run this — fail silently and let the column-add migration
+    // below set things up for next boot.
+  }
+
   // Migration: add source_* provenance columns to tasks for calendar imports.
   for (const stmt of [
     `ALTER TABLE tasks ADD COLUMN source_provider TEXT`,
