@@ -63,6 +63,13 @@ describe("TaskCard", () => {
       />
     );
 
-    expect(screen.getByTestId("task-toggle-series-1").className).not.toContain("bg-slate-900");
+    // Tokenize so a `dark:bg-slate-900/80` (the legitimate dark-mode
+    // equivalent of bg-white/80 on the unchecked checkbox) doesn't trip
+    // a substring match. We're asserting the toggle isn't in its filled
+    // "checked" state — that state uses the bare `bg-slate-900` class.
+    const toggleClassTokens = screen
+      .getByTestId("task-toggle-series-1")
+      .className.split(/\s+/);
+    expect(toggleClassTokens).not.toContain("bg-slate-900");
   });
 });
