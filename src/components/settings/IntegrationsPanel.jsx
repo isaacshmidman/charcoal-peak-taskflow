@@ -28,7 +28,7 @@ function ConnectedRow({
   settingDefault,
 }) {
   return (
-    <div className="rounded-lg border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-3 space-y-1.5">
+    <div className="rounded-lg border border-slate-100 dark:border-[#303030] bg-white dark:bg-[#111111] p-3 space-y-1.5">
       {/* Header row: provider title + Default badge on the left, disconnect X
           on the far right. The title flex-shrinks via `truncate` so a long
           provider/account name ellipses BEFORE pushing the badge into the X. */}
@@ -40,7 +40,7 @@ function ConnectedRow({
             </p>
             {integration.is_default && (
               <span
-                className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-amber-50 dark:bg-amber-950/45 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300"
+                className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-amber-50 dark:bg-[#29230e] px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300"
                 title="New tasks created in Zephyrly are pushed here."
               >
                 <Star className="w-2.5 h-2.5 fill-current" /> Default
@@ -54,7 +54,7 @@ function ConnectedRow({
         <Button
           variant="ghost"
           size="icon"
-          className="shrink-0 h-7 w-7 text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/40"
+          className="shrink-0 h-7 w-7 text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-[#2a1116]"
           onClick={() => onDisconnect(integration.id)}
           disabled={isDisconnecting}
           title="Disconnect"
@@ -113,7 +113,7 @@ function ConnectedRow({
 
 function ConnectCard({ provider, onConnect, connecting, disabled }) {
   return (
-    <div className="rounded-lg border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-3 flex items-center justify-between">
+    <div className="rounded-lg border border-slate-100 dark:border-[#303030] bg-white dark:bg-[#111111] p-3 flex items-center justify-between">
       <div>
         <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{provider.label}</p>
         <p className="text-xs text-slate-400 dark:text-slate-500">

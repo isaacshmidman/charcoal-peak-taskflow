@@ -13,6 +13,9 @@ const HOUR_HEIGHT = 44;
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const DAY_HEADER_HEIGHT = 40; // day-of-week label + date number + py-1 padding
 const COLLAPSE_KEY = "calendar_week_allday_collapsed";
+const ALLDAY_ROW_HEIGHT = 26;
+const ALLDAY_MORE_HEIGHT = 24;
+const COLLAPSED_ALLDAY_VISIBLE = 2;
 
 const formatHour = (h) => {
   if (h === 0) return "12 AM";
@@ -21,19 +24,21 @@ const formatHour = (h) => {
   return `${h - 12} PM`;
 };
 
-function AllDayCell({ dateStr, tasks, priorities, onTaskClick, onToggleDone, collapsed }) {
+function AllDayCell({ dateStr, tasks, priorities, onTaskClick, onToggleDone, collapsed, onExpand }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `allday-${dateStr}`,
     data: { kind: "allday", dateStr },
   });
-  const visible = collapsed ? tasks.slice(0, 1) : tasks;
+  const visibleLimit = collapsed ? COLLAPSED_ALLDAY_VISIBLE : tasks.length;
+  const visible = tasks.slice(0, visibleLimit);
+  const hiddenCount = Math.max(0, tasks.length - visible.length);
   return (
     <div
       ref={setNodeRef}
       className={cn(
-        "flex-1 min-w-0 border-l border-slate-100 dark:border-slate-800 p-1 space-y-0.5",
+        "flex-1 min-w-0 border-l border-slate-100 dark:border-[#303030] p-1 space-y-0.5",
         collapsed && "overflow-hidden",
-        isOver && "bg-blue-50/60 dark:bg-blue-950/30"
+        isOver && "bg-blue-50 dark:bg-[#101f34]"
       )}
     >
       {visible.map((task) => (
@@ -45,6 +50,20 @@ function AllDayCell({ dateStr, tasks, priorities, onTaskClick, onToggleDone, col
           onToggleDone={onToggleDone}
         />
       ))}
+      {collapsed && hiddenCount > 0 && (
+        <button
+          type="button"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onExpand?.();
+          }}
+          className="h-5 w-full rounded border border-slate-200 dark:border-[#343434] bg-slate-50 dark:bg-[#161616] px-1.5 text-left text-[10px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222222] transition-colors"
+          title={`Show ${hiddenCount} more all-day task${hiddenCount === 1 ? "" : "s"}`}
+        >
+          {hiddenCount} more
+        </button>
+      )}
     </div>
   );
 }
@@ -66,15 +85,15 @@ function TimedColumn({ date, timedTasks, priorities, onTaskClick, onToggleDone }
     <div
       ref={setNodeRef}
       className={cn(
-        "flex-1 min-w-0 border-l border-slate-100 dark:border-slate-800 relative",
-        isOver && "bg-blue-50/60 dark:bg-blue-950/30"
+        "flex-1 min-w-0 border-l border-slate-100 dark:border-[#303030] relative",
+        isOver && "bg-blue-50 dark:bg-[#101f34]"
       )}
       style={{ height: HOURS.length * HOUR_HEIGHT }}
     >
       {HOURS.map((h) => (
         <div
           key={h}
-          className="absolute left-0 right-0 border-t border-slate-100 dark:border-slate-800"
+          className="absolute left-0 right-0 border-t border-slate-100 dark:border-[#303030]"
           style={{ top: h * HOUR_HEIGHT, height: HOUR_HEIGHT }}
         />
       ))}
@@ -128,8 +147,8 @@ function DayHeader({ date, onClick }) {
       type="button"
       onClick={() => onClick?.(dateStr)}
       className={cn(
-        "flex-1 min-w-0 border-l border-slate-100 dark:border-slate-800 py-1 text-center hover:bg-slate-50 dark:hover:bg-slate-800",
-        isToday && "bg-red-50 dark:bg-red-950/30"
+        "flex-1 min-w-0 border-l border-slate-100 dark:border-[#303030] py-1 text-center hover:bg-slate-50 dark:hover:bg-[#161616]",
+        isToday && "bg-red-50 dark:bg-[#2a1116]"
       )}
     >
       <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase">{format(date, "EEE")}</div>
@@ -215,9 +234,13 @@ export default function WeekView({
     return max;
   }, [byDay, days]);
 
-  // Row height per task ≈ 1.625rem; pad 0.5rem.
-  const expandedAllDayHeight = Math.max(1, maxAllDayCount) * 26 + 8;
-  const collapsedAllDayHeight = 28; // 1.75rem
+  const expandedAllDayHeight = Math.max(1, maxAllDayCount) * ALLDAY_ROW_HEIGHT + 8;
+  const collapsedVisibleCount = Math.min(COLLAPSED_ALLDAY_VISIBLE, maxAllDayCount);
+  const collapsedHasMore = maxAllDayCount > COLLAPSED_ALLDAY_VISIBLE;
+  const collapsedAllDayHeight =
+    Math.max(1, collapsedVisibleCount) * ALLDAY_ROW_HEIGHT +
+    (collapsedHasMore ? ALLDAY_MORE_HEIGHT : 0) +
+    8;
   const allDayHeight = allDayCollapsed
     ? collapsedAllDayHeight
     : expandedAllDayHeight;
@@ -243,13 +266,13 @@ export default function WeekView({
   return (
     <div
       ref={scrollRef}
-      className="border border-slate-100 dark:border-slate-800 rounded-lg bg-white dark:bg-slate-900/60 overflow-auto max-h-[75vh]"
+      className="border border-slate-100 dark:border-[#303030] rounded-lg bg-white dark:bg-[#0c0c0c] overflow-auto max-h-[75vh]"
     >
       <div className="min-w-full">
         {/* Sticky day-header row (on top) */}
-        <div className="sticky top-0 z-40 bg-white dark:bg-slate-900/60 border-b border-slate-100 dark:border-slate-800">
+        <div className="sticky top-0 z-40 bg-white dark:bg-[#0c0c0c] border-b border-slate-100 dark:border-[#303030]">
           <div className="flex" style={{ height: DAY_HEADER_HEIGHT }}>
-            <div className="w-12 shrink-0 border-r border-slate-100 dark:border-slate-800" />
+            <div className="w-12 shrink-0 border-r border-slate-100 dark:border-[#303030] bg-white dark:bg-[#0c0c0c]" />
             {days.map((d) => (
               <DayHeader key={toDateStr(d)} date={d} onClick={onDayClick} />
             ))}
@@ -258,11 +281,11 @@ export default function WeekView({
 
         {/* Sticky all-day bar (directly below day headers) */}
         <div
-          className="sticky z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-b border-slate-100 dark:border-slate-800"
+          className="sticky z-30 bg-white dark:bg-[#0c0c0c] border-b border-slate-100 dark:border-[#303030]"
           style={{ top: DAY_HEADER_HEIGHT }}
         >
           <div className="flex" style={{ height: allDayHeight }}>
-            <div className="w-12 shrink-0 border-r border-slate-100 dark:border-slate-800 flex items-start justify-center pt-1">
+            <div className="w-12 shrink-0 border-r border-slate-100 dark:border-[#303030] bg-white dark:bg-[#0c0c0c] flex items-start justify-center pt-1">
               <button
                 type="button"
                 onClick={() => setAllDayCollapsed((v) => !v)}
@@ -288,6 +311,7 @@ export default function WeekView({
                   onTaskClick={onTaskClick}
                   onToggleDone={onToggleDone}
                   collapsed={allDayCollapsed}
+                  onExpand={() => setAllDayCollapsed(false)}
                 />
               );
             })}
@@ -296,7 +320,7 @@ export default function WeekView({
 
         {/* Timed grid */}
         <div className="flex">
-          <div className="w-12 shrink-0 border-r border-slate-100 dark:border-slate-800 relative" style={{ height: HOURS.length * HOUR_HEIGHT }}>
+          <div className="w-12 shrink-0 border-r border-slate-100 dark:border-[#303030] bg-white dark:bg-[#0c0c0c] relative" style={{ height: HOURS.length * HOUR_HEIGHT }}>
             {HOURS.map((h) => (
               <div
                 key={h}

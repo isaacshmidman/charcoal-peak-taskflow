@@ -67,7 +67,7 @@ export default function AuthCallback() {
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="w-full max-w-md rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/85 p-8 shadow-sm text-center">
+      <div className="w-full max-w-md rounded-3xl border border-slate-200 dark:border-[#343434] bg-white dark:bg-[#111111] p-8 shadow-sm text-center">
         <div className="mx-auto w-12 h-12 rounded-2xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 flex items-center justify-center">
           <LoaderCircle className="w-5 h-5 animate-spin" />
         </div>

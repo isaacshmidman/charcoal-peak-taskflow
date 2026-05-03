@@ -72,7 +72,7 @@ export default function ConnectAppleModal({ open, onOpenChange }) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="rounded-md border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 p-2.5 text-xs text-slate-600 dark:text-slate-300 space-y-1.5">
+          <div className="rounded-md border border-slate-100 dark:border-[#303030] bg-slate-50 dark:bg-[#161616] p-2.5 text-xs text-slate-600 dark:text-slate-300 space-y-1.5">
             <p className="font-medium text-slate-700 dark:text-slate-200">How to get an app-specific password</p>
             <ol className="list-decimal list-inside space-y-0.5">
               <li>
@@ -102,7 +102,7 @@ export default function ConnectAppleModal({ open, onOpenChange }) {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@icloud.com"
-              className="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950/40 px-2.5 py-1.5 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-slate-400 dark:focus:border-slate-500 focus:outline-none"
+              className="w-full rounded-md border border-slate-200 dark:border-[#343434] bg-white dark:bg-[#0c0c0c] px-2.5 py-1.5 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-slate-400 dark:focus:border-slate-500 focus:outline-none"
             />
           </div>
 
@@ -115,7 +115,7 @@ export default function ConnectAppleModal({ open, onOpenChange }) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="xxxx-xxxx-xxxx-xxxx"
-              className="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950/40 px-2.5 py-1.5 text-sm font-mono text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-slate-400 dark:focus:border-slate-500 focus:outline-none"
+              className="w-full rounded-md border border-slate-200 dark:border-[#343434] bg-white dark:bg-[#0c0c0c] px-2.5 py-1.5 text-sm font-mono text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-slate-400 dark:focus:border-slate-500 focus:outline-none"
             />
             <p className="text-[11px] text-slate-400 dark:text-slate-500">
               Your password is encrypted at rest and only used for CalDAV calls to iCloud.
@@ -123,7 +123,7 @@ export default function ConnectAppleModal({ open, onOpenChange }) {
           </div>
 
           {errorMsg && (
-            <div className="flex items-start gap-1.5 rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/45 p-2 text-xs text-amber-700 dark:text-amber-300">
+            <div className="flex items-start gap-1.5 rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-[#29230e] p-2 text-xs text-amber-700 dark:text-amber-300">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
               <span>{errorMsg}</span>
             </div>

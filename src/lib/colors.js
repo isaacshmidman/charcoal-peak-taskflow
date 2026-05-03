@@ -54,26 +54,26 @@ export const colorDot = {
 
 /** Task card background + border class, tuned to match the dot hue at low saturation. */
 export const colorBg = {
-  red: "bg-red-50 border-red-100 dark:bg-red-950/35 dark:border-red-900/60",
-  orange: "bg-orange-50 border-orange-100 dark:bg-orange-950/35 dark:border-orange-900/60",
-  yellow: "bg-yellow-50 border-yellow-100 dark:bg-yellow-950/30 dark:border-yellow-900/55",
-  green: "bg-green-50 border-green-100 dark:bg-emerald-950/35 dark:border-emerald-900/60",
-  blue: "bg-blue-50 border-blue-100 dark:bg-blue-950/35 dark:border-blue-900/60",
-  violet: "bg-violet-50 border-violet-100 dark:bg-violet-950/35 dark:border-violet-900/60",
-  pink: "bg-pink-50 border-pink-100 dark:bg-pink-950/35 dark:border-pink-900/60",
-  teal: "bg-teal-50 border-teal-100 dark:bg-teal-950/35 dark:border-teal-900/60",
-  cyan: "bg-cyan-50 border-cyan-100 dark:bg-cyan-950/35 dark:border-cyan-900/60",
-  rose: "bg-rose-50 border-rose-100 dark:bg-rose-950/35 dark:border-rose-900/60",
-  slate: "bg-slate-50 border-slate-100 dark:bg-slate-900/65 dark:border-slate-700",
-  black: "bg-slate-900 border-slate-900 text-white dark:bg-slate-950 dark:border-slate-700 dark:text-slate-100",
-  white: "bg-white border-slate-200 dark:bg-slate-900/70 dark:border-slate-700",
-  brown: "bg-amber-50 border-amber-100 dark:bg-amber-950/35 dark:border-amber-900/60",
-  red_alt: "bg-red-100 border-red-200 dark:bg-red-950/45 dark:border-red-800/70",
-  orange_alt: "bg-orange-100 border-orange-200 dark:bg-orange-950/45 dark:border-orange-800/70",
-  yellow_alt: "bg-yellow-100 border-yellow-200 dark:bg-yellow-950/40 dark:border-yellow-800/65",
-  green_alt: "bg-green-100 border-green-200 dark:bg-emerald-950/45 dark:border-emerald-800/70",
-  blue_alt: "bg-blue-100 border-blue-200 dark:bg-blue-950/45 dark:border-blue-800/70",
-  violet_alt: "bg-violet-100 border-violet-200 dark:bg-violet-950/45 dark:border-violet-800/70",
+  red: "bg-red-50 border-red-100 dark:bg-[#2a1116] dark:border-[#6f2634]",
+  orange: "bg-orange-50 border-orange-100 dark:bg-[#2b180f] dark:border-[#76401c]",
+  yellow: "bg-yellow-50 border-yellow-100 dark:bg-[#29230e] dark:border-[#73621d]",
+  green: "bg-green-50 border-green-100 dark:bg-[#10261b] dark:border-[#2f6f4b]",
+  blue: "bg-blue-50 border-blue-100 dark:bg-[#101f34] dark:border-[#2f5f9c]",
+  violet: "bg-violet-50 border-violet-100 dark:bg-[#201735] dark:border-[#61419e]",
+  pink: "bg-pink-50 border-pink-100 dark:bg-[#2a1220] dark:border-[#743057]",
+  teal: "bg-teal-50 border-teal-100 dark:bg-[#102723] dark:border-[#2f756b]",
+  cyan: "bg-cyan-50 border-cyan-100 dark:bg-[#102630] dark:border-[#2f7086]",
+  rose: "bg-rose-50 border-rose-100 dark:bg-[#2b1219] dark:border-[#763044]",
+  slate: "bg-slate-50 border-slate-100 dark:bg-[#111111] dark:border-[#303030]",
+  black: "bg-slate-900 border-slate-900 text-white dark:bg-[#080808] dark:border-[#343434] dark:text-slate-100",
+  white: "bg-white border-slate-200 dark:bg-[#161616] dark:border-[#3a3a3a]",
+  brown: "bg-amber-50 border-amber-100 dark:bg-[#2a1a0d] dark:border-[#7a4b1c]",
+  red_alt: "bg-red-100 border-red-200 dark:bg-[#341219] dark:border-[#8a2f3c]",
+  orange_alt: "bg-orange-100 border-orange-200 dark:bg-[#351a0d] dark:border-[#93501f]",
+  yellow_alt: "bg-yellow-100 border-yellow-200 dark:bg-[#30270b] dark:border-[#8b711b]",
+  green_alt: "bg-green-100 border-green-200 dark:bg-[#0e2f1c] dark:border-[#347f4e]",
+  blue_alt: "bg-blue-100 border-blue-200 dark:bg-[#0f2340] dark:border-[#346bad]",
+  violet_alt: "bg-violet-100 border-violet-200 dark:bg-[#251746] dark:border-[#6b46b3]",
 };
 
 /** True when the given color has a dark background and needs light text. */
@@ -104,6 +104,17 @@ export function hexToRgba(hex, alpha = 1) {
   if (!c) return null;
   const a = Math.max(0, Math.min(1, alpha));
   return `rgba(${c.r}, ${c.g}, ${c.b}, ${a})`;
+}
+
+/** Mix a hex color with a solid target color and return a solid #rrggbb value. */
+export function mixHexColor(hex, targetHex, sourceWeight = 0.5) {
+  const source = parseHexColor(hex);
+  const target = parseHexColor(targetHex);
+  if (!source || !target) return null;
+  const w = Math.max(0, Math.min(1, sourceWeight));
+  const mix = (a, b) => Math.round(a * w + b * (1 - w));
+  const toHex = (n) => n.toString(16).padStart(2, "0");
+  return `#${toHex(mix(source.r, target.r))}${toHex(mix(source.g, target.g))}${toHex(mix(source.b, target.b))}`;
 }
 
 /**

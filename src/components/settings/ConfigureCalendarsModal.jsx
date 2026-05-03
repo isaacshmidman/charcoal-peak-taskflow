@@ -144,11 +144,11 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
               No calendars found on this account.
             </p>
           ) : (
-            <ul className="min-w-0 max-h-80 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/60">
+            <ul className="min-w-0 max-h-80 overflow-y-auto divide-y divide-slate-100 dark:divide-[#303030] rounded-lg border border-slate-100 dark:border-[#303030] bg-white dark:bg-[#111111]">
               {rows.map((c) => (
                 <li
                   key={c.external_calendar_id}
-                  className="flex items-center gap-3 px-3 py-2 min-w-0 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                  className="flex items-center gap-3 px-3 py-2 min-w-0 hover:bg-slate-50 dark:hover:bg-[#222222] transition-colors"
                 >
                   {/* Color swatch — solid round dot matching Priority
                       Levels styling. For writable calendars it also
@@ -269,7 +269,7 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
                     {!c.writable && (
                       <span
                         title="Read-only — events from this calendar can't be edited"
-                        className="inline-flex items-center gap-0.5 text-[10px] text-slate-400 dark:text-slate-500 px-1 py-0.5 rounded bg-slate-50 dark:bg-slate-800/50"
+                        className="inline-flex items-center gap-0.5 text-[10px] text-slate-400 dark:text-slate-500 px-1 py-0.5 rounded bg-slate-50 dark:bg-[#161616]"
                       >
                         <Lock className="w-2.5 h-2.5" /> read-only
                       </span>
@@ -282,7 +282,7 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
                       onChange={(e) => toggle(c.external_calendar_id, e.target.checked)}
                       className="sr-only peer"
                     />
-                    <span className="relative w-9 h-5 rounded-full bg-slate-200 dark:bg-slate-700 peer-checked:bg-emerald-500 transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:rounded-full after:bg-white after:shadow after:transition-transform peer-checked:after:translate-x-4" />
+                    <span className="relative w-9 h-5 rounded-full bg-slate-200 dark:bg-[#222222] peer-checked:bg-emerald-500 transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:rounded-full after:bg-white after:shadow after:transition-transform peer-checked:after:translate-x-4" />
                   </label>
                 </li>
               ))}

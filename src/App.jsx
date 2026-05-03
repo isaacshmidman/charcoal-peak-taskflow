@@ -56,7 +56,7 @@ const AuthenticatedApp = () => {
     if (authError.type !== "auth_required") {
       return (
         <div className="fixed inset-0 flex items-center justify-center px-4">
-          <div className="max-w-sm w-full bg-white dark:bg-slate-900/85 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 text-center shadow-sm">
+          <div className="max-w-sm w-full bg-white dark:bg-[#111111] border border-slate-200 dark:border-[#343434] rounded-2xl p-6 text-center shadow-sm">
             <h1 className="text-base font-semibold text-slate-900 dark:text-slate-100">Couldn&apos;t load Zephyrly</h1>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">{authError.message || "Something went wrong while loading the app."}</p>
             <button

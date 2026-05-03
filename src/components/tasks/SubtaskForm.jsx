@@ -119,7 +119,7 @@ export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubm
                   <button
                     type="button"
                     onClick={() => setForm({ ...form, task_time: form.task_time ? "" : "9:00AM" })}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${form.task_time ? "bg-slate-900 dark:bg-slate-100" : "bg-slate-200 dark:bg-slate-700"}`}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${form.task_time ? "bg-slate-900 dark:bg-slate-100" : "bg-slate-200 dark:bg-[#222222]"}`}
                   >
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white dark:bg-slate-900 shadow transition-transform duration-200 ${form.task_time ? "translate-x-6" : "translate-x-1"}`} />
                   </button>
@@ -136,7 +136,7 @@ export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubm
             <div>
               {task && onDelete && (
                 <Button type="button" variant="ghost" size="icon"
-                  className="text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
+                  className="text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-[#2a1116]"
                   onClick={() => { onDelete(task); onOpenChange(false); }}>
                   <Trash2 className="w-4 h-4" />
                 </Button>
@@ -191,7 +191,7 @@ function TimeInput({ value, onChange }) {
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900/60 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+        className="w-full flex items-center justify-between px-3 py-1.5 border border-slate-200 dark:border-[#343434] rounded-lg bg-white dark:bg-[#111111] text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#222222] transition-colors"
       >
         {value}
         <svg className={cn("w-3.5 h-3.5 text-slate-400 dark:text-slate-500 transition-transform", open && "rotate-180")} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -199,7 +199,7 @@ function TimeInput({ value, onChange }) {
         </svg>
       </button>
       {open && (
-        <div className="absolute z-50 mt-1 left-0 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden bg-white dark:bg-slate-900/60 shadow-md w-full">
+        <div className="absolute z-50 mt-1 left-0 border border-slate-200 dark:border-[#343434] rounded-lg overflow-hidden bg-white dark:bg-[#111111] shadow-md w-full">
           <div className="max-h-48 overflow-y-auto">
             {TIME_SLOTS.map((slot) => {
               const isSelected = slot === value;
@@ -211,7 +211,7 @@ function TimeInput({ value, onChange }) {
                 onClick={() => { onChange(slot); setOpen(false); }}
                 className={cn(
                   "w-full text-left px-3 py-1.5 text-base md:text-sm transition-colors",
-                  isSelected ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 font-medium" : "text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  isSelected ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 font-medium" : "text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#222222]"
                 )}
                 >
                 {slot}

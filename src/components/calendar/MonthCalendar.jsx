@@ -60,9 +60,9 @@ function DayCell({
       ref={setNodeRef}
       onClick={handleEmptyClick}
       className={cn(
-        "flex flex-col border border-slate-100 dark:border-slate-800 rounded-md p-1 min-h-[5.5rem] transition-colors cursor-pointer",
-        inMonth ? "bg-white dark:bg-slate-900/60" : "bg-slate-50/60 dark:bg-slate-800/60",
-        isOver && "bg-blue-50 dark:bg-blue-950/35 border-blue-200 dark:border-blue-800"
+        "flex flex-col border border-slate-100 dark:border-[#303030] rounded-md p-1 min-h-[5.5rem] transition-colors cursor-pointer",
+        inMonth ? "bg-white dark:bg-[#0c0c0c]" : "bg-slate-50 dark:bg-[#151515]",
+        isOver && "bg-blue-50 dark:bg-[#101f34] border-blue-200 dark:border-[#2f5f9c]"
       )}
     >
       <div

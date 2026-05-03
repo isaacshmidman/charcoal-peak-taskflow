@@ -221,7 +221,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
             </DialogTitle>
           </DialogHeader>
           {isReadOnly && (
-            <div className="flex items-start gap-2 rounded-md bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 p-2 text-[11px] text-slate-500 dark:text-slate-400 mb-1">
+            <div className="flex items-start gap-2 rounded-md bg-slate-50 dark:bg-[#161616] border border-slate-100 dark:border-[#303030] p-2 text-[11px] text-slate-500 dark:text-slate-400 mb-1">
               <Lock className="w-3.5 h-3.5 mt-0.5 shrink-0 text-slate-400 dark:text-slate-500" />
               <p>
                 This event comes from a read-only calendar
@@ -259,11 +259,11 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                 <div>
                   <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-1.5 block">Calendar</Label>
                   <div
-                    className="h-9 px-3 inline-flex items-center gap-2 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-sm text-slate-700 dark:text-slate-200"
+                    className="h-9 px-3 inline-flex items-center gap-2 w-full rounded-md border border-slate-200 dark:border-[#343434] bg-slate-50 dark:bg-[#161616] text-sm text-slate-700 dark:text-slate-200"
                     title={`${sourceCalendarName} (${sourceProvider})`}
                   >
                     <span
-                      className="inline-block w-2.5 h-2.5 rounded-full shrink-0 border border-slate-200 dark:border-slate-700"
+                      className="inline-block w-2.5 h-2.5 rounded-full shrink-0 border border-slate-200 dark:border-[#343434]"
                       style={sourceColorHex ? { backgroundColor: sourceColorHex, borderColor: hexToRgba(sourceColorHex, 0.6) || undefined } : { backgroundColor: "#94a3b8" }}
                     />
                     <span className="truncate">{sourceCalendarName}</span>
@@ -347,7 +347,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                               "w-9 h-9 rounded-full text-xs font-semibold transition-all border-2",
                               selected
                                 ? "bg-slate-900 text-white border-slate-900 dark:bg-slate-100 dark:text-slate-900 dark:border-slate-100"
-                                : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 border-transparent",
+                                : "bg-slate-100 dark:bg-[#161616] text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-[#222222] border-transparent",
                               dayError && "border-red-500"
                             )}
                           >
@@ -462,7 +462,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                           setForm({ ...form, task_time: "9:00AM", task_end_time: "10:00AM" });
                         }
                       }}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${form.task_time ? "bg-slate-900 dark:bg-slate-100" : "bg-slate-200 dark:bg-slate-700"}`}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${form.task_time ? "bg-slate-900 dark:bg-slate-100" : "bg-slate-200 dark:bg-[#222222]"}`}
                     >
                       <span className={`inline-block h-4 w-4 transform rounded-full bg-white dark:bg-slate-900 shadow transition-transform duration-200 ${form.task_time ? "translate-x-6" : "translate-x-1"}`} />
                     </button>
@@ -509,13 +509,13 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                     className=""
                   />
                   {tagInputFocused && filteredSuggestions.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg overflow-hidden max-h-40 overflow-y-auto">
+                    <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white dark:bg-[#111111] border border-slate-200 dark:border-[#343434] rounded-lg shadow-lg overflow-hidden max-h-40 overflow-y-auto">
                       {filteredSuggestions.map(tag => (
                         <button
                           key={tag}
                           type="button"
                           onMouseDown={(e) => { e.preventDefault(); addTag(tag); }}
-                          className="w-full text-left text-xs font-medium px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-900 dark:text-slate-100"
+                          className="w-full text-left text-xs font-medium px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-[#222222] text-slate-900 dark:text-slate-100"
                         >
                           {tag}
                         </button>
@@ -532,7 +532,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                   {form.tags.map(tag => (
                     <Badge key={tag} variant="secondary" className="text-xs gap-1 pr-1 max-w-full break-words whitespace-normal">
                       <span className="break-words whitespace-normal">{tag}</span>
-                      <button type="button" onClick={() => removeTag(tag)} className="text-slate-400 dark:text-slate-500 hover:text-red-400 transition-colors"><X className="w-3 h-3" /></button>
+                      <button type="button" onClick={() => removeTag(tag)} className="text-slate-400 dark:text-slate-500 hover:text-red-400 dark:hover:text-red-300 transition-colors"><X className="w-3 h-3" /></button>
                     </Badge>
                   ))}
                 </div>
@@ -567,7 +567,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                           onClick={() => onToggleSubtask && onToggleSubtask(sub)}
                           className={cn(
                             "shrink-0 w-3.5 h-3.5 rounded border-2 flex items-center justify-center transition-all",
-                            sub.status === "done" ? "bg-slate-900 border-slate-900 text-white dark:bg-slate-100 dark:border-slate-100 dark:text-slate-900" : "border-slate-400 dark:border-slate-500 hover:border-slate-600 dark:hover:border-slate-300 bg-white/80 dark:bg-slate-900/80"
+                            sub.status === "done" ? "bg-slate-900 border-slate-900 text-white dark:bg-slate-100 dark:border-slate-100 dark:text-slate-900" : "border-slate-400 dark:border-slate-500 hover:border-slate-600 dark:hover:border-slate-300 bg-white/80 dark:bg-[#0c0c0c]"
                           )}
                         >
                           {sub.status === "done" && <CheckSquare className="w-2 h-2" />}
@@ -581,7 +581,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                         <button
                           type="button"
                           onPointerDown={(e) => { e.preventDefault(); onDeleteSubtask && onDeleteSubtask(sub); }}
-                          className="text-slate-400 dark:text-slate-500 hover:text-red-400 transition-colors"
+                          className="text-slate-400 dark:text-slate-500 hover:text-red-400 dark:hover:text-red-300 transition-colors"
                         >
                           <X className="w-3 h-3" />
                         </button>
@@ -596,7 +596,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                       <div key={idx} className="inline-flex items-center gap-1.5 bg-secondary text-secondary-foreground rounded-full px-2.5 py-0.5 text-xs font-semibold group">
                         <div className="shrink-0 w-3.5 h-3.5 rounded border-2 border-slate-400" />
                         <span className="break-words whitespace-normal max-w-full">{title}</span>
-                        <button type="button" onPointerDown={(e) => { e.preventDefault(); removeSubtask(idx); }} className="text-slate-400 dark:text-slate-500 hover:text-red-400 transition-colors">
+                        <button type="button" onPointerDown={(e) => { e.preventDefault(); removeSubtask(idx); }} className="text-slate-400 dark:text-slate-500 hover:text-red-400 dark:hover:text-red-300 transition-colors">
                           <X className="w-3 h-3" />
                         </button>
                       </div>
@@ -614,7 +614,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
+                    className="text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-[#2a1116]"
                     data-testid="task-form-delete"
                     onClick={() => { onDelete(task); onOpenChange(false); }}
                   >
@@ -688,14 +688,14 @@ function TimeInput({ value, onChange }) {
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900/60 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+        className="w-full flex items-center justify-between px-3 py-1.5 border border-slate-200 dark:border-[#343434] rounded-lg bg-white dark:bg-[#111111] text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#222222] transition-colors"
       >
         {value}
         <svg className={cn("w-3.5 h-3.5 text-slate-400 dark:text-slate-500 transition-transform", open && "rotate-180")} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1 left-0 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden bg-white dark:bg-slate-900/60 shadow-md w-full">
+        <div className="absolute z-50 mt-1 left-0 border border-slate-200 dark:border-[#343434] rounded-lg overflow-hidden bg-white dark:bg-[#111111] shadow-md w-full">
           <div ref={listRef} className="max-h-48 overflow-y-auto">
             {TIME_SLOTS.map((slot) => {
               const isSelected = slot === value;
@@ -707,7 +707,7 @@ function TimeInput({ value, onChange }) {
                   onClick={() => { onChange(slot); setOpen(false); }}
                   className={cn(
                     "w-full text-left px-3 py-1.5 text-base md:text-sm transition-colors",
-                    isSelected ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 font-medium" : "text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    isSelected ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 font-medium" : "text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#222222]"
                   )}
                 >
                   {slot}

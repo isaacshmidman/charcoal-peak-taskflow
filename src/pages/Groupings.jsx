@@ -70,8 +70,8 @@ function GroupColumn({ title, subtitle, tasks, priorities, priorityOrderMap, onT
   }, [tasks, sorts, priorityOrderMap, calendarIndexByKey]);
 
   return (
-    <div className={`flex-shrink-0 ${wide ? "w-72" : "w-60"} flex flex-col rounded-2xl border ${accent || "border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50"} overflow-hidden`}>
-      <div className={`px-3 py-2.5 border-b ${accent ? "" : "border-slate-100 dark:border-slate-800"}`}>
+    <div className={`flex-shrink-0 ${wide ? "w-72" : "w-60"} flex flex-col rounded-2xl border ${accent || "border-slate-100 dark:border-[#303030] bg-slate-50 dark:bg-[#111111]"} overflow-hidden`}>
+      <div className={`px-3 py-2.5 border-b ${accent ? "" : "border-slate-100 dark:border-[#303030]"}`}>
         <p className="text-xs font-semibold text-slate-900 dark:text-slate-100">{title}</p>
         {subtitle && <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{subtitle}</p>}
         <p className="text-[10px] text-slate-400 dark:text-slate-500">{tasks.length} task{tasks.length !== 1 ? "s" : ""}</p>
@@ -251,13 +251,13 @@ export default function Groupings() {
   }, [tasks.length]);
 
   const columns = [
-    { key: "past", title: "Past", subtitle: "Before yesterday", tasks: groups.past, accent: "border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/80" },
-    { key: "yest", title: "Yesterday", subtitle: format(yesterday, "MMM d"), tasks: groups.yest, accent: "border-orange-100 dark:border-orange-900/60 bg-orange-50/50 dark:bg-orange-950/25" },
-    { key: "tod", title: "Today", subtitle: format(today, "MMM d"), tasks: groups.tod, accent: "border-blue-200 dark:border-blue-900/60 bg-blue-50/50 dark:bg-blue-950/25", wide: true },
-    { key: "tom", title: "Tomorrow", subtitle: format(tomorrow, "MMM d"), tasks: groups.tom, accent: "border-orange-100 dark:border-orange-900/60 bg-orange-50/50 dark:bg-orange-950/25" },
-    { key: "next7", title: "Next 7 Days", subtitle: `${format(addDays(tomorrow, 1), "MMM d")} – ${format(nextSevenDaysEnd, "MMM d")}`, tasks: groups.next7, accent: "border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/80" },
-    { key: "future", title: "Future", subtitle: `After ${format(nextSevenDaysEnd, "MMM d")}`, tasks: groups.future, accent: "border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/80" },
-    { key: "noDue", title: "No Due Date", tasks: groups.noDue, accent: "border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/60" },
+    { key: "past", title: "Past", subtitle: "Before yesterday", tasks: groups.past, accent: "border-slate-200 dark:border-[#303030] bg-slate-50 dark:bg-[#111111]" },
+    { key: "yest", title: "Yesterday", subtitle: format(yesterday, "MMM d"), tasks: groups.yest, accent: "border-orange-100 dark:border-[#76401c] bg-orange-50 dark:bg-[#2b180f]" },
+    { key: "tod", title: "Today", subtitle: format(today, "MMM d"), tasks: groups.tod, accent: "border-blue-200 dark:border-[#2f5f9c] bg-blue-50 dark:bg-[#101f34]", wide: true },
+    { key: "tom", title: "Tomorrow", subtitle: format(tomorrow, "MMM d"), tasks: groups.tom, accent: "border-orange-100 dark:border-[#76401c] bg-orange-50 dark:bg-[#2b180f]" },
+    { key: "next7", title: "Next 7 Days", subtitle: `${format(addDays(tomorrow, 1), "MMM d")} – ${format(nextSevenDaysEnd, "MMM d")}`, tasks: groups.next7, accent: "border-slate-200 dark:border-[#303030] bg-slate-50 dark:bg-[#111111]" },
+    { key: "future", title: "Future", subtitle: `After ${format(nextSevenDaysEnd, "MMM d")}`, tasks: groups.future, accent: "border-slate-200 dark:border-[#303030] bg-slate-50 dark:bg-[#111111]" },
+    { key: "noDue", title: "No Due Date", tasks: groups.noDue, accent: "border-slate-100 dark:border-[#303030] bg-slate-50 dark:bg-[#111111]" },
   ];
 
   return (
@@ -333,7 +333,7 @@ export default function Groupings() {
                 onEdit={handleEdit}
                 onDelete={handleDelete}
                 onUpdate={handleUpdate}
-                accent="border-violet-100 dark:border-violet-900/60 bg-violet-50/40 dark:bg-violet-950/25"
+                accent="border-violet-100 dark:border-[#61419e] bg-violet-50 dark:bg-[#201735]"
                 sorts={sorts}
               />
             ))}

@@ -56,7 +56,7 @@ export default function Layout() {
   return (
     <div className="min-h-screen bg-transparent">
       {/* Top nav */}
-      <header className="sticky top-0 z-40 bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl border-b border-slate-100 dark:border-slate-800/80">
+      <header className="sticky top-0 z-40 bg-white/80 dark:bg-black backdrop-blur-xl dark:backdrop-blur-none border-b border-slate-100 dark:border-[#303030]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <Link to={defaultNav} className="flex items-center gap-2.5">
             <img src="/zephyrly-logo.png" alt="Zephyrly" className="w-7 h-7 rounded-lg object-cover" />
@@ -72,7 +72,7 @@ export default function Layout() {
                   to={item.path}
                   className={cn(
                     "px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200",
-                    isActive ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950" : "text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    isActive ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950" : "text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-[#161616]"
                   )}
                 >
                   <span className="flex items-center gap-1.5">
@@ -94,7 +94,7 @@ export default function Layout() {
                 "w-10 h-10 -mr-1",
                 location.pathname === "/Settings"
                   ? "text-slate-900 dark:text-slate-950 bg-slate-100 dark:bg-slate-100"
-                  : "text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  : "text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-[#161616]"
               )}
             >
               <Settings className="w-4 h-4 pointer-events-none" />
@@ -104,7 +104,7 @@ export default function Layout() {
       </header>
 
       {/* Mobile nav — raised from bottom edge for comfortable thumb reach */}
-      <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/90 dark:bg-slate-950/90 backdrop-blur-xl border-t border-slate-100 dark:border-slate-800/80 px-1 pt-2 pb-5">
+      <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/90 dark:bg-black backdrop-blur-xl dark:backdrop-blur-none border-t border-slate-100 dark:border-[#303030] px-1 pt-2 pb-5">
         <div className="flex justify-around">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path;
@@ -114,7 +114,7 @@ export default function Layout() {
                 to={item.path}
                 className={cn(
                   "flex flex-col items-center gap-0.5 px-1.5 py-1.5 rounded-lg text-[11px] font-medium transition-all touch-manipulation flex-1 min-w-0",
-                  isActive ? "text-slate-900 dark:text-slate-100 bg-slate-100/80 dark:bg-slate-800/80" : "text-slate-400 dark:text-slate-500"
+                  isActive ? "text-slate-900 dark:text-slate-100 bg-slate-100/80 dark:bg-[#161616]" : "text-slate-400 dark:text-slate-500"
                 )}
               >
                 <item.icon className="w-5 h-5" />

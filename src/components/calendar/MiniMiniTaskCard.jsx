@@ -3,7 +3,8 @@ import { useState, useEffect } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import { CheckSquare, CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { colorBg, isDarkColor, hexToRgba } from "@/lib/colors";
+import { colorBg, isDarkColor, mixHexColor } from "@/lib/colors";
+import { useTheme } from "@/lib/ThemeProvider";
 
 /**
  * Ultra-compact task chip for month-calendar day cells.
@@ -19,6 +20,7 @@ import { colorBg, isDarkColor, hexToRgba } from "@/lib/colors";
  * }} props
  */
 export default function MiniMiniTaskCard({ task, priorities, onClick, onToggleDone, fillHeight = false }) {
+  const { isDark } = useTheme();
   const priority = priorities.find((p) => p.id === task.priority_id);
   const colorKey = priority?.color || "slate";
   const isRecurring =
@@ -40,8 +42,8 @@ export default function MiniMiniTaskCard({ task, priorities, onClick, onToggleDo
   });
 
   const dark = sourceHex ? false : isDarkColor(colorKey);
-  const hexBg = sourceHex ? hexToRgba(sourceHex, 0.18) : null;
-  const hexBorder = sourceHex ? hexToRgba(sourceHex, 0.45) : null;
+  const hexBg = sourceHex ? mixHexColor(sourceHex, isDark ? "#000000" : "#ffffff", isDark ? 0.34 : 0.22) : null;
+  const hexBorder = sourceHex ? mixHexColor(sourceHex, isDark ? "#000000" : "#ffffff", isDark ? 0.72 : 0.62) : null;
 
   return (
     <div
@@ -83,8 +85,8 @@ export default function MiniMiniTaskCard({ task, priorities, onClick, onToggleDo
             isDone
               ? "bg-slate-900 border-slate-900 text-white dark:bg-slate-100 dark:border-slate-100 dark:text-slate-900"
               : dark
-                ? "border-white/60 bg-white/20 dark:bg-white/10 hover:bg-white/40 dark:hover:bg-white/20"
-                : "border-slate-400 bg-white/80 dark:bg-slate-900/80 hover:border-slate-600"
+                ? "border-white bg-white dark:bg-[#0c0c0c] hover:bg-white dark:hover:bg-[#222222]"
+                : "border-slate-400 bg-white dark:bg-[#0c0c0c] hover:border-slate-600"
           )}
           aria-label={isDone ? "Mark incomplete" : "Mark done"}
         >

@@ -57,20 +57,20 @@ export default function CalendarVisibilityDropdown({ calendars, hidden, onChange
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64 p-2">
-        <div className="flex items-center justify-between px-1.5 pb-1.5 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-center justify-between px-1.5 pb-1.5 border-b border-slate-100 dark:border-[#303030]">
           <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">Calendars</span>
           <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={showAll}
-              className="text-[11px] text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 px-1.5 py-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700"
+              className="text-[11px] text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 px-1.5 py-0.5 rounded hover:bg-slate-100 dark:hover:bg-[#222222]"
             >
               All
             </button>
             <button
               type="button"
               onClick={hideAll}
-              className="text-[11px] text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 px-1.5 py-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700"
+              className="text-[11px] text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 px-1.5 py-0.5 rounded hover:bg-slate-100 dark:hover:bg-[#222222]"
             >
               None
             </button>
@@ -87,7 +87,7 @@ export default function CalendarVisibilityDropdown({ calendars, hidden, onChange
               return (
                 <li key={c.key}>
                   <label
-                    className="flex items-center gap-2 px-1.5 py-1.5 rounded hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
+                    className="flex items-center gap-2 px-1.5 py-1.5 rounded hover:bg-slate-50 dark:hover:bg-[#222222] cursor-pointer"
                   >
                     <input
                       type="checkbox"
@@ -97,7 +97,7 @@ export default function CalendarVisibilityDropdown({ calendars, hidden, onChange
                     />
                     {c.color ? (
                       <span
-                        className="inline-block w-2.5 h-2.5 rounded-sm shrink-0 border border-slate-200 dark:border-slate-700"
+                        className="inline-block w-2.5 h-2.5 rounded-sm shrink-0 border border-slate-200 dark:border-[#343434]"
                         style={{ backgroundColor: c.color }}
                         aria-hidden
                       />

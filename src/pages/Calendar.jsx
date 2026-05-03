@@ -494,7 +494,7 @@ export default function Calendar() {
                     state: { scrollTo: "bottom" },
                   })
                 }
-                className="h-7 px-2 gap-1 text-xs font-medium text-slate-900 dark:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700"
+                className="h-7 px-2 gap-1 text-xs font-medium text-slate-900 dark:text-slate-100 hover:bg-slate-100 dark:hover:bg-[#222222]"
               >
                 <SettingsIcon className="w-3.5 h-3.5" />
                 Settings
@@ -562,7 +562,7 @@ export default function Calendar() {
               </span>
             </div>
           )}
-          <div className="inline-flex rounded-lg border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-0.5">
+          <div className="inline-flex rounded-lg border border-slate-100 dark:border-[#303030] bg-white dark:bg-[#0c0c0c] p-0.5">
             {VIEWS.map((v) => (
               <button
                 key={v}
@@ -592,7 +592,7 @@ export default function Calendar() {
             <button
               type="button"
               onClick={goToday}
-              className="text-xs font-medium text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-slate-100 px-2 py-1 rounded hover:bg-slate-50 dark:hover:bg-slate-800"
+              className="text-xs font-medium text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-slate-100 px-2 py-1 rounded hover:bg-slate-50 dark:hover:bg-[#222222]"
               title="Jump to today"
             >
               Today

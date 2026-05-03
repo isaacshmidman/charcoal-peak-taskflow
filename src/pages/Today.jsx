@@ -211,7 +211,7 @@ export default function Today() {
 
       {isLoading ? (
         <div className="space-y-2">
-          {[1, 2, 3].map(i => <div key={i} className="bg-white dark:bg-slate-900/60 rounded-xl border border-slate-100 dark:border-slate-800 h-12 animate-pulse" />)}
+          {[1, 2, 3].map(i => <div key={i} className="bg-white dark:bg-[#111111] rounded-xl border border-slate-100 dark:border-[#303030] h-12 animate-pulse" />)}
         </div>
       ) : todayAndPast.length === 0 ? (
         <div className="py-14 text-center">

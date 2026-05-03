@@ -22,7 +22,7 @@ function readLastSignIn() {
 
 function LastUsedBadge() {
   return (
-    <span className="ml-2 inline-flex items-center rounded-full bg-amber-50 dark:bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-500/30">
+    <span className="ml-2 inline-flex items-center rounded-full bg-amber-50 dark:bg-[#29230e] px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-[#73621d]">
       Last used
     </span>
   );
@@ -115,7 +115,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="w-full max-w-md rounded-[28px] border border-slate-200/80 dark:border-slate-700/60 bg-white/95 dark:bg-slate-900/85 backdrop-blur p-8 shadow-[0_24px_80px_rgba(15,23,42,0.08)] dark:shadow-[0_24px_80px_rgba(0,0,0,0.5)]">
+      <div className="w-full max-w-md rounded-[28px] border border-slate-200/80 dark:border-[#343434] bg-white/95 dark:bg-[#111111] backdrop-blur dark:backdrop-blur-none p-8 shadow-[0_24px_80px_rgba(15,23,42,0.08)] dark:shadow-[0_24px_80px_rgba(0,0,0,0.5)]">
         <div className="flex items-center gap-2.5 mb-6">
           <img
             src="/zephyrly-logo.png"
@@ -138,7 +138,7 @@ export default function Login() {
             <form className="mt-6 space-y-3" onSubmit={handleEmailPasswordSignIn}>
               <label className="block">
                 <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Email</span>
-                <div className="mt-1 flex items-center gap-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 px-4 h-12">
+                <div className="mt-1 flex items-center gap-3 rounded-2xl border border-slate-200 dark:border-[#343434] bg-white dark:bg-[#161616] px-4 h-12">
                   <Mail className="w-4 h-4 text-slate-400 dark:text-slate-500 shrink-0" />
                   <input
                     data-testid="login-email"
@@ -154,7 +154,7 @@ export default function Login() {
 
               <label className="block">
                 <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Password</span>
-                <div className="mt-1 flex items-center gap-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 px-4 h-12">
+                <div className="mt-1 flex items-center gap-3 rounded-2xl border border-slate-200 dark:border-[#343434] bg-white dark:bg-[#161616] px-4 h-12">
                   <KeyRound className="w-4 h-4 text-slate-400 dark:text-slate-500 shrink-0" />
                   <input
                     data-testid="login-password"
@@ -182,9 +182,9 @@ export default function Login() {
             </form>
 
             <div className="mt-5 flex items-center gap-3 text-xs text-slate-400 dark:text-slate-500">
-              <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+              <div className="h-px flex-1 bg-slate-200 dark:bg-[#222222]" />
               <span>or</span>
-              <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+              <div className="h-px flex-1 bg-slate-200 dark:bg-[#222222]" />
             </div>
           </>
         ) : (
@@ -194,7 +194,7 @@ export default function Login() {
         <button
           onClick={handleGoogleSignIn}
           disabled={!googleEnabled}
-          className={`${emailPasswordEnabled ? "mt-5" : "mt-6"} w-full h-12 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 text-slate-900 dark:text-slate-100 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 inline-flex items-center justify-center gap-3 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed`}
+          className={`${emailPasswordEnabled ? "mt-5" : "mt-6"} w-full h-12 rounded-2xl border border-slate-200 dark:border-[#343434] bg-white dark:bg-[#161616] text-slate-900 dark:text-slate-100 text-sm font-medium hover:bg-slate-50 dark:hover:bg-[#222222] inline-flex items-center justify-center gap-3 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed`}
         >
           <svg viewBox="0 0 24 24" className="w-5 h-5" aria-hidden="true">
             <path fill="#EA4335" d="M12 10.2v3.9h5.4c-.2 1.3-1.7 3.9-5.4 3.9-3.2 0-5.8-2.7-5.8-6s2.6-6 5.8-6c1.8 0 3 .8 3.7 1.5l2.5-2.4C16.6 3.6 14.5 2.7 12 2.7 6.9 2.7 2.8 6.9 2.8 12s4.1 9.3 9.2 9.3c5.3 0 8.8-3.7 8.8-8.9 0-.6-.1-1-.1-1.4H12Z" />
@@ -206,7 +206,7 @@ export default function Login() {
           {lastUsed === "google" ? <LastUsedBadge /> : null}
         </button>
 
-        <div className="mt-5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 px-4 py-3">
+        <div className="mt-5 rounded-2xl bg-slate-50 dark:bg-[#161616] border border-slate-200 dark:border-[#343434] px-4 py-3">
           <p className="text-xs text-slate-500 dark:text-slate-400 leading-5">
             {googleEnabled
               ? "Google sign-in will bring you right back to this app automatically."

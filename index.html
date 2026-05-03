@@ -29,7 +29,7 @@
           if (dark) {
             document.documentElement.classList.add("dark");
             var theme = document.querySelector('meta[name="theme-color"]');
-            if (theme) theme.setAttribute("content", "#0b1220");
+            if (theme) theme.setAttribute("content", "#000000");
           }
         } catch (_) {}
       })();
@@ -42,7 +42,7 @@
       }
 
       html.dark {
-        background: radial-gradient(circle at 100% 100%, #1f2937 0%, #111827 18%, #0b1220 50%);
+        background: radial-gradient(circle at 100% 100%, rgba(245, 245, 160, 0.18) 0%, rgba(245, 245, 160, 0.07) 18%, #000000 48%, #000000 100%);
         color-scheme: dark;
       }
 

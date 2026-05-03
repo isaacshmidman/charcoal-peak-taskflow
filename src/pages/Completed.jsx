@@ -189,7 +189,7 @@ export default function Completed() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
+                className="h-9 w-9 text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-[#2a1116]"
                 title="Delete all completed"
                 onClick={() => setShowDeleteAllDialog(true)}
               >
@@ -210,7 +210,7 @@ export default function Completed() {
                   <button
                     type="button"
                     onClick={() => setShowDeleteAllDialog(false)}
-                    className="w-full h-12 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-medium shadow-sm transition-colors"
+                    className="w-full h-12 rounded-xl bg-slate-100 dark:bg-[#161616] hover:bg-slate-200 dark:hover:bg-[#222222] text-slate-700 dark:text-slate-200 text-sm font-medium shadow-sm transition-colors"
                   >
                     Cancel
                   </button>
@@ -223,7 +223,7 @@ export default function Completed() {
 
       {isLoading ? (
         <div className="space-y-2">
-          {[1, 2, 3].map((i) => <div key={i} className="bg-white dark:bg-slate-900/60 rounded-xl border border-slate-100 dark:border-slate-800 h-12 animate-pulse" />)}
+          {[1, 2, 3].map((i) => <div key={i} className="bg-white dark:bg-[#111111] rounded-xl border border-slate-100 dark:border-[#303030] h-12 animate-pulse" />)}
         </div>
       ) : completedItems.length === 0 ? (
         <div className="text-center py-14">

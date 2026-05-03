@@ -189,7 +189,7 @@ export default function TaskCard({
   const doneSubtasks = subtasks.filter((s) => s.status === "done").length;
   const recurrenceLabel = buildRecurrenceShortLabel(task);
 
-  const cardBg = priority ? colorBg[priority.color] || colorBg.slate : "bg-white dark:bg-slate-900/60 border-slate-100 dark:border-slate-800";
+  const cardBg = priority ? colorBg[priority.color] || colorBg.slate : "bg-white dark:bg-[#111111] border-slate-100 dark:border-[#303030]";
   const isDarkCard = isDarkColor(priority?.color);
 
   // Overdue: has a due_date, not done, and date is in the past (before today)
@@ -221,7 +221,7 @@ export default function TaskCard({
         return (
           <div className={cn(
             "absolute inset-0 rounded-xl flex items-center px-5 pointer-events-none z-0 transition-colors duration-100",
-            willDelete ? "bg-red-500" : "bg-red-100 dark:bg-red-950/50",
+            willDelete ? "bg-red-500" : "bg-red-100 dark:bg-[#2a1116]",
             swipeX > 0 ? "justify-start" : "justify-end"
           )}>
             <Trash2 className={cn("w-5 h-5 transition-colors duration-100", willDelete ? "text-white" : "text-red-400")} />
@@ -252,7 +252,7 @@ export default function TaskCard({
               className={cn(
                 "shrink-0 w-7 h-7 rounded-md border-2 flex items-center justify-center transition-all touch-manipulation",
                 isDone && !optimisticUndone ? "bg-slate-900 border-slate-900 text-white dark:bg-slate-100 dark:border-slate-100 dark:text-slate-900" :
-                "border-slate-300 dark:border-slate-600 hover:border-slate-500 bg-white/80 dark:bg-slate-900/80"
+                "border-slate-300 dark:border-slate-600 hover:border-slate-500 bg-white dark:bg-[#0c0c0c]"
               )}
             >
               {isDone && !optimisticUndone && <CheckSquare className="w-3.5 h-3.5" />}
@@ -279,7 +279,7 @@ export default function TaskCard({
               {task.tags?.length > 0 && (
                 <div className="hidden sm:flex items-center gap-1">
                   {task.tags.slice(0, 2).map((tag) => (
-                    <span key={tag} className="text-[10px] font-medium text-slate-500 dark:text-slate-300 bg-white/70 dark:bg-slate-950/45 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700/80">
+                    <span key={tag} className="text-[10px] font-medium text-slate-500 dark:text-slate-300 bg-white dark:bg-[#0c0c0c] px-1.5 py-0.5 rounded border border-slate-200 dark:border-[#343434]">
                       {tag.length > 20 ? `${tag.slice(0, 20)}…` : tag}
                     </span>
                   ))}
@@ -300,7 +300,7 @@ export default function TaskCard({
                   {task.due_date ? (
                     <button
                       onClick={(e) => e.stopPropagation()}
-                      className="text-[11px] flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors text-slate-400 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-800/70"
+                      className="text-[11px] flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors text-slate-400 dark:text-slate-400 hover:bg-white dark:hover:bg-[#222222]"
                     >
                       <Calendar className="w-3 h-3" />
                       {dateDisplay}
@@ -308,7 +308,7 @@ export default function TaskCard({
                   ) : (
                     <button
                       onClick={(e) => e.stopPropagation()}
-                      className="text-[11px] text-slate-300 dark:text-slate-600 hover:text-slate-400 dark:hover:text-slate-300 hover:bg-white/50 dark:hover:bg-slate-800/60 px-1.5 py-0.5 rounded transition-colors"
+                      className="text-[11px] text-slate-300 dark:text-slate-600 hover:text-slate-400 dark:hover:text-slate-300 hover:bg-white dark:hover:bg-[#222222] px-1.5 py-0.5 rounded transition-colors"
                     >
                       <Calendar className="w-3 h-3" />
                     </button>
@@ -361,7 +361,7 @@ export default function TaskCard({
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
                 exit={{ opacity: 0, height: 0 }}
-                className="px-3 pb-3 ml-10 space-y-1.5 border-l-2 border-white/60 dark:border-slate-700/70 overflow-hidden"
+                className="px-3 pb-3 ml-10 space-y-1.5 border-l-2 border-white dark:border-[#343434] overflow-hidden"
               >
                 {subtasks.map((sub, subIdx) => {
                   const subOverdue = sub.due_date && new Date(sub.due_date + "T00:00:00") < new Date(new Date().setHours(0,0,0,0)) && sub.status !== "done";
@@ -394,7 +394,7 @@ export default function TaskCard({
                         onClick={(e) => { e.stopPropagation(); onToggleDone(sub); }}
                         className={cn(
                           "shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-all touch-manipulation",
-                          sub.status === "done" ? "bg-slate-900 border-slate-900 text-white dark:bg-slate-100 dark:border-slate-100 dark:text-slate-900" : "border-slate-300 dark:border-slate-600 hover:border-slate-500 bg-white/80 dark:bg-slate-900/80"
+                          sub.status === "done" ? "bg-slate-900 border-slate-900 text-white dark:bg-slate-100 dark:border-slate-100 dark:text-slate-900" : "border-slate-300 dark:border-slate-600 hover:border-slate-500 bg-white dark:bg-[#0c0c0c]"
                         )}
                       >
                         {sub.status === "done" && <CheckSquare className="w-2.5 h-2.5" />}
@@ -408,7 +408,7 @@ export default function TaskCard({
                         </span>
                       )}
                       <button
-                        className="opacity-0 group-hover/sub:opacity-100 text-slate-400 dark:text-slate-500 hover:text-red-400 transition-colors"
+                        className="opacity-0 group-hover/sub:opacity-100 text-slate-400 dark:text-slate-500 hover:text-red-400 dark:hover:text-red-300 transition-colors"
                         onClick={(e) => { e.stopPropagation(); if (didSwipe.current) return; onDelete(sub); }}
                       >
                         <X className="w-3 h-3" />
@@ -441,7 +441,7 @@ function RecurrenceBadge({ label }) {
     return (
       <>
         <span className="xs:hidden w-2 h-2 rounded-full bg-violet-600 shrink-0 inline-block" title={label} />
-        <span className="hidden xs:inline text-[10px] font-medium text-violet-600 dark:text-violet-300 bg-violet-50 dark:bg-violet-950/45 border border-violet-200 dark:border-violet-800 px-1.5 py-0.5 rounded max-w-[240px] truncate shrink-0">
+        <span className="hidden xs:inline text-[10px] font-medium text-violet-600 dark:text-violet-300 bg-violet-50 dark:bg-[#201735] border border-violet-200 dark:border-[#61419e] px-1.5 py-0.5 rounded max-w-[240px] truncate shrink-0">
           {label}
         </span>
       </>

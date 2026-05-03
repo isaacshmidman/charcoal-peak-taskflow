@@ -84,7 +84,7 @@ function PriorityRow({ p, idx, total, isEditing, onStartEdit, onStopEdit, onDele
 
   if (isEditing) {
     return (
-      <div className="flex items-center gap-2 bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5">
+      <div className="flex items-center gap-2 bg-white dark:bg-[#111111] border border-slate-200 dark:border-[#303030] rounded-xl px-3 py-2.5">
         <span className={cn("w-3 h-3 rounded-full shrink-0", colorDot[editColor] || colorDot.slate)} />
         <Input
           value={editName}
@@ -110,7 +110,7 @@ function PriorityRow({ p, idx, total, isEditing, onStartEdit, onStopEdit, onDele
         <Button size="icon" variant="ghost" className="h-7 w-7 text-emerald-600" onClick={save}>
           <Check className="w-3.5 h-3.5" />
         </Button>
-        <Button size="icon" variant="ghost" className="h-7 w-7 text-slate-400" onClick={onStopEdit}>
+        <Button size="icon" variant="ghost" className="h-7 w-7 text-slate-400 dark:text-slate-500 hover:text-red-400 dark:hover:text-red-300" onClick={onStopEdit}>
           <X className="w-3.5 h-3.5" />
         </Button>
       </div>);
@@ -119,7 +119,7 @@ function PriorityRow({ p, idx, total, isEditing, onStartEdit, onStopEdit, onDele
 
   return (
     <div
-      className="flex items-center gap-3 bg-white dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 rounded-xl px-3 py-2.5 hover:border-slate-200 dark:hover:border-slate-700 transition-colors"
+      className="flex items-center gap-3 bg-white dark:bg-[#111111] border border-slate-100 dark:border-[#303030] rounded-xl px-3 py-2.5 hover:border-slate-200 dark:hover:border-[#454545] transition-colors"
       onDoubleClick={onStartEdit}>
       
       <div className="flex flex-col gap-0.5">
@@ -133,7 +133,7 @@ function PriorityRow({ p, idx, total, isEditing, onStartEdit, onStopEdit, onDele
       <span className={cn("w-3 h-3 rounded-full shrink-0", colorDot[p.color] || colorDot.slate)} />
       <span className="text-sm font-medium text-slate-900 dark:text-slate-100 flex-1 min-w-0 break-words whitespace-normal">{p.name}</span>
       
-      <button className="text-slate-300 dark:text-slate-600 hover:text-red-400 transition-colors" onClick={(e) => {e.stopPropagation();onDelete(p.id);}}>
+      <button className="text-slate-300 dark:text-slate-600 hover:text-red-400 dark:hover:text-red-300 transition-colors" onClick={(e) => {e.stopPropagation();onDelete(p.id);}}>
         <X className="w-3.5 h-3.5" />
       </button>
     </div>);
@@ -484,7 +484,7 @@ export default function Settings() {
         </div>
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-2 text-slate-900 dark:text-slate-100 hover:text-red-400 hover:border-red-200 dark:hover:border-red-800 text-sm font-medium shrink-0">
+            <Button variant="outline" size="sm" className="gap-2 text-slate-900 dark:text-slate-100 hover:text-red-400 dark:hover:text-red-300 hover:border-red-200 dark:hover:border-red-800 text-sm font-medium shrink-0">
               <LogOut className="w-4 h-4" />
               Log out
             </Button>
@@ -508,10 +508,10 @@ export default function Settings() {
       <section>
         <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Default Appearance</h2>
         <Select value={appearance} onValueChange={setAppearance}>
-          <SelectTrigger className="w-48 h-9 bg-white dark:bg-slate-900 dark:border-slate-700 text-sm font-medium text-slate-900 dark:text-slate-100">
+          <SelectTrigger className="w-48 h-9 bg-white dark:bg-[#111111] dark:border-[#343434] text-sm font-medium text-slate-900 dark:text-slate-100">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent className="bg-white dark:bg-slate-900 dark:border-slate-700">
+          <SelectContent className="bg-white dark:bg-[#111111] dark:border-[#343434]">
             <SelectItem value="system" className="text-sm font-medium text-slate-900 dark:text-slate-100">System</SelectItem>
             <SelectItem value="light" className="text-sm font-medium text-slate-900 dark:text-slate-100">Light</SelectItem>
             <SelectItem value="dark" className="text-sm font-medium text-slate-900 dark:text-slate-100">Dark</SelectItem>
@@ -526,10 +526,10 @@ export default function Settings() {
       <section>
         <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Default View</h2>
         <Select value={selectedDefaultNav} onValueChange={saveDefaultNav}>
-          <SelectTrigger className="w-48 h-9 bg-white dark:bg-slate-900 dark:border-slate-700 text-sm font-medium text-slate-900 dark:text-slate-100">
+          <SelectTrigger className="w-48 h-9 bg-white dark:bg-[#111111] dark:border-[#343434] text-sm font-medium text-slate-900 dark:text-slate-100">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent className="bg-white dark:bg-slate-900 dark:border-slate-700">
+          <SelectContent className="bg-white dark:bg-[#111111] dark:border-[#343434]">
             {navOrder.map((path) => {
               const opt = NAV_OPTIONS.find((o) => o.value === path);
               return opt ? <SelectItem key={opt.value} value={opt.value} className="text-sm font-medium text-slate-900 dark:text-slate-100">{opt.label}</SelectItem> : null;
@@ -544,7 +544,7 @@ export default function Settings() {
         
         <div className="space-y-2">
           {navOrder.map((path, idx) =>
-          <div key={path} className="flex items-center gap-3 bg-white dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 rounded-xl px-3 py-2.5 hover:border-slate-200 dark:hover:border-slate-700 transition-colors">
+          <div key={path} className="flex items-center gap-3 bg-white dark:bg-[#111111] border border-slate-100 dark:border-[#303030] rounded-xl px-3 py-2.5 hover:border-slate-200 dark:hover:border-[#454545] transition-colors">
               <div className="flex flex-col gap-0.5">
                 <button onClick={() => moveNav(idx, -1)} disabled={idx === 0} className="disabled:opacity-20 text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400 transition-colors">
                   <ArrowUp className="w-3 h-3" />
@@ -616,16 +616,16 @@ export default function Settings() {
         <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Tags</h2>
         
 
-        <div className="border border-slate-100 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900/60">
+        <div className="border border-slate-100 dark:border-[#303030] rounded-xl overflow-hidden bg-white dark:bg-[#111111]">
           {savedTags.slice(-20).length === 0 ?
           <p className="text-xs text-slate-400 px-4 py-3">No saved tags yet</p> :
 
           savedTags.slice(-20).map((tag, i, arr) =>
-          <div key={tag.id} className={cn("flex items-center justify-between px-4 py-2", i < arr.length - 1 && "border-b border-slate-50 dark:border-slate-800")}>
+          <div key={tag.id} className={cn("flex items-center justify-between px-4 py-2", i < arr.length - 1 && "border-b border-slate-50 dark:border-[#303030]")}>
                 <span className="text-sm font-medium text-slate-900 dark:text-slate-100 flex items-center gap-2 min-w-0 break-words whitespace-normal">
                   <Tag className="w-3 h-3 text-slate-900 dark:text-slate-100 shrink-0" /><span className="break-words whitespace-normal">{tag.name}</span>
                 </span>
-                <button onClick={() => deleteTagMutation.mutate(tag.id)} className="text-slate-300 dark:text-slate-600 hover:text-red-400 transition-colors">
+                <button onClick={() => deleteTagMutation.mutate(tag.id)} className="text-slate-300 dark:text-slate-600 hover:text-red-400 dark:hover:text-red-300 transition-colors">
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -664,7 +664,7 @@ export default function Settings() {
       <section>
         <button
           onClick={() => { scrollPosRef.current = window.scrollY; setShowRecentlyDeleted(true); }}
-          className="w-full flex items-center justify-between bg-white dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 rounded-xl px-4 py-3 hover:border-slate-200 dark:hover:border-slate-700 transition-colors"
+          className="w-full flex items-center justify-between bg-white dark:bg-[#111111] border border-slate-100 dark:border-[#303030] rounded-xl px-4 py-3 hover:border-slate-200 dark:hover:border-[#454545] transition-colors"
         >
           <span className="text-sm font-medium text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <Trash2 className="w-4 h-4 text-red-400" />
@@ -685,10 +685,10 @@ export default function Settings() {
       <section>
         <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Default Calendar View</h2>
         <Select value={selectedCalendarView} onValueChange={saveDefaultCalendarView}>
-          <SelectTrigger className="w-48 h-9 bg-white dark:bg-slate-900 dark:border-slate-700 text-sm font-medium text-slate-900 dark:text-slate-100">
+          <SelectTrigger className="w-48 h-9 bg-white dark:bg-[#111111] dark:border-[#343434] text-sm font-medium text-slate-900 dark:text-slate-100">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent className="bg-white dark:bg-slate-900 dark:border-slate-700">
+          <SelectContent className="bg-white dark:bg-[#111111] dark:border-[#343434]">
             <SelectItem value="day" className="text-sm font-medium text-slate-900 dark:text-slate-100">Day</SelectItem>
             <SelectItem value="week" className="text-sm font-medium text-slate-900 dark:text-slate-100">Week</SelectItem>
             <SelectItem value="month" className="text-sm font-medium text-slate-900 dark:text-slate-100">Month</SelectItem>
@@ -717,7 +717,7 @@ export default function Settings() {
               return (
                 <div
                   key={c.key}
-                  className="flex items-center gap-3 bg-white dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 rounded-xl px-3 py-2.5 hover:border-slate-200 dark:hover:border-slate-700 transition-colors"
+                  className="flex items-center gap-3 bg-white dark:bg-[#111111] border border-slate-100 dark:border-[#303030] rounded-xl px-3 py-2.5 hover:border-slate-200 dark:hover:border-[#454545] transition-colors"
                 >
                   <div className="flex flex-col gap-0.5">
                     <button

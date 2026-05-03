@@ -124,7 +124,7 @@ export default function MultiSortPanel({ sorts, onSortsChange, page = "default" 
                 .filter(Boolean)
             );
             return (
-              <div key={index} className="rounded-lg border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/60">
+              <div key={index} className="rounded-lg border border-slate-100 dark:border-[#303030] bg-white dark:bg-[#111111]">
                 <div className="flex items-center gap-1 px-2 py-1.5">
                   <button
                     type="button"
@@ -145,7 +145,7 @@ export default function MultiSortPanel({ sorts, onSortsChange, page = "default" 
                     <button
                       type="button"
                       onClick={() => removeSortAt(index)}
-                      className="p-1 text-slate-300 dark:text-slate-600 hover:text-red-400 transition-colors"
+                      className="p-1 text-slate-300 dark:text-slate-600 hover:text-red-400 dark:hover:text-red-300 transition-colors"
                       title="Remove sort"
                     >
                       <X className="w-3.5 h-3.5" />
@@ -169,8 +169,8 @@ export default function MultiSortPanel({ sorts, onSortsChange, page = "default" 
                             isSelected
                               ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 font-medium"
                               : isUsedElsewhere
-                                ? "text-slate-300 dark:text-slate-600 cursor-not-allowed opacity-40 bg-slate-50 dark:bg-slate-800/50"
-                                : "text-slate-900 dark:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700"
+                                ? "text-slate-300 dark:text-slate-600 cursor-not-allowed opacity-40 bg-slate-50 dark:bg-[#161616]"
+                                : "text-slate-900 dark:text-slate-100 hover:bg-slate-100 dark:hover:bg-[#222222]"
                           )}
                         >
                           {opt.label}
@@ -187,7 +187,7 @@ export default function MultiSortPanel({ sorts, onSortsChange, page = "default" 
             <button
               type="button"
               onClick={addSort}
-              className="w-full rounded-lg border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/60 px-2 py-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-200 dark:hover:border-slate-700 flex items-center justify-center gap-2 transition-colors"
+              className="w-full rounded-lg border border-slate-100 dark:border-[#303030] bg-white dark:bg-[#111111] px-2 py-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-200 dark:hover:border-[#454545] flex items-center justify-center gap-2 transition-colors"
             >
               <Plus className="w-4 h-4" /> Add sort
             </button>

@@ -63,7 +63,7 @@ describe("TaskCard", () => {
       />
     );
 
-    // Tokenize so a `dark:bg-slate-900/80` (the legitimate dark-mode
+    // Tokenize so a `dark:bg-[#0c0c0c]` (the legitimate dark-mode
     // equivalent of bg-white/80 on the unchecked checkbox) doesn't trip
     // a substring match. We're asserting the toggle isn't in its filled
     // "checked" state — that state uses the bare `bg-slate-900` class.
