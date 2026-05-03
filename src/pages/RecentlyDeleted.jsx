@@ -23,7 +23,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import MultiSortPanel from "@/components/tasks/MultiSortPanel";
-import { colorBg } from "@/lib/colors";
+import { colorBg, isDarkColor } from "@/lib/colors";
 import { compareDueDateTime } from "@/lib/sort-helpers";
 
 const RETENTION_OPTIONS = [
@@ -241,7 +241,7 @@ export default function RecentlyDeleted({ onBack } = {}) {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 text-red-400 hover:text-red-600 hover:bg-red-50"
+                className="h-9 w-9 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
                 title="Empty recently deleted"
                 onClick={() => setShowEmptyDialog(true)}
               >
@@ -315,6 +315,7 @@ function DeletedTaskCard({ record, priorityMap, onRestore, onDelete }) {
   const priority = priorityMap[record.priority_id];
   const colorKey = priority?.color || record.priority_color || "slate";
   const cardBg = colorBg[colorKey] || colorBg.slate;
+  const isDarkCard = isDarkColor(colorKey);
   const isDone = record.was_completed;
 
   const deletedDate = record.deleted_at ? format(new Date(record.deleted_at), "MMM d, yyyy") : "";
@@ -333,19 +334,23 @@ function DeletedTaskCard({ record, priorityMap, onRestore, onDelete }) {
             {/* Status indicator */}
             <div className={cn(
               "shrink-0 w-7 h-7 rounded-md border-2 flex items-center justify-center",
-              isDone ? "bg-slate-900 border-slate-900 text-white" : "border-slate-300 dark:border-slate-600 bg-white/80 dark:bg-slate-900/80"
+              isDone ? "bg-slate-900 border-slate-900 text-white dark:bg-slate-100 dark:border-slate-100 dark:text-slate-900" : "border-slate-300 dark:border-slate-600 bg-white/80 dark:bg-slate-900/80"
             )}>
-              {isDone && <CheckSquare className="w-3.5 h-3.5 text-white" />}
+              {isDone && <CheckSquare className="w-3.5 h-3.5" />}
             </div>
 
             <div className="flex-1 min-w-0">
-              <p className={cn("text-sm font-medium text-slate-900 dark:text-slate-100 truncate", isDone && "line-through text-slate-400 dark:text-slate-500")}>
+              <p className={cn(
+                "text-sm font-medium truncate",
+                isDarkCard ? "text-white dark:text-slate-100" : "text-slate-900 dark:text-slate-100",
+                isDone && "line-through text-slate-400 dark:text-slate-500"
+              )}>
                 {record.title}
               </p>
 
               {/* Deleted-at badge */}
               <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                <span className="text-[10px] font-medium text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded">
+                <span className="text-[10px] font-medium text-red-600 dark:text-red-300 bg-red-50 dark:bg-red-950/45 border border-red-200 dark:border-red-800 px-1.5 py-0.5 rounded">
                   Deleted {deletedDate}
                 </span>
                 {record.due_date && (
@@ -354,7 +359,7 @@ function DeletedTaskCard({ record, priorityMap, onRestore, onDelete }) {
                   </span>
                 )}
                 {record.tags?.length > 0 && record.tags.slice(0, 2).map(tag => (
-                  <span key={tag} className="text-[10px] font-medium text-slate-400 dark:text-slate-500 bg-white/70 dark:bg-slate-900/70 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                  <span key={tag} className="text-[10px] font-medium text-slate-500 dark:text-slate-300 bg-white/70 dark:bg-slate-950/45 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700/80">
                     {tag}
                   </span>
                 ))}
@@ -368,14 +373,14 @@ function DeletedTaskCard({ record, priorityMap, onRestore, onDelete }) {
             <div className="flex items-center gap-1 shrink-0">
               <button
                 onClick={onRestore}
-                className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors"
                 title="Restore"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={onDelete}
-                className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-red-500 hover:bg-red-50 transition-colors"
+                className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
                 title="Delete permanently"
               >
                 <Trash2 className="w-3.5 h-3.5" />

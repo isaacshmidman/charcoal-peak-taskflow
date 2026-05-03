@@ -36,14 +36,14 @@ export default function DeleteToast() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 12 }}
             transition={{ duration: 0.18 }}
-            className="pointer-events-auto flex items-center gap-3 bg-slate-900 px-4 py-2.5 rounded-xl shadow-lg"
+            className="pointer-events-auto flex items-center gap-3 bg-slate-900 dark:bg-slate-100 px-4 py-2.5 rounded-xl shadow-lg"
             data-testid="delete-toast"
           >
-            <span className="text-xs font-medium text-white">{toast.label}</span>
+            <span className="text-xs font-medium text-white dark:text-slate-900">{toast.label}</span>
             {!toast.hideUndo && (
               <button
                 onClick={() => { toast.onUndo?.(); setToast(null); }}
-                className="text-xs font-semibold text-yellow-300 hover:text-yellow-200 transition-colors shrink-0"
+                className="text-xs font-semibold text-yellow-300 dark:text-amber-700 hover:text-yellow-200 dark:hover:text-amber-600 transition-colors shrink-0"
                 data-testid="delete-toast-undo"
               >
                 Undo

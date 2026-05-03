@@ -12,6 +12,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Zephyrly" />
     <meta name="theme-color" content="#f5f5a0" />
+    <meta name="color-scheme" content="light dark" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="manifest" href="/manifest.json" />
     <title>Zephyrly</title>
@@ -25,10 +26,36 @@
           var dark = v === "dark" ||
             (v === "system" && window.matchMedia &&
              window.matchMedia("(prefers-color-scheme: dark)").matches);
-          if (dark) document.documentElement.classList.add("dark");
+          if (dark) {
+            document.documentElement.classList.add("dark");
+            var theme = document.querySelector('meta[name="theme-color"]');
+            if (theme) theme.setAttribute("content", "#0b1220");
+          }
         } catch (_) {}
       })();
     </script>
+    <style>
+      html {
+        min-height: 100%;
+        background: radial-gradient(circle at 100% 100%, #f5f5a0 0%, #fdfdcf 12%, #ffffff 40%);
+        color-scheme: light;
+      }
+
+      html.dark {
+        background: radial-gradient(circle at 100% 100%, #1f2937 0%, #111827 18%, #0b1220 50%);
+        color-scheme: dark;
+      }
+
+      body,
+      #root {
+        min-height: 100vh;
+      }
+
+      body {
+        margin: 0;
+        background: transparent;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

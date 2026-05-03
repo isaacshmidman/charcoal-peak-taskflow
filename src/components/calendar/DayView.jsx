@@ -32,7 +32,7 @@ function TimedDropZone({ dateStr, children }) {
   return (
     <div
       ref={setNodeRef}
-      className={cn("relative", isOver && "bg-blue-50/60")}
+      className={cn("relative", isOver && "bg-blue-50/60 dark:bg-blue-950/30")}
       style={{ height: HOURS.length * HOUR_HEIGHT }}
     >
       {children}
@@ -50,7 +50,7 @@ function AllDayColumn({ dateStr, allDayTasks, priorities, onTaskClick, onToggleD
       ref={setNodeRef}
       className={cn(
         "border border-slate-100 dark:border-slate-800 rounded-lg bg-white dark:bg-slate-900/60 p-2 h-full",
-        isOver && "bg-blue-50/60"
+        isOver && "bg-blue-50/60 dark:bg-blue-950/30"
       )}
     >
       <h3 className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-2">All day</h3>
@@ -63,8 +63,10 @@ function AllDayColumn({ dateStr, allDayTasks, priorities, onTaskClick, onToggleD
             "[&::-webkit-scrollbar]:w-1",
             "[&::-webkit-scrollbar-track]:bg-transparent",
             "[&::-webkit-scrollbar-thumb]:bg-slate-200",
+            "dark:[&::-webkit-scrollbar-thumb]:bg-slate-700",
             "[&::-webkit-scrollbar-thumb]:rounded-full",
             "[&::-webkit-scrollbar-thumb:hover]:bg-slate-300",
+            "dark:[&::-webkit-scrollbar-thumb:hover]:bg-slate-600",
           )}
           style={{ maxHeight: "calc(70vh - 2.5rem)" }}
         >

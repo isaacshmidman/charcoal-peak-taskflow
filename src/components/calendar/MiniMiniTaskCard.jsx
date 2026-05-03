@@ -81,9 +81,9 @@ export default function MiniMiniTaskCard({ task, priorities, onClick, onToggleDo
           className={cn(
             "shrink-0 w-3 h-3 rounded-sm border flex items-center justify-center transition-all",
             isDone
-              ? "bg-slate-900 border-slate-900 text-white"
+              ? "bg-slate-900 border-slate-900 text-white dark:bg-slate-100 dark:border-slate-100 dark:text-slate-900"
               : dark
-                ? "border-white/60 bg-white/20 dark:bg-slate-900/20 hover:bg-white/40"
+                ? "border-white/60 bg-white/20 dark:bg-white/10 hover:bg-white/40 dark:hover:bg-white/20"
                 : "border-slate-400 bg-white/80 dark:bg-slate-900/80 hover:border-slate-600"
           )}
           aria-label={isDone ? "Mark incomplete" : "Mark done"}
@@ -100,7 +100,7 @@ export default function MiniMiniTaskCard({ task, priorities, onClick, onToggleDo
       <span
         className={cn(
           "truncate flex-1",
-          dark ? "text-white" : "text-slate-900 dark:text-slate-100",
+          dark ? "text-white dark:text-slate-100" : "text-slate-900 dark:text-slate-100",
           isDone && "line-through"
         )}
       >

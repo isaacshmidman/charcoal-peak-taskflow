@@ -189,7 +189,7 @@ export default function Completed() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 text-red-400 hover:text-red-600 hover:bg-red-50"
+                className="h-9 w-9 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
                 title="Delete all completed"
                 onClick={() => setShowDeleteAllDialog(true)}
               >

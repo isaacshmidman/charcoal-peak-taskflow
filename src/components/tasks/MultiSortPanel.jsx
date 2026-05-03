@@ -167,7 +167,7 @@ export default function MultiSortPanel({ sorts, onSortsChange, page = "default" 
                           className={cn(
                             "w-full text-left px-3 py-1.5 text-xs rounded transition-colors",
                             isSelected
-                              ? "bg-slate-900 text-white font-medium"
+                              ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 font-medium"
                               : isUsedElsewhere
                                 ? "text-slate-300 dark:text-slate-600 cursor-not-allowed opacity-40 bg-slate-50 dark:bg-slate-800/50"
                                 : "text-slate-900 dark:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700"

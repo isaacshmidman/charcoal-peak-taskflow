@@ -119,9 +119,9 @@ export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubm
                   <button
                     type="button"
                     onClick={() => setForm({ ...form, task_time: form.task_time ? "" : "9:00AM" })}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${form.task_time ? "bg-slate-900" : "bg-slate-200 dark:bg-slate-700"}`}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${form.task_time ? "bg-slate-900 dark:bg-slate-100" : "bg-slate-200 dark:bg-slate-700"}`}
                   >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white dark:bg-slate-900/60 shadow transition-transform duration-200 ${form.task_time ? "translate-x-6" : "translate-x-1"}`} />
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white dark:bg-slate-900 shadow transition-transform duration-200 ${form.task_time ? "translate-x-6" : "translate-x-1"}`} />
                   </button>
                 </div>
               )}
@@ -136,7 +136,7 @@ export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubm
             <div>
               {task && onDelete && (
                 <Button type="button" variant="ghost" size="icon"
-                  className="text-red-400 hover:text-red-600 hover:bg-red-50"
+                  className="text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
                   onClick={() => { onDelete(task); onOpenChange(false); }}>
                   <Trash2 className="w-4 h-4" />
                 </Button>
@@ -144,7 +144,7 @@ export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubm
             </div>
             <div className="flex gap-2">
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-              <Button type="submit" className="bg-slate-900 hover:bg-slate-800">
+              <Button type="submit" className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200">
                 {task ? "Save Changes" : "Create Subtask"}
               </Button>
             </div>
@@ -211,7 +211,7 @@ function TimeInput({ value, onChange }) {
                 onClick={() => { onChange(slot); setOpen(false); }}
                 className={cn(
                   "w-full text-left px-3 py-1.5 text-base md:text-sm transition-colors",
-                  isSelected ? "bg-slate-900 text-white font-medium" : "text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  isSelected ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 font-medium" : "text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
                 )}
                 >
                 {slot}

@@ -132,7 +132,7 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
             </div>
           ) : error ? (
             <div className="space-y-2 py-3">
-              <p className="text-xs text-red-600">
+              <p className="text-xs text-red-600 dark:text-red-300">
                 Couldn't load calendars: {error.message || "network error"}
               </p>
               <Button variant="outline" size="sm" onClick={() => refetch()}>
@@ -144,11 +144,11 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
               No calendars found on this account.
             </p>
           ) : (
-            <ul className="min-w-0 max-h-80 overflow-y-auto divide-y divide-slate-100 rounded-lg border border-slate-100 dark:border-slate-800">
+            <ul className="min-w-0 max-h-80 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/60">
               {rows.map((c) => (
                 <li
                   key={c.external_calendar_id}
-                  className="flex items-center gap-3 px-3 py-2 min-w-0"
+                  className="flex items-center gap-3 px-3 py-2 min-w-0 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
                 >
                   {/* Color swatch — solid round dot matching Priority
                       Levels styling. For writable calendars it also
@@ -160,7 +160,7 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
                       <PopoverTrigger asChild>
                         <button
                           type="button"
-                          className="shrink-0 w-3 h-3 rounded-full ring-1 ring-slate-200 hover:ring-slate-400 transition-shadow disabled:opacity-50 relative"
+                          className="shrink-0 w-3 h-3 rounded-full ring-1 ring-slate-200 dark:ring-slate-700 hover:ring-slate-400 dark:hover:ring-slate-500 transition-shadow disabled:opacity-50 relative"
                           style={{ backgroundColor: c.color_hex || "#94a3b8" }}
                           title="Change calendar color"
                           aria-label="Change calendar color"
@@ -199,8 +199,8 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
                                 className={
                                   "w-6 h-6 rounded-full ring-1 transition-shadow hover:scale-110 " +
                                   (isCurrent
-                                    ? "ring-slate-900 ring-2"
-                                    : "ring-slate-200 hover:ring-slate-400")
+                                    ? "ring-slate-900 dark:ring-slate-100 ring-2"
+                                    : "ring-slate-200 dark:ring-slate-700 hover:ring-slate-400 dark:hover:ring-slate-500")
                                 }
                                 style={{ backgroundColor: hex }}
                                 title={hex}

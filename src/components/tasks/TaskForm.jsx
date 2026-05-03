@@ -346,7 +346,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                             className={cn(
                               "w-9 h-9 rounded-full text-xs font-semibold transition-all border-2",
                               selected
-                                ? "bg-slate-900 text-white border-slate-900"
+                                ? "bg-slate-900 text-white border-slate-900 dark:bg-slate-100 dark:text-slate-900 dark:border-slate-100"
                                 : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 border-transparent",
                               dayError && "border-red-500"
                             )}
@@ -462,9 +462,9 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                           setForm({ ...form, task_time: "9:00AM", task_end_time: "10:00AM" });
                         }
                       }}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${form.task_time ? "bg-slate-900" : "bg-slate-200 dark:bg-slate-700"}`}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${form.task_time ? "bg-slate-900 dark:bg-slate-100" : "bg-slate-200 dark:bg-slate-700"}`}
                     >
-                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white dark:bg-slate-900/60 shadow transition-transform duration-200 ${form.task_time ? "translate-x-6" : "translate-x-1"}`} />
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white dark:bg-slate-900 shadow transition-transform duration-200 ${form.task_time ? "translate-x-6" : "translate-x-1"}`} />
                     </button>
                   </div>
                 )}
@@ -523,7 +523,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                     </div>
                   )}
                 </div>
-                <Button type="button" size="sm" onClick={() => addTag()} className="h-9 px-3 bg-slate-900 hover:bg-slate-800 text-white">
+                <Button type="button" size="sm" onClick={() => addTag()} className="h-9 px-3 bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200">
                   <Plus className="w-4 h-4" />
                 </Button>
               </div>
@@ -552,7 +552,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                     onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSubtask(); } }}
                     className=""
                   />
-                  <Button type="button" size="sm" onClick={addSubtask} className="h-9 px-3 bg-slate-900 hover:bg-slate-800 text-white">
+                  <Button type="button" size="sm" onClick={addSubtask} className="h-9 px-3 bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200">
                     <Plus className="w-4 h-4" />
                   </Button>
                 </div>
@@ -567,7 +567,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                           onClick={() => onToggleSubtask && onToggleSubtask(sub)}
                           className={cn(
                             "shrink-0 w-3.5 h-3.5 rounded border-2 flex items-center justify-center transition-all",
-                            sub.status === "done" ? "bg-slate-900 border-slate-900 text-white" : "border-slate-400 hover:border-slate-600"
+                            sub.status === "done" ? "bg-slate-900 border-slate-900 text-white dark:bg-slate-100 dark:border-slate-100 dark:text-slate-900" : "border-slate-400 dark:border-slate-500 hover:border-slate-600 dark:hover:border-slate-300 bg-white/80 dark:bg-slate-900/80"
                           )}
                         >
                           {sub.status === "done" && <CheckSquare className="w-2 h-2" />}
@@ -614,7 +614,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="text-red-400 hover:text-red-600 hover:bg-red-50"
+                    className="text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
                     data-testid="task-form-delete"
                     onClick={() => { onDelete(task); onOpenChange(false); }}
                   >
@@ -627,7 +627,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                   {isReadOnly ? "Close" : "Cancel"}
                 </Button>
                 {!isReadOnly && (
-                  <Button type="submit" className="bg-slate-900 hover:bg-slate-800" data-testid="task-form-submit">
+                  <Button type="submit" className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200" data-testid="task-form-submit">
                     {task ? "Save Changes" : "Create Task"}
                   </Button>
                 )}
@@ -707,7 +707,7 @@ function TimeInput({ value, onChange }) {
                   onClick={() => { onChange(slot); setOpen(false); }}
                   className={cn(
                     "w-full text-left px-3 py-1.5 text-base md:text-sm transition-colors",
-                    isSelected ? "bg-slate-900 text-white font-medium" : "text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    isSelected ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 font-medium" : "text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
                   )}
                 >
                   {slot}

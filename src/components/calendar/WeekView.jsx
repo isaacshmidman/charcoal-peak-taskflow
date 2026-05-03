@@ -33,7 +33,7 @@ function AllDayCell({ dateStr, tasks, priorities, onTaskClick, onToggleDone, col
       className={cn(
         "flex-1 min-w-0 border-l border-slate-100 dark:border-slate-800 p-1 space-y-0.5",
         collapsed && "overflow-hidden",
-        isOver && "bg-blue-50/60"
+        isOver && "bg-blue-50/60 dark:bg-blue-950/30"
       )}
     >
       {visible.map((task) => (
@@ -67,7 +67,7 @@ function TimedColumn({ date, timedTasks, priorities, onTaskClick, onToggleDone }
       ref={setNodeRef}
       className={cn(
         "flex-1 min-w-0 border-l border-slate-100 dark:border-slate-800 relative",
-        isOver && "bg-blue-50/60"
+        isOver && "bg-blue-50/60 dark:bg-blue-950/30"
       )}
       style={{ height: HOURS.length * HOUR_HEIGHT }}
     >
@@ -129,7 +129,7 @@ function DayHeader({ date, onClick }) {
       onClick={() => onClick?.(dateStr)}
       className={cn(
         "flex-1 min-w-0 border-l border-slate-100 dark:border-slate-800 py-1 text-center hover:bg-slate-50 dark:hover:bg-slate-800",
-        isToday && "bg-red-50"
+        isToday && "bg-red-50 dark:bg-red-950/30"
       )}
     >
       <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase">{format(date, "EEE")}</div>

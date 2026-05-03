@@ -40,7 +40,7 @@ function ConnectedRow({
             </p>
             {integration.is_default && (
               <span
-                className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700"
+                className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-amber-50 dark:bg-amber-950/45 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300"
                 title="New tasks created in Zephyrly are pushed here."
               >
                 <Star className="w-2.5 h-2.5 fill-current" /> Default
@@ -54,7 +54,7 @@ function ConnectedRow({
         <Button
           variant="ghost"
           size="icon"
-          className="shrink-0 h-7 w-7 text-slate-400 dark:text-slate-500 hover:text-red-600 hover:bg-red-50"
+          className="shrink-0 h-7 w-7 text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/40"
           onClick={() => onDisconnect(integration.id)}
           disabled={isDisconnecting}
           title="Disconnect"
@@ -100,12 +100,12 @@ function ConnectedRow({
         </Button>
       )}
       {integration.status === "needs_reauth" && (
-        <p className="inline-flex items-center gap-1 text-[11px] text-amber-600 pt-0.5">
+        <p className="inline-flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-300 pt-0.5">
           <AlertTriangle className="w-3 h-3" /> Needs reauth — reconnect to resume syncing.
         </p>
       )}
       {integration.last_error && (
-        <p className="text-[11px] text-amber-600 pt-0.5">{integration.last_error}</p>
+        <p className="text-[11px] text-amber-600 dark:text-amber-300 pt-0.5">{integration.last_error}</p>
       )}
     </div>
   );
@@ -196,12 +196,12 @@ export default function IntegrationsPanel() {
         </p>
       </div>
       {integrationError && (
-        <p className="text-xs text-red-600">
+        <p className="text-xs text-red-600 dark:text-red-300">
           Connection failed: {integrationError.replace(/_/g, " ")}
         </p>
       )}
       {error && (
-        <p className="text-xs text-amber-600">
+        <p className="text-xs text-amber-600 dark:text-amber-300">
           Couldn't load integrations: {error.message || "network error"}
         </p>
       )}

@@ -62,7 +62,7 @@ function DayCell({
       className={cn(
         "flex flex-col border border-slate-100 dark:border-slate-800 rounded-md p-1 min-h-[5.5rem] transition-colors cursor-pointer",
         inMonth ? "bg-white dark:bg-slate-900/60" : "bg-slate-50/60 dark:bg-slate-800/60",
-        isOver && "bg-blue-50 border-blue-200"
+        isOver && "bg-blue-50 dark:bg-blue-950/35 border-blue-200 dark:border-blue-800"
       )}
     >
       <div

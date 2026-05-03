@@ -78,6 +78,16 @@
 
 
 @layer base {
+  html {
+    background: radial-gradient(circle at 100% 100%, #f5f5a0 0%, #fdfdcf 12%, #ffffff 40%);
+    color-scheme: light;
+  }
+
+  html.dark {
+    background: radial-gradient(circle at 100% 100%, #1f2937 0%, #111827 18%, #0b1220 50%);
+    color-scheme: dark;
+  }
+
   * {
     @apply border-border outline-ring/50;
   }
@@ -101,6 +111,10 @@
   html.dark body {
     background: radial-gradient(circle at 100% 100%, #1f2937 0%, #111827 18%, #0b1220 50%);
     color: hsl(0 0% 92%);
+  }
+
+  #root {
+    min-height: 100vh;
   }
 
   input,

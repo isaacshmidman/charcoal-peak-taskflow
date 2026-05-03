@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { CheckSquare } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { colorBg } from "@/lib/colors";
+import { colorBg, isDarkColor } from "@/lib/colors";
 
 const toDateStr = (date) => format(date, "yyyy-MM-dd");
 const fromDateStr = (str) => new Date(str + "T00:00:00");
@@ -21,6 +21,7 @@ export default function CompactTaskCard({ task, priorities, onToggleDone, onEdit
 
   const isDone = task.status === "done" || optimisticDone;
   const priority = priorities.find(p => p.id === task.priority_id);
+  const isDarkCard = isDarkColor(priority?.color);
   const isRecurring = task.task_type === "recurring" && task.recurrence && task.recurrence !== "none";
 
   const cardStyle = priority ? (colorBg[priority.color] || colorBg.slate) : "bg-white dark:bg-slate-900/60 border-slate-100 dark:border-slate-800";
@@ -42,7 +43,7 @@ export default function CompactTaskCard({ task, priorities, onToggleDone, onEdit
         onClick={(e) => { e.stopPropagation(); if (task.status !== "done") setOptimisticDone(true); onToggleDone(task); }}
         className={cn(
           "shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-all",
-          isDone ? "bg-slate-900 border-slate-900 text-white" : "border-slate-300 dark:border-slate-600 hover:border-slate-500 bg-white/80 dark:bg-slate-900/80"
+          isDone ? "bg-slate-900 border-slate-900 text-white dark:bg-slate-100 dark:border-slate-100 dark:text-slate-900" : "border-slate-300 dark:border-slate-600 hover:border-slate-500 bg-white/80 dark:bg-slate-900/80"
         )}
       >
         {isDone && <CheckSquare className="w-2.5 h-2.5" />}
@@ -51,7 +52,11 @@ export default function CompactTaskCard({ task, priorities, onToggleDone, onEdit
       {/* Title */}
       <span
         onClick={() => onEdit(task)}
-        className={cn("flex-1 text-xs font-medium text-slate-900 dark:text-slate-100 truncate cursor-pointer", isDone && "line-through text-slate-400 dark:text-slate-500")}
+        className={cn(
+          "flex-1 text-xs font-medium truncate cursor-pointer",
+          isDarkCard ? "text-white dark:text-slate-100" : "text-slate-900 dark:text-slate-100",
+          isDone && "line-through text-slate-400 dark:text-slate-500"
+        )}
       >
         {task.title}
       </span>
@@ -72,7 +77,7 @@ export default function CompactTaskCard({ task, priorities, onToggleDone, onEdit
             <button
               onClick={(e) => e.stopPropagation()}
               className={cn(
-                "text-[10px] leading-none px-1 py-0.5 rounded transition-colors",
+                "text-[10px] leading-none px-1 py-0.5 rounded transition-colors hover:bg-white/60 dark:hover:bg-slate-800/70",
                 task.due_date ? "text-slate-400 dark:text-slate-500" : "text-slate-300 dark:text-slate-600"
               )}
             >
@@ -90,7 +95,7 @@ export default function CompactTaskCard({ task, priorities, onToggleDone, onEdit
               showOutsideDays fixedWeeks
             />
             {task.due_date && (
-              <div className="p-2 border-t">
+              <div className="p-2 border-t border-slate-200 dark:border-slate-800">
                 <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => {
                   onUpdate && onUpdate(task, { due_date: "" });
                   setDateOpen(false);

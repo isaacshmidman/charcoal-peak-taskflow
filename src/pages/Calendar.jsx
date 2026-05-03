@@ -530,7 +530,7 @@ export default function Calendar() {
           <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} page="calendar" />
           <Button
             onClick={openNewTask}
-            className="bg-slate-900 hover:bg-slate-800 h-9 gap-1.5"
+            className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200 h-9 gap-1.5"
           >
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">New Task</span>
@@ -571,7 +571,7 @@ export default function Calendar() {
                 className={cn(
                   "px-2.5 py-1 text-xs font-medium rounded-md capitalize transition-colors",
                   view === v
-                    ? "bg-slate-900 text-white"
+                    ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
                     : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
                 )}
               >

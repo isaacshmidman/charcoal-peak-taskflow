@@ -168,13 +168,13 @@ export default function Login() {
                 </div>
               </label>
 
-              {loginError ? <p className="text-sm text-red-600">{loginError}</p> : null}
+              {loginError ? <p className="text-sm text-red-600 dark:text-red-300">{loginError}</p> : null}
 
               <button
                 type="submit"
                 data-testid="login-submit"
                 disabled={isLoadingAuth}
-                className="w-full h-12 rounded-2xl bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center"
+                className="w-full h-12 rounded-2xl bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 text-sm font-medium hover:bg-slate-800 dark:hover:bg-slate-200 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center"
               >
                 <span>{isLoadingAuth ? "Signing in..." : "Sign In"}</span>
                 {lastUsed === "email" ? <LastUsedBadge /> : null}
@@ -188,7 +188,7 @@ export default function Login() {
             </div>
           </>
         ) : (
-          loginError ? <p className="mt-6 text-sm text-red-600">{loginError}</p> : null
+          loginError ? <p className="mt-6 text-sm text-red-600 dark:text-red-300">{loginError}</p> : null
         )}
 
         <button

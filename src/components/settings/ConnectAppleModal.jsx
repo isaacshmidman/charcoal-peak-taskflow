@@ -81,7 +81,7 @@ export default function ConnectAppleModal({ open, onOpenChange }) {
                   href="https://appleid.apple.com/account/manage"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline inline-flex items-center gap-0.5"
+                  className="text-blue-600 dark:text-blue-300 hover:underline inline-flex items-center gap-0.5"
                 >
                   appleid.apple.com
                   <ExternalLink className="w-3 h-3" />
@@ -102,7 +102,7 @@ export default function ConnectAppleModal({ open, onOpenChange }) {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@icloud.com"
-              className="w-full rounded-md border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 text-sm focus:border-slate-400 focus:outline-none"
+              className="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950/40 px-2.5 py-1.5 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-slate-400 dark:focus:border-slate-500 focus:outline-none"
             />
           </div>
 
@@ -115,7 +115,7 @@ export default function ConnectAppleModal({ open, onOpenChange }) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="xxxx-xxxx-xxxx-xxxx"
-              className="w-full rounded-md border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 text-sm font-mono focus:border-slate-400 focus:outline-none"
+              className="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950/40 px-2.5 py-1.5 text-sm font-mono text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-slate-400 dark:focus:border-slate-500 focus:outline-none"
             />
             <p className="text-[11px] text-slate-400 dark:text-slate-500">
               Your password is encrypted at rest and only used for CalDAV calls to iCloud.
@@ -123,7 +123,7 @@ export default function ConnectAppleModal({ open, onOpenChange }) {
           </div>
 
           {errorMsg && (
-            <div className="flex items-start gap-1.5 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700">
+            <div className="flex items-start gap-1.5 rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/45 p-2 text-xs text-amber-700 dark:text-amber-300">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
               <span>{errorMsg}</span>
             </div>

@@ -252,9 +252,9 @@ export default function Groupings() {
 
   const columns = [
     { key: "past", title: "Past", subtitle: "Before yesterday", tasks: groups.past, accent: "border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/80" },
-    { key: "yest", title: "Yesterday", subtitle: format(yesterday, "MMM d"), tasks: groups.yest, accent: "border-orange-100 bg-orange-50/50" },
-    { key: "tod", title: "Today", subtitle: format(today, "MMM d"), tasks: groups.tod, accent: "border-blue-200 bg-blue-50/50", wide: true },
-    { key: "tom", title: "Tomorrow", subtitle: format(tomorrow, "MMM d"), tasks: groups.tom, accent: "border-orange-100 bg-orange-50/50" },
+    { key: "yest", title: "Yesterday", subtitle: format(yesterday, "MMM d"), tasks: groups.yest, accent: "border-orange-100 dark:border-orange-900/60 bg-orange-50/50 dark:bg-orange-950/25" },
+    { key: "tod", title: "Today", subtitle: format(today, "MMM d"), tasks: groups.tod, accent: "border-blue-200 dark:border-blue-900/60 bg-blue-50/50 dark:bg-blue-950/25", wide: true },
+    { key: "tom", title: "Tomorrow", subtitle: format(tomorrow, "MMM d"), tasks: groups.tom, accent: "border-orange-100 dark:border-orange-900/60 bg-orange-50/50 dark:bg-orange-950/25" },
     { key: "next7", title: "Next 7 Days", subtitle: `${format(addDays(tomorrow, 1), "MMM d")} – ${format(nextSevenDaysEnd, "MMM d")}`, tasks: groups.next7, accent: "border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/80" },
     { key: "future", title: "Future", subtitle: `After ${format(nextSevenDaysEnd, "MMM d")}`, tasks: groups.future, accent: "border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/80" },
     { key: "noDue", title: "No Due Date", tasks: groups.noDue, accent: "border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/60" },
@@ -286,7 +286,7 @@ export default function Groupings() {
             <Search className="w-4 h-4" />
           </Button>
           <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} page="groupings" />
-          <Button onClick={() => { setEditingTask(null); setAddSubtaskParent(null); setShowForm(true); }} className="bg-slate-900 hover:bg-slate-800 h-9 gap-1.5">
+          <Button onClick={() => { setEditingTask(null); setAddSubtaskParent(null); setShowForm(true); }} className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200 h-9 gap-1.5">
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">New Task</span>
           </Button>
@@ -333,7 +333,7 @@ export default function Groupings() {
                 onEdit={handleEdit}
                 onDelete={handleDelete}
                 onUpdate={handleUpdate}
-                accent="border-violet-100 bg-violet-50/40"
+                accent="border-violet-100 dark:border-violet-900/60 bg-violet-50/40 dark:bg-violet-950/25"
                 sorts={sorts}
               />
             ))}
