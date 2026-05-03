@@ -83,7 +83,7 @@ const NS = {
  * @param {{ origin: string, email: string, password: string }} ctx
  * @param {string} method
  * @param {string} pathOrUrl — absolute URL or path under origin
- * @param {{ headers?: Record<string, string>, body?: string }} [opts]
+ * @param {{ headers?: Record<string, string>, body?: string, allowStatuses?: number[] }} [opts]
  * @returns {Promise<{ status: number, headers: Headers, text: string, finalUrl: string }>}
  */
 async function caldavRequest(ctx, method, pathOrUrl, opts = {}) {
@@ -118,6 +118,9 @@ async function caldavRequest(ctx, method, pathOrUrl, opts = {}) {
       // @ts-expect-error
       err.statusCode = 401;
       throw err;
+    }
+    if (opts.allowStatuses?.includes(resp.status)) {
+      return { status: resp.status, headers: resp.headers, text, finalUrl: target };
     }
     if (!resp.ok && resp.status !== 207 /* multistatus */ && resp.status !== 204) {
       const err = new Error(`Apple CalDAV ${method} ${redactPath(target)} failed (${resp.status}): ${truncate(text)}`);
@@ -908,7 +911,7 @@ export async function putEvent(ctx, href, ics, etag) {
   const headers = { "Content-Type": "text/calendar; charset=utf-8" };
   if (etag) headers["If-Match"] = etag;
   else headers["If-None-Match"] = "*";
-  const resp = await caldavRequest(ctx, "PUT", href, { headers, body: ics });
+  const resp = await caldavRequest(ctx, "PUT", href, { headers, body: ics, allowStatuses: [412] });
   // 412 = our If-Match lost the race, or If-None-Match found an existing UID.
   // Fall back to unconditional PUT so the user's edit lands.
   if (resp.status === 412) {

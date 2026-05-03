@@ -108,6 +108,7 @@ export function createDatabase(config = backendConfig) {
       external_event_id TEXT NOT NULL,
       external_calendar_id TEXT NOT NULL,
       etag TEXT,
+      zephyrly_metadata_synced_at TEXT,
       last_synced_at TEXT NOT NULL,
       created_date TEXT NOT NULL,
       updated_date TEXT NOT NULL,
@@ -265,6 +266,11 @@ export function createDatabase(config = backendConfig) {
   } catch {
     // Column already exists — ignore
   }
+  try {
+    db.exec(`ALTER TABLE external_event_map ADD COLUMN zephyrly_metadata_synced_at TEXT`);
+  } catch {
+    // Column already exists — ignore
+  }
 
   // Backfill: for any (app_id, user_id) that has active integrations but no
   // current default, promote the oldest active one. Without this, users who
@@ -324,6 +330,30 @@ export function createDatabase(config = backendConfig) {
              AND ic.external_calendar_id = tasks.source_calendar_id
          )`
     ).run();
+    // Provider-origin tasks from writable calendars are kept on disconnect,
+    // but old versions left their source_* fields pointing at integration
+    // rows that no longer exist. Localize those stale tasks so they behave and
+    // render like normal Zephyrly tasks after boot.
+    db.prepare(
+      `UPDATE tasks
+       SET source_provider = '',
+           source_kind = '',
+           source_calendar_id = '',
+           source_calendar_name = '',
+           source_color_hex = '',
+           source_writable = 1,
+           source_recurrence_rule = '',
+           updated_date = ?
+       WHERE COALESCE(source_provider, '') != ''
+         AND COALESCE(source_kind, '') != 'event'
+         AND NOT EXISTS (
+           SELECT 1 FROM integration_calendars ic
+           JOIN calendar_integrations ci ON ci.id = ic.integration_id
+           WHERE ci.app_id = tasks.app_id
+             AND ci.provider = tasks.source_provider
+             AND ic.external_calendar_id = tasks.source_calendar_id
+         )`
+    ).run(new Date().toISOString());
     // Same idea for external_event_map rows pointing at integrations
     // that were already torn down — leftover map rows occasionally
     // cause push.js to retry against a no-longer-existing integration.
@@ -441,4 +471,3 @@ export function closeDatabase() {
   cachedDb.close();
   cachedDb = null;
 }
-

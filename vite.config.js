@@ -1,8 +1,9 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv } from "vite";
 import { backendConfig } from "./backend/config.js";
-import { closeDatabase } from "./backend/db.js";
+import { closeDatabase, getDatabase } from "./backend/db.js";
 import { createRequestHandler } from "./backend/server.js";
+import { startSyncLoop } from "./backend/sync.js";
 import { createViteConfig } from "./vite.shared.js";
 
 function createEmbeddedBackendPlugin({ appId }) {
@@ -11,15 +12,19 @@ function createEmbeddedBackendPlugin({ appId }) {
     apply: "serve",
     configureServer(server) {
       const configuredPort = Number(server.config.server.port || 5173);
-      const handler = createRequestHandler({
+      const embeddedConfig = {
         ...backendConfig,
         appId: appId || backendConfig.appId,
         host: "127.0.0.1",
         port: configuredPort,
         publicAppUrl: `http://127.0.0.1:${configuredPort}`,
-      });
+      };
+      const db = getDatabase(embeddedConfig);
+      const handler = createRequestHandler(embeddedConfig, db);
+      const syncHandle = startSyncLoop(db, embeddedConfig);
 
       server.httpServer?.once("close", () => {
+        syncHandle.stop();
         closeDatabase();
       });
 

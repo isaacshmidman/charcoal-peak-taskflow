@@ -22,8 +22,8 @@
  *
  * Safety:
  *   - We only push to integrations the task's owner has connected.
- *   - We push to ALL of that user's active Google integrations (for now
- *     that's always at most one; architecture allows multiple accounts).
+ *   - New local tasks push only to the user's default active Google/Apple
+ *     integration. Existing mapped tasks keep round-tripping where they live.
  *   - Errors are caught per-integration; one failing integration cannot
  *     break another, and never breaks the originating Task mutation.
  */
@@ -100,6 +100,31 @@ function isSuppressed(taskId) {
     return false;
   }
   return true;
+}
+
+export function getPushQueueState() {
+  return {
+    debounced: debounceTimers.size,
+    queued: pushQueue.length,
+    running: queueRunning,
+  };
+}
+
+export async function waitForPushIdle({ timeoutMs = 300_000, pollMs = 50 } = {}) {
+  const startedAt = Date.now();
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const state = getPushQueueState();
+    if (state.debounced === 0 && state.queued === 0 && !state.running) {
+      return;
+    }
+    if (Date.now() - startedAt >= timeoutMs) {
+      throw new Error(
+        `Timed out waiting for push queue to drain: debounced=${state.debounced}, queued=${state.queued}, running=${state.running}`
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, pollMs));
+  }
 }
 
 /**
@@ -303,6 +328,9 @@ async function pushOne(db, config, { op, integration, taskSnapshot }) {
     integration.primary_calendar_id ||
     "primary";
   const calendarId = targetCalendarId;
+  if (isCalendarSyncDisabled(db, integration.id, mapRow?.external_calendar_id || calendarId)) {
+    return;
+  }
   const tz = integration.primary_calendar_timezone || "UTC";
 
   // Delete path: task was hard/soft-deleted. Remove mapped event if present.
@@ -391,8 +419,13 @@ async function pushOne(db, config, { op, integration, taskSnapshot }) {
       db.prepare(`DELETE FROM external_event_map WHERE id = ?`).run(mapRow.id);
     } else {
       db.prepare(
-        `UPDATE external_event_map SET etag = ?, last_synced_at = ?, updated_date = ? WHERE id = ?`
-      ).run(result.etag || null, now, now, mapRow.id);
+        `UPDATE external_event_map
+         SET etag = ?,
+             zephyrly_metadata_synced_at = ?,
+             last_synced_at = ?,
+             updated_date = ?
+         WHERE id = ?`
+      ).run(result.etag || null, now, now, now, mapRow.id);
       markPushOk(db, integration.id);
       return;
     }
@@ -410,8 +443,9 @@ async function pushOne(db, config, { op, integration, taskSnapshot }) {
   db.prepare(
     `INSERT INTO external_event_map (
        id, app_id, integration_id, task_id, external_event_id,
-       external_calendar_id, etag, last_synced_at, created_date, updated_date
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       external_calendar_id, etag, zephyrly_metadata_synced_at,
+       last_synced_at, created_date, updated_date
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     `emap_${randomUUID()}`,
     integration.app_id,
@@ -420,6 +454,7 @@ async function pushOne(db, config, { op, integration, taskSnapshot }) {
     created.id,
     calendarId,
     created.etag || null,
+    now,
     now,
     now,
     now
@@ -450,6 +485,9 @@ async function pushOneApple(db, integration, taskSnapshot, op) {
 
   const targetCalendarId =
     taskSnapshot.source_calendar_id || integration.primary_calendar_id || "";
+  if (isCalendarSyncDisabled(db, integration.id, mapRow?.external_calendar_id || targetCalendarId)) {
+    return;
+  }
   if (!targetCalendarId && op === "upsert") {
     // Nothing to write to — silently no-op rather than hard-error. The user
     // probably hasn't enabled any calendar yet.
@@ -588,6 +626,19 @@ function buildAppleStartEnd(task, tz) {
   };
 }
 
+function isCalendarSyncDisabled(db, integrationId, externalCalendarId) {
+  if (!externalCalendarId) return false;
+  const row = /** @type {any} */ (
+    db
+      .prepare(
+        `SELECT sync_enabled FROM integration_calendars
+         WHERE integration_id = ? AND external_calendar_id = ?`
+      )
+      .get(integrationId, externalCalendarId)
+  );
+  return !!row && Number(row.sync_enabled) === 0;
+}
+
 function toLocalIcsDateTime(ymd, mins) {
   const [y, m, d] = ymd.split("-").map(Number);
   const h = Math.floor(mins / 60);
@@ -659,6 +710,16 @@ export function taskToEventBody(task, timeZone, colorId) {
   // mapping. Omit the field entirely when no priority/no mapping so the
   // event picks up the calendar's default color, not a hard-coded one.
   const colorField = colorId ? { colorId: String(colorId) } : {};
+  const zephyrlyMetadata = task.id
+    ? {
+        extendedProperties: {
+          private: {
+            zephyrlyTaskId: String(task.id),
+            zephyrlyAppId: String(task.app_id || ""),
+          },
+        },
+      }
+    : {};
 
   // All-day event — Google expects end.date to be exclusive (next day).
   if (!task.task_time) {
@@ -669,6 +730,7 @@ export function taskToEventBody(task, timeZone, colorId) {
       end: { date: addOneDay(task.due_date) },
       ...(recurrence ? { recurrence } : {}),
       ...colorField,
+      ...zephyrlyMetadata,
     };
   }
 
@@ -686,6 +748,7 @@ export function taskToEventBody(task, timeZone, colorId) {
     end: { dateTime: endDt, timeZone },
     ...(recurrence ? { recurrence } : {}),
     ...colorField,
+    ...zephyrlyMetadata,
   };
 }
 

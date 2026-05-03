@@ -170,7 +170,7 @@ Imported SQLite data lives in `backend/data/` and is ignored by git so your loca
 
 ## Calendar Integrations
 
-Zephyrly can sync events from Google Calendar and (in a later commit) Apple Calendar into your task list. One-way for now — provider events become tasks; changes from Zephyrly back to the provider land in a follow-up commit.
+Zephyrly can sync Google Calendar and iCloud Calendar with your task list. Provider events become Zephyrly tasks, and Zephyrly task edits push back to writable provider calendars.
 
 ### One-time setup
 
@@ -184,19 +184,22 @@ Zephyrly can sync events from Google Calendar and (in a later commit) Apple Cale
 
 2. **Create an OAuth 2.0 client for Google Calendar** in the Google Cloud Console:
    - Enable the "Google Calendar API" on the project
-   - On the OAuth consent screen, add the scope `.../auth/calendar.events` (marked "sensitive" — fine for testing, requires Google verification for public release)
+   - On the OAuth consent screen, add `.../auth/calendar.events`, `.../auth/calendar.calendars.readonly`, `.../auth/calendar.calendarlist.readonly`, `openid`, `email`, and `profile` (calendar scopes are marked "sensitive" — fine for testing, requires Google verification for public release)
    - Add yourself as a test user while unverified
    - Add the redirect URI: `http://127.0.0.1:8787/api/apps/taskflow-local/integrations/google/callback` (dev) and the equivalent production URL
    - Paste the client id / secret into `TASKFLOW_GOOGLE_CALENDAR_CLIENT_ID` / `TASKFLOW_GOOGLE_CALENDAR_CLIENT_SECRET` (or reuse your login credentials — same vars with `TASKFLOW_GOOGLE_` prefix also work)
 
-3. Restart the backend. The Settings page's "Calendar Integrations" panel now shows a working Connect button.
+3. **For Apple Calendar**, create an app-specific password at appleid.apple.com. Users enter their Apple ID and that app-specific password in Settings; the backend encrypts it with `INTEGRATIONS_ENCRYPTION_KEY`.
+
+4. Restart the backend. The Settings page's "Calendar Integrations" panel now shows Google and iCloud connect buttons.
 
 ### How sync works
 
-- Polling every 5 min (configurable via `TASKFLOW_SYNC_INTERVAL_MS`).
-- Uses Google's incremental `syncToken` so each tick only fetches changes since the last run.
+- Polling every 1 min by default (configurable via `TASKFLOW_SYNC_INTERVAL_MS`).
+- Uses Google incremental `syncToken` and Apple CalDAV `sync-token` so each tick only fetches changes since the last run.
 - Tokens encrypted with AES-256-GCM using the master key above, with the row's id as AAD (so blobs can't be swapped between rows).
-- Disconnecting revokes the token at Google and deletes the row — imported tasks stay.
+- Disabling a provider calendar removes imported read-only event clutter from Zephyrly, pauses inbound/outbound writes for that calendar, clears its cursor, and preserves non-event mappings so re-enabling does not create duplicate provider events.
+- Disconnecting revokes the Google token when possible, removes imported calendar events from Zephyrly, and keeps Zephyrly-native tasks.
 
 ### Security posture
 

@@ -5,9 +5,11 @@
  * Scopes requested:
  *   - https://www.googleapis.com/auth/calendar.events
  *       Read/write events on calendars the user owns or has been given
- *       access to. We do NOT request `calendar` (calendar list management)
- *       or `calendar.readonly`/`calendar.events.readonly`, because we need
- *       bidirectional sync and the smallest scope that covers it.
+ *       access to. We do NOT request `calendar` (calendar list management).
+ *   - https://www.googleapis.com/auth/calendar.calendars.readonly
+ *   - https://www.googleapis.com/auth/calendar.calendarlist.readonly
+ *       Read calendar metadata/list rows so the user can choose which
+ *       calendars to sync without granting full calendar management.
  *   - openid email profile
  *       So we can identify which Google account was connected and show it
  *       to the user in Settings.
@@ -118,9 +120,12 @@ export async function exchangeCode(config, { code, codeVerifier }) {
   if (!data.access_token) throw new Error("Google token response missing access_token");
 
   const scope = String(data.scope || "");
-  if (!scope.includes(CALENDAR_SCOPE)) {
+  const grantedScopes = new Set(scope.split(/\s+/).filter(Boolean));
+  const requiredScopes = [CALENDAR_SCOPE, CALENDAR_META_SCOPE, CALENDAR_LIST_SCOPE];
+  const missingScopes = requiredScopes.filter((required) => !grantedScopes.has(required));
+  if (missingScopes.length) {
     throw new Error(
-      "User did not grant calendar.events scope — cannot sync. Ask the user to retry and accept all requested permissions."
+      "User did not grant all required Google Calendar scopes — cannot sync. Ask the user to retry and accept all requested permissions."
     );
   }
 
@@ -383,6 +388,33 @@ export async function setCalendarColor(accessToken, calendarId, hex) {
     err.statusCode = resp.status;
     throw err;
   }
+}
+
+/**
+ * Fetch a single event so callers can merge nested fields before patching.
+ *
+ * @param {string} accessToken
+ * @param {string} calendarId
+ * @param {string} eventId
+ * @returns {Promise<any & { status: number }>}
+ */
+export async function getEvent(accessToken, calendarId, eventId) {
+  const url = `${EVENTS_URL(calendarId)}/${encodeURIComponent(eventId)}`;
+  const resp = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (resp.status === 404 || resp.status === 410) {
+    return { id: eventId, etag: "", status: resp.status };
+  }
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => "");
+    const err = new Error(`Google event fetch failed (${resp.status}): ${redact(body)}`);
+    // @ts-expect-error
+    err.statusCode = resp.status;
+    throw err;
+  }
+  const data = await resp.json();
+  return { ...data, status: resp.status };
 }
 
 /**

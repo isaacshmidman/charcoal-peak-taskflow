@@ -40,7 +40,7 @@
 
 import { getDatabase } from "../db.js";
 import { backendConfig } from "../config.js";
-import { enqueueTaskPush } from "../push.js";
+import { enqueueTaskPush, waitForPushIdle } from "../push.js";
 
 async function main() {
   if (!backendConfig.integrationsEnabled) {
@@ -106,14 +106,13 @@ async function main() {
     process.exit(0);
   }
 
-  // push.js debounces upserts by 350ms then drains at ~4 pushes/sec across all
-  // integrations. Wait long enough for the queue to flush, with a generous
-  // floor for network latency.
-  const drainSeconds = Math.max(10, Math.ceil(totalEnqueued / 4) + 4);
+  // push.js debounces upserts and drains at a fixed rate. Wait for the queue
+  // to report idle instead of sleeping for a guessed duration.
+  const timeoutSeconds = Math.max(60, Math.ceil(totalEnqueued / 4) + 30);
   console.log(
-    `[backfill] enqueued ${totalEnqueued} pushes — waiting ${drainSeconds}s for queue to drain…`
+    `[backfill] enqueued ${totalEnqueued} pushes; waiting for queue to drain (timeout ${timeoutSeconds}s).`
   );
-  await new Promise((r) => setTimeout(r, drainSeconds * 1000));
+  await waitForPushIdle({ timeoutMs: timeoutSeconds * 1000 });
   console.log("[backfill] Done. Restart the dev server.");
   process.exit(0);
 }

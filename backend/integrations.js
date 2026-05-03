@@ -153,6 +153,13 @@ export function setPrimaryCalendar(db, { appId, userId, integrationId, externalC
       .get(integrationId, externalCalendarId)
   );
   if (!cal) throw new HttpError(404, "Calendar not found on this integration.", "not_found");
+  if (!isWritableCalendar(cal)) {
+    throw new HttpError(
+      400,
+      "Primary calendar must be writable.",
+      "calendar_not_writable"
+    );
+  }
 
   const now = new Date().toISOString();
   db.exec("BEGIN");
@@ -618,9 +625,9 @@ export function getAppleCredentials(db, integrationRow) {
 }
 
 /**
- * Disconnect an integration. Revokes the token at Google (best effort),
- * then deletes the row + its event map entries. The associated tasks are
- * NOT deleted — the user keeps whatever got imported.
+ * Disconnect an integration. Revokes the token at Google (best effort), drops
+ * imported read-only events from Zephyrly, localizes kept provider-origin tasks,
+ * then deletes the row + event maps. Zephyrly-native tasks stay untouched.
  */
 export async function disconnectIntegration(db, { appId, userId, id }) {
   const row = getIntegrationForUser(db, { appId, userId, id });
@@ -640,45 +647,71 @@ export async function disconnectIntegration(db, { appId, userId, id }) {
     }
   }
 
-  // Cleanup mirror of setEnabledCalendars's per-calendar disable, but at
-  // the integration level: drop the imported events that came from any
-  // of this integration's calendars, then drop event_map / calendar /
-  // integration rows. Without this the imported events lingered as
-  // orphans after disconnect, still cluttering the Calendar nav and the
-  // Settings → Calendar Order section.
-  //
-  // Zephyrly-native tasks that had been pushed outbound to this
-  // integration's calendars survive — only the link (event_map) is cut.
-  db.prepare(
-    `DELETE FROM tasks
-     WHERE app_id = ?
-       AND source_provider = ?
-       AND source_kind = 'event'
-       AND source_calendar_id IN (
-         SELECT external_calendar_id FROM integration_calendars WHERE integration_id = ?
-       )`
-  ).run(appId, row.provider, row.id);
-  db.prepare(`DELETE FROM external_event_map WHERE integration_id = ?`).run(row.id);
-  db.prepare(`DELETE FROM integration_calendars WHERE integration_id = ?`).run(row.id);
-  db.prepare(`DELETE FROM calendar_integrations WHERE id = ?`).run(row.id);
+  const now = new Date().toISOString();
+  db.exec("BEGIN");
+  try {
+    // Cleanup mirror of setEnabledCalendars's per-calendar disable, but at
+    // the integration level: drop imported read-only events that came from
+    // this integration's calendars. Without this they linger as orphans after
+    // disconnect, still cluttering the Calendar nav and Settings.
+    db.prepare(
+      `DELETE FROM tasks
+       WHERE app_id = ?
+         AND source_provider = ?
+         AND source_kind = 'event'
+         AND source_calendar_id IN (
+           SELECT external_calendar_id FROM integration_calendars WHERE integration_id = ?
+         )`
+    ).run(appId, row.provider, row.id);
 
-  // If we just removed the default, promote the oldest remaining active integration
-  // so the user is never left without one.
-  if (row.is_default) {
-    const next = /** @type {any} */ (
-      db
-        .prepare(
-          `SELECT id FROM calendar_integrations
-           WHERE app_id = ? AND user_id = ? AND status = 'active'
-           ORDER BY created_date ASC LIMIT 1`
-        )
-        .get(appId, userId)
-    );
-    if (next) {
-      db.prepare(
-        `UPDATE calendar_integrations SET is_default = 1, updated_date = ? WHERE id = ?`
-      ).run(new Date().toISOString(), next.id);
+    // Writable provider-origin tasks are real user tasks. Keep them, but strip
+    // provider provenance before deleting the integration rows so the UI no
+    // longer renders ghost calendar names/colors and future pushes treat them
+    // as ordinary Zephyrly tasks.
+    db.prepare(
+      `UPDATE tasks
+       SET source_provider = '',
+           source_kind = '',
+           source_calendar_id = '',
+           source_calendar_name = '',
+           source_color_hex = '',
+           source_writable = 1,
+           source_recurrence_rule = '',
+           updated_date = ?
+       WHERE app_id = ?
+         AND source_provider = ?
+         AND COALESCE(source_kind, '') != 'event'
+         AND source_calendar_id IN (
+           SELECT external_calendar_id FROM integration_calendars WHERE integration_id = ?
+         )`
+    ).run(now, appId, row.provider, row.id);
+
+    db.prepare(`DELETE FROM external_event_map WHERE integration_id = ?`).run(row.id);
+    db.prepare(`DELETE FROM integration_calendars WHERE integration_id = ?`).run(row.id);
+    db.prepare(`DELETE FROM calendar_integrations WHERE id = ?`).run(row.id);
+
+    // If we just removed the default, promote the oldest remaining active integration
+    // so the user is never left without one.
+    if (row.is_default) {
+      const next = /** @type {any} */ (
+        db
+          .prepare(
+            `SELECT id FROM calendar_integrations
+             WHERE app_id = ? AND user_id = ? AND status = 'active'
+             ORDER BY created_date ASC LIMIT 1`
+          )
+          .get(appId, userId)
+      );
+      if (next) {
+        db.prepare(
+          `UPDATE calendar_integrations SET is_default = 1, updated_date = ? WHERE id = ?`
+        ).run(now, next.id);
+      }
     }
+    db.exec("COMMIT");
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
   }
 }
 
@@ -880,8 +913,12 @@ export function serializeIntegrationCalendar(row) {
     sync_enabled: !!row.sync_enabled,
     last_synced_at: row.last_synced_at,
     last_error: row.last_error,
-    writable: row.access_role === "owner" || row.access_role === "writer",
+    writable: isWritableCalendar(row),
   };
+}
+
+function isWritableCalendar(row) {
+  return row?.access_role === "owner" || row?.access_role === "writer";
 }
 
 /**
@@ -889,8 +926,8 @@ export function serializeIntegrationCalendar(row) {
  * payload is `{ [external_calendar_id]: boolean }` so the UI can submit
  * the whole list at once.
  *
- * Disabling a calendar is treated as a HARD CLEANUP, not just a flag
- * flip — the previous "just turn the flag off" semantics caused three
+ * Disabling a calendar is treated as a local cleanup + sync stop, not just
+ * a flag flip — the previous "just turn the flag off" semantics caused two
  * user-visible bugs:
  *
  *   1. Imported events (source_kind='event') from the now-disabled
@@ -898,14 +935,7 @@ export function serializeIntegrationCalendar(row) {
  *      showing up in the Calendar nav and the Calendar Order section
  *      of Settings even though the user had explicitly hidden the
  *      source.
- *   2. external_event_map rows for that calendar still referenced
- *      Google/Apple events that were no longer being polled. Any
- *      local edit to a Zephyrly-native task that had been pushed to
- *      that calendar would trigger an outbound push (because the map
- *      row still existed), which the provider sometimes rejected,
- *      producing a sync flap that made tasks appear/disappear in the
- *      UI as React Query invalidated and re-fetched.
- *   3. Re-enabling later didn't pull a fresh import because the per-
+ *   2. Re-enabling later didn't pull a fresh import because the per-
  *      calendar sync_token was still cached, so Google reported "no
  *      changes since last token" — but everything from before was
  *      already gone, leading to an empty calendar.
@@ -914,9 +944,11 @@ export function serializeIntegrationCalendar(row) {
  *   - DELETE imported events (tasks where source_calendar_id matches
  *     and source_kind='event'). These were never user-authored, so
  *     it's safe to drop them entirely.
- *   - DELETE external_event_map rows for the calendar so push.js
- *     stops trying to update events on the provider. Tasks the user
- *     created in Zephyrly survive — only the link is severed.
+ *   - DELETE only the event_map rows for those deleted imported events.
+ *     Keep mappings for Zephyrly-native tasks and writable provider tasks:
+ *     push.js checks sync_enabled before writing, so disabled calendars stay
+ *     quiet, while the preserved map lets a later re-enable resume without
+ *     creating duplicate provider events.
  *   - CLEAR sync_token so a future re-enable starts with a full
  *     initial import instead of an empty incremental delta.
  *
@@ -951,9 +983,17 @@ export function setEnabledCalendars(db, integrationId, updates) {
        AND source_calendar_id = ?
        AND source_kind = 'event'`
   );
-  const deleteMapsStmt = db.prepare(
+  const deleteImportedEventMapsStmt = db.prepare(
     `DELETE FROM external_event_map
-     WHERE integration_id = ? AND external_calendar_id = ?`
+     WHERE integration_id = ?
+       AND external_calendar_id = ?
+       AND task_id IN (
+         SELECT id FROM tasks
+         WHERE app_id = ?
+           AND source_provider = ?
+           AND source_calendar_id = ?
+           AND source_kind = 'event'
+       )`
   );
 
   db.exec("BEGIN");
@@ -962,8 +1002,14 @@ export function setEnabledCalendars(db, integrationId, updates) {
       if (enabled) {
         enableStmt.run(now, integrationId, extId);
       } else {
+        deleteImportedEventMapsStmt.run(
+          integrationId,
+          extId,
+          integration.app_id,
+          integration.provider,
+          extId
+        );
         deleteImportedTasksStmt.run(integration.app_id, integration.provider, extId);
-        deleteMapsStmt.run(integrationId, extId);
         disableStmt.run(now, integrationId, extId);
       }
     }

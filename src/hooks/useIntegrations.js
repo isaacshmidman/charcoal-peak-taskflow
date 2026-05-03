@@ -24,7 +24,11 @@ export function useIntegrations() {
 
   const disconnectMutation = useMutation({
     mutationFn: (/** @type {string} */ id) => apiClient.integrations.disconnect(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
+    onSuccess: (_data, id) => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.removeQueries({ queryKey: ["integration-calendars", id] });
+    },
   });
 
   const connectAppleMutation = useMutation({

@@ -177,7 +177,7 @@ export default function IntegrationsPanel() {
   };
 
   const handleDisconnect = async (id) => {
-    if (!window.confirm("Disconnect this calendar? Imported events will remain as tasks.")) return;
+    if (!window.confirm("Disconnect this calendar? Imported calendar events will be removed from Zephyrly. Zephyrly tasks will remain.")) return;
     setPendingDisconnectId(id);
     try {
       await disconnect(id);
@@ -191,8 +191,8 @@ export default function IntegrationsPanel() {
       <div>
         <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Calendar Integrations</h2>
         <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
-          Sync your tasks with Google Calendar or Apple Calendar. Connecting opens the provider's
-          login — your password is never sent to Zephyrly.
+          Sync your tasks with Google Calendar or iCloud Calendar. Google uses OAuth; iCloud uses
+          an app-specific password encrypted on the backend.
         </p>
       </div>
       {integrationError && (

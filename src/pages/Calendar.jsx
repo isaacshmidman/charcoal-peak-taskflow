@@ -149,6 +149,19 @@ export default function Calendar() {
     queryFn: () => apiClient.entities.Priority.list("order", 50),
   });
 
+  const subtaskMap = useMemo(() => {
+    const map = {};
+    for (const task of tasks) {
+      if (!task.parent_id) continue;
+      if (!map[task.parent_id]) map[task.parent_id] = [];
+      map[task.parent_id].push(task);
+    }
+    Object.values(map).forEach((items) => {
+      items.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+    });
+    return map;
+  }, [tasks]);
+
   const priorityOrderMap = useMemo(() => {
     const map = {};
     priorities.forEach((p) => { map[p.id] = p.order; });
@@ -677,12 +690,34 @@ export default function Calendar() {
         task={editingTask}
         defaultDueDate={formDefaultDueDate}
         defaultTaskTime={formDefaultTimeStart}
+        existingSubtasks={editingTask ? (subtaskMap[editingTask.id] || []) : []}
+        onToggleSubtask={handleToggleDone}
+        onDeleteSubtask={(sub) => deleteWithUndo(sub, { isSubtask: true })}
         onDelete={handleDelete}
-        onSubmit={async (data) => {
+        onSubmit={async (data, subtaskTitles = []) => {
           if (editingTask) {
             await updateTask(editingTask.id, data);
+            const existingSubCount = (subtaskMap[editingTask.id] || []).length;
+            for (let i = 0; i < subtaskTitles.length; i++) {
+              await createTask({
+                title: subtaskTitles[i],
+                status: "todo",
+                task_type: "one_time",
+                parent_id: editingTask.id,
+                order: existingSubCount + i,
+              });
+            }
           } else {
-            await createTask(data);
+            const created = await createTask(data);
+            for (let i = 0; i < subtaskTitles.length; i++) {
+              await createTask({
+                title: subtaskTitles[i],
+                status: "todo",
+                task_type: "one_time",
+                parent_id: created.id,
+                order: i,
+              });
+            }
           }
         }}
       />

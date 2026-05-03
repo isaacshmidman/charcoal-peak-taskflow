@@ -12,6 +12,7 @@ export const APP_STORAGE_KEYS = {
 };
 
 const TOKEN_FALLBACK_STORAGE_KEYS = ["token"];
+const CLEAR_TOKEN_STORAGE_KEY = "__taskflow_clear_token__";
 
 function getStorageValue(key) {
   if (!storage?.getItem) return null;
@@ -109,8 +110,15 @@ function getWindowUrl() {
 }
 
 function getAppConfig() {
-  if (readConfigValue({ paramNames: ["clear_access_token", "clear_token"], storageKey: "__taskflow_clear_token__" }) === "true") {
+  if (
+    readConfigValue({
+      paramNames: ["clear_access_token", "clear_token"],
+      storageKey: CLEAR_TOKEN_STORAGE_KEY,
+      removeFromUrl: true,
+    }) === "true"
+  ) {
     clearStoredToken();
+    removeStorageValue(CLEAR_TOKEN_STORAGE_KEY);
   }
 
   return {

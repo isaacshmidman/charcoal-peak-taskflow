@@ -10,6 +10,8 @@ export default mergeConfig(
       globals: true,
       setupFiles: ["./src/test/setup.js"],
       css: false,
+      pool: "threads",
+      maxWorkers: 2,
       include: ["src/**/*.{test,spec}.{js,jsx,ts,tsx}", "backend/**/*.{test,spec}.js"],
       exclude: ["e2e/**", "playwright.config.ts"],
       coverage: {

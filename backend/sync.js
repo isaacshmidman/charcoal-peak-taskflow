@@ -46,6 +46,7 @@ import {
 import { buildUserForSync } from "./sync-user.js";
 import { createEntityRecord, updateEntityRecord, deleteEntityRecord } from "./store.js";
 import { suppressPush } from "./push.js";
+import { backfillGoogleEventMetadata } from "./google-metadata-backfill.js";
 import { formatInTimeZone } from "date-fns-tz";
 
 // Ensure we don't run two sync cycles for the same integration simultaneously.
@@ -53,6 +54,8 @@ const inFlight = new Set();
 
 /** @type {NodeJS.Timeout | null} */
 let intervalHandle = null;
+/** @type {NodeJS.Timeout | null} */
+let initialTimeoutHandle = null;
 
 /**
  * Start the background poller.
@@ -68,11 +71,13 @@ export function startSyncLoop(db, config) {
 
   // Run once at boot (delayed) so the server starts listening immediately.
   const initialDelay = Math.min(30_000, config.syncIntervalMs);
-  setTimeout(() => {
+  initialTimeoutHandle = setTimeout(() => {
+    initialTimeoutHandle = null;
     runAllDueSyncs(db, config).catch((err) => {
       console.warn("[sync] initial tick failed:", err.message);
     });
   }, initialDelay);
+  initialTimeoutHandle.unref?.();
 
   intervalHandle = setInterval(() => {
     runAllDueSyncs(db, config).catch((err) => {
@@ -86,6 +91,10 @@ export function startSyncLoop(db, config) {
 }
 
 export function stopSyncLoop() {
+  if (initialTimeoutHandle) {
+    clearTimeout(initialTimeoutHandle);
+    initialTimeoutHandle = null;
+  }
   if (intervalHandle) {
     clearInterval(intervalHandle);
     intervalHandle = null;
@@ -164,6 +173,22 @@ export async function syncIntegration(db, config, integrationRow) {
   } catch (err) {
     markSyncResult(db, integrationRow.id, { error: err.message });
     throw err;
+  }
+
+  try {
+    const backfill = await backfillGoogleEventMetadata(db, {
+      integration: integrationRow,
+      accessToken,
+    });
+    if (backfill.errors) {
+      console.warn(
+        `[sync] Google metadata backfill for integration ${integrationRow.id}: ${backfill.lastError}`
+      );
+    }
+  } catch (err) {
+    console.warn(
+      `[sync] Google metadata backfill for integration ${integrationRow.id} failed: ${err.message}`
+    );
   }
 
   for (const cal of calendars) {
@@ -301,6 +326,32 @@ async function applyEventToTasks(db, config, { integration, user, calendarRow, e
     db.prepare(
       `UPDATE external_event_map SET etag = ?, last_synced_at = ?, updated_date = ? WHERE id = ?`
     ).run(event.etag || null, now, now, existing.id);
+    return;
+  }
+
+  const linkedTask = findZephyrlyTaskForProviderEvent(db, {
+    integration,
+    user,
+    taskId: googleZephyrlyTaskId(event, integration.app_id),
+  });
+  if (linkedTask) {
+    suppressPush(linkedTask.id);
+    updateEntityRecord(db, {
+      entityName: "Task",
+      appId: integration.app_id,
+      user,
+      id: linkedTask.id,
+      input: mappedInputForExistingZephyrlyTask(mapped, linkedTask),
+    });
+    insertExternalEventMap(db, {
+      appId: integration.app_id,
+      integrationId: integration.id,
+      taskId: linkedTask.id,
+      externalEventId: event.id,
+      externalCalendarId: calendarRow.external_calendar_id,
+      etag: event.etag || null,
+      now,
+    });
     return;
   }
 
@@ -726,6 +777,32 @@ async function applyAppleChangeToTasks(db, config, { integration, user, calendar
     return;
   }
 
+  const linkedTask = findZephyrlyTaskForProviderEvent(db, {
+    integration,
+    user,
+    taskId: appleZephyrlyTaskId(ev.uid),
+  });
+  if (linkedTask) {
+    suppressPush(linkedTask.id);
+    updateEntityRecord(db, {
+      entityName: "Task",
+      appId: integration.app_id,
+      user,
+      id: linkedTask.id,
+      input: mappedInputForExistingZephyrlyTask(mapped, linkedTask),
+    });
+    insertExternalEventMap(db, {
+      appId: integration.app_id,
+      integrationId: integration.id,
+      taskId: linkedTask.id,
+      externalEventId: change.href,
+      externalCalendarId: calendarRow.external_calendar_id,
+      etag: change.etag || null,
+      now,
+    });
+    return;
+  }
+
   const task = createEntityRecord(db, {
     entityName: "Task",
     appId: integration.app_id,
@@ -756,3 +833,77 @@ async function applyAppleChangeToTasks(db, config, { integration, user, calendar
   );
 }
 
+function googleZephyrlyTaskId(event, appId) {
+  const props = event?.extendedProperties?.private || {};
+  const eventAppId = String(props.zephyrlyAppId || "");
+  if (eventAppId && eventAppId !== appId) return "";
+  return String(props.zephyrlyTaskId || "");
+}
+
+function appleZephyrlyTaskId(uid) {
+  const match = /^zephyrly-(.+)@zephyrly$/i.exec(String(uid || ""));
+  return match?.[1] || "";
+}
+
+function findZephyrlyTaskForProviderEvent(db, { integration, user, taskId }) {
+  if (!taskId) return null;
+  return /** @type {any} */ (
+    db
+      .prepare(
+        `SELECT * FROM tasks
+         WHERE id = ?
+           AND app_id = ?
+           AND (
+             (created_by_id = ? AND created_by_id != '')
+             OR LOWER(created_by) = ?
+           )`
+      )
+      .get(taskId, integration.app_id, user.id || "", String(user.email || "").toLowerCase())
+  );
+}
+
+function mappedInputForExistingZephyrlyTask(mapped, task) {
+  const input = { ...mapped };
+  if (!task.source_provider) {
+    delete input.source_provider;
+    delete input.source_kind;
+    delete input.source_calendar_id;
+    delete input.source_calendar_name;
+    delete input.source_color_hex;
+    delete input.source_writable;
+    delete input.source_recurrence_rule;
+  }
+  return input;
+}
+
+function insertExternalEventMap(db, {
+  appId,
+  integrationId,
+  taskId,
+  externalEventId,
+  externalCalendarId,
+  etag,
+  now,
+}) {
+  db.prepare(`DELETE FROM external_event_map WHERE integration_id = ? AND task_id = ?`).run(
+    integrationId,
+    taskId
+  );
+  db.prepare(
+    `INSERT INTO external_event_map (
+       id, app_id, integration_id, task_id, external_event_id,
+       external_calendar_id, etag, last_synced_at, created_date, updated_date
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    `emap_${randomUUID()}`,
+    appId,
+    integrationId,
+    taskId,
+    externalEventId,
+    externalCalendarId,
+    etag || null,
+    now,
+    now,
+    now
+  );
+}
