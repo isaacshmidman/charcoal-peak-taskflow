@@ -474,7 +474,7 @@ export default function Calendar() {
   return (
     <div className="space-y-4">
       {/* Top row: title + count + centered empty-state link + actions */}
-      <div className="flex items-center justify-between gap-6">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div className="flex-1 min-w-0">
           <h1 className="text-base font-semibold text-slate-900 dark:text-slate-100">Calendar</h1>
           <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
@@ -482,7 +482,7 @@ export default function Calendar() {
           </p>
         </div>
         {!integrationsConnected && (
-          <div className="hidden lg:flex items-center shrink-0">
+          <div className={cn("hidden items-center shrink-0", showSearch ? "2xl:flex" : "lg:flex")}>
             <span className="inline-flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500 leading-none whitespace-nowrap">
               Connect Calendars in
               <Button
@@ -536,6 +536,27 @@ export default function Calendar() {
             <span className="hidden sm:inline">New Task</span>
           </Button>
         </div>
+        {!integrationsConnected && !showSearch && (
+          <div className="basis-full min-w-0 lg:hidden">
+            <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs leading-5 text-slate-400 dark:text-slate-500">
+              Connect Calendars in
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() =>
+                  navigate("/Settings", {
+                    state: { scrollTo: "bottom" },
+                  })
+                }
+                className="h-7 px-2 gap-1 text-xs font-medium text-slate-900 dark:text-slate-100 hover:bg-slate-100 dark:hover:bg-[#222222]"
+              >
+                <SettingsIcon className="w-3.5 h-3.5" />
+                Settings
+              </Button>
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Second row: range label + tz / view switcher + nav arrows */}

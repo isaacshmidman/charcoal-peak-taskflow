@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { isSameDay } from "date-fns";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import MiniMiniTaskCard from "./MiniMiniTaskCard";
 import { parseTaskTime, compareTaskTime } from "@/lib/sort-helpers";
@@ -11,7 +12,11 @@ import { toDateStr } from "./MonthCalendar";
 const HOUR_HEIGHT = 48; // px per hour slot
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const ALLDAY_WIDTH_KEY = "calendar_day_allday_width";
+const ALLDAY_COLLAPSE_KEY = "calendar_day_allday_collapsed";
 const MIN_ALLDAY_W = 96;
+const ALLDAY_ROW_HEIGHT = 26;
+const ALLDAY_MORE_HEIGHT = 24;
+const COLLAPSED_ALLDAY_VISIBLE = 2;
 const getMaxAllDayW = () => {
   if (typeof window === "undefined") return 480;
   return Math.max(MIN_ALLDAY_W, Math.floor(window.innerWidth * 0.5));
@@ -23,6 +28,28 @@ const formatHour = (h) => {
   if (h < 12) return `${h} AM`;
   return `${h - 12} PM`;
 };
+
+function useMediaQuery(query) {
+  const [matches, setMatches] = useState(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return false;
+    return window.matchMedia(query).matches;
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return undefined;
+    const mql = window.matchMedia(query);
+    const onChange = () => setMatches(mql.matches);
+    onChange();
+    if (mql.addEventListener) mql.addEventListener("change", onChange);
+    else mql.addListener(onChange);
+    return () => {
+      if (mql.removeEventListener) mql.removeEventListener("change", onChange);
+      else mql.removeListener(onChange);
+    };
+  }, [query]);
+
+  return matches;
+}
 
 function TimedDropZone({ dateStr, children }) {
   const { setNodeRef, isOver } = useDroppable({
@@ -36,6 +63,101 @@ function TimedDropZone({ dateStr, children }) {
       style={{ height: HOURS.length * HOUR_HEIGHT }}
     >
       {children}
+    </div>
+  );
+}
+
+function AllDayOverlayCell({ dateStr, allDayTasks, priorities, onTaskClick, onToggleDone, collapsed, onExpand }) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `allday-${dateStr}`,
+    data: { kind: "allday", dateStr },
+  });
+  const visibleLimit = collapsed ? COLLAPSED_ALLDAY_VISIBLE : allDayTasks.length;
+  const visible = allDayTasks.slice(0, visibleLimit);
+  const hiddenCount = Math.max(0, allDayTasks.length - visible.length);
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "flex-1 min-w-0 border-l border-slate-100 dark:border-[#303030] p-1 space-y-0.5",
+        collapsed && "overflow-hidden",
+        isOver && "bg-blue-50 dark:bg-[#101f34]"
+      )}
+    >
+      {visible.map((task) => (
+        <MiniMiniTaskCard
+          key={task.id}
+          task={task}
+          priorities={priorities}
+          onClick={onTaskClick}
+          onToggleDone={onToggleDone}
+        />
+      ))}
+      {collapsed && hiddenCount > 0 && (
+        <button
+          type="button"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onExpand?.();
+          }}
+          className="h-5 w-full rounded border border-slate-200 dark:border-[#343434] bg-slate-50 dark:bg-[#161616] px-1.5 text-left text-[10px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222222] transition-colors"
+          title={`Show ${hiddenCount} more all-day task${hiddenCount === 1 ? "" : "s"}`}
+        >
+          {hiddenCount} more
+        </button>
+      )}
+    </div>
+  );
+}
+
+function MobileAllDayOverlay({
+  dateStr,
+  allDayTasks,
+  priorities,
+  onTaskClick,
+  onToggleDone,
+  collapsed,
+  onToggleCollapsed,
+  onExpand,
+}) {
+  const visibleCount = collapsed
+    ? Math.min(COLLAPSED_ALLDAY_VISIBLE, allDayTasks.length)
+    : allDayTasks.length;
+  const hasMore = collapsed && allDayTasks.length > COLLAPSED_ALLDAY_VISIBLE;
+  const height =
+    Math.max(1, visibleCount) * ALLDAY_ROW_HEIGHT +
+    (hasMore ? ALLDAY_MORE_HEIGHT : 0) +
+    8;
+
+  return (
+    <div className="sticky top-0 z-30 bg-white dark:bg-[#0c0c0c] border-b border-slate-100 dark:border-[#303030]">
+      <div className="flex" style={{ height }}>
+        <div className="w-12 shrink-0 border-r border-slate-100 dark:border-[#303030] bg-white dark:bg-[#0c0c0c] flex items-start justify-center pt-1">
+          <button
+            type="button"
+            onClick={onToggleCollapsed}
+            className="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
+            aria-label={collapsed ? "Expand all-day" : "Collapse all-day"}
+          >
+            {collapsed ? (
+              <ChevronRight className="w-4 h-4" />
+            ) : (
+              <ChevronDown className="w-4 h-4" />
+            )}
+          </button>
+        </div>
+        <AllDayOverlayCell
+          dateStr={dateStr}
+          allDayTasks={allDayTasks}
+          priorities={priorities}
+          onTaskClick={onTaskClick}
+          onToggleDone={onToggleDone}
+          collapsed={collapsed}
+          onExpand={onExpand}
+        />
+      </div>
     </div>
   );
 }
@@ -97,6 +219,7 @@ export default function DayView({
 }) {
   const timedScrollRef = useRef(null);
   const dateStr = toDateStr(anchorDate);
+  const useSideAllDay = useMediaQuery("(min-width: 640px)");
 
   const [allDayWidth, setAllDayWidth] = useState(() => {
     try {
@@ -108,6 +231,16 @@ export default function DayView({
     }
     return 192;
   });
+  const [allDayCollapsed, setAllDayCollapsed] = useState(() => {
+    try {
+      const stored = localStorage.getItem(ALLDAY_COLLAPSE_KEY);
+      if (stored === "1") return true;
+      if (stored === "0") return false;
+      return true;
+    } catch {
+      return true;
+    }
+  });
 
   useEffect(() => {
     try {
@@ -116,6 +249,14 @@ export default function DayView({
       // ignore
     }
   }, [allDayWidth]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(ALLDAY_COLLAPSE_KEY, allDayCollapsed ? "1" : "0");
+    } catch {
+      // ignore
+    }
+  }, [allDayCollapsed]);
 
   const { timedTasks, allDayTasks } = useMemo(() => {
     const timed = [];
@@ -175,12 +316,24 @@ export default function DayView({
   }, [allDayWidth]);
 
   return (
-    <div className="flex flex-col sm:flex-row items-stretch gap-3 sm:gap-0">
+    <div className="flex items-stretch gap-0">
       {/* Timed column */}
       <div
         ref={timedScrollRef}
         className="flex-1 min-w-0 relative border border-slate-100 dark:border-[#303030] rounded-lg bg-white dark:bg-[#0c0c0c] overflow-y-auto max-h-[70vh]"
       >
+        {!useSideAllDay && (
+          <MobileAllDayOverlay
+            dateStr={dateStr}
+            allDayTasks={allDayTasks}
+            priorities={priorities}
+            onTaskClick={onTaskClick}
+            onToggleDone={onToggleDone}
+            collapsed={allDayCollapsed}
+            onToggleCollapsed={() => setAllDayCollapsed((v) => !v)}
+            onExpand={() => setAllDayCollapsed(false)}
+          />
+        )}
         <TimedDropZone dateStr={dateStr}>
           {HOURS.map((h) => (
             <div
@@ -243,25 +396,29 @@ export default function DayView({
       </div>
 
       {/* Splitter (desktop only) */}
-      <div
-        role="separator"
-        aria-orientation="vertical"
-        onPointerDown={startResize}
-        className="hidden sm:flex w-2 cursor-col-resize items-center justify-center group shrink-0"
-      >
-        <div className="w-0.5 h-8 bg-slate-200 dark:bg-[#222222] rounded-full group-hover:bg-slate-400 transition-colors" />
-      </div>
+      {useSideAllDay && (
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          onPointerDown={startResize}
+          className="flex w-2 cursor-col-resize items-center justify-center group shrink-0"
+        >
+          <div className="w-0.5 h-8 bg-slate-200 dark:bg-[#222222] rounded-full group-hover:bg-slate-400 transition-colors" />
+        </div>
+      )}
 
-      {/* All-day column — fixed width (desktop), stacks full-width on mobile */}
-      <div className="shrink-0 w-full sm:w-[var(--ad-w)]" style={{ "--ad-w": `${allDayWidth}px` }}>
-        <AllDayColumn
-          dateStr={dateStr}
-          allDayTasks={allDayTasks}
-          priorities={priorities}
-          onTaskClick={onTaskClick}
-          onToggleDone={onToggleDone}
-        />
-      </div>
+      {/* All-day column — fixed width when there is room; mobile uses sticky overlay above. */}
+      {useSideAllDay && (
+        <div className="shrink-0 w-[var(--ad-w)]" style={{ "--ad-w": `${allDayWidth}px` }}>
+          <AllDayColumn
+            dateStr={dateStr}
+            allDayTasks={allDayTasks}
+            priorities={priorities}
+            onTaskClick={onTaskClick}
+            onToggleDone={onToggleDone}
+          />
+        </div>
+      )}
     </div>
   );
 }
