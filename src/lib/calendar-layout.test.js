@@ -80,6 +80,19 @@ describe("layoutTimedTasks", () => {
     }
   });
 
+  it("lays out a long event beside sequential overlaps in stable columns", () => {
+    const out = layoutTimedTasks([
+      t("long", "9:00AM", "12:00PM"),
+      t("b", "9:00AM", "10:00AM"),
+      t("c", "10:00AM", "11:00AM"),
+      t("d", "11:00AM", "12:00PM"),
+    ]);
+    expect(find(out, "long")).toMatchObject({ col: 0, cols: 2, colSpan: 1 });
+    expect(find(out, "b")).toMatchObject({ col: 1, cols: 2, colSpan: 1 });
+    expect(find(out, "c")).toMatchObject({ col: 1, cols: 2, colSpan: 1 });
+    expect(find(out, "d")).toMatchObject({ col: 1, cols: 2, colSpan: 1 });
+  });
+
   it("defaults end to start+60min when task_end_time is missing", () => {
     const out = layoutTimedTasks([
       t("a", "9:00AM"),

@@ -1,6 +1,9 @@
 // @ts-check
 import { describe, it, expect } from "vitest";
-import { taskToRruleLine } from "./recurrence-rrule.js";
+import {
+  parseRruleValueToTaskRecurrence,
+  taskToRruleLine,
+} from "./recurrence-rrule.js";
 
 describe("taskToRruleLine", () => {
   it("returns null for non-recurring tasks", () => {
@@ -9,14 +12,39 @@ describe("taskToRruleLine", () => {
     expect(taskToRruleLine({ task_type: "recurring" })).toBeNull(); // no recurrence
   });
 
-  it("rounds-trips imported source_recurrence_rule verbatim", () => {
+  it("rounds-trips imported source_recurrence_rule only for unsupported custom rules", () => {
     expect(
-      taskToRruleLine({ source_recurrence_rule: "RRULE:FREQ=MONTHLY;BYMONTHDAY=15" })
+      taskToRruleLine({
+        task_type: "recurring",
+        recurrence: "custom",
+        source_recurrence_rule: "RRULE:FREQ=MONTHLY;BYMONTHDAY=15",
+      })
     ).toBe("RRULE:FREQ=MONTHLY;BYMONTHDAY=15");
     // Adds RRULE: prefix when missing.
     expect(
-      taskToRruleLine({ source_recurrence_rule: "FREQ=YEARLY" })
+      taskToRruleLine({
+        task_type: "recurring",
+        recurrence: "custom",
+        source_recurrence_rule: "FREQ=YEARLY",
+      })
     ).toBe("RRULE:FREQ=YEARLY");
+  });
+
+  it("uses native recurrence fields over stale imported source rules", () => {
+    expect(
+      taskToRruleLine({
+        task_type: "recurring",
+        recurrence: "weekly",
+        source_recurrence_rule: "RRULE:FREQ=MONTHLY;BYDAY=1MO",
+      })
+    ).toBe("RRULE:FREQ=WEEKLY");
+    expect(
+      taskToRruleLine({
+        task_type: "one_time",
+        recurrence: "none",
+        source_recurrence_rule: "RRULE:FREQ=DAILY",
+      })
+    ).toBeNull();
   });
 
   it("maps daily / weekly / biweekly / monthly / quarterly / yearly", () => {
@@ -91,5 +119,81 @@ describe("taskToRruleLine", () => {
     expect(
       taskToRruleLine({ task_type: "recurring", recurrence: "every-other-tuesday" })
     ).toBeNull();
+  });
+});
+
+describe("parseRruleValueToTaskRecurrence", () => {
+  it("maps provider BYDAY rules into Zephyrly custom_days", () => {
+    expect(
+      parseRruleValueToTaskRecurrence("RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR;UNTIL=20260630T235959Z")
+    ).toEqual({
+      recurrence: "custom_days",
+      recurrence_days: [1, 3, 5],
+      recurrence_end_date: "2026-06-30",
+    });
+  });
+
+  it("maps weekday and interval rules to native recurrence values", () => {
+    expect(
+      parseRruleValueToTaskRecurrence("FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR")
+    ).toEqual({
+      recurrence: "weekdays",
+      recurrence_days: [],
+      recurrence_end_date: "",
+    });
+    expect(
+      parseRruleValueToTaskRecurrence("FREQ=WEEKLY;INTERVAL=2;BYDAY=TU")
+    ).toEqual({
+      recurrence: "biweekly",
+      recurrence_days: [],
+      recurrence_end_date: "",
+    });
+  });
+
+  it("maps simple monthly, quarterly, and yearly date rules when DTSTART matches", () => {
+    expect(
+      parseRruleValueToTaskRecurrence("FREQ=MONTHLY;BYMONTHDAY=4", {
+        dtstartYmd: "2026-05-04",
+      })
+    ).toEqual({
+      recurrence: "monthly",
+      recurrence_days: [],
+      recurrence_end_date: "",
+    });
+    expect(
+      parseRruleValueToTaskRecurrence("FREQ=MONTHLY;INTERVAL=3;BYMONTHDAY=4", {
+        dtstartYmd: "2026-05-04",
+      })
+    ).toEqual({
+      recurrence: "quarterly",
+      recurrence_days: [],
+      recurrence_end_date: "",
+    });
+    expect(
+      parseRruleValueToTaskRecurrence("FREQ=YEARLY;BYMONTH=5;BYMONTHDAY=4", {
+        dtstartYmd: "2026-05-04",
+      })
+    ).toEqual({
+      recurrence: "yearly",
+      recurrence_days: [],
+      recurrence_end_date: "",
+    });
+  });
+
+  it("keeps unsupported finite or positional provider rules as custom", () => {
+    expect(parseRruleValueToTaskRecurrence("FREQ=DAILY;COUNT=5")).toEqual({
+      recurrence: "custom",
+      recurrence_days: [],
+      recurrence_end_date: "",
+    });
+    expect(
+      parseRruleValueToTaskRecurrence("FREQ=MONTHLY;BYDAY=1MO", {
+        dtstartYmd: "2026-05-04",
+      })
+    ).toEqual({
+      recurrence: "custom",
+      recurrence_days: [],
+      recurrence_end_date: "",
+    });
   });
 });

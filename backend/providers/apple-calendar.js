@@ -60,6 +60,7 @@
 import { randomUUID } from "node:crypto";
 import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
 import { buildVTimezone } from "./_vtimezones.js";
+import { parseRruleValueToTaskRecurrence } from "../recurrence-rrule.js";
 
 const ICLOUD_CALDAV_ROOT = "https://caldav.icloud.com";
 
@@ -699,7 +700,9 @@ export function mapVEventToTaskInput(ev, calendarRow) {
   const sourceKind = writable ? "task" : "event";
 
   // Recurrence — same parser shape as Google's so the UI renders the violet dot.
-  const recurrenceMapped = ev.rrule ? parseRRule(ev.rrule) : null;
+  const recurrenceMapped = ev.rrule
+    ? parseRruleValueToTaskRecurrence(ev.rrule, { dtstartYmd: due_date })
+    : null;
   const taskType = recurrenceMapped?.recurrence ? "recurring" : "one_time";
 
   return {
@@ -721,33 +724,6 @@ export function mapVEventToTaskInput(ev, calendarRow) {
     source_writable: writable,
     source_recurrence_rule: ev.rrule ? `RRULE:${ev.rrule}` : "",
   };
-}
-
-/** Same shape Google's parseRecurrence returns. */
-function parseRRule(rule) {
-  const parts = rule.split(";").reduce((acc, p) => {
-    const [k, v] = p.split("=");
-    if (k && v) acc[k.toUpperCase()] = v.toUpperCase();
-    return acc;
-  }, /** @type {Record<string,string>} */ ({}));
-  const freq = parts.FREQ;
-  const interval = Number(parts.INTERVAL || "1");
-  const until = parts.UNTIL ? icsUntilToYmd(parts.UNTIL) : "";
-  const byday = parts.BYDAY ? parts.BYDAY.split(",") : [];
-  const dayMap = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
-  const days = byday.map((d) => dayMap[d.replace(/^[+-]?\d+/, "")]).filter((n) => n != null);
-
-  if (freq === "DAILY" && interval === 1) return { recurrence: "daily", recurrence_days: [], recurrence_end_date: until };
-  if (freq === "WEEKLY") return { recurrence: "weekly", recurrence_days: days, recurrence_end_date: until };
-  if (freq === "MONTHLY") return { recurrence: "monthly", recurrence_days: [], recurrence_end_date: until };
-  if (freq === "YEARLY") return { recurrence: "yearly", recurrence_days: [], recurrence_end_date: until };
-  return { recurrence: "custom", recurrence_days: [], recurrence_end_date: until };
-}
-
-function icsUntilToYmd(until) {
-  const ymd = until.slice(0, 8);
-  if (ymd.length !== 8) return "";
-  return `${ymd.slice(0, 4)}-${ymd.slice(4, 6)}-${ymd.slice(6, 8)}`;
 }
 
 /**

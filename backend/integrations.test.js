@@ -12,10 +12,14 @@ import {
   setPrimaryCalendar,
 } from "./integrations.js";
 import { exchangeCode as exchangeGoogleCode } from "./providers/google-calendar.js";
-import { putEvent as putAppleEvent } from "./providers/apple-calendar.js";
+import {
+  mapVEventToTaskInput,
+  parseVEvent,
+  putEvent as putAppleEvent,
+} from "./providers/apple-calendar.js";
 import { backfillGoogleEventMetadata } from "./google-metadata-backfill.js";
-import { enqueueTaskPush, waitForPushIdle } from "./push.js";
-import { syncIntegration } from "./sync.js";
+import { enqueueTaskPush, taskToEventBody, waitForPushIdle } from "./push.js";
+import { mapGoogleEventToTaskInput, syncIntegration } from "./sync.js";
 
 let tempDir = "";
 let config;
@@ -598,6 +602,105 @@ describe("database calendar-provenance cleanup", () => {
   });
 });
 
+describe("calendar provider task mapping", () => {
+  it("imports Google timed events in the calendar timezone with end times", () => {
+    const mapped = mapGoogleEventToTaskInput(
+      {
+        id: "evt_1",
+        summary: "Design review",
+        description: "Bring notes",
+        start: { dateTime: "2026-05-04T09:15:00-04:00", timeZone: "America/New_York" },
+        end: { dateTime: "2026-05-04T10:45:00-04:00", timeZone: "America/New_York" },
+        recurrence: ["RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR;UNTIL=20260630T235959Z"],
+      },
+      {
+        external_calendar_id: "primary@example.com",
+        summary: "Primary",
+        time_zone: "America/New_York",
+        color_hex: "#3174ad",
+        access_role: "owner",
+      }
+    );
+
+    expect(mapped).toMatchObject({
+      title: "Design review",
+      description: "Bring notes",
+      due_date: "2026-05-04",
+      task_time: "9:15AM",
+      task_end_time: "10:45AM",
+      task_type: "recurring",
+      recurrence: "custom_days",
+      recurrence_days: [1, 3, 5],
+      recurrence_end_date: "2026-06-30",
+      source_provider: "google",
+      source_kind: "task",
+      source_recurrence_rule: "RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR;UNTIL=20260630T235959Z",
+    });
+  });
+
+  it("imports Apple timed VEVENTs with TZID and recurrence", () => {
+    const event = parseVEvent([
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "BEGIN:VEVENT",
+      "UID:apple-1",
+      "SUMMARY:Studio block",
+      "DESCRIPTION:Sketch pass",
+      "DTSTART;TZID=America/New_York:20260504T091500",
+      "DTEND;TZID=America/New_York:20260504T104500",
+      "RRULE:FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n"));
+
+    const mapped = mapVEventToTaskInput(event, {
+      external_calendar_id: "https://caldav.example.com/cal/1/",
+      summary: "Work",
+      time_zone: "America/New_York",
+      color_hex: "#3174ad",
+      access_role: "owner",
+    });
+
+    expect(mapped).toMatchObject({
+      title: "Studio block",
+      description: "Sketch pass",
+      due_date: "2026-05-04",
+      task_time: "9:15AM",
+      task_end_time: "10:45AM",
+      task_type: "recurring",
+      recurrence: "weekdays",
+      recurrence_days: [],
+      source_provider: "apple",
+      source_kind: "task",
+      source_recurrence_rule: "RRULE:FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR",
+    });
+  });
+
+  it("pushes native recurrence fields and normalizes invalid timed ends", () => {
+    const body = taskToEventBody(
+      {
+        id: "task_1",
+        app_id: "test-app",
+        title: "Late task",
+        description: "",
+        due_date: "2026-05-04",
+        task_time: "11:30PM",
+        task_end_time: "10:00PM",
+        task_type: "recurring",
+        recurrence: "weekly",
+        source_recurrence_rule: "RRULE:FREQ=MONTHLY;BYDAY=1MO",
+      },
+      "America/New_York"
+    );
+
+    expect(body).toMatchObject({
+      start: { dateTime: "2026-05-04T23:30:00", timeZone: "America/New_York" },
+      end: { dateTime: "2026-05-05T00:30:00", timeZone: "America/New_York" },
+      recurrence: ["RRULE:FREQ=WEEKLY"],
+    });
+  });
+});
+
 describe("Apple CalDAV provider", () => {
   it("retries PUT unconditionally after a 412 conflict", async () => {
     const fetchMock = vi.fn()
@@ -782,6 +885,47 @@ describe("push backfill queue", () => {
       etag: "event-etag",
     });
     expect(map.zephyrly_metadata_synced_at).toBeTruthy();
+  });
+
+  it("pushes Apple timed events across midnight with valid ICS times", async () => {
+    const { integrationId, calendarId } = seedAppleIntegration({
+      calendarId: "https://caldav.example.com/cal/1/",
+    });
+    insertTask({ id: "task_late", title: "Late Apple task", dueDate: "2026-05-04" });
+    db.prepare(
+      `UPDATE tasks
+       SET task_time = ?, task_end_time = ?
+       WHERE id = ?`
+    ).run("11:30PM", "10:00PM", "task_late");
+    const task = db.prepare(`SELECT * FROM tasks WHERE id = ?`).get("task_late");
+
+    let icsBody = "";
+    const fetchMock = vi.fn(async (_url, options = {}) => {
+      expect(String(options.method || "GET")).toBe("PUT");
+      icsBody = String(options.body || "");
+      return new Response(null, {
+        status: 204,
+        headers: { etag: '"apple-etag"' },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    enqueueTaskPush(db, config, {
+      op: "upsert",
+      appId: "test-app",
+      taskSnapshot: task,
+    });
+    await waitForPushIdle({ timeoutMs: 5000, pollMs: 5 });
+
+    expect(icsBody).toContain("DTSTART;TZID=America/New_York:20260504T233000");
+    expect(icsBody).toContain("DTEND;TZID=America/New_York:20260505T003000");
+    expect(icsBody).not.toContain("T243000");
+    const map = db.prepare(`SELECT * FROM external_event_map WHERE task_id = ?`).get("task_late");
+    expect(map).toMatchObject({
+      integration_id: integrationId,
+      external_calendar_id: calendarId,
+      etag: "apple-etag",
+    });
   });
 });
 

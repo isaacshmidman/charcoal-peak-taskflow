@@ -47,6 +47,7 @@ import { buildUserForSync } from "./sync-user.js";
 import { createEntityRecord, updateEntityRecord, deleteEntityRecord } from "./store.js";
 import { suppressPush } from "./push.js";
 import { backfillGoogleEventMetadata } from "./google-metadata-backfill.js";
+import { parseRruleValueToTaskRecurrence } from "./recurrence-rrule.js";
 import { formatInTimeZone } from "date-fns-tz";
 
 // Ensure we don't run two sync cycles for the same integration simultaneously.
@@ -415,51 +416,14 @@ function classifySource(event, calendarRow) {
 /**
  * Convert a Google Calendar RRULE recurrence array into the Zephyrly
  * recurrence shape (recurrence + recurrence_days + recurrence_end_date).
- * Returns null if the event isn't recurring or the rule isn't representable.
+ * Unsupported RRULEs become recurrence="custom" so the provider series stays
+ * marked recurring without pretending Zephyrly can auto-roll that shape.
  */
-function parseRecurrence(event) {
+function parseRecurrence(event, dtstartYmd = "") {
   const rrules = Array.isArray(event.recurrence) ? event.recurrence : [];
   const rrule = rrules.find((r) => typeof r === "string" && r.startsWith("RRULE:"));
   if (!rrule) return null;
-  const parts = rrule.slice("RRULE:".length).split(";").reduce((acc, p) => {
-    const [k, v] = p.split("=");
-    if (k && v) acc[k.toUpperCase()] = v.toUpperCase();
-    return acc;
-  }, /** @type {Record<string,string>} */ ({}));
-
-  const freq = parts.FREQ;
-  const interval = Number(parts.INTERVAL || "1");
-  const until = parts.UNTIL ? googleUntilToYmd(parts.UNTIL) : "";
-  const byday = parts.BYDAY ? parts.BYDAY.split(",") : [];
-
-  // Map BYDAY tokens (MO/TU/...) → Zephyrly day numbers (0=Sun..6=Sat) used
-  // in `recurrence_days_json`. (Frontend uses date-fns-style 0..6.)
-  const dayMap = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
-  const days = byday.map((d) => dayMap[d.replace(/^[+-]?\d+/, "")]).filter((n) => n != null);
-
-  if (freq === "DAILY" && interval === 1) {
-    return { recurrence: "daily", recurrence_days: [], recurrence_end_date: until };
-  }
-  if (freq === "WEEKLY") {
-    return { recurrence: "weekly", recurrence_days: days, recurrence_end_date: until };
-  }
-  if (freq === "MONTHLY") {
-    return { recurrence: "monthly", recurrence_days: [], recurrence_end_date: until };
-  }
-  if (freq === "YEARLY") {
-    return { recurrence: "yearly", recurrence_days: [], recurrence_end_date: until };
-  }
-  // Fallback: still mark recurring so the UI shows the violet dot, but use
-  // 'custom' which the frontend treats as "won't auto-roll, just one card".
-  return { recurrence: "custom", recurrence_days: [], recurrence_end_date: until };
-}
-
-function googleUntilToYmd(until) {
-  // RRULE UNTIL is YYYYMMDD or YYYYMMDDTHHMMSSZ.
-  if (!until) return "";
-  const ymd = until.slice(0, 8);
-  if (ymd.length !== 8) return "";
-  return `${ymd.slice(0, 4)}-${ymd.slice(4, 6)}-${ymd.slice(6, 8)}`;
+  return parseRruleValueToTaskRecurrence(rrule, { dtstartYmd });
 }
 
 /**
@@ -522,7 +486,7 @@ export function mapGoogleEventToTaskInput(event, calendarRow) {
   // Recurrence — pulled off the master series, since we list with
   // singleEvents=false.
   const recurrenceMapped = /** @type {{ recurrence?: string, recurrence_days?: number[], recurrence_end_date?: string }} */ (
-    parseRecurrence(event) || {}
+    parseRecurrence(event, due_date) || {}
   );
   const taskType = recurrenceMapped.recurrence ? "recurring" : "one_time";
   const rawRrule = Array.isArray(event.recurrence)

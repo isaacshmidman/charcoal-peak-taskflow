@@ -536,10 +536,9 @@ async function pushOneApple(db, integration, taskSnapshot, op) {
     deriveStableUid(taskSnapshot.id);
 
   const tz = integration.primary_calendar_timezone || "UTC";
-  // RRULE handling unifies two cases:
-  //   - Imported series (source_recurrence_rule set) → round-trip as-is.
-  //   - Native Zephyrly recurrence → derive from recurrence/recurrence_days/
-  //     recurrence_end_date via taskToRruleLine.
+  // RRULE handling is centralized: native Zephyrly recurrence fields are
+  // serialized directly, while unsupported imported `custom` series can still
+  // round-trip their original source_recurrence_rule.
   // buildVEvent expects the RRULE *value* (no "RRULE:" prefix), so strip it.
   const rruleFullLine = taskToRruleLine(taskSnapshot);
   const rrule = rruleFullLine ? rruleFullLine.replace(/^RRULE:/i, "") : "";
@@ -641,11 +640,10 @@ function isCalendarSyncDisabled(db, integrationId, externalCalendarId) {
 
 function toLocalIcsDateTime(ymd, mins) {
   const [y, m, d] = ymd.split("-").map(Number);
-  const h = Math.floor(mins / 60);
-  const mm = mins % 60;
+  const dt = new Date(Date.UTC(y, m - 1, d, 0, mins));
   const pad = (n) => String(n).padStart(2, "0");
   // Floating local time tagged with TZID — iCloud handles the offset.
-  return `${y}${pad(m)}${pad(d)}T${pad(h)}${pad(mm)}00`;
+  return `${dt.getUTCFullYear()}${pad(dt.getUTCMonth() + 1)}${pad(dt.getUTCDate())}T${pad(dt.getUTCHours())}${pad(dt.getUTCMinutes())}00`;
 }
 
 function deriveStableUid(taskId) {
@@ -698,10 +696,9 @@ export function taskToEventBody(task, timeZone, colorId) {
   const description = String(task.description || "").slice(0, 5000);
 
   // Native recurrence → RFC 5545 RRULE. Google's REST shape expects the
-  // RRULE in the `recurrence` array (one or more lines, each starting
-  // with the property name). For tasks imported from a provider we
-  // round-trip the original `source_recurrence_rule` to avoid lossy
-  // re-encoding — see taskToRruleLine for that branch.
+  // RRULE in the `recurrence` array (one or more lines, each starting with
+  // the property name). Unsupported imported recurrence rules still
+  // round-trip through source_recurrence_rule; supported/native fields win.
   const rruleLine = taskToRruleLine(task);
   const recurrence = rruleLine ? [rruleLine] : undefined;
 
@@ -734,12 +731,15 @@ export function taskToEventBody(task, timeZone, colorId) {
     };
   }
 
-  const startDt = isoFromDateAndTime(task.due_date, task.task_time, timeZone);
-  if (!startDt) return null;
-  const endDt =
-    task.task_end_time
-      ? isoFromDateAndTime(task.due_date, task.task_end_time, timeZone) || plusHours(startDt, 1)
-      : plusHours(startDt, 1);
+  const startMins = parseTaskTime(task.task_time);
+  if (startMins == null) return null;
+  const endParsed = parseTaskTime(task.task_end_time);
+  const endMins = endParsed != null && endParsed > startMins
+    ? endParsed
+    : startMins + 60;
+  const startDt = isoFromDateAndMinutes(task.due_date, startMins);
+  const endDt = isoFromDateAndMinutes(task.due_date, endMins);
+  if (!startDt || !endDt) return null;
 
   return {
     summary,
@@ -760,30 +760,15 @@ function addOneDay(ymd) {
 }
 
 /**
- * Convert a Zephyrly date + "H:MMAM|PM" time into an ISO string (wall-clock
- * in the given IANA timezone). We emit the ISO without an offset and let
- * Google interpret it via the `timeZone` field on the event — this avoids
- * us having to compute the offset ourselves (which would require access to
- * a tz database at runtime).
+ * Convert a Zephyrly date + minutes-since-midnight into a floating ISO
+ * wall-clock string. We emit no offset and let Google interpret it via the
+ * event's `timeZone` field.
  */
-function isoFromDateAndTime(ymd, timeStr, _timeZone) {
-  const parsed = parseTaskTime(timeStr);
-  if (parsed == null) return null;
+function isoFromDateAndMinutes(ymd, minutes) {
   const [y, m, d] = ymd.split("-").map(Number);
-  const h = Math.floor(parsed / 60);
-  const mm = parsed % 60;
+  if (![y, m, d].every(Number.isFinite)) return null;
+  const dt = new Date(Date.UTC(y, m - 1, d, 0, minutes));
   // Format: "YYYY-MM-DDTHH:MM:00" (no tz suffix — Google uses event.timeZone).
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${y}-${pad(m)}-${pad(d)}T${pad(h)}:${pad(mm)}:00`;
-}
-
-function plusHours(iso, hours) {
-  // Works on the "YYYY-MM-DDTHH:MM:00" format above.
-  const [datePart, timePart] = iso.split("T");
-  const [y, m, d] = datePart.split("-").map(Number);
-  const [h, mm] = timePart.split(":").map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d, h, mm));
-  dt.setUTCHours(dt.getUTCHours() + hours);
   const pad = (n) => String(n).padStart(2, "0");
   return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}T${pad(dt.getUTCHours())}:${pad(dt.getUTCMinutes())}:00`;
 }
