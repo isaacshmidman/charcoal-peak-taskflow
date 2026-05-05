@@ -35,4 +35,55 @@ describe("apiClient offline fallback", () => {
 
     expect(publicSettings).toEqual({ app_id: "test-app", name: "Taskflow Offline" });
   });
+
+  it("returns cached integrations when offline", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error("Network down"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { saveToCache } = await import("@/lib/offlineCache");
+    saveToCache("integrations", [{ id: "int-1", provider: "google", status: "active" }]);
+
+    const { apiClient } = await import("./apiClient");
+    const integrations = await apiClient.integrations.list();
+
+    expect(integrations).toEqual([{ id: "int-1", provider: "google", status: "active" }]);
+  });
+
+  it("returns cached integration calendars when offline", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error("Network down"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { saveToCache } = await import("@/lib/offlineCache");
+    saveToCache("integrationCalendars", {
+      "int-1": [{ external_calendar_id: "cal-1", summary: "Cached calendar" }],
+    });
+
+    const { apiClient } = await import("./apiClient");
+    const calendars = await apiClient.integrations.listCalendars("int-1");
+
+    expect(calendars).toEqual([{ external_calendar_id: "cal-1", summary: "Cached calendar" }]);
+  });
+
+  it("returns cached notification settings when offline", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error("Network down"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { saveToCache } = await import("@/lib/offlineCache");
+    saveToCache("notificationSettings", {
+      available: true,
+      vapidPublicKey: "public-key",
+      settings: { enabled: true, allDayTime: "9:00AM" },
+      defaulted: false,
+    });
+
+    const { apiClient } = await import("./apiClient");
+    const settings = await apiClient.notifications.getSettings();
+
+    expect(settings).toEqual({
+      available: true,
+      vapidPublicKey: "public-key",
+      settings: { enabled: true, allDayTime: "9:00AM" },
+      defaulted: false,
+    });
+  });
 });

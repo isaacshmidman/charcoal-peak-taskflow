@@ -38,7 +38,14 @@ import { loadFromCache, saveToCache } from "@/lib/offlineCache";
  *     setToken: (token: string, saveToStorage?: boolean) => void,
  *   },
   *   setToken: (token: string, saveToStorage?: boolean) => void,
-  *   getPublicSettings: () => Promise<any>,
+ *   getPublicSettings: () => Promise<any>,
+ *   notifications: {
+ *     getSettings: () => Promise<any>,
+ *     updateSettings: (settings: any) => Promise<any>,
+ *     subscribe: (subscription: any) => Promise<any>,
+ *     unsubscribe: (endpoint: string) => Promise<any>,
+ *     sendTest: () => Promise<any>,
+ *   },
  *   integrations: {
  *     list: () => Promise<any[]>,
  *     connectApple: (creds: { email: string, password: string }) => Promise<any>,
@@ -72,6 +79,9 @@ export class ApiError extends Error {
 
 let currentToken = appConfig.token || getStoredAccessToken();
 const PUBLIC_SETTINGS_CACHE_KEY = "publicSettings";
+const INTEGRATIONS_CACHE_KEY = "integrations";
+const INTEGRATION_CALENDARS_CACHE_KEY = "integrationCalendars";
+const NOTIFICATION_SETTINGS_CACHE_KEY = "notificationSettings";
 const ENTITY_CACHE_KEYS = {
   Task: "tasks",
   Priority: "priorities",
@@ -360,8 +370,18 @@ const liveApiClient = {
   },
   integrations: {
     async list() {
-      const data = await apiRequest(`/apps/${appConfig.appId}/integrations`);
-      return Array.isArray(data?.integrations) ? data.integrations : [];
+      try {
+        const data = await apiRequest(`/apps/${appConfig.appId}/integrations`);
+        const integrations = Array.isArray(data?.integrations) ? data.integrations : [];
+        saveToCache(INTEGRATIONS_CACHE_KEY, integrations);
+        return integrations;
+      } catch (error) {
+        if (isRecoverableReadError(error)) {
+          const cached = loadFromCache(INTEGRATIONS_CACHE_KEY);
+          if (Array.isArray(cached)) return cached;
+        }
+        throw error;
+      }
     },
     async connectApple({ email, password }) {
       return apiRequest(`/apps/${appConfig.appId}/integrations/apple/connect`, {
@@ -389,17 +409,39 @@ const liveApiClient = {
       );
     },
     async listCalendars(id) {
-      const data = await apiRequest(
-        `/apps/${appConfig.appId}/integrations/${encodeURIComponent(id)}/calendars`
-      );
-      return Array.isArray(data?.calendars) ? data.calendars : [];
+      const cacheId = String(id);
+      try {
+        const data = await apiRequest(
+          `/apps/${appConfig.appId}/integrations/${encodeURIComponent(id)}/calendars`
+        );
+        const calendars = Array.isArray(data?.calendars) ? data.calendars : [];
+        const cachedByIntegration = loadFromCache(INTEGRATION_CALENDARS_CACHE_KEY) || {};
+        saveToCache(INTEGRATION_CALENDARS_CACHE_KEY, {
+          ...cachedByIntegration,
+          [cacheId]: calendars,
+        });
+        return calendars;
+      } catch (error) {
+        if (isRecoverableReadError(error)) {
+          const cachedByIntegration = loadFromCache(INTEGRATION_CALENDARS_CACHE_KEY) || {};
+          const cached = cachedByIntegration[cacheId];
+          if (Array.isArray(cached)) return cached;
+        }
+        throw error;
+      }
     },
     async setCalendars(id, updates) {
       const data = await apiRequest(
         `/apps/${appConfig.appId}/integrations/${encodeURIComponent(id)}/calendars`,
         { method: "PUT", body: { updates } }
       );
-      return Array.isArray(data?.calendars) ? data.calendars : [];
+      const calendars = Array.isArray(data?.calendars) ? data.calendars : [];
+      const cachedByIntegration = loadFromCache(INTEGRATION_CALENDARS_CACHE_KEY) || {};
+      saveToCache(INTEGRATION_CALENDARS_CACHE_KEY, {
+        ...cachedByIntegration,
+        [String(id)]: calendars,
+      });
+      return calendars;
     },
     async setDefault(id) {
       return apiRequest(
@@ -408,16 +450,72 @@ const liveApiClient = {
       );
     },
     async setPrimaryCalendar(id, externalCalendarId) {
-      return apiRequest(
+      const data = await apiRequest(
         `/apps/${appConfig.appId}/integrations/${encodeURIComponent(id)}/primary-calendar`,
         { method: "POST", body: { external_calendar_id: externalCalendarId } }
       );
+      if (Array.isArray(data?.calendars)) {
+        const cachedByIntegration = loadFromCache(INTEGRATION_CALENDARS_CACHE_KEY) || {};
+        saveToCache(INTEGRATION_CALENDARS_CACHE_KEY, {
+          ...cachedByIntegration,
+          [String(id)]: data.calendars,
+        });
+      }
+      return data;
     },
     async setCalendarColor(id, externalCalendarId, colorHex) {
-      return apiRequest(
+      const data = await apiRequest(
         `/apps/${appConfig.appId}/integrations/${encodeURIComponent(id)}/calendar-color`,
         { method: "POST", body: { external_calendar_id: externalCalendarId, color_hex: colorHex } }
       );
+      if (Array.isArray(data?.calendars)) {
+        const cachedByIntegration = loadFromCache(INTEGRATION_CALENDARS_CACHE_KEY) || {};
+        saveToCache(INTEGRATION_CALENDARS_CACHE_KEY, {
+          ...cachedByIntegration,
+          [String(id)]: data.calendars,
+        });
+      }
+      return data;
+    },
+  },
+  notifications: {
+    async getSettings() {
+      try {
+        const result = await apiRequest(`/apps/${appConfig.appId}/notifications/settings`);
+        saveToCache(NOTIFICATION_SETTINGS_CACHE_KEY, result);
+        return result;
+      } catch (error) {
+        if (isRecoverableReadError(error)) {
+          const cached = loadFromCache(NOTIFICATION_SETTINGS_CACHE_KEY);
+          if (cached) return cached;
+        }
+        throw error;
+      }
+    },
+    async updateSettings(settings) {
+      const result = await apiRequest(`/apps/${appConfig.appId}/notifications/settings`, {
+        method: "PUT",
+        body: { settings },
+      });
+      saveToCache(NOTIFICATION_SETTINGS_CACHE_KEY, result);
+      return result;
+    },
+    async subscribe(subscription) {
+      return apiRequest(`/apps/${appConfig.appId}/notifications/subscribe`, {
+        method: "POST",
+        body: { subscription },
+      });
+    },
+    async unsubscribe(endpoint) {
+      return apiRequest(`/apps/${appConfig.appId}/notifications/unsubscribe`, {
+        method: "POST",
+        body: { endpoint },
+      });
+    },
+    async sendTest() {
+      return apiRequest(`/apps/${appConfig.appId}/notifications/test`, {
+        method: "POST",
+      });
     },
   },
   async getPublicSettings() {

@@ -18,6 +18,7 @@ const persistBackend = (backend) => {
         lastLoginFromUrl: backend.lastLoginFromUrl,
         lastLogout: backend.lastLogout,
         lastToken: backend.lastToken,
+        lastNotificationTest: /** @type {any} */ (backend).lastNotificationTest,
       })
     );
   } catch {}
@@ -189,6 +190,58 @@ export function createE2EApiClient() {
       },
       async setCalendarColor() {
         return { success: true, calendars: [] };
+      },
+    },
+    notifications: {
+      async getSettings() {
+        const state = /** @type {any} */ (backend.state);
+        const settings = state.notificationSettings || {
+          enabled: false,
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          timedOffsetMinutes: 0,
+          allDayEnabled: true,
+          allDayTime: "9:00AM",
+          includeExternalEvents: false,
+          missedGraceMinutes: 120,
+        };
+        return {
+          available: true,
+          vapidPublicKey: "BMockNotificationPublicKey",
+          reason: "",
+          settings: clone(settings),
+          defaulted: !state.notificationSettings,
+        };
+      },
+      async updateSettings(settings) {
+        const state = /** @type {any} */ (backend.state);
+        state.notificationSettings = { ...settings };
+        persistBackend(backend);
+        return {
+          available: true,
+          vapidPublicKey: "BMockNotificationPublicKey",
+          reason: "",
+          settings: clone(state.notificationSettings),
+          defaulted: false,
+        };
+      },
+      async subscribe(subscription) {
+        const state = /** @type {any} */ (backend.state);
+        state.notificationSubscriptions = state.notificationSubscriptions || [];
+        state.notificationSubscriptions.push(subscription);
+        persistBackend(backend);
+        return { success: true, subscription_id: `mock-sub-${state.notificationSubscriptions.length}` };
+      },
+      async unsubscribe(endpoint) {
+        const state = /** @type {any} */ (backend.state);
+        state.notificationSubscriptions = (state.notificationSubscriptions || [])
+          .filter((subscription) => subscription?.endpoint !== endpoint);
+        persistBackend(backend);
+        return { success: true };
+      },
+      async sendTest() {
+        /** @type {any} */ (backend).lastNotificationTest = Date.now();
+        persistBackend(backend);
+        return { sent: 1, failed: 0 };
       },
     },
     cleanup() {},

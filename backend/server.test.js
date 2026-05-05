@@ -111,6 +111,10 @@ beforeAll(() => {
     hasGoogleCalendarCredentials: false,
     integrationsEnabled: false,
     syncIntervalMs: 300000,
+    notificationPollMs: 60000,
+    vapidPublicKey: "",
+    vapidPrivateKey: "",
+    vapidSubject: "mailto:test@example.com",
   };
 
   db = createDatabase(config);
@@ -173,6 +177,73 @@ describe("taskflow backend contract", () => {
     });
 
     expect(postLogoutMe.statusCode).toBe(401);
+  });
+
+  it("supports notification settings and subscription endpoints", async () => {
+    const accessToken = await login("notify@example.com");
+    const headers = {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    };
+
+    const defaults = await invoke("/api/apps/test-app/notifications/settings", { headers });
+    expect(defaults.statusCode).toBe(200);
+    expect(defaults.body.available).toBe(false);
+    expect(defaults.body.settings).toMatchObject({
+      enabled: false,
+      timedOffsetMinutes: 0,
+      allDayTime: "9:00AM",
+    });
+
+    const saved = await invoke("/api/apps/test-app/notifications/settings", {
+      method: "PUT",
+      headers,
+      body: {
+        settings: {
+          enabled: true,
+          timeZone: "America/New_York",
+          timedOffsetMinutes: -15,
+          allDayTime: "8:30AM",
+          includeExternalEvents: true,
+        },
+      },
+    });
+    expect(saved.statusCode).toBe(200);
+    expect(saved.body.settings).toMatchObject({
+      enabled: true,
+      timeZone: "America/New_York",
+      timedOffsetMinutes: -15,
+      allDayTime: "8:30AM",
+      includeExternalEvents: true,
+    });
+
+    const subscribed = await invoke("/api/apps/test-app/notifications/subscribe", {
+      method: "POST",
+      headers,
+      body: {
+        subscription: {
+          endpoint: "https://push.example.com/notify-endpoint",
+          keys: { p256dh: "p256dh", auth: "auth" },
+        },
+      },
+    });
+    expect(subscribed.statusCode).toBe(200);
+    expect(subscribed.body.success).toBe(true);
+
+    const unsubscribed = await invoke("/api/apps/test-app/notifications/unsubscribe", {
+      method: "POST",
+      headers,
+      body: { endpoint: "https://push.example.com/notify-endpoint" },
+    });
+    expect(unsubscribed.statusCode).toBe(200);
+    expect(unsubscribed.body.success).toBe(true);
+
+    const test = await invoke("/api/apps/test-app/notifications/test", {
+      method: "POST",
+      headers,
+    });
+    expect(test.statusCode).toBe(503);
+    expect(test.body.code).toBe("notifications_unavailable");
   });
 
   it("supports scoped CRUD for tasks and deleted-task retention", async () => {

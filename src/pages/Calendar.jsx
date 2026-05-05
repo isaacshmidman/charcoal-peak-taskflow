@@ -1,6 +1,6 @@
 // @ts-nocheck
-import { useState, useMemo, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState, useMemo, useRef } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/api/apiClient";
 import { useOfflineMutation } from "@/hooks/useOfflineMutation";
@@ -68,11 +68,15 @@ import {
   nextQuarterHour,
 } from "@/lib/sort-helpers";
 import { useIntegrationsConnected, useIntegrations } from "@/hooks/useIntegrations";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 
 const VIEWS = ["day", "week", "month", "year"];
 
 export default function Calendar() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const online = useOnlineStatus();
+  const handledNotificationUrlRef = useRef("");
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [formDefaultDueDate, setFormDefaultDueDate] = useState(null);
@@ -148,6 +152,34 @@ export default function Calendar() {
     queryKey: ["priorities"],
     queryFn: () => apiClient.entities.Priority.list("order", 50),
   });
+
+  useEffect(() => {
+    if (!location.search || handledNotificationUrlRef.current === location.search) return;
+    const params = new URLSearchParams(location.search);
+    const dateParam = params.get("date");
+    const taskId = params.get("task");
+    const viewParam = params.get("view");
+    if (!dateParam && !taskId && !viewParam) return;
+
+    if (viewParam && VIEWS.includes(viewParam)) setView(viewParam);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(String(dateParam || ""))) {
+      const nextDate = startOfDay(new Date(`${dateParam}T00:00:00`));
+      if (!Number.isNaN(nextDate.getTime())) setAnchorDate(nextDate);
+    }
+
+    if (taskId && tasks.length) {
+      const task = tasks.find((t) => String(t.id) === String(taskId));
+      if (task) {
+        setEditingTask(task);
+        setFormDefaultDueDate(null);
+        setFormDefaultTimeStart(null);
+        setShowForm(true);
+        handledNotificationUrlRef.current = location.search;
+      }
+    } else if (!taskId) {
+      handledNotificationUrlRef.current = location.search;
+    }
+  }, [location.search, tasks]);
 
   const subtaskMap = useMemo(() => {
     const map = {};
@@ -414,7 +446,7 @@ export default function Calendar() {
     }
   }, [activeIntegration?.last_synced_at]);
   const handleSyncNow = async () => {
-    if (!activeIntegration) return;
+    if (!activeIntegration || !online) return;
     try {
       await sync(activeIntegration.id);
     } catch {
@@ -571,9 +603,9 @@ export default function Calendar() {
                 variant="ghost"
                 size="sm"
                 onClick={handleSyncNow}
-                disabled={syncing}
+                disabled={syncing || !online}
                 className="h-8 px-2 gap-1 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
-                title="Sync calendars now"
+                title={online ? "Sync calendars now" : "Calendar sync needs an internet connection"}
               >
                 <RefreshCw className={cn("w-3.5 h-3.5", syncing && "animate-spin")} />
                 <span className="hidden sm:inline">Sync</span>

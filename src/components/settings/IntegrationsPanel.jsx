@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useIntegrations } from "@/hooks/useIntegrations";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { Loader2, AlertTriangle, Settings2, X, Star } from "lucide-react";
 import ConfigureCalendarsModal from "./ConfigureCalendarsModal";
 import ConnectAppleModal from "./ConnectAppleModal";
@@ -26,6 +27,7 @@ function ConnectedRow({
   showDefaultControl,
   onMakeDefault,
   settingDefault,
+  offline,
 }) {
   return (
     <div className="rounded-lg border border-slate-100 dark:border-[#303030] bg-white dark:bg-[#111111] p-3 space-y-1.5">
@@ -56,7 +58,7 @@ function ConnectedRow({
           size="icon"
           className="shrink-0 h-7 w-7 text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-[#2a1116]"
           onClick={() => onDisconnect(integration.id)}
-          disabled={isDisconnecting}
+          disabled={isDisconnecting || offline}
           title="Disconnect"
           aria-label="Disconnect"
         >
@@ -88,7 +90,7 @@ function ConnectedRow({
           size="sm"
           className="h-7 w-full text-xs gap-1"
           onClick={() => onMakeDefault(integration.id)}
-          disabled={settingDefault || integration.status !== "active"}
+          disabled={settingDefault || offline || integration.status !== "active"}
           title="Make this the default destination for new tasks"
         >
           {settingDefault ? (
@@ -136,6 +138,8 @@ function ConnectCard({ provider, onConnect, connecting, disabled }) {
 }
 
 export default function IntegrationsPanel() {
+  const online = useOnlineStatus();
+  const offline = !online;
   const {
     integrations,
     isLoading,
@@ -195,6 +199,12 @@ export default function IntegrationsPanel() {
           an app-specific password encrypted on the backend.
         </p>
       </div>
+      {offline && (
+        <p className="rounded-lg border border-amber-100 dark:border-[#4a3512] bg-amber-50 dark:bg-[#1f1809] px-3 py-2 text-xs text-amber-700 dark:text-amber-200">
+          Offline: connected calendars are shown from cache. Connecting, disconnecting,
+          manual sync, and calendar configuration changes resume when you are online.
+        </p>
+      )}
       {integrationError && (
         <p className="text-xs text-red-600 dark:text-red-300">
           Connection failed: {integrationError.replace(/_/g, " ")}
@@ -220,12 +230,14 @@ export default function IntegrationsPanel() {
               showDefaultControl={showDefaultControl}
               onMakeDefault={setDefault}
               settingDefault={settingDefault}
+              offline={offline}
             />
           ) : (
             <ConnectCard
               provider={PROVIDERS[0]}
               onConnect={handleConnect}
               connecting={false}
+              disabled={offline}
             />
           )}
           {appleRow ? (
@@ -237,12 +249,14 @@ export default function IntegrationsPanel() {
               showDefaultControl={showDefaultControl}
               onMakeDefault={setDefault}
               settingDefault={settingDefault}
+              offline={offline}
             />
           ) : (
             <ConnectCard
               provider={PROVIDERS[1]}
               onConnect={handleConnect}
               connecting={false}
+              disabled={offline}
             />
           )}
         </div>

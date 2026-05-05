@@ -13,8 +13,6 @@ const HOUR_HEIGHT = 44;
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const DAY_HEADER_HEIGHT = 40; // day-of-week label + date number + py-1 padding
 const COLLAPSE_KEY = "calendar_week_allday_collapsed";
-const ALLDAY_ROW_HEIGHT = 26;
-const ALLDAY_MORE_HEIGHT = 24;
 const COLLAPSED_ALLDAY_VISIBLE = 2;
 
 const formatHour = (h) => {
@@ -225,26 +223,6 @@ export default function WeekView({
     return map;
   }, [tasks, days]);
 
-  const maxAllDayCount = useMemo(() => {
-    let max = 0;
-    for (const d of days) {
-      const count = byDay.get(toDateStr(d))?.allDay.length ?? 0;
-      if (count > max) max = count;
-    }
-    return max;
-  }, [byDay, days]);
-
-  const expandedAllDayHeight = Math.max(1, maxAllDayCount) * ALLDAY_ROW_HEIGHT + 8;
-  const collapsedVisibleCount = Math.min(COLLAPSED_ALLDAY_VISIBLE, maxAllDayCount);
-  const collapsedHasMore = maxAllDayCount > COLLAPSED_ALLDAY_VISIBLE;
-  const collapsedAllDayHeight =
-    Math.max(1, collapsedVisibleCount) * ALLDAY_ROW_HEIGHT +
-    (collapsedHasMore ? ALLDAY_MORE_HEIGHT : 0) +
-    8;
-  const allDayHeight = allDayCollapsed
-    ? collapsedAllDayHeight
-    : expandedAllDayHeight;
-
   const dateKey = toDateStr(weekStart);
   // If today is in the visible week, auto-scroll so the red now-line sits
   // near the vertical center of the scroll area. Otherwise fall back to 7 AM.
@@ -284,7 +262,7 @@ export default function WeekView({
           className="sticky z-30 bg-white dark:bg-[#0c0c0c] border-b border-slate-100 dark:border-[#303030]"
           style={{ top: DAY_HEADER_HEIGHT }}
         >
-          <div className="flex" style={{ height: allDayHeight }}>
+          <div className="flex min-h-7">
             <div className="w-12 shrink-0 border-r border-slate-100 dark:border-[#303030] bg-white dark:bg-[#0c0c0c] flex items-start justify-center pt-1">
               <button
                 type="button"

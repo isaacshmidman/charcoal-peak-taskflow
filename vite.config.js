@@ -4,6 +4,7 @@ import { backendConfig } from "./backend/config.js";
 import { closeDatabase, getDatabase } from "./backend/db.js";
 import { createRequestHandler } from "./backend/server.js";
 import { startSyncLoop } from "./backend/sync.js";
+import { startNotificationLoop } from "./backend/notifications.js";
 import { createViteConfig } from "./vite.shared.js";
 
 function createEmbeddedBackendPlugin({ appId }) {
@@ -22,9 +23,11 @@ function createEmbeddedBackendPlugin({ appId }) {
       const db = getDatabase(embeddedConfig);
       const handler = createRequestHandler(embeddedConfig, db);
       const syncHandle = startSyncLoop(db, embeddedConfig);
+      const notificationHandle = startNotificationLoop(db, embeddedConfig);
 
       server.httpServer?.once("close", () => {
         syncHandle.stop();
+        notificationHandle.stop();
         closeDatabase();
       });
 

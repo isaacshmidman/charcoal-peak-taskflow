@@ -38,6 +38,14 @@ import {
 } from "./integrations.js";
 import { startSyncLoop, syncIntegration } from "./sync.js";
 import { enqueueTaskPush } from "./push.js";
+import {
+  getNotificationSettingsResponse,
+  sendTestNotification,
+  startNotificationLoop,
+  unsubscribeNotificationSubscription,
+  updateUserNotificationSettings,
+  upsertNotificationSubscription,
+} from "./notifications.js";
 
 const distRoot = resolve(projectRoot, "dist");
 const CONTENT_TYPES = {
@@ -150,6 +158,8 @@ export function createTaskflowServer(config = backendConfig) {
   const server = http.createServer(requestHandler);
   /** @type {{ stop: () => void } | null} */
   let syncHandle = null;
+  /** @type {{ stop: () => void } | null} */
+  let notificationHandle = null;
 
   return {
     server,
@@ -160,6 +170,7 @@ export function createTaskflowServer(config = backendConfig) {
         server.listen(config.port, config.host, () => {
           console.log(`Zephyrly backend listening on http://${config.host}:${config.port}`);
           syncHandle = startSyncLoop(db, config);
+          notificationHandle = startNotificationLoop(db, config);
           resolve(server);
         });
       });
@@ -168,6 +179,8 @@ export function createTaskflowServer(config = backendConfig) {
       return new Promise((resolve, reject) => {
         syncHandle?.stop();
         syncHandle = null;
+        notificationHandle?.stop();
+        notificationHandle = null;
         server.close((error) => {
           if (error) {
             reject(error);
@@ -574,6 +587,63 @@ export function createRequestHandler(config = backendConfig, db = getDatabase(co
         throw new HttpError(404, "Route not found.", "not_found");
       }
       // ------------------------------------------------------------------
+
+      if (segments[3] === "notifications") {
+        const user = requireAuthenticatedUser(db, config, request, appId);
+
+        if (request.method === "GET" && segments[4] === "settings") {
+          sendJson(response, 200, getNotificationSettingsResponse(db, config, { appId, user }));
+          return;
+        }
+
+        if (request.method === "PUT" && segments[4] === "settings") {
+          const body = (await readJsonBody(request)) || {};
+          const settings = updateUserNotificationSettings(db, {
+            appId,
+            userId: user.id,
+            input: body.settings || body,
+          });
+          sendJson(response, 200, {
+            ...getNotificationSettingsResponse(db, config, { appId, user }),
+            settings,
+            defaulted: false,
+          });
+          return;
+        }
+
+        if (request.method === "POST" && segments[4] === "subscribe") {
+          const body = (await readJsonBody(request)) || {};
+          const subscription = upsertNotificationSubscription(db, {
+            appId,
+            user,
+            subscription: body.subscription || body,
+            userAgent: String(request.headers["user-agent"] || ""),
+          });
+          sendJson(response, 200, { success: true, subscription_id: subscription.id });
+          return;
+        }
+
+        if (request.method === "POST" && segments[4] === "unsubscribe") {
+          const body = (await readJsonBody(request)) || {};
+          sendJson(
+            response,
+            200,
+            unsubscribeNotificationSubscription(db, {
+              appId,
+              user,
+              endpoint: body.endpoint,
+            })
+          );
+          return;
+        }
+
+        if (request.method === "POST" && segments[4] === "test") {
+          sendJson(response, 200, await sendTestNotification(db, config, { appId, user }));
+          return;
+        }
+
+        throw new HttpError(404, "Route not found.", "not_found");
+      }
 
       if (segments[3] !== "entities") {
         throw new HttpError(404, "Route not found.", "not_found");

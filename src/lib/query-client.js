@@ -1,12 +1,14 @@
 import { QueryClient } from '@tanstack/react-query';
 import { loadFromCache } from '@/lib/offlineCache';
 
-const SEED_KEYS = ['tasks', 'priorities', 'savedTags', 'deletedTasks'];
+const SEED_KEYS = ['tasks', 'priorities', 'savedTags', 'deletedTasks', 'integrations', 'notificationSettings'];
 const EMPTY_CACHE_VALUES = {
 	tasks: [],
 	priorities: [],
 	savedTags: [],
 	deletedTasks: [],
+	integrations: [],
+	notificationSettings: undefined,
 };
 
 export const queryClientInstance = new QueryClient({
@@ -28,8 +30,17 @@ export function syncOfflineQueryCache() {
 	for (const key of SEED_KEYS) {
 		try {
 			const data = loadFromCache(key);
+			if (data === undefined || data === null) {
+				if (EMPTY_CACHE_VALUES[key] === undefined) {
+					queryClientInstance.removeQueries({ queryKey: [key] });
+				} else {
+					queryClientInstance.setQueryData([key], EMPTY_CACHE_VALUES[key]);
+				}
+				continue;
+			}
 			queryClientInstance.setQueryData([key], data ?? EMPTY_CACHE_VALUES[key]);
 		} catch {
+			if (EMPTY_CACHE_VALUES[key] === undefined) continue;
 			queryClientInstance.setQueryData([key], EMPTY_CACHE_VALUES[key]);
 		}
 	}

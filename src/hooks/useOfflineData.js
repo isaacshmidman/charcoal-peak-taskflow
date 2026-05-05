@@ -15,7 +15,7 @@ import {
 } from '@/lib/offlineCache';
 import { apiClient } from '@/api/apiClient';
 
-const CACHE_KEYS = ['tasks', 'priorities', 'savedTags', 'deletedTasks'];
+const CACHE_KEYS = ['tasks', 'priorities', 'savedTags', 'deletedTasks', 'integrations', 'notificationSettings'];
 
 /**
  * Hook that:

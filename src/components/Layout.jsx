@@ -3,7 +3,9 @@ import { ListTodo, CalendarDays, LayoutGrid, Settings, Sun, WifiOff, CheckCircle
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { useOfflineData } from "@/hooks/useOfflineData";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import DeleteToast from "@/components/tasks/DeleteToast";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DEFAULT_NAV_ORDER, sanitizeNavOrder, sanitizeNavRoute } from "@/lib/navigation";
 
 const ALL_NAV_ITEMS = {
@@ -33,16 +35,8 @@ export default function Layout() {
   const location = useLocation();
   const [navItems, setNavItems] = useState(getNavItems);
   const [defaultNav, setDefaultNav] = useState(getDefaultNav);
-  const [online, setOnline] = useState(navigator.onLine);
+  const online = useOnlineStatus();
   useOfflineData();
-
-  useEffect(() => {
-    const on = () => setOnline(true);
-    const off = () => setOnline(false);
-    window.addEventListener('online', on);
-    window.addEventListener('offline', off);
-    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
-  }, []);
 
   // Listen for nav order/default changes from Settings
   useEffect(() => {
@@ -85,7 +79,39 @@ export default function Layout() {
           </nav>
 
           <div className="flex items-center gap-1">
-            {!online && <WifiOff className="w-4 h-4 text-red-500" />}
+            {!online && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="h-10 w-10 inline-flex items-center justify-center rounded-lg text-red-500 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-[#2a1116] transition-colors"
+                    aria-label="Offline status"
+                    title="Offline"
+                  >
+                    <WifiOff className="w-4 h-4" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-72 rounded-lg border-slate-200 dark:border-[#303030] bg-white dark:bg-[#111111] p-3">
+                  <div className="space-y-2">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Offline mode</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        Cached tasks, priorities, tags, recently deleted items, calendar connection status, and notification settings remain readable.
+                      </p>
+                    </div>
+                    <div className="rounded-md bg-slate-50 dark:bg-[#171717] border border-slate-100 dark:border-[#303030] p-2">
+                      <p className="text-[11px] font-medium text-slate-700 dark:text-slate-200">Queued until you reconnect</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                        Task, priority, tag, and recently deleted edits sync automatically as soon as the app is back online.
+                      </p>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Calendar connect/sync/configuration, push notification subscription/tests, and server-scheduled reminders require an internet connection.
+                    </p>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
             <Link
               to="/Settings"
               onClick={() => window.dispatchEvent(new Event("settingsNavClicked"))}

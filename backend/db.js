@@ -142,6 +142,37 @@ export function createDatabase(config = backendConfig) {
       UNIQUE(integration_id, external_calendar_id)
     );
 
+    CREATE TABLE IF NOT EXISTS notification_subscriptions (
+      id TEXT PRIMARY KEY,
+      app_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      endpoint TEXT NOT NULL,
+      p256dh TEXT NOT NULL,
+      auth TEXT NOT NULL,
+      user_agent TEXT,
+      status TEXT NOT NULL DEFAULT 'active',
+      last_error TEXT,
+      last_seen_at TEXT,
+      created_date TEXT NOT NULL,
+      updated_date TEXT NOT NULL,
+      UNIQUE(endpoint)
+    );
+
+    CREATE TABLE IF NOT EXISTS task_notification_deliveries (
+      id TEXT PRIMARY KEY,
+      app_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      subscription_id TEXT NOT NULL,
+      task_id TEXT NOT NULL,
+      scheduled_for TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      delivered_at TEXT,
+      error TEXT,
+      created_date TEXT NOT NULL,
+      updated_date TEXT NOT NULL,
+      UNIQUE(subscription_id, task_id, scheduled_for)
+    );
+
     CREATE TABLE IF NOT EXISTS priorities (
       id TEXT PRIMARY KEY,
       app_id TEXT NOT NULL,
@@ -243,6 +274,8 @@ export function createDatabase(config = backendConfig) {
     CREATE INDEX IF NOT EXISTS idx_event_map_integration ON external_event_map(integration_id);
     CREATE INDEX IF NOT EXISTS idx_event_map_task ON external_event_map(task_id);
     CREATE INDEX IF NOT EXISTS idx_integration_calendars_integration ON integration_calendars(integration_id);
+    CREATE INDEX IF NOT EXISTS idx_notification_subscriptions_user ON notification_subscriptions(app_id, user_id, status);
+    CREATE INDEX IF NOT EXISTS idx_task_notification_deliveries_due ON task_notification_deliveries(app_id, user_id, scheduled_for, status);
   `);
 
   // Migration: add task_end_time to existing databases.

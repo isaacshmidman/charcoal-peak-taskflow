@@ -22,6 +22,7 @@ import {
 "@/components/ui/alert-dialog";
 import RecentlyDeleted from "@/pages/RecentlyDeleted";
 import IntegrationsPanel from "@/components/settings/IntegrationsPanel";
+import NotificationsPanel from "@/components/settings/NotificationsPanel";
 import { useLocation } from "react-router-dom";
 import { DEFAULT_NAV_ORDER, sanitizeNavOrder, sanitizeNavRoute } from "@/lib/navigation";
 import { useTheme } from "@/lib/ThemeProvider";
@@ -766,6 +767,8 @@ export default function Settings() {
           </div>
         </section>
       )}
+
+      <NotificationsPanel />
 
     </div>);
 

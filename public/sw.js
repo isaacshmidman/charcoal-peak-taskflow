@@ -1,10 +1,58 @@
-const CACHE_NAME = 'zephyrly-v1';
+const CACHE_NAME = 'zephyrly-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
+  '/manifest.json',
+  '/zephyrly-logo.png',
+  '/apple-touch-icon.png',
+  '/icon.svg',
 ];
 
 const isLocalhost = ["localhost", "127.0.0.1"].includes(self.location.hostname);
+
+self.addEventListener('push', (event) => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch {
+    payload = { body: event.data ? event.data.text() : "" };
+  }
+
+  const title = payload.title || 'Zephyrly';
+  const options = {
+    body: payload.body || '',
+    icon: payload.icon || '/zephyrly-logo.png',
+    badge: payload.badge || '/zephyrly-logo.png',
+    tag: payload.tag || undefined,
+    renotify: Boolean(payload.tag),
+    data: payload.data || {},
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const data = event.notification.data || {};
+  const targetUrl = new URL(data.url || '/', self.location.origin).href;
+
+  event.waitUntil((async () => {
+    const clientList = await clients.matchAll({
+      type: 'window',
+      includeUncontrolled: true,
+    });
+
+    for (const client of clientList) {
+      const clientUrl = new URL(client.url);
+      if (clientUrl.origin !== self.location.origin) continue;
+      if ('navigate' in client) await client.navigate(targetUrl);
+      if ('focus' in client) return client.focus();
+      return;
+    }
+
+    if (clients.openWindow) return clients.openWindow(targetUrl);
+  })());
+});
 
 if (isLocalhost) {
   self.addEventListener('install', () => {
@@ -15,11 +63,15 @@ if (isLocalhost) {
     event.waitUntil((async () => {
       const keys = await caches.keys();
       await Promise.all(keys.map((key) => caches.delete(key)));
-      await self.registration.unregister();
       await self.clients.claim();
     })());
   });
 } else {
+  const cacheResponse = async (request, response) => {
+    if (!response || !response.ok || response.type === 'opaque') return;
+    const cache = await caches.open(CACHE_NAME);
+    await cache.put(request, response.clone());
+  };
 
   self.addEventListener('install', (event) => {
     event.waitUntil(
@@ -40,6 +92,10 @@ if (isLocalhost) {
   self.addEventListener('fetch', (event) => {
     const { request } = event;
     const url = new URL(request.url);
+
+    if (request.method !== 'GET') {
+      return;
+    }
 
     // NEVER intercept /api requests.
     // For navigation requests (e.g. OAuth login redirects), the browser must
@@ -66,8 +122,7 @@ if (isLocalhost) {
           try {
             const response = await fetch(request);
             if (response.ok) {
-              const clone = response.clone();
-              caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', clone));
+              cacheResponse('/index.html', response).catch(() => {});
             }
             return response;
           } catch {
@@ -91,8 +146,7 @@ if (isLocalhost) {
           if (cached) return cached;
           return fetch(request).then((response) => {
             if (response.ok) {
-              const clone = response.clone();
-              caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+              cacheResponse(request, response).catch(() => {});
             }
             return response;
           });
@@ -106,8 +160,7 @@ if (isLocalhost) {
         try {
           const response = await fetch(request);
           if (response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+            cacheResponse(request, response).catch(() => {});
           }
           return response;
         } catch {

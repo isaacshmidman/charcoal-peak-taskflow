@@ -14,6 +14,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useIntegrationCalendars } from "@/hooks/useIntegrations";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { Loader2, Lock, Star } from "lucide-react";
 
 // Compact palette used for the per-calendar color swatch popover. We
@@ -39,6 +40,8 @@ const CALENDAR_COLOR_SWATCHES = [
  * }} props
  */
 export default function ConfigureCalendarsModal({ open, onOpenChange, integration }) {
+  const online = useOnlineStatus();
+  const offline = !online;
   const integrationId = integration?.id || null;
   const {
     calendars,
@@ -126,6 +129,12 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
         </DialogHeader>
 
         <div className="pt-1 min-w-0">
+          {offline && (
+            <p className="mb-3 rounded-lg border border-amber-100 dark:border-[#4a3512] bg-amber-50 dark:bg-[#1f1809] px-3 py-2 text-xs text-amber-700 dark:text-amber-200">
+              Offline: cached calendars are view-only. Sync choices, primary calendar,
+              and provider colors can be changed when you reconnect.
+            </p>
+          )}
           {isLoading ? (
             <div className="flex items-center gap-2 text-xs text-slate-400 dark:text-slate-500 py-6 justify-center">
               <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading calendars…
@@ -164,7 +173,7 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
                           style={{ backgroundColor: c.color_hex || "#94a3b8" }}
                           title="Change calendar color"
                           aria-label="Change calendar color"
-                          disabled={settingColor && colorTargetId === c.external_calendar_id}
+                          disabled={offline || (settingColor && colorTargetId === c.external_calendar_id)}
                         >
                           {settingColor && colorTargetId === c.external_calendar_id && (
                             <Loader2 className="absolute inset-0 m-auto w-2.5 h-2.5 animate-spin text-slate-700 dark:text-slate-200" />
@@ -249,7 +258,7 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
                           title="Make this the primary calendar"
                           aria-label="Make primary"
                           onClick={() => setPrimary(c.external_calendar_id)}
-                          disabled={settingPrimary}
+                          disabled={offline || settingPrimary}
                           className="shrink-0 inline-flex items-center text-slate-300 dark:text-slate-600 hover:text-amber-500 transition-colors disabled:opacity-50"
                         >
                           <Star className="w-3 h-3" />
@@ -279,10 +288,11 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
                     <input
                       type="checkbox"
                       checked={c.enabled}
+                      disabled={offline}
                       onChange={(e) => toggle(c.external_calendar_id, e.target.checked)}
                       className="sr-only peer"
                     />
-                    <span className="relative w-9 h-5 rounded-full bg-slate-200 dark:bg-[#222222] peer-checked:bg-emerald-500 transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:rounded-full after:bg-white after:shadow after:transition-transform peer-checked:after:translate-x-4" />
+                    <span className="relative w-9 h-5 rounded-full bg-slate-200 dark:bg-[#222222] peer-checked:bg-emerald-500 peer-disabled:opacity-50 transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:rounded-full after:bg-white after:shadow after:transition-transform peer-checked:after:translate-x-4" />
                   </label>
                 </li>
               ))}
@@ -301,7 +311,7 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
             <Button
               size="sm"
               onClick={handleSave}
-              disabled={saving || isLoading}
+              disabled={saving || isLoading || (offline && dirty)}
               className="gap-1"
             >
               {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : null}

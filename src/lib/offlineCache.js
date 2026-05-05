@@ -1,6 +1,6 @@
 /**
  * Simple offline cache using localStorage.
- * Stores tasks and priorities so the app can render when offline.
+ * Stores app data so Zephyrly can render and queue supported edits offline.
  */
 import { appConfig, getStoredLocalSession } from "@/lib/app-config";
 
@@ -9,6 +9,9 @@ const KEYS = {
   priorities: 'taskflow_offline_priorities',
   savedTags: 'taskflow_offline_savedTags',
   deletedTasks: 'taskflow_offline_deletedTasks',
+  integrations: 'taskflow_offline_integrations',
+  integrationCalendars: 'taskflow_offline_integration_calendars',
+  notificationSettings: 'taskflow_offline_notification_settings',
   publicSettings: 'taskflow_public_settings',
   pendingMutations: 'taskflow_pending_mutations',
   pendingPriorityMutations: 'taskflow_pending_priority_mutations',
@@ -21,6 +24,9 @@ const SCOPED_KEYS = new Set([
   'priorities',
   'savedTags',
   'deletedTasks',
+  'integrations',
+  'integrationCalendars',
+  'notificationSettings',
   'publicSettings',
   'pendingMutations',
   'pendingPriorityMutations',

@@ -52,6 +52,20 @@ function parseBoolean(value, fallback = false) {
   return fallback;
 }
 
+function deriveVapidSubject() {
+  const explicit = process.env.TASKFLOW_VAPID_SUBJECT;
+  if (explicit) return explicit;
+  const publicUrl = process.env.TASKFLOW_PUBLIC_APP_URL;
+  if (publicUrl) {
+    try {
+      return `mailto:notifications@${new URL(publicUrl).hostname}`;
+    } catch {
+      // fall through
+    }
+  }
+  return "mailto:notifications@localhost";
+}
+
 const isProduction = process.env.NODE_ENV === "production";
 const host = process.env.TASKFLOW_BACKEND_HOST || process.env.HOST || (isProduction ? "0.0.0.0" : "127.0.0.1");
 const port = parseInteger(process.env.TASKFLOW_BACKEND_PORT || process.env.PORT, 8787);
@@ -78,6 +92,10 @@ const integrationsEnabled = parseBoolean(
 );
 const syncIntervalMs = parseInteger(
   process.env.TASKFLOW_SYNC_INTERVAL_MS,
+  60 * 1000 // 1 minute
+);
+const notificationPollMs = parseInteger(
+  process.env.TASKFLOW_NOTIFICATION_POLL_MS,
   60 * 1000 // 1 minute
 );
 
@@ -108,6 +126,10 @@ export const backendConfig = {
   hasGoogleCalendarCredentials,
   integrationsEnabled,
   syncIntervalMs,
+  notificationPollMs,
+  vapidPublicKey: process.env.TASKFLOW_VAPID_PUBLIC_KEY || "",
+  vapidPrivateKey: process.env.TASKFLOW_VAPID_PRIVATE_KEY || "",
+  vapidSubject: deriveVapidSubject(),
 };
 
 export function getGoogleCalendarRedirectUrl(config = backendConfig) {
