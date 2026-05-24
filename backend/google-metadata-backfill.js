@@ -1,4 +1,11 @@
 // @ts-check
+/**
+ * @file PER-SYNC BACKFILL.
+ * Runs on every sync cycle (called from backend/sync.js) to patch older
+ * Google events that lack Zephyrly's `extendedProperties` metadata. Safe
+ * to keep indefinitely — short-circuits when the metadata is already
+ * present, so the steady-state cost is roughly zero per tick.
+ */
 import {
   getEvent as getGoogleEvent,
   updateEvent as updateGoogleEvent,

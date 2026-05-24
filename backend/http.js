@@ -1,5 +1,6 @@
 // @ts-check
 import { URL } from "node:url";
+import { log } from "./log.js";
 
 export class HttpError extends Error {
   /**
@@ -87,7 +88,7 @@ export function sendError(response, error) {
     return;
   }
 
-  console.error(error);
+  log.error(error);
   sendJson(response, 500, {
     message: "Something went wrong on the server.",
     code: "internal_error",

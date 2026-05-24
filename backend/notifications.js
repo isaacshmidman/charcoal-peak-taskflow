@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
 import { fromZonedTime } from "date-fns-tz";
 import { HttpError } from "./http.js";
+import { log } from "./log.js";
 
 const require = createRequire(import.meta.url);
 /** @type {any} */
@@ -184,7 +185,7 @@ export function startNotificationLoop(db, config, opts = {}) {
     if (loopRunning) return;
     loopRunning = true;
     runNotificationSweep(db, config, opts)
-      .catch((err) => console.warn("[notifications] sweep failed:", err.message))
+      .catch((err) => log.warn("[notifications] sweep failed:", err.message))
       .finally(() => {
         loopRunning = false;
       });

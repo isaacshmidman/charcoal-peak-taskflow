@@ -34,13 +34,13 @@
  * Usage:
  *   Stop the dev server first (so we don't double-write the SQLite WAL),
  *   then run:
- *     node backend/scripts/backfill-pushes.js
+ *     node backend/scripts/one-shots/backfill-pushes.js
  *   Restart the dev server when the script reports "Done."
  */
 
-import { getDatabase } from "../db.js";
-import { backendConfig } from "../config.js";
-import { enqueueTaskPush, waitForPushIdle } from "../push.js";
+import { getDatabase } from "../../db.js";
+import { backendConfig } from "../../config.js";
+import { enqueueTaskPush, waitForPushIdle } from "../../push.js";
 
 async function main() {
   if (!backendConfig.integrationsEnabled) {

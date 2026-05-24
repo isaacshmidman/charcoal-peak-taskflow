@@ -9,9 +9,12 @@ import { Button } from "@/components/ui/button";
 import { AnimatedSearchInput } from "@/components/ui/animated-search-input";
 import { Plus, Search } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
-import {
-  startOfDay, subDays, addDays, isWithinInterval, format, isBefore
-} from "date-fns";
+import { addDays } from "date-fns/addDays";
+import { format } from "date-fns/format";
+import { isBefore } from "date-fns/isBefore";
+import { isWithinInterval } from "date-fns/isWithinInterval";
+import { startOfDay } from "date-fns/startOfDay";
+import { subDays } from "date-fns/subDays";
 import CompactTaskCard from "@/components/tasks/CompactTaskCard";
 import TaskForm from "@/components/tasks/TaskForm";
 import MultiSortPanel from "@/components/tasks/MultiSortPanel";

@@ -8,6 +8,8 @@
     "node": "22.14.0"
   },
   "scripts": {
+    "audit:deps": "npx --yes depcheck --skip-missing",
+    "audit:size": "find src backend -type f \\( -name '*.js' -o -name '*.jsx' -o -name '*.ts' -o -name '*.tsx' \\) -not -path '*/node_modules/*' -exec wc -l {} + | sort -rn | head -20",
     "dev": "vite",
     "dev:open": "vite --open",
     "start": "node backend/server.js",
@@ -15,8 +17,8 @@
     "backend:dev": "node --watch backend/server.js",
     "backend:import": "node backend/import-base44-exports.js",
     "build": "vite build",
-    "lint": "eslint . --quiet",
-    "lint:fix": "eslint . --fix",
+    "lint": "node scripts/run-eslint.mjs",
+    "lint:fix": "node scripts/run-eslint.mjs --fix",
     "playwright:install": "playwright install chromium",
     "test": "vitest",
     "test:run": "vitest run",
@@ -70,6 +72,7 @@
     "eslint-plugin-react-refresh": "^0.4.18",
     "eslint-plugin-unused-imports": "^4.3.0",
     "globals": "^15.14.0",
+    "happy-dom": "^20.9.0",
     "jsdom": "^29.0.1",
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.17",

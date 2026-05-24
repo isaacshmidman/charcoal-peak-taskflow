@@ -1,16 +1,14 @@
 // @ts-nocheck
 import { useMemo } from "react";
-import {
-  startOfYear,
-  startOfMonth,
-  startOfWeek,
-  addDays,
-  addMonths,
-  format,
-  isSameMonth,
-  isSameDay,
-  startOfDay,
-} from "date-fns";
+import { addDays } from "date-fns/addDays";
+import { addMonths } from "date-fns/addMonths";
+import { format } from "date-fns/format";
+import { isSameDay } from "date-fns/isSameDay";
+import { isSameMonth } from "date-fns/isSameMonth";
+import { startOfDay } from "date-fns/startOfDay";
+import { startOfMonth } from "date-fns/startOfMonth";
+import { startOfWeek } from "date-fns/startOfWeek";
+import { startOfYear } from "date-fns/startOfYear";
 import { cn } from "@/lib/utils";
 import { toDateStr } from "./MonthCalendar";
 

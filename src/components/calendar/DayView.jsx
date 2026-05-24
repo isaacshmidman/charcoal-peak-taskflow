@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useDroppable } from "@dnd-kit/core";
-import { isSameDay } from "date-fns";
+import { isSameDay } from "date-fns/isSameDay";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import MiniMiniTaskCard from "./MiniMiniTaskCard";

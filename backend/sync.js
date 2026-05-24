@@ -49,6 +49,7 @@ import { suppressPush } from "./push.js";
 import { backfillGoogleEventMetadata } from "./google-metadata-backfill.js";
 import { parseRruleValueToTaskRecurrence } from "./recurrence-rrule.js";
 import { formatInTimeZone } from "date-fns-tz";
+import { log } from "./log.js";
 
 // Ensure we don't run two sync cycles for the same integration simultaneously.
 const inFlight = new Set();
@@ -75,14 +76,14 @@ export function startSyncLoop(db, config) {
   initialTimeoutHandle = setTimeout(() => {
     initialTimeoutHandle = null;
     runAllDueSyncs(db, config).catch((err) => {
-      console.warn("[sync] initial tick failed:", err.message);
+      log.warn("[sync] initial tick failed:", err.message);
     });
   }, initialDelay);
   initialTimeoutHandle.unref?.();
 
   intervalHandle = setInterval(() => {
     runAllDueSyncs(db, config).catch((err) => {
-      console.warn("[sync] tick failed:", err.message);
+      log.warn("[sync] tick failed:", err.message);
     });
   }, config.syncIntervalMs);
   // Don't keep the process alive just for the sync timer.
@@ -113,7 +114,7 @@ async function runAllDueSyncs(db, config) {
       await syncIntegration(db, config, row);
     } catch (err) {
       // Log without tokens; integration row already marked with last_error.
-      console.warn(`[sync] integration ${row.id} failed:`, err.message);
+      log.warn(`[sync] integration ${row.id} failed:`, err.message);
     } finally {
       inFlight.delete(row.id);
     }
@@ -140,7 +141,7 @@ export async function syncIntegration(db, config, integrationRow) {
   } catch (err) {
     // Often a 403 quota or transient network blip — just continue with
     // whatever calendars we have on record.
-    console.warn(
+    log.warn(
       `[sync] refresh calendars for integration ${integrationRow.id} failed: ${err.message}`
     );
   }
@@ -182,12 +183,12 @@ export async function syncIntegration(db, config, integrationRow) {
       accessToken,
     });
     if (backfill.errors) {
-      console.warn(
+      log.warn(
         `[sync] Google metadata backfill for integration ${integrationRow.id}: ${backfill.lastError}`
       );
     }
   } catch (err) {
-    console.warn(
+    log.warn(
       `[sync] Google metadata backfill for integration ${integrationRow.id} failed: ${err.message}`
     );
   }
@@ -206,7 +207,7 @@ export async function syncIntegration(db, config, integrationRow) {
       markCalendarSyncResult(db, integrationRow.id, cal.external_calendar_id, {
         error: err.message,
       });
-      console.warn(
+      log.warn(
         `[sync] calendar ${cal.external_calendar_id} on integration ${integrationRow.id}: ${err.message}`
       );
     }
@@ -252,7 +253,7 @@ async function syncOneCalendar(db, config, { integration, accessToken, user, cal
       });
     } catch (err) {
       // Keep going — one bad event shouldn't break the cycle.
-      console.warn(
+      log.warn(
         `[sync] event ${event?.id || "?"} on integration ${integration.id}: ${err.message}`
       );
     }
@@ -447,7 +448,7 @@ export function mapGoogleEventToTaskInput(event, calendarRow) {
 
   if (event.start.date) {
     // All-day: prefer the start date. Multi-day all-day events collapse
-    // to the start date for now (TODO: multi-day spans).
+    // to the start date for now (KNOWN-LIMITATION: multi-day spans are flattened — fix tracked separately).
     due_date = event.start.date; // YYYY-MM-DD
   } else if (event.start.dateTime) {
     const startDt = new Date(event.start.dateTime);
@@ -564,7 +565,7 @@ async function syncAppleIntegration(db, config, integrationRow) {
   try {
     await refreshIntegrationCalendars(db, config, integrationRow);
   } catch (err) {
-    console.warn(
+    log.warn(
       `[sync] apple refresh calendars for integration ${integrationRow.id} failed: ${err.message}`
     );
   }
@@ -607,7 +608,7 @@ async function syncAppleIntegration(db, config, integrationRow) {
       markCalendarSyncResult(db, integrationRow.id, cal.external_calendar_id, {
         error: err.message,
       });
-      console.warn(
+      log.warn(
         `[sync] apple calendar ${cal.external_calendar_id} on integration ${integrationRow.id}: ${err.message}`
       );
     }
@@ -639,7 +640,7 @@ async function syncOneAppleCalendar(db, config, { integration, creds, user, cale
         change,
       });
     } catch (err) {
-      console.warn(
+      log.warn(
         `[sync] apple event ${change.href || "?"} on integration ${integration.id}: ${err.message}`
       );
     }

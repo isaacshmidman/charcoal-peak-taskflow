@@ -15,7 +15,7 @@ import {
   ArrowDown,
   X,
 } from "lucide-react";
-import { format } from "date-fns";
+import { format } from "date-fns/format";
 import { cn } from "@/lib/utils";
 import { colorBg, isDarkColor } from "@/lib/colors";
 

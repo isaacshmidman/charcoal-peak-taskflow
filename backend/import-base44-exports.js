@@ -1,4 +1,12 @@
 // @ts-check
+/**
+ * @file ONE-SHOT MIGRATION SCRIPT.
+ * Run only when migrating a legacy Base44 dataset into Zephyrly. Not
+ * invoked at server startup. Triggered manually via:
+ *   npm run backend:import
+ * Safe to delete once all Base44 data has been migrated. Until then it
+ * stays here so users with old Base44 dumps can re-import as needed.
+ */
 import { readFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { backendConfig } from "./config.js";

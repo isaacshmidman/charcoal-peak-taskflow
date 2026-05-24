@@ -4,6 +4,7 @@ import { apiClient } from "@/api/apiClient";
 import { appConfig, getStoredAccessToken, getStoredLocalSession, removeAccessToken, removeLocalSession, saveLocalSession } from "@/lib/app-config";
 import { syncOfflineQueryCache } from "@/lib/query-client";
 import { isRecoverableConnectionError } from "@/lib/network";
+import { logger } from "@/lib/logger";
 
 const AuthContext = createContext();
 
@@ -35,7 +36,7 @@ export const AuthProvider = ({ children }) => {
       syncOfflineQueryCache();
       return { currentUser, errorType: null };
     } catch (error) {
-      console.error("User auth check failed:", error);
+      logger.error("User auth check failed:", error);
       setUser(null);
       setIsAuthenticated(false);
 
@@ -86,7 +87,7 @@ export const AuthProvider = ({ children }) => {
         }
       }
     } catch (appError) {
-      console.error("App state check failed:", appError);
+      logger.error("App state check failed:", appError);
 
       if (appError.status === 403 && appError.data?.extra_data?.reason) {
         const reason = appError.data.extra_data.reason;

@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { backendConfig, projectRoot } from "./config.js";
 import { closeDatabase, getDatabase } from "./db.js";
 import { HttpError, getRequestUrl, readJsonBody, redirect, sendError, sendJson } from "./http.js";
+import { log } from "./log.js";
 import {
   clearSessionCookie,
   completeGoogleLogin,
@@ -168,7 +169,7 @@ export function createTaskflowServer(config = backendConfig) {
     start() {
       return new Promise((resolve) => {
         server.listen(config.port, config.host, () => {
-          console.log(`Zephyrly backend listening on http://${config.host}:${config.port}`);
+          log.info(`backend listening on http://${config.host}:${config.port}`);
           syncHandle = startSyncLoop(db, config);
           notificationHandle = startNotificationLoop(db, config);
           resolve(server);

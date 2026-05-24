@@ -47,6 +47,7 @@ import {
   colorNameToGoogleColorId,
   colorNameToHex,
 } from "./priority-color.js";
+import { log } from "./log.js";
 
 /** @typedef {import("node:sqlite").DatabaseSync} DB */
 
@@ -208,7 +209,7 @@ async function drainQueue() {
         await job();
       } catch (err) {
         // Already logged inside runPush; keep draining.
-        console.warn(`[push] queued job error: ${err?.message || err}`);
+        log.warn(`[push] queued job error: ${err?.message || err}`);
       }
     }
   } finally {
@@ -262,7 +263,7 @@ async function runPush(db, config, { op, appId, taskSnapshot }) {
       await pushOne(db, config, { op, integration, taskSnapshot });
     } catch (err) {
       // Per-integration failure already logged + marked; keep going.
-      console.warn(
+      log.warn(
         `[push] integration ${integration.id} task ${taskSnapshot.id}: ${err.message}`
       );
     }

@@ -2,23 +2,29 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@dnd-kit/core": ["./src/types/dnd-kit-core-shim.d.ts"],
+      "date-fns": ["./src/types/date-fns-shim.d.ts"],
+      "date-fns/*": ["./src/types/date-fns-shim.d.ts"],
+      "date-fns-tz": ["./src/types/date-fns-tz-shim.d.ts"],
+      "vitest": ["./src/types/vitest-shim.d.ts"]
     },
     "jsx": "react-jsx",
     "module": "esnext",
     "moduleResolution": "bundler",
-    "lib": ["esnext", "dom"],
-    "target": "esnext",
+    "lib": ["es2022", "dom", "dom.iterable"],
+    "target": "es2022",
     "allowJs": true,
+    "maxNodeModuleJsDepth": 0,
     "checkJs": true,
     "noEmit": true,
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "resolveJsonModule": true,
-    "types": ["vite/client", "vitest/globals", "node"]
+    "types": ["vite/client"]
   },
-  "include": ["src/**/*", "backend/**/*", "vitest.config.js", "playwright.config.ts", "e2e/**/*"],
+  "include": ["src/**/*", "backend/**/*"],
   "exclude": [
     "node_modules",
     "dist",

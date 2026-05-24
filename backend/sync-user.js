@@ -1,9 +1,10 @@
 // @ts-check
 /**
+ * @file SYNC AUTHORIZATION HELPER.
  * Builds a user payload suitable for passing into store.js entity calls
  * on behalf of a sync job. Mirrors the shape produced by
  * `auth.requireAuthenticatedUser` so the authorization scope clauses in
- * store.js continue to apply.
+ * store.js continue to apply. Sole consumer: backend/sync.js.
  */
 
 export function buildUserForSync(db, integrationRow) {

@@ -1,17 +1,17 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv } from "vite";
-import { backendConfig } from "./backend/config.js";
-import { closeDatabase, getDatabase } from "./backend/db.js";
-import { createRequestHandler } from "./backend/server.js";
-import { startSyncLoop } from "./backend/sync.js";
-import { startNotificationLoop } from "./backend/notifications.js";
 import { createViteConfig } from "./vite.shared.js";
 
 function createEmbeddedBackendPlugin({ appId }) {
   return {
     name: "taskflow-embedded-backend",
     apply: "serve",
-    configureServer(server) {
+    async configureServer(server) {
+      const { backendConfig } = await import("./backend/config.js");
+      const { closeDatabase, getDatabase } = await import("./backend/db.js");
+      const { createRequestHandler } = await import("./backend/server.js");
+      const { startSyncLoop } = await import("./backend/sync.js");
+      const { startNotificationLoop } = await import("./backend/notifications.js");
       const configuredPort = Number(server.config.server.port || 5173);
       const embeddedConfig = {
         ...backendConfig,
@@ -82,7 +82,7 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [
       react(),
-      ...(useEmbeddedApi ? [createEmbeddedBackendPlugin({ appId: env.VITE_APP_ID || backendConfig.appId })] : []),
+      ...(useEmbeddedApi ? [createEmbeddedBackendPlugin({ appId: env.VITE_APP_ID })] : []),
     ],
   };
 });

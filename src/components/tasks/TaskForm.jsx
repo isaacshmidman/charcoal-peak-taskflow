@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Calendar as CalendarIcon, X, Plus, Trash2, CheckSquare, Lock } from "lucide-react";
 import { hexToRgba } from "@/lib/colors";
 
-import { format } from "date-fns";
+import { format } from "date-fns/format";
 import { cn } from "@/lib/utils";
 import { useOutsideClick } from "@/hooks/useOutsideClick";
 import { getNextRecurrenceDate } from "@/lib/recurrence";

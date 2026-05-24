@@ -17,27 +17,6 @@ import {
   pointerWithin,
 } from "@dnd-kit/core";
 import {
-  addDays,
-  addWeeks,
-  addMonths,
-  addYears,
-  subDays,
-  subWeeks,
-  subMonths,
-  subYears,
-  startOfDay,
-  startOfWeek,
-  endOfWeek,
-  startOfMonth,
-  endOfMonth,
-  startOfYear,
-  endOfYear,
-  isWithinInterval,
-  isSameMonth,
-  isSameYear,
-  format,
-} from "date-fns";
-import {
   Plus,
   Search,
   ChevronLeft,
@@ -45,7 +24,26 @@ import {
   Settings as SettingsIcon,
   RefreshCw,
 } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { addDays } from "date-fns/addDays";
+import { addMonths } from "date-fns/addMonths";
+import { addWeeks } from "date-fns/addWeeks";
+import { addYears } from "date-fns/addYears";
+import { endOfMonth } from "date-fns/endOfMonth";
+import { endOfWeek } from "date-fns/endOfWeek";
+import { endOfYear } from "date-fns/endOfYear";
+import { format } from "date-fns/format";
+import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
+import { isSameMonth } from "date-fns/isSameMonth";
+import { isSameYear } from "date-fns/isSameYear";
+import { isWithinInterval } from "date-fns/isWithinInterval";
+import { startOfDay } from "date-fns/startOfDay";
+import { startOfMonth } from "date-fns/startOfMonth";
+import { startOfWeek } from "date-fns/startOfWeek";
+import { startOfYear } from "date-fns/startOfYear";
+import { subDays } from "date-fns/subDays";
+import { subMonths } from "date-fns/subMonths";
+import { subWeeks } from "date-fns/subWeeks";
+import { subYears } from "date-fns/subYears";
 import { Button } from "@/components/ui/button";
 import { AnimatedSearchInput } from "@/components/ui/animated-search-input";
 import { cn } from "@/lib/utils";

@@ -1,4 +1,8 @@
-import "@testing-library/jest-dom/vitest";
+// Dropped `@testing-library/jest-dom/vitest` import — its custom matchers
+// (toBeInTheDocument, etc.) aren't used by any current test, and the
+// import was the trigger for a vitest-4.x worker-startup deadlock with
+// happy-dom. If you reintroduce jest-dom matchers later, verify worker
+// startup still completes within ~5s.
 import { vi } from "vitest";
 
 vi.mock("framer-motion", async () => {

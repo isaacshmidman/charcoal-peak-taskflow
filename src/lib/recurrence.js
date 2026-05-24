@@ -1,11 +1,9 @@
-import {
-  addDays,
-  addMonths,
-  addQuarters,
-  addWeeks,
-  addYears,
-  getDay,
-} from "date-fns";
+import { addDays } from "date-fns/addDays";
+import { addMonths } from "date-fns/addMonths";
+import { addQuarters } from "date-fns/addQuarters";
+import { addWeeks } from "date-fns/addWeeks";
+import { addYears } from "date-fns/addYears";
+import { getDay } from "date-fns/getDay";
 
 /**
  * @typedef {import("@/types/tasks").TaskRecord} TaskRecord

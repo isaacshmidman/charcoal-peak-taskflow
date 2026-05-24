@@ -1,17 +1,15 @@
 // @ts-nocheck
 import { useMemo } from "react";
 import { useDroppable } from "@dnd-kit/core";
-import {
-  startOfMonth,
-  endOfMonth,
-  startOfWeek,
-  endOfWeek,
-  addDays,
-  format,
-  isSameMonth,
-  isSameDay,
-  startOfDay,
-} from "date-fns";
+import { addDays } from "date-fns/addDays";
+import { endOfMonth } from "date-fns/endOfMonth";
+import { endOfWeek } from "date-fns/endOfWeek";
+import { format } from "date-fns/format";
+import { isSameDay } from "date-fns/isSameDay";
+import { isSameMonth } from "date-fns/isSameMonth";
+import { startOfDay } from "date-fns/startOfDay";
+import { startOfMonth } from "date-fns/startOfMonth";
+import { startOfWeek } from "date-fns/startOfWeek";
 import { cn } from "@/lib/utils";
 import MiniMiniTaskCard from "./MiniMiniTaskCard";
 

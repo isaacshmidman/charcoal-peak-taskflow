@@ -3,7 +3,7 @@ import { isOnline, queueMutation, dequeueOfflineCreate, updateQueuedCreate } fro
 import { apiClient } from '@/api/apiClient';
 import { useDeletedTasks } from '@/hooks/useDeletedTasks';
 import { isRecoverableConnectionError } from '@/lib/network';
-import { format } from 'date-fns';
+import { format } from 'date-fns/format';
 import { getNextRecurringDueDate } from '@/lib/recurrence';
 
 const createOptimisticId = (prefix) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;

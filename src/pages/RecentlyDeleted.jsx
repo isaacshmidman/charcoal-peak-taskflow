@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { AnimatedSearchInput } from "@/components/ui/animated-search-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AnimatePresence, motion } from "framer-motion";
-import { format } from "date-fns";
+import { format } from "date-fns/format";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useDeletedTasks } from "@/hooks/useDeletedTasks";
