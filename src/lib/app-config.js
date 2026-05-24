@@ -1,8 +1,27 @@
-// @ts-nocheck
 const isServer = typeof window === "undefined";
-const fallbackStorage = new Map();
+const fallbackStorage = {
+  /** @type {Map<string, string>} */
+  values: new Map(),
+  /** @param {string} key */
+  getItem(key) { return this.values.get(key) ?? null; },
+  /** @param {string} key @param {string} value */
+  setItem(key, value) { this.values.set(key, value); },
+  /** @param {string} key */
+  removeItem(key) { this.values.delete(key); },
+};
 const storage = isServer ? fallbackStorage : window.localStorage;
 
+/**
+ * @typedef {{
+ *   accessToken: string,
+ *   appId: string,
+ *   apiBaseUrl: string,
+ *   fromUrl: string,
+ *   localSession: string,
+ * }} StorageKeys
+ */
+
+/** @type {StorageKeys} */
 export const APP_STORAGE_KEYS = {
   accessToken: "taskflow_access_token",
   appId: "taskflow_app_id",
@@ -14,6 +33,10 @@ export const APP_STORAGE_KEYS = {
 const TOKEN_FALLBACK_STORAGE_KEYS = ["token"];
 const CLEAR_TOKEN_STORAGE_KEY = "__taskflow_clear_token__";
 
+/**
+ * @param {string} key
+ * @returns {string | null}
+ */
 function getStorageValue(key) {
   if (!storage?.getItem) return null;
 
@@ -24,6 +47,11 @@ function getStorageValue(key) {
   }
 }
 
+/**
+ * @param {string} key
+ * @param {string} value
+ * @returns {void}
+ */
 function setStorageValue(key, value) {
   if (!storage?.setItem || value == null || value === "") return;
 
@@ -32,6 +60,10 @@ function setStorageValue(key, value) {
   } catch {}
 }
 
+/**
+ * @param {string} key
+ * @returns {void}
+ */
 function removeStorageValue(key) {
   if (!storage?.removeItem) return;
 
@@ -40,10 +72,19 @@ function removeStorageValue(key) {
   } catch {}
 }
 
+/**
+ * @param {Array<string | null | undefined>} values
+ * @returns {string | null}
+ */
 function getFirstDefined(values) {
   return values.find((value) => value != null && value !== "") ?? null;
 }
 
+/**
+ * @param {string} primaryKey
+ * @param {string[]} [legacyKeys]
+ * @returns {string | null}
+ */
 function readStoredValue(primaryKey, legacyKeys = []) {
   const primaryValue = getStorageValue(primaryKey);
   if (primaryValue) return primaryValue;
@@ -57,6 +98,16 @@ function readStoredValue(primaryKey, legacyKeys = []) {
   return null;
 }
 
+/**
+ * @param {{
+ *   paramNames?: string[],
+ *   storageKey: string,
+ *   legacyStorageKeys?: string[],
+ *   defaultValues?: Array<string | null | undefined>,
+ *   removeFromUrl?: boolean,
+ * }} options
+ * @returns {string | null}
+ */
 function readConfigValue({
   paramNames = [],
   storageKey,
@@ -99,16 +150,26 @@ function readConfigValue({
   return readStoredValue(storageKey, legacyStorageKeys);
 }
 
+/** @returns {void} */
 function clearStoredToken() {
   removeStorageValue(APP_STORAGE_KEYS.accessToken);
   TOKEN_FALLBACK_STORAGE_KEYS.forEach(removeStorageValue);
 }
 
+/** @returns {string} */
 function getWindowUrl() {
   if (isServer) return "";
   return window.location.href;
 }
 
+/**
+ * @returns {{
+ *   appId: string | null,
+ *   token: string | null,
+ *   fromUrl: string | null,
+ *   apiBaseUrl: string | null,
+ * }}
+ */
 function getAppConfig() {
   if (
     readConfigValue({
@@ -146,24 +207,36 @@ function getAppConfig() {
   };
 }
 
+/**
+ * @type {{
+ *   appId: string | null,
+ *   apiBaseUrl: string | null,
+ *   token: string | null,
+ *   fromUrl: string | null,
+ * }}
+ */
 export const appConfig = {
   ...getAppConfig(),
 };
 
+/** @returns {string | null} */
 export function getStoredAccessToken() {
   return readStoredValue(APP_STORAGE_KEYS.accessToken, TOKEN_FALLBACK_STORAGE_KEYS);
 }
 
+/** @param {string | null | undefined} token */
 export function saveAccessToken(token) {
   if (!token) return;
   setStorageValue(APP_STORAGE_KEYS.accessToken, token);
   setStorageValue("token", token);
 }
 
+/** @returns {void} */
 export function removeAccessToken() {
   clearStoredToken();
 }
 
+/** @returns {any | null} */
 export function getStoredLocalSession() {
   const rawValue = getStorageValue(APP_STORAGE_KEYS.localSession);
   if (!rawValue) return null;
@@ -175,11 +248,13 @@ export function getStoredLocalSession() {
   }
 }
 
+/** @param {any} session */
 export function saveLocalSession(session) {
   if (!session) return;
   setStorageValue(APP_STORAGE_KEYS.localSession, JSON.stringify(session));
 }
 
+/** @returns {void} */
 export function removeLocalSession() {
   removeStorageValue(APP_STORAGE_KEYS.localSession);
 }

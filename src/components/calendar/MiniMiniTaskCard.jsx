@@ -1,10 +1,12 @@
-// @ts-nocheck
 import { useState, useEffect } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import { CheckSquare, CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { colorBg, isDarkColor, mixHexColor } from "@/lib/colors";
 import { useTheme } from "@/lib/ThemeProvider";
+
+/** @typedef {import("@/types/tasks").TaskRecord & { source_kind?: string | null, source_color_hex?: string | null }} TaskRecord */
+/** @typedef {import("@/types/tasks").PriorityOption} PriorityOption */
 
 /**
  * Ultra-compact task chip for month-calendar day cells.
@@ -13,10 +15,11 @@ import { useTheme } from "@/lib/ThemeProvider";
  * Draggable between days.
  *
  * @param {{
- *   task: any,
- *   priorities: Array<{id: string, color?: string}>,
- *   onClick: (task: any) => void,
- *   onToggleDone?: (task: any) => void,
+ *   task: TaskRecord,
+ *   priorities: PriorityOption[],
+ *   onClick: (task: TaskRecord) => void,
+ *   onToggleDone?: (task: TaskRecord) => void,
+ *   fillHeight?: boolean,
  * }} props
  */
 export default function MiniMiniTaskCard({ task, priorities, onClick, onToggleDone, fillHeight = false }) {

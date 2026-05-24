@@ -1,10 +1,14 @@
-// @ts-nocheck
 /**
  * Shared color palette for priority swatches and task card backgrounds.
  * Used by Settings (swatch picker), TaskCard (card bg), and RecentlyDeleted
  * (DeletedTaskCard bg). Keep in sync — adding a color here adds it everywhere.
  */
 
+/**
+ * @typedef {{ value: string, label: string, class: string }} ColorOption
+ */
+
+/** @type {ColorOption[]} */
 export const COLOR_OPTIONS = [
   { value: "red", label: "Red", class: "bg-red-400" },
   { value: "orange", label: "Orange", class: "bg-orange-400" },
@@ -29,6 +33,7 @@ export const COLOR_OPTIONS = [
 ];
 
 /** Small circular dot class per color — used by inline priority indicators. */
+/** @type {Record<string, string>} */
 export const colorDot = {
   red: "bg-red-400",
   orange: "bg-orange-400",
@@ -53,6 +58,7 @@ export const colorDot = {
 };
 
 /** Task card background + border class, tuned to match the dot hue at low saturation. */
+/** @type {Record<string, string>} */
 export const colorBg = {
   red: "bg-red-50 border-red-100 dark:bg-[#2a1116] dark:border-[#6f2634]",
   orange: "bg-orange-50 border-orange-100 dark:bg-[#2b180f] dark:border-[#76401c]",
@@ -77,6 +83,10 @@ export const colorBg = {
 };
 
 /** True when the given color has a dark background and needs light text. */
+/**
+ * @param {string | undefined} colorKey
+ * @returns {boolean}
+ */
 export function isDarkColor(colorKey) {
   return colorKey === "black";
 }
@@ -84,6 +94,8 @@ export function isDarkColor(colorKey) {
 /**
  * Parse a #RRGGBB / #RGB hex string to an `{r,g,b}` object.
  * Returns null when the input doesn't match.
+ * @param {string} hex
+ * @returns {{ r: number, g: number, b: number } | null}
  */
 export function parseHexColor(hex) {
   if (typeof hex !== "string") return null;
@@ -99,6 +111,11 @@ export function parseHexColor(hex) {
 }
 
 /** Produce an `rgba(...)` string from a hex color + alpha (0..1). */
+/**
+ * @param {string} hex
+ * @param {number} [alpha]
+ * @returns {string | null}
+ */
 export function hexToRgba(hex, alpha = 1) {
   const c = parseHexColor(hex);
   if (!c) return null;
@@ -107,6 +124,12 @@ export function hexToRgba(hex, alpha = 1) {
 }
 
 /** Mix a hex color with a solid target color and return a solid #rrggbb value. */
+/**
+ * @param {string} hex
+ * @param {string} targetHex
+ * @param {number} [sourceWeight]
+ * @returns {string | null}
+ */
 export function mixHexColor(hex, targetHex, sourceWeight = 0.5) {
   const source = parseHexColor(hex);
   const target = parseHexColor(targetHex);
@@ -120,6 +143,8 @@ export function mixHexColor(hex, targetHex, sourceWeight = 0.5) {
 /**
  * True when an arbitrary hex color is "dark" (perceptual luminance below 50%).
  * Used to choose between light / dark text on a hex-colored surface.
+ * @param {string} hex
+ * @returns {boolean}
  */
 export function isHexDark(hex) {
   const c = parseHexColor(hex);

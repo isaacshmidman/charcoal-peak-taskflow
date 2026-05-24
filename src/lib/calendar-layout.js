@@ -1,7 +1,25 @@
-// @ts-nocheck
 import { parseTaskTime } from "@/lib/sort-helpers";
 
 const DEFAULT_DURATION_MIN = 60;
+
+/** @typedef {import("@/types/tasks").TaskRecord} TaskRecord */
+/**
+ * @typedef {{
+ *   task: TaskRecord,
+ *   startMin: number,
+ *   endMin: number,
+ *   col: number,
+ *   cols: number,
+ *   colSpan: number,
+ * }} LaidOutTask
+ */
+/**
+ * @typedef {{
+ *   task: TaskRecord,
+ *   startMin: number,
+ *   endMin: number,
+ * }} TimedTask
+ */
 
 /**
  * Given timed tasks for a single day, assign each event:
@@ -33,10 +51,11 @@ const DEFAULT_DURATION_MIN = 60;
  * it at 10:30. With step 4, C expands `colSpan` to 2 and renders full
  * width. Render code multiplies `colSpan / cols` instead of `1 / cols`.
  *
- * @returns {Array<{task, startMin, endMin, col, cols, colSpan}>}
+ * @param {TaskRecord[]} tasks
+ * @returns {LaidOutTask[]}
  */
 export function layoutTimedTasks(tasks) {
-  const events = tasks
+  const events = /** @type {TimedTask[]} */ (tasks
     .map((t) => {
       const startMin = parseTaskTime(t.task_time);
       if (startMin == null) return null;
@@ -47,12 +66,12 @@ export function layoutTimedTasks(tasks) {
           : startMin + DEFAULT_DURATION_MIN;
       return { task: t, startMin, endMin };
     })
-    .filter(Boolean)
+    .filter(Boolean))
     .sort((a, b) => a.startMin - b.startMin || b.endMin - a.endMin);
 
   // 2. Cluster overlapping events.
-  const clusters = [];
-  let cur = [];
+  const clusters = /** @type {TimedTask[][]} */ ([]);
+  let cur = /** @type {TimedTask[]} */ ([]);
   let curEnd = -1;
   for (const e of events) {
     if (cur.length && e.startMin < curEnd) {
@@ -66,11 +85,11 @@ export function layoutTimedTasks(tasks) {
   }
   if (cur.length) clusters.push(cur);
 
-  const out = [];
+  const out = /** @type {LaidOutTask[]} */ ([]);
   for (const cluster of clusters) {
     // 3. Greedy per-cluster column assignment.
-    const cols = []; // last endMin per column
-    const assigned = [];
+    const cols = /** @type {number[]} */ ([]); // last endMin per column
+    const assigned = /** @type {Array<TimedTask & { col: number, colSpan?: number }>} */ ([]);
     for (const e of cluster) {
       let placed = false;
       for (let i = 0; i < cols.length; i++) {
@@ -106,7 +125,7 @@ export function layoutTimedTasks(tasks) {
       e.colSpan = span;
     }
 
-    for (const a of assigned) out.push({ ...a, cols: colCount });
+    for (const a of assigned) out.push(/** @type {LaidOutTask} */ ({ ...a, colSpan: a.colSpan ?? 1, cols: colCount }));
   }
   return out;
 }

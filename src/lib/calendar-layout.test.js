@@ -1,8 +1,13 @@
-// @ts-nocheck
 import { describe, it, expect } from "vitest";
 import { layoutTimedTasks } from "@/lib/calendar-layout";
 
 // Helper — short-form task constructor for terser tests.
+/**
+ * @param {string} id
+ * @param {string} time
+ * @param {string} [end]
+ * @returns {import("@/types/tasks").TaskRecord}
+ */
 const t = (id, time, end) => ({
   id,
   task_time: time,
@@ -10,6 +15,10 @@ const t = (id, time, end) => ({
 });
 
 // Find the layout entry for a task id.
+/**
+ * @param {ReturnType<typeof layoutTimedTasks>} laidOut
+ * @param {string} id
+ */
 const find = (laidOut, id) => laidOut.find((e) => e.task.id === id);
 
 describe("layoutTimedTasks", () => {

@@ -23,6 +23,7 @@
  */
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { getGoogleCalendarRedirectUrl } from "../config.js";
+import { HttpStatusError } from "../lib/http-status-error.js";
 
 const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events";
 const CALENDAR_META_SCOPE = "https://www.googleapis.com/auth/calendar.calendars.readonly";
@@ -177,10 +178,7 @@ export async function refreshAccessToken(config, refreshToken) {
     const body = await resp.text().catch(() => "");
     // 400 invalid_grant → user revoked access at Google. Caller should mark
     // integration as needs_reauth and stop retrying.
-    const err = new Error(`Google refresh failed (${resp.status}): ${redact(body)}`);
-    // @ts-expect-error — attach status for caller
-    err.statusCode = resp.status;
-    throw err;
+    throw new HttpStatusError(`Google refresh failed (${resp.status}): ${redact(body)}`, resp.status);
   }
 
   const data = await resp.json();
@@ -264,10 +262,7 @@ export async function listEventsIncremental(accessToken, calendarId, syncToken) 
     }
     if (!resp.ok) {
       const body = await resp.text().catch(() => "");
-      const err = new Error(`Google events list failed (${resp.status}): ${redact(body)}`);
-      // @ts-expect-error
-      err.statusCode = resp.status;
-      throw err;
+      throw new HttpStatusError(`Google events list failed (${resp.status}): ${redact(body)}`, resp.status);
     }
 
     const data = await resp.json();
@@ -294,10 +289,7 @@ export async function getCalendarMeta(accessToken, calendarId = "primary") {
   const resp = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
   if (!resp.ok) {
     const body = await resp.text().catch(() => "");
-    const err = new Error(`Google calendar meta failed (${resp.status}): ${redact(body)}`);
-    // @ts-expect-error
-    err.statusCode = resp.status;
-    throw err;
+    throw new HttpStatusError(`Google calendar meta failed (${resp.status}): ${redact(body)}`, resp.status);
   }
   const data = await resp.json();
   return {
@@ -328,10 +320,7 @@ export async function listCalendarList(accessToken) {
   const resp = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
   if (!resp.ok) {
     const body = await resp.text().catch(() => "");
-    const err = new Error(`Google calendarList failed (${resp.status}): ${redact(body)}`);
-    // @ts-expect-error
-    err.statusCode = resp.status;
-    throw err;
+    throw new HttpStatusError(`Google calendarList failed (${resp.status}): ${redact(body)}`, resp.status);
   }
   const data = await resp.json();
   const items = Array.isArray(data.items) ? data.items : [];
@@ -408,10 +397,7 @@ export async function getEvent(accessToken, calendarId, eventId) {
   }
   if (!resp.ok) {
     const body = await resp.text().catch(() => "");
-    const err = new Error(`Google event fetch failed (${resp.status}): ${redact(body)}`);
-    // @ts-expect-error
-    err.statusCode = resp.status;
-    throw err;
+    throw new HttpStatusError(`Google event fetch failed (${resp.status}): ${redact(body)}`, resp.status);
   }
   const data = await resp.json();
   return { ...data, status: resp.status };
@@ -436,10 +422,7 @@ export async function createEvent(accessToken, calendarId, eventBody) {
   });
   if (!resp.ok) {
     const body = await resp.text().catch(() => "");
-    const err = new Error(`Google event create failed (${resp.status}): ${redact(body)}`);
-    // @ts-expect-error
-    err.statusCode = resp.status;
-    throw err;
+    throw new HttpStatusError(`Google event create failed (${resp.status}): ${redact(body)}`, resp.status);
   }
   const data = await resp.json();
   return { id: String(data.id), etag: String(data.etag || "") };
@@ -480,10 +463,7 @@ export async function updateEvent(accessToken, calendarId, eventId, patch, etag)
   }
   if (!resp.ok) {
     const body = await resp.text().catch(() => "");
-    const err = new Error(`Google event update failed (${resp.status}): ${redact(body)}`);
-    // @ts-expect-error
-    err.statusCode = resp.status;
-    throw err;
+    throw new HttpStatusError(`Google event update failed (${resp.status}): ${redact(body)}`, resp.status);
   }
   const data = await resp.json();
   return { id: String(data.id), etag: String(data.etag || ""), status: 200 };
@@ -506,10 +486,7 @@ export async function deleteEvent(accessToken, calendarId, eventId) {
     return;
   }
   const body = await resp.text().catch(() => "");
-  const err = new Error(`Google event delete failed (${resp.status}): ${redact(body)}`);
-  // @ts-expect-error
-  err.statusCode = resp.status;
-  throw err;
+  throw new HttpStatusError(`Google event delete failed (${resp.status}): ${redact(body)}`, resp.status);
 }
 
 /**

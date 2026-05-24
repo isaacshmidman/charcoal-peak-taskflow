@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Shared task filters that decide which records appear in which views.
  *
@@ -8,13 +7,24 @@
  * or Recently Deleted.
  */
 
-/** True when a record represents a non-task event imported from a provider. */
+/** @typedef {import("@/types/tasks").TaskRecord & { source_kind?: string | null }} TaskRecord */
+
+/**
+ * True when a record represents a non-task event imported from a provider.
+ * @param {TaskRecord | null | undefined} record
+ * @returns {boolean}
+ */
 export function isExternalEvent(record) {
   return !!record && record.source_kind === "event";
 }
 
-/** Filter out external (provider) events. Safe to pass any iterable shape. */
+/**
+ * Filter out external (provider) events. Safe to pass any iterable shape.
+ * @template T
+ * @param {T} records
+ * @returns {T}
+ */
 export function excludeExternalEvents(records) {
   if (!Array.isArray(records)) return records;
-  return records.filter((r) => !isExternalEvent(r));
+  return /** @type {T} */ (records.filter((r) => !isExternalEvent(r)));
 }

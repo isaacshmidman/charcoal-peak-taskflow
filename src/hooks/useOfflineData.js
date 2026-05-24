@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -18,9 +17,24 @@ import { apiClient } from '@/api/apiClient';
 const CACHE_KEYS = ['tasks', 'priorities', 'savedTags', 'deletedTasks', 'integrations', 'notificationSettings'];
 
 /**
+ * @typedef {{
+ *   id?: string,
+ *   type: "create" | "update" | "delete",
+ *   entityName?: string,
+ *   data?: Record<string, any>,
+ *   name?: string,
+ * }} OfflineQueueEntry
+ */
+
+/**
+ * @typedef {Record<string, unknown[]>} CachedEntities
+ */
+
+/**
  * Hook that:
  * 1. Persists query cache data to localStorage on every data update (catches API fetches + optimistic setQueryData).
  * 2. Replays pending mutations when coming back online.
+ * @returns {void}
  */
 export function useOfflineData() {
   const queryClient = useQueryClient();
@@ -67,7 +81,7 @@ export function useOfflineData() {
               if (result?.id && m.data._offlineId) {
                 idRemap[m.data._offlineId] = result.id;
                 queryClient.setQueryData(['tasks'], (old = []) =>
-                  old.map(t => {
+                  /** @type {Array<Record<string, any>>} */ (old).map(t => {
                     if (t.id === m.data._offlineId) return { ...t, id: result.id };
                     if (t.parent_id === m.data._offlineId) return { ...t, parent_id: result.id };
                     return t;
@@ -106,7 +120,8 @@ export function useOfflineData() {
               if (result?.id && m.data?._offlineId) {
                 priorityIdRemap[m.data._offlineId] = result.id;
                 queryClient.setQueryData(['priorities'], (old = []) =>
-                  old.map(p => p.id === m.data._offlineId ? { ...p, id: result.id } : p)
+                  /** @type {Array<Record<string, any>>} */ (old)
+                    .map(p => p.id === m.data._offlineId ? { ...p, id: result.id } : p)
                 );
               }
             } else if (m.type === 'update') {
@@ -159,7 +174,7 @@ export function useOfflineData() {
               if (result?.id && offlineId) {
                 deletedIdRemap[offlineId] = result.id;
                 // Update local cache with real id
-                const cached = queryClient.getQueryData(['deletedTasks']) || [];
+                const cached = /** @type {Array<Record<string, any>>} */ (queryClient.getQueryData(['deletedTasks']) || []);
                 const updated = cached.map(r => r.id === offlineId ? { ...r, id: result.id } : r);
                 queryClient.setQueryData(['deletedTasks'], updated);
                 updateDeletedTasksCache(updated);

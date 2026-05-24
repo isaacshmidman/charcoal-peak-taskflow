@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -34,10 +33,12 @@ export const SORT_OPTIONS = [
   { value: "calendar_order", label: "Calendar Order", hideOnScope: ["calendar"], group: "calendar_order" },
 ];
 
+/** @param {string} value */
 const groupOf = (value) => SORT_OPTIONS.find((o) => o.value === value)?.group;
 
 const MAX_SORTS = 5;
 
+/** @param {number} n */
 function ordinal(n) {
   const tens = n % 100;
   if (tens >= 11 && tens <= 13) return `${n}th`;
@@ -66,6 +67,10 @@ export default function MultiSortPanel({ sorts, onSortsChange, page = "default" 
   const labelFor = (value) =>
     SORT_OPTIONS.find((o) => o.value === value)?.label || "None";
 
+  /**
+   * @param {number} index
+   * @param {string} value
+   */
   const setSortAt = (index, value) => {
     const next = [...sorts];
     next[index] = value;
@@ -74,6 +79,7 @@ export default function MultiSortPanel({ sorts, onSortsChange, page = "default" 
     setExpandedIndex(-1);
   };
 
+  /** @param {number} index */
   const removeSortAt = (index) => {
     const next = sorts.filter((_, i) => i !== index);
     onSortsChange(next.length ? next : ["none"]);
@@ -87,6 +93,7 @@ export default function MultiSortPanel({ sorts, onSortsChange, page = "default" 
     setExpandedIndex(next.length - 1);
   };
 
+  /** @param {number} index */
   const toggleRow = (index) => {
     setExpandedIndex((cur) => (cur === index ? -1 : index));
   };

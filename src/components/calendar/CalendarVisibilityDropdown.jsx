@@ -1,4 +1,3 @@
-// @ts-nocheck
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -7,6 +6,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+/** @typedef {import("@/types/tasks").TaskRecord & { parent_id?: string | null, source_calendar_id?: string | null, source_provider?: string | null, source_calendar_name?: string | null, source_color_hex?: string | null }} TaskRecord */
+/**
+ * @typedef {{ key: string, label: string, color?: string }} CalendarDescriptor
+ */
 
 /**
  * Dropdown letting the user hide/show specific calendars (Zephyrly,
@@ -21,7 +25,7 @@ import { cn } from "@/lib/utils";
  *   - External:                                      "{provider}:{calId}"
  *
  * @param {{
- *   calendars: Array<{ key: string, label: string, color?: string }>,
+ *   calendars: CalendarDescriptor[],
  *   hidden: Set<string>,
  *   onChange: (next: Set<string>) => void,
  * }} props
@@ -30,6 +34,7 @@ export default function CalendarVisibilityDropdown({ calendars, hidden, onChange
   const allShown = hidden.size === 0;
   const someHidden = hidden.size > 0 && hidden.size < calendars.length;
 
+  /** @param {string} key */
   const toggle = (key) => {
     const next = new Set(hidden);
     if (next.has(key)) next.delete(key);
@@ -119,9 +124,11 @@ export default function CalendarVisibilityDropdown({ calendars, hidden, onChange
 /**
  * Build the unique-calendars list from tasks. Skipping subtasks. Stable
  * order: Zephyrly first, then external grouped by provider, alpha within.
+ * @param {TaskRecord[]} tasks
+ * @returns {CalendarDescriptor[]}
  */
 export function deriveCalendars(tasks) {
-  const map = new Map();
+  const map = /** @type {Map<string, CalendarDescriptor>} */ (new Map());
   for (const t of tasks || []) {
     if (t.parent_id) continue;
     const calId = t.source_calendar_id || "";
@@ -145,6 +152,10 @@ export function deriveCalendars(tasks) {
   });
 }
 
+/**
+ * @param {TaskRecord} task
+ * @returns {string}
+ */
 export function calendarKeyForTask(task) {
   const calId = task.source_calendar_id || "";
   const provider = task.source_provider || "";

@@ -58,6 +58,7 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { HttpStatusError } from "../lib/http-status-error.js";
 import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
 import { buildVTimezone } from "./_vtimezones.js";
 import { parseRruleValueToTaskRecurrence } from "../recurrence-rrule.js";
@@ -79,7 +80,7 @@ const NS = {
 /**
  * Perform an authenticated CalDAV request. Follows up to 5 redirects manually
  * (fetch's automatic redirect drops headers like Depth which CalDAV needs).
- * Throws an Error with .statusCode set so callers can branch on auth failures.
+ * Throws HttpStatusError so callers can branch on auth failures.
  *
  * @param {{ origin: string, email: string, password: string }} ctx
  * @param {string} method
@@ -115,26 +116,17 @@ async function caldavRequest(ctx, method, pathOrUrl, opts = {}) {
     }
     const text = await resp.text().catch(() => "");
     if (resp.status === 401) {
-      const err = new Error("Apple Calendar rejected the credentials. Check the Apple ID and app-specific password.");
-      // @ts-expect-error
-      err.statusCode = 401;
-      throw err;
+      throw new HttpStatusError("Apple Calendar rejected the credentials. Check the Apple ID and app-specific password.", 401);
     }
     if (opts.allowStatuses?.includes(resp.status)) {
       return { status: resp.status, headers: resp.headers, text, finalUrl: target };
     }
     if (!resp.ok && resp.status !== 207 /* multistatus */ && resp.status !== 204) {
-      const err = new Error(`Apple CalDAV ${method} ${redactPath(target)} failed (${resp.status}): ${truncate(text)}`);
-      // @ts-expect-error
-      err.statusCode = resp.status;
-      throw err;
+      throw new HttpStatusError(`Apple CalDAV ${method} ${redactPath(target)} failed (${resp.status}): ${truncate(text)}`, resp.status);
     }
     return { status: resp.status, headers: resp.headers, text, finalUrl: target };
   }
-  const err = new Error(`Apple CalDAV ${method} too many redirects: ${redactPath(target)}`);
-  // @ts-expect-error
-  err.statusCode = lastResp?.status || 0;
-  throw err;
+  throw new HttpStatusError(`Apple CalDAV ${method} too many redirects: ${redactPath(target)}`, lastResp?.status || 0);
 }
 
 function redactPath(url) {

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Shared comparators so date-based sorts across pages consistently fall back
  * to `task_time` as a tiebreaker. Before this existed, `date_asc`/`date_desc`
@@ -6,10 +5,14 @@
  * day with different times sorted arbitrarily.
  */
 
+/** @typedef {import("@/types/tasks").TaskRecord} TaskRecord */
+
 /**
  * Parse a task_time string ("9:00AM", "11:45PM", "12:00AM") into minutes
  * since midnight. Returns null for empty / malformed input so callers can
  * distinguish "all-day" from timed.
+ * @param {string | null | undefined} str
+ * @returns {number | null}
  */
 export function parseTaskTime(str) {
   if (!str || typeof str !== "string") return null;
@@ -27,6 +30,10 @@ export function parseTaskTime(str) {
  * Compare two task_time strings. Null/empty sorts AFTER timed entries
  * in both directions — all-day tasks drop to the end of the day's stack
  * so the time-ordered list is visually continuous.
+ * @param {string | null | undefined} ta
+ * @param {string | null | undefined} tb
+ * @param {"asc" | "desc"} [direction]
+ * @returns {number}
  */
 export function compareTaskTime(ta, tb, direction = "asc") {
   const a = parseTaskTime(ta);
@@ -40,6 +47,10 @@ export function compareTaskTime(ta, tb, direction = "asc") {
 /**
  * Compare two tasks by (due_date, task_time). Tasks without a due_date
  * sort to the end; within a day, timed tasks precede all-day tasks (asc).
+ * @param {TaskRecord} a
+ * @param {TaskRecord} b
+ * @param {"asc" | "desc"} [direction]
+ * @returns {number}
  */
 export function compareDueDateTime(a, b, direction = "asc") {
   const da = a?.due_date ? new Date(a.due_date + "T00:00:00").getTime() : null;
@@ -54,6 +65,8 @@ export function compareDueDateTime(a, b, direction = "asc") {
 /**
  * Next 15-minute boundary strictly after `now`. Used for defaulting
  * new-task start times in Day/Week views. e.g. 6:23 -> 6:30, 6:30 -> 6:45.
+ * @param {Date} [now]
+ * @returns {string}
  */
 export function nextQuarterHour(now = new Date()) {
   const h = now.getHours();
@@ -70,6 +83,8 @@ export function nextQuarterHour(now = new Date()) {
 /**
  * Convert minutes-since-midnight to a canonical task_time string.
  * Inverse of parseTaskTime (wraps into [0, 24*60)).
+ * @param {number} mins
+ * @returns {string}
  */
 export function minutesToTaskTime(mins) {
   const total = ((mins % (24 * 60)) + 24 * 60) % (24 * 60);

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Appearance / theme provider.
  *
@@ -21,17 +20,32 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 const STORAGE_KEY = "appearance";
-const DEFAULT_APPEARANCE = "light";
-const VALID = new Set(["system", "light", "dark"]);
+/** @typedef {"system" | "light" | "dark"} Appearance */
+/**
+ * @typedef {{
+ *   appearance: Appearance,
+ *   isDark: boolean,
+ *   setAppearance: (next: Appearance) => void,
+ * }} ThemeContextValue
+ */
 
+/** @type {Appearance} */
+const DEFAULT_APPEARANCE = "light";
+const VALID = /** @type {Set<Appearance>} */ (new Set(["system", "light", "dark"]));
+
+/** @returns {Appearance} */
 function readStored() {
   try {
     const v = localStorage.getItem(STORAGE_KEY);
-    if (v && VALID.has(v)) return v;
+    if (v && VALID.has(/** @type {Appearance} */ (v))) return /** @type {Appearance} */ (v);
   } catch {}
   return DEFAULT_APPEARANCE;
 }
 
+/**
+ * @param {Appearance} appearance
+ * @returns {boolean}
+ */
 function resolveDark(appearance) {
   if (appearance === "dark") return true;
   if (appearance === "light") return false;
@@ -40,6 +54,7 @@ function resolveDark(appearance) {
   return window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
 
+/** @param {boolean} isDark */
 function applyDarkClass(isDark) {
   const root = document.documentElement;
   if (isDark) root.classList.add("dark");
@@ -48,12 +63,13 @@ function applyDarkClass(isDark) {
   if (theme) theme.setAttribute("content", isDark ? "#000000" : "#f5f5a0");
 }
 
-const ThemeContext = createContext({
+const ThemeContext = createContext(/** @type {ThemeContextValue} */ ({
   appearance: DEFAULT_APPEARANCE,
   isDark: false,
   setAppearance: (_) => {},
-});
+}));
 
+/** @param {{ children: import("react").ReactNode }} props */
 export function ThemeProvider({ children }) {
   const [appearance, setAppearanceState] = useState(readStored);
   const [isDark, setIsDark] = useState(() => resolveDark(readStored()));
@@ -84,7 +100,7 @@ export function ThemeProvider({ children }) {
     };
   }, [appearance]);
 
-  const setAppearance = useCallback((next) => {
+  const setAppearance = useCallback(/** @param {Appearance} next */ (next) => {
     const v = VALID.has(next) ? next : DEFAULT_APPEARANCE;
     setAppearanceState(v);
     try { localStorage.setItem(STORAGE_KEY, v); } catch {}
@@ -95,6 +111,7 @@ export function ThemeProvider({ children }) {
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
+/** @returns {ThemeContextValue} */
 export function useTheme() {
   return useContext(ThemeContext);
 }

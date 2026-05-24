@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -9,9 +8,23 @@ import { format } from "date-fns/format";
 import { cn } from "@/lib/utils";
 import { colorBg, isDarkColor } from "@/lib/colors";
 
+/** @typedef {import("@/types/tasks").TaskRecord} TaskRecord */
+/** @typedef {import("@/types/tasks").PriorityOption} PriorityOption */
+
+/** @param {Date} date */
 const toDateStr = (date) => format(date, "yyyy-MM-dd");
+/** @param {string} str */
 const fromDateStr = (str) => new Date(str + "T00:00:00");
 
+/**
+ * @param {{
+ *   task: TaskRecord,
+ *   priorities: PriorityOption[],
+ *   onToggleDone: (task: TaskRecord) => void,
+ *   onEdit: (task: TaskRecord) => void,
+ *   onUpdate: (task: TaskRecord, changes: Partial<TaskRecord>) => void,
+ * }} props
+ */
 export default function CompactTaskCard({ task, priorities, onToggleDone, onEdit, onUpdate }) {
   const [dateOpen, setDateOpen] = useState(false);
   const [optimisticDone, setOptimisticDone] = useState(false);

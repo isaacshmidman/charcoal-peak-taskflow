@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Calendar order + non-Calendar-page visibility — single source of truth.
  *
@@ -28,33 +27,52 @@
 const ORDER_KEY = "calendar_order";
 const HIDDEN_GLOBAL_KEY = "calendar_hidden_global";
 
+/** @typedef {import("@/types/tasks").TaskRecord & { source_calendar_id?: string | null, source_provider?: string | null }} TaskRecord */
+/**
+ * @typedef {{ key: string, label: string, color?: string }} CalendarDescriptor
+ */
+
 // Wraps localStorage so private-mode / disabled-storage callers don't crash.
+/**
+ * @template T
+ * @param {string} key
+ * @param {T} fallback
+ * @returns {T}
+ */
 function readJson(key, fallback) {
   try {
     const raw = localStorage.getItem(key);
     if (!raw) return fallback;
     const parsed = JSON.parse(raw);
-    if (Array.isArray(fallback)) return Array.isArray(parsed) ? parsed : fallback;
+    if (Array.isArray(fallback)) return /** @type {T} */ (Array.isArray(parsed) ? parsed : fallback);
     return parsed ?? fallback;
   } catch {
     return fallback;
   }
 }
+/**
+ * @param {string} key
+ * @param {unknown} value
+ */
 function writeJson(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
 }
 
+/** @returns {string[]} */
 export function getCalendarOrder() {
   return readJson(ORDER_KEY, []);
 }
+/** @param {string[]} arr */
 export function setCalendarOrder(arr) {
   writeJson(ORDER_KEY, [...arr]);
   notify();
 }
 
+/** @returns {Set<string>} */
 export function getHiddenOnNonCalendarPages() {
   return new Set(readJson(HIDDEN_GLOBAL_KEY, []));
 }
+/** @param {Set<string>} set */
 export function setHiddenOnNonCalendarPages(set) {
   writeJson(HIDDEN_GLOBAL_KEY, [...set]);
   notify();
@@ -71,14 +89,14 @@ export function setHiddenOnNonCalendarPages(set) {
  * Pure function (no localStorage write) so callers can preview / persist
  * separately.
  *
- * @param {Array<{ key: string, label: string }>} calendars
+ * @param {CalendarDescriptor[]} calendars
  * @param {string[]} savedOrder
- * @returns {Array<{ key: string, label: string }>}
+ * @returns {CalendarDescriptor[]}
  */
 export function mergeOrder(calendars, savedOrder) {
   const byKey = new Map(calendars.map((c) => [c.key, c]));
   const seen = new Set();
-  const out = [];
+  const out = /** @type {CalendarDescriptor[]} */ ([]);
   for (const k of savedOrder || []) {
     const c = byKey.get(k);
     if (!c) continue;
@@ -102,6 +120,10 @@ export function mergeOrder(calendars, savedOrder) {
  * Performance note: callers usually compute a Map<key, index> once and
  * close over it instead of calling this in a tight loop. See
  * `compareByCalendarOrder` factory below.
+ * @param {TaskRecord} a
+ * @param {TaskRecord} b
+ * @param {Map<string, number>} indexByKey
+ * @returns {number}
  */
 export function compareByCalendarOrder(a, b, indexByKey) {
   const ka = calendarKeyForTask(a);
@@ -112,6 +134,10 @@ export function compareByCalendarOrder(a, b, indexByKey) {
   return ia - ib;
 }
 
+/**
+ * @param {TaskRecord} task
+ * @returns {string}
+ */
 export function calendarKeyForTask(task) {
   const calId = task.source_calendar_id || "";
   const provider = task.source_provider || "";
@@ -120,7 +146,7 @@ export function calendarKeyForTask(task) {
 
 // Subscribe to changes so consumer pages re-render after the user
 // reorders or toggles in Settings without needing a route change.
-const listeners = new Set();
+const listeners = /** @type {Set<() => void>} */ (new Set());
 function notify() {
   for (const fn of listeners) {
     try { fn(); } catch {}
@@ -128,9 +154,14 @@ function notify() {
   // Also fire a window event so non-React subscribers (cross-tab) can react.
   try { window.dispatchEvent(new Event("calendarOrderChanged")); } catch {}
 }
+/**
+ * @param {() => void} fn
+ * @returns {() => void}
+ */
 export function subscribeCalendarOrder(fn) {
   listeners.add(fn);
   // Cross-tab: fire when localStorage changes in another window.
+  /** @param {StorageEvent} e */
   const onStorage = (e) => {
     if (e.key === ORDER_KEY || e.key === HIDDEN_GLOBAL_KEY) fn();
   };

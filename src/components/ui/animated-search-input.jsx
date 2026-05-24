@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -24,10 +23,11 @@ import { cn } from "@/lib/utils";
  * }} props
  */
 export function AnimatedSearchInput({ open, value, onChange, onClose, placeholder = "Search...", className }) {
-  const wrapperRef = useRef(null);
+  const wrapperRef = /** @type {import("react").MutableRefObject<HTMLDivElement | null>} */ (useRef(null));
 
   useEffect(() => {
     if (!open) return undefined;
+    /** @param {PointerEvent} event */
     const handler = (event) => {
       const target = event.target;
       if (!target || !(target instanceof Node)) return;

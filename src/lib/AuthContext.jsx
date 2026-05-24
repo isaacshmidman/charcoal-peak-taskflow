@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { apiClient } from "@/api/apiClient";
 import { appConfig, getStoredAccessToken, getStoredLocalSession, removeAccessToken, removeLocalSession, saveLocalSession } from "@/lib/app-config";
@@ -6,15 +5,60 @@ import { syncOfflineQueryCache } from "@/lib/query-client";
 import { isRecoverableConnectionError } from "@/lib/network";
 import { logger } from "@/lib/logger";
 
-const AuthContext = createContext();
+/**
+ * @typedef {{
+ *   id: string,
+ *   email: string,
+ *   full_name?: string,
+ *   avatar_url?: string,
+ *   role?: string,
+ *   auth_provider?: string,
+ * } | null} AuthUser
+ */
+/**
+ * @typedef {{ type: string, message?: string } | null} AuthError
+ */
+/**
+ * @typedef {{
+ *   auth_providers?: {
+ *     google?: boolean,
+ *     email_password?: boolean,
+ *   },
+ * }} PublicSettings
+ */
+/**
+ * @typedef {{
+ *   user: AuthUser,
+ *   isAuthenticated: boolean,
+ *   isLoadingAuth: boolean,
+ *   isLoadingPublicSettings: boolean,
+ *   authError: AuthError,
+ *   appPublicSettings: PublicSettings | null,
+ *   logout: (shouldRedirect?: boolean) => Promise<void>,
+ *   completeLogin: (token?: string | null) => Promise<AuthUser>,
+ *   loginWithEmailPassword: (email: string, password: string) => Promise<unknown>,
+ *   navigateToLogin: (nextUrl?: string) => void,
+ *   checkAppState: () => Promise<void>,
+ * }} AuthContextValue
+ */
+/**
+ * @typedef {{
+ *   status?: number,
+ *   message?: string,
+ *   data?: { extra_data?: { reason?: string } },
+ * }} ApiError
+ */
 
+const AuthContext = createContext(/** @type {AuthContextValue | undefined} */ (undefined));
+
+/** @param {{ children: import("react").ReactNode }} props */
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(/** @type {AuthUser} */ (null));
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [isLoadingPublicSettings, setIsLoadingPublicSettings] = useState(true);
-  const [authError, setAuthError] = useState(null);
-  const [appPublicSettings, setAppPublicSettings] = useState(null);
+  const [authError, setAuthError] = useState(/** @type {AuthError} */ (null));
+  const [appPublicSettings, setAppPublicSettings] = useState(/** @type {PublicSettings | null} */ (null));
 
   const syncStoredToken = useCallback(() => {
     const token = getStoredAccessToken() || appConfig.token;
@@ -24,7 +68,7 @@ export const AuthProvider = ({ children }) => {
     return token;
   }, []);
 
-  const checkUserAuth = useCallback(async ({ manageLoading = true } = {}) => {
+  const checkUserAuth = useCallback(/** @param {{ manageLoading?: boolean }} [options] */ async ({ manageLoading = true } = {}) => {
     if (manageLoading) setIsLoadingAuth(true);
 
     try {
@@ -36,11 +80,12 @@ export const AuthProvider = ({ children }) => {
       syncOfflineQueryCache();
       return { currentUser, errorType: null };
     } catch (error) {
+      const authCheckError = /** @type {ApiError} */ (error);
       logger.error("User auth check failed:", error);
       setUser(null);
       setIsAuthenticated(false);
 
-      if (error.status === 401 || error.status === 403) {
+      if (authCheckError.status === 401 || authCheckError.status === 403) {
         if (navigator.onLine) {
           apiClient.setToken(null, false);
           removeAccessToken();
@@ -56,7 +101,7 @@ export const AuthProvider = ({ children }) => {
         const errorType = isRecoverableConnectionError(error) ? "offline" : "unknown";
         setAuthError({
           type: errorType,
-          message: error.message || "Failed to authenticate",
+          message: authCheckError.message || "Failed to authenticate",
         });
         return { currentUser: null, errorType };
       }
@@ -87,15 +132,16 @@ export const AuthProvider = ({ children }) => {
         }
       }
     } catch (appError) {
+      const appStateError = /** @type {ApiError} */ (appError);
       logger.error("App state check failed:", appError);
 
-      if (appError.status === 403 && appError.data?.extra_data?.reason) {
-        const reason = appError.data.extra_data.reason;
+      if (appStateError.status === 403 && appStateError.data?.extra_data?.reason) {
+        const reason = appStateError.data.extra_data.reason;
 
         if (reason === "auth_required") {
           setAuthError({ type: "auth_required", message: "Authentication required" });
         } else {
-          setAuthError({ type: reason, message: appError.message });
+          setAuthError({ type: reason, message: appStateError.message });
         }
       } else if (isRecoverableConnectionError(appError)) {
         const cachedSession = getStoredLocalSession();
@@ -111,7 +157,7 @@ export const AuthProvider = ({ children }) => {
       } else {
         setAuthError({
           type: "unknown",
-          message: appError.message || "Failed to load app",
+          message: appStateError.message || "Failed to load app",
         });
       }
     } finally {
@@ -120,7 +166,7 @@ export const AuthProvider = ({ children }) => {
     }
   }, [checkUserAuth, syncStoredToken]);
 
-  const completeLogin = useCallback(async (token) => {
+  const completeLogin = useCallback(/** @param {string | null | undefined} token */ async (token) => {
     if (token) {
       apiClient.setToken(token);
     } else {
@@ -131,7 +177,7 @@ export const AuthProvider = ({ children }) => {
     return result.currentUser;
   }, [checkUserAuth, syncStoredToken]);
 
-  const loginWithEmailPassword = useCallback(async (email, password) => {
+  const loginWithEmailPassword = useCallback(/** @param {string} email @param {string} password */ async (email, password) => {
     setAuthError(null);
     setIsLoadingAuth(true);
     const normalizedEmail = email.trim().toLowerCase();
@@ -147,8 +193,9 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(true);
       return response;
     } catch (error) {
+      const loginError = /** @type {ApiError} */ (error);
       if (isRecoverableConnectionError(error)) {
-        const cachedSession = getStoredLocalSession();
+        const cachedSession = /** @type {AuthUser} */ (getStoredLocalSession());
         const offlineUser =
           cachedSession?.email?.toLowerCase() === normalizedEmail
             ? cachedSession
@@ -170,8 +217,8 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       setIsAuthenticated(false);
       setAuthError({
-        type: error.status === 401 || error.status === 403 ? "auth_required" : "unknown",
-        message: error.message || "Sign-in failed",
+        type: loginError.status === 401 || loginError.status === 403 ? "auth_required" : "unknown",
+        message: loginError.message || "Sign-in failed",
       });
       throw error;
     } finally {
@@ -183,6 +230,7 @@ export const AuthProvider = ({ children }) => {
     checkAppState();
   }, [checkAppState]);
 
+  /** @param {boolean} [shouldRedirect] */
   const logout = async (shouldRedirect = true) => {
     setUser(null);
     setIsAuthenticated(false);
@@ -199,7 +247,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const navigateToLogin = useCallback((nextUrl = window.location.href) => {
+  const navigateToLogin = useCallback(/** @param {string} [nextUrl] */ (nextUrl = window.location.href) => {
     const loginUrl = new URL("/login", window.location.origin);
     loginUrl.searchParams.set("next", nextUrl);
     window.location.href = loginUrl.toString();
@@ -226,6 +274,7 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
+/** @returns {AuthContextValue} */
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {

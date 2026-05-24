@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState } from "react";
 import {
   Dialog,
@@ -39,11 +38,13 @@ export default function ConnectAppleModal({ open, onOpenChange }) {
     setErrorMsg("");
   };
 
+  /** @param {boolean} next */
   const handleClose = (next) => {
     if (!next) reset();
     onOpenChange(next);
   };
 
+  /** @param {import("react").FormEvent<HTMLFormElement>} e */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg("");
@@ -53,9 +54,10 @@ export default function ConnectAppleModal({ open, onOpenChange }) {
     } catch (err) {
       // Backend distinguishes invalid_credentials vs caldav_unreachable;
       // we surface the human message either way.
+      const error = /** @type {{ body?: { message?: string }, message?: string }} */ (err);
       const msg =
-        err?.body?.message ||
-        err?.message ||
+        error?.body?.message ||
+        error?.message ||
         "Couldn't connect. Check the Apple ID and app-specific password.";
       setErrorMsg(String(msg).slice(0, 300));
     }

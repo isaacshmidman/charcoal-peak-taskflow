@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useMemo } from "react";
 import { addDays } from "date-fns/addDays";
 import { addMonths } from "date-fns/addMonths";
@@ -14,6 +13,12 @@ import { toDateStr } from "./MonthCalendar";
 
 const WEEKDAY_LETTERS = ["S", "M", "T", "W", "T", "F", "S"];
 
+/**
+ * @param {{
+ *   month: Date,
+ *   onDayClick?: (dateStr: string) => void,
+ * }} props
+ */
 function MiniMonth({ month, onDayClick }) {
   const today = useMemo(() => startOfDay(new Date()), []);
   const days = useMemo(() => {
@@ -62,6 +67,10 @@ function MiniMonth({ month, onDayClick }) {
 /**
  * Year view — 4×3 grid of mini-month calendars.
  * Click any day → parent switches to DayView for that date.
+ * @param {{
+ *   anchorDate: Date,
+ *   onDayClick?: (dateStr: string) => void,
+ * }} props
  */
 export default function YearView({ anchorDate, onDayClick }) {
   const year = useMemo(() => startOfYear(anchorDate), [anchorDate]);
