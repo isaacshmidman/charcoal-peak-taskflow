@@ -1,4 +1,4 @@
-const CACHE_NAME = 'zephyrly-v3';
+const CACHE_NAME = 'zephyrly-v4';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -31,11 +31,13 @@ self.addEventListener('push', (event) => {
     // renotify lets the OS re-announce a re-issued tag (e.g. snoozed task
     // firing a second time) instead of silently replacing the previous.
     renotify: Boolean(payload.tag),
-    // Default behavior on iOS: auto-dismiss after user interaction. We do
-    // NOT want requireInteraction; users dismiss with a swipe like Google
-    // Calendar reminders.
-    requireInteraction: false,
-    silent: false,
+    // Advanced options from per-user notification settings — silently
+    // ignored by browsers/devices that don't support them (e.g. iOS
+    // Safari drops `actions` and `vibrate`).
+    requireInteraction: payload.requireInteraction === true,
+    silent: payload.silent === true,
+    vibrate: Array.isArray(payload.vibrate) ? payload.vibrate : undefined,
+    actions: Array.isArray(payload.actions) ? payload.actions : undefined,
     lang: 'en',
     dir: 'auto',
     data: payload.data || {},
@@ -47,6 +49,11 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const data = event.notification.data || {};
+  // Both the "Snooze" and "Mark done" action buttons currently route to
+  // the task in the app — the user completes/snoozes there. A future
+  // iteration can hit the API directly from the SW (requires the auth
+  // cookie + a /api/.../tasks/:id/snooze endpoint), but this gives a
+  // working button on every platform that supports actions at all.
   const targetUrl = new URL(data.url || '/', self.location.origin).href;
 
   event.waitUntil((async () => {

@@ -8,6 +8,13 @@ export const DEFAULT_NOTIFICATION_SETTINGS = {
   allDayTime: "9:00AM",
   includeExternalEvents: false,
   missedGraceMinutes: 120,
+  // ─ Advanced (configured under Advanced Notification Settings) ─
+  requireInteraction: true,    // keep notification visible until dismissed
+  vibrate: true,               // Android — system honors vibrate array
+  showDescription: false,      // append task.description to notification body
+  snoozeAction: false,         // show "Snooze 10m" action button (Android/desktop)
+  doneAction: false,           // show "Mark done" action button (Android/desktop)
+  silent: false,               // mute the sound for the notification
 };
 
 const MAX_OFFSET_MINUTES = 7 * 24 * 60;
@@ -33,6 +40,13 @@ export function normalizeNotificationSettings(settings, { defaulted = false } = 
     allDayTime: taskTimeToNativeTime(merged.allDayTime) ? String(merged.allDayTime) : DEFAULT_NOTIFICATION_SETTINGS.allDayTime,
     includeExternalEvents: Boolean(merged.includeExternalEvents),
     missedGraceMinutes: clampInteger(merged.missedGraceMinutes, 0, 24 * 60, DEFAULT_NOTIFICATION_SETTINGS.missedGraceMinutes),
+    // Advanced — booleans coerced; defaults applied when missing.
+    requireInteraction: merged.requireInteraction !== false,
+    vibrate: merged.vibrate !== false,
+    showDescription: Boolean(merged.showDescription),
+    snoozeAction: Boolean(merged.snoozeAction),
+    doneAction: Boolean(merged.doneAction),
+    silent: Boolean(merged.silent),
   };
 }
 

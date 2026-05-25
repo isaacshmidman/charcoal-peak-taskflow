@@ -37,7 +37,15 @@ export function addMinutes(t, mins) {
   return `${hour}:${String(m).padStart(2, "0")}${ampm}`;
 }
 
-export default function TimeInput({ value, onChange }) {
+/**
+ * @param {{
+ *   value: string,
+ *   onChange: (value: string) => void,
+ *   className?: string,    // wrapper className override (default: "relative w-36")
+ *   triggerClassName?: string,  // button className override
+ * }} props
+ */
+export default function TimeInput({ value, onChange, className, triggerClassName }) {
   const [open, setOpen] = useState(false);
   const listRef = useRef(null);
   const selectedRef = useRef(null);
@@ -52,18 +60,21 @@ export default function TimeInput({ value, onChange }) {
   }, [open]);
 
   return (
-    <div ref={containerRef} className="relative w-36">
+    <div ref={containerRef} className={cn("relative", className || "w-36")}>
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-3 py-1.5 border border-slate-200 dark:border-[#343434] rounded-lg bg-white dark:bg-[#111111] text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#222222] transition-colors"
+        className={cn(
+          "w-full flex items-center justify-between px-3 py-1.5 border border-slate-200 dark:border-[#343434] rounded-lg bg-white dark:bg-[#111111] text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#222222] transition-colors",
+          triggerClassName
+        )}
       >
         {value}
         <svg className={cn("w-3.5 h-3.5 text-slate-400 dark:text-slate-500 transition-transform", open && "rotate-180")} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1 left-0 border border-slate-200 dark:border-[#343434] rounded-lg overflow-hidden bg-white dark:bg-[#111111] shadow-md w-full">
+        <div className="absolute z-50 mt-1 left-0 right-0 border border-slate-200 dark:border-[#343434] rounded-lg overflow-hidden bg-white dark:bg-[#111111] shadow-md">
           <div ref={listRef} className="max-h-48 overflow-y-auto">
             {TIME_SLOTS.map((slot) => {
               const isSelected = slot === value;

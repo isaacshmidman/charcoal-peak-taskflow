@@ -1,25 +1,26 @@
 // @ts-nocheck
 /**
- * @file Notifications settings — full rewrite (post Phase 5).
+ * @file Notifications settings.
  *
  * Structure:
- *   1. Bell box: master "Notifications On/Off" toggle. When off, the
- *      rest of the panel is hidden — same pattern as recurring-task
- *      options in TaskForm.
- *   2. (when on) This device box: a single Allow/Block button that
- *      flips based on the device's current subscription state.
+ *   1. Bell box: master "Notifications" toggle. When off the rest of
+ *      the panel is hidden — same pattern as recurring-task options in
+ *      TaskForm.
+ *   2. (when on) Full-width Allow/Block button for the current device.
  *   3. (when on) Remind me box: timed-task offset, all-day reminder
  *      time, missed-reminder grace window, and an "include read-only
  *      Google/Apple calendar events" checkbox that's auto-disabled
  *      when no calendar integration is connected.
+ *   4. (when on) "Advanced Notification Settings" trigger (chevron-
+ *      right card, mirrors the Recently Deleted button). Opens a
+ *      sub-page managed by Settings.jsx.
  *
  * All settings auto-save on change (debounced ~500ms). No explicit
  * Save button. A small "Saved." status line appears after each commit.
- * No "Send test" button — the real reminder schedule is the only path.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, BellOff, Loader2, ShieldOff, Smartphone } from "lucide-react";
+import { Bell, BellOff, ChevronRight, Loader2, ShieldOff, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -93,7 +94,10 @@ function Toggle({ checked, onChange, disabled }) {
   );
 }
 
-export default function NotificationsPanel() {
+/**
+ * @param {{ onOpenAdvanced?: () => void }} props
+ */
+export default function NotificationsPanel({ onOpenAdvanced }) {
   const queryClient = useQueryClient();
   const online = useOnlineStatus();
   const supported = isPushSupported();
@@ -218,6 +222,10 @@ export default function NotificationsPanel() {
   const unavailable = data ? !data.available : false;
   const deviceBusy = subscribeMutation.isPending || unsubscribeMutation.isPending;
 
+  // Trigger styles for the Select dropdowns in this panel — re-used by
+  // the all-day TimeInput so it visually matches the rest of the form.
+  const SELECT_TRIGGER_CLASS = "h-9 bg-white dark:bg-[#111111] dark:border-[#343434] text-sm font-medium text-slate-900 dark:text-slate-100";
+
   return (
     <section id="notifications" className="space-y-3">
       <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Notifications</h2>
@@ -256,60 +264,50 @@ export default function NotificationsPanel() {
       {/* ── Device + Remind-me only visible when master is on ──── */}
       {draft.enabled && (
         <>
-          {/* This device — one button, label depends on current state.
-              Hidden entirely if the browser can't do push or the server
-              hasn't been configured with VAPID keys (a real environment
-              error the user can't act on from this panel). */}
+          {/* This device — one full-width button, label depends on
+              current subscription state. Hidden entirely if the browser
+              can't do push or the server hasn't been configured with
+              VAPID keys. */}
           {supported && !unavailable && (
-            <SettingBox className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3 min-w-0">
-                {deviceSubscribed ? (
-                  <Smartphone className="w-5 h-5 text-emerald-500 shrink-0" />
+            permission === "denied" ? (
+              <SettingBox>
+                <p className="text-xs text-amber-600 dark:text-amber-300">
+                  Notifications are blocked at the browser level — re-enable them in your browser's site settings to continue.
+                </p>
+              </SettingBox>
+            ) : deviceSubscribed ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full h-11 gap-2 text-sm rounded-xl text-red-500 dark:text-red-300 border-red-200 dark:border-red-900 hover:bg-red-50 dark:hover:bg-[#2a1116] hover:text-red-600 dark:hover:text-red-200 hover:border-red-300 dark:hover:border-red-800"
+                disabled={deviceBusy || offline}
+                onClick={() => unsubscribeMutation.mutate()}
+              >
+                {unsubscribeMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  <Smartphone className="w-5 h-5 text-slate-400 dark:text-slate-500 shrink-0" />
+                  <ShieldOff className="w-4 h-4" />
                 )}
-                <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                  This device
-                </p>
-              </div>
-              {permission === "denied" ? (
-                <p className="text-xs text-amber-600 dark:text-amber-300 max-w-[18rem] text-right">
-                  Notifications are blocked at the browser level — re-enable them in your browser's site settings.
-                </p>
-              ) : deviceSubscribed ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 gap-2 text-xs text-red-500 dark:text-red-300 border-red-200 dark:border-red-900 hover:bg-red-50 dark:hover:bg-[#2a1116] hover:text-red-600 dark:hover:text-red-200 hover:border-red-300 dark:hover:border-red-800"
-                  disabled={deviceBusy || offline}
-                  onClick={() => unsubscribeMutation.mutate()}
-                >
-                  {unsubscribeMutation.isPending ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <ShieldOff className="w-3 h-3" />
-                  )}
-                  Block notifications for this device
-                </Button>
-              ) : (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 gap-2 text-xs"
-                  disabled={deviceBusy || offline}
-                  onClick={() => subscribeMutation.mutate()}
-                >
-                  {subscribeMutation.isPending ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <Bell className="w-3 h-3" />
-                  )}
-                  Allow notifications for this device
-                </Button>
-              )}
-            </SettingBox>
+                Block notifications for this device
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full h-11 gap-2 text-sm rounded-xl bg-white dark:bg-[#111111] border-slate-100 dark:border-[#303030] hover:border-slate-200 dark:hover:border-[#454545] text-slate-900 dark:text-slate-100"
+                disabled={deviceBusy || offline}
+                onClick={() => subscribeMutation.mutate()}
+              >
+                {subscribeMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Bell className="w-4 h-4" />
+                )}
+                Allow notifications for this device
+              </Button>
+            )
           )}
 
           {!supported && (
@@ -346,7 +344,7 @@ export default function NotificationsPanel() {
                   }
                 }}
               >
-                <SelectTrigger className="h-9 bg-white dark:bg-[#111111] dark:border-[#343434] text-sm font-medium text-slate-900 dark:text-slate-100">
+                <SelectTrigger className={SELECT_TRIGGER_CLASS}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-white dark:bg-[#111111] dark:border-[#343434]">
@@ -415,10 +413,12 @@ export default function NotificationsPanel() {
                     onChange={(e) => patchDraft({ allDayEnabled: e.target.checked })}
                     className="h-4 w-4 accent-slate-900 dark:accent-slate-100 shrink-0"
                   />
-                  <div className={cn("flex-1", (!draft.allDayEnabled || offline) && "opacity-50 pointer-events-none")}>
+                  <div className={cn("flex-1 min-w-0", (!draft.allDayEnabled || offline) && "opacity-50 pointer-events-none")}>
                     <TimeInput
                       value={draft.allDayTime || "9:00AM"}
                       onChange={(value) => patchDraft({ allDayTime: value })}
+                      className="w-full"
+                      triggerClassName={SELECT_TRIGGER_CLASS}
                     />
                   </div>
                 </div>
@@ -431,7 +431,7 @@ export default function NotificationsPanel() {
                   disabled={offline}
                   onValueChange={(value) => patchDraft({ missedGraceMinutes: Number(value) })}
                 >
-                  <SelectTrigger className="h-9 bg-white dark:bg-[#111111] dark:border-[#343434] text-sm font-medium text-slate-900 dark:text-slate-100">
+                  <SelectTrigger className={SELECT_TRIGGER_CLASS}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-white dark:bg-[#111111] dark:border-[#343434]">
@@ -467,6 +467,22 @@ export default function NotificationsPanel() {
               Include read-only Google and Apple calendar events
             </label>
           </SettingBox>
+
+          {/* Advanced Notification Settings — same trigger pattern as
+              the Recently Deleted button in Settings.jsx. */}
+          {onOpenAdvanced && (
+            <button
+              type="button"
+              onClick={onOpenAdvanced}
+              className="w-full flex items-center justify-between bg-white dark:bg-[#111111] border border-slate-100 dark:border-[#303030] rounded-xl px-4 py-3 hover:border-slate-200 dark:hover:border-[#454545] transition-colors"
+            >
+              <span className="text-sm font-medium text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <SlidersHorizontal className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                Advanced Notification Settings
+              </span>
+              <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600" />
+            </button>
+          )}
         </>
       )}
 

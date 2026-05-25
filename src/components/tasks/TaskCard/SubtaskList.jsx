@@ -71,61 +71,72 @@ export default function SubtaskList({
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="px-3 pb-3 ml-10 space-y-1.5 border-l-2 border-slate-200/60 dark:border-[#343434] overflow-hidden"
+            className="px-3 pb-3 ml-10 space-y-1.5 overflow-hidden"
           >
-            {subtasks.map((sub, subIdx) => {
-              const subOverdue = sub.due_date && new Date(sub.due_date + "T00:00:00") < new Date(new Date().setHours(0,0,0,0)) && sub.status !== "done";
-              const moveSubtask = (dir) => {
-                if (!onReorderSubtasks) return;
-                const reordered = [...subtasks];
-                const newIdx = subIdx + dir;
-                if (newIdx < 0 || newIdx >= reordered.length) return;
-                [reordered[subIdx], reordered[newIdx]] = [reordered[newIdx], reordered[subIdx]];
-                onReorderSubtasks(reordered);
-              };
-              return (
-                <div
-                  key={sub.id}
-                  className="flex items-center gap-2 group/sub cursor-pointer"
-                  onClick={() => { if (wasSwipe()) return; onEditSubtask ? onEditSubtask(sub) : onEdit(sub); }}
-                >
-                  {onReorderSubtasks && (
-                    <div className="flex flex-col gap-0.5 opacity-0 group-hover/sub:opacity-100 transition-opacity">
-                      <button type="button" onClick={(e) => { e.stopPropagation(); moveSubtask(-1); }} disabled={subIdx === 0} className="disabled:opacity-20 text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400 transition-colors">
-                        <ArrowUp className="w-3 h-3" />
-                      </button>
-                      <button type="button" onClick={(e) => { e.stopPropagation(); moveSubtask(1); }} disabled={subIdx === subtasks.length - 1} className="disabled:opacity-20 text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400 transition-colors">
-                        <ArrowDown className="w-3 h-3" />
-                      </button>
-                    </div>
-                  )}
-                  {subOverdue && <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />}
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onToggleDone(sub); }}
-                    className={cn(
-                      "shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-all touch-manipulation",
-                      sub.status === "done" ? "bg-slate-900 border-slate-900 text-white dark:bg-slate-100 dark:border-slate-100 dark:text-slate-900" : "border-slate-300 dark:border-slate-600 hover:border-slate-500 bg-white dark:bg-[#0c0c0c]"
+            {/* Per-item AnimatePresence + layout so deleting a subtask
+                collapses its row (height + opacity) BEFORE the siblings
+                reflow — without this the remaining row visibly stretches
+                into the deleted row's space for a frame. */}
+            <AnimatePresence initial={false}>
+              {subtasks.map((sub, subIdx) => {
+                const subOverdue = sub.due_date && new Date(sub.due_date + "T00:00:00") < new Date(new Date().setHours(0,0,0,0)) && sub.status !== "done";
+                const moveSubtask = (dir) => {
+                  if (!onReorderSubtasks) return;
+                  const reordered = [...subtasks];
+                  const newIdx = subIdx + dir;
+                  if (newIdx < 0 || newIdx >= reordered.length) return;
+                  [reordered[subIdx], reordered[newIdx]] = [reordered[newIdx], reordered[subIdx]];
+                  onReorderSubtasks(reordered);
+                };
+                return (
+                  <motion.div
+                    key={sub.id}
+                    layout
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                    transition={{ duration: 0.15, ease: "easeOut" }}
+                    className="flex items-center gap-2 group/sub cursor-pointer overflow-hidden"
+                    onClick={() => { if (wasSwipe()) return; onEditSubtask ? onEditSubtask(sub) : onEdit(sub); }}
+                  >
+                    {onReorderSubtasks && (
+                      <div className="flex flex-col gap-0.5 opacity-0 group-hover/sub:opacity-100 transition-opacity">
+                        <button type="button" onClick={(e) => { e.stopPropagation(); moveSubtask(-1); }} disabled={subIdx === 0} className="disabled:opacity-20 text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400 transition-colors">
+                          <ArrowUp className="w-3 h-3" />
+                        </button>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); moveSubtask(1); }} disabled={subIdx === subtasks.length - 1} className="disabled:opacity-20 text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400 transition-colors">
+                          <ArrowDown className="w-3 h-3" />
+                        </button>
+                      </div>
                     )}
-                  >
-                    {sub.status === "done" && <CheckSquare className="w-2.5 h-2.5" />}
-                  </button>
-                  <span className={cn("text-xs font-medium text-slate-900 dark:text-slate-100 flex-1 truncate", sub.status === "done" && "line-through text-slate-400 dark:text-slate-500")}>
-                    {sub.title}
-                  </span>
-                  {sub.due_date && (
-                    <span className={cn("text-[10px] shrink-0", subOverdue ? "text-red-400" : "text-slate-400 dark:text-slate-500")}>
-                      {format(new Date(sub.due_date + "T00:00:00"), "MMM d")}{sub.task_time ? `, ${sub.task_time}` : ""}
+                    {subOverdue && <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onToggleDone(sub); }}
+                      className={cn(
+                        "shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-all touch-manipulation",
+                        sub.status === "done" ? "bg-slate-900 border-slate-900 text-white dark:bg-slate-100 dark:border-slate-100 dark:text-slate-900" : "border-slate-300 dark:border-slate-600 hover:border-slate-500 bg-white dark:bg-[#0c0c0c]"
+                      )}
+                    >
+                      {sub.status === "done" && <CheckSquare className="w-2.5 h-2.5" />}
+                    </button>
+                    <span className={cn("text-xs font-medium text-slate-900 dark:text-slate-100 flex-1 truncate", sub.status === "done" && "line-through text-slate-400 dark:text-slate-500")}>
+                      {sub.title}
                     </span>
-                  )}
-                  <button
-                    className="opacity-0 group-hover/sub:opacity-100 text-slate-400 dark:text-slate-500 hover:text-red-400 dark:hover:text-red-300 transition-colors"
-                    onClick={(e) => { e.stopPropagation(); if (wasSwipe()) return; onDelete(sub); }}
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              );
-            })}
+                    {sub.due_date && (
+                      <span className={cn("text-[10px] shrink-0", subOverdue ? "text-red-400" : "text-slate-400 dark:text-slate-500")}>
+                        {format(new Date(sub.due_date + "T00:00:00"), "MMM d")}{sub.task_time ? `, ${sub.task_time}` : ""}
+                      </span>
+                    )}
+                    <button
+                      className="opacity-0 group-hover/sub:opacity-100 text-slate-400 dark:text-slate-500 hover:text-red-400 dark:hover:text-red-300 transition-colors"
+                      onClick={(e) => { e.stopPropagation(); if (wasSwipe()) return; onDelete(sub); }}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
             {onAddSubtask && (
               <button
                 onClick={() => onAddSubtask(task)}

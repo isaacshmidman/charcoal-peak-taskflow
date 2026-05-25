@@ -35,6 +35,7 @@ import {
 import RecentlyDeleted from "@/pages/RecentlyDeleted";
 import IntegrationsPanel from "@/components/settings/IntegrationsPanel";
 import NotificationsPanel from "@/components/settings/NotificationsPanel";
+import AdvancedNotificationSettings from "@/components/settings/AdvancedNotificationSettings";
 import AppearanceSection from "@/components/settings/AppearanceSection";
 import DefaultsSection from "@/components/settings/DefaultsSection";
 import PrioritiesSection from "@/components/settings/PrioritiesSection";
@@ -52,6 +53,7 @@ export const NAV_OPTIONS = [
 
 export default function Settings() {
   const [showRecentlyDeleted, setShowRecentlyDeleted] = useState(false);
+  const [showAdvancedNotifications, setShowAdvancedNotifications] = useState(false);
   const scrollPosRef = useRef(0);
   const pendingScrollRestoreRef = useRef(null);
   const { user, logout } = useAuth();
@@ -91,18 +93,22 @@ export default function Settings() {
   }, [location.state]);
 
   useLayoutEffect(() => {
-    if (showRecentlyDeleted || pendingScrollRestoreRef.current === null) return;
+    if (showRecentlyDeleted || showAdvancedNotifications || pendingScrollRestoreRef.current === null) return;
     window.scrollTo({ top: pendingScrollRestoreRef.current, left: 0, behavior: "auto" });
     pendingScrollRestoreRef.current = null;
-  }, [showRecentlyDeleted]);
+  }, [showRecentlyDeleted, showAdvancedNotifications]);
 
   // Return to main Settings (restoring scroll) when the top Settings icon is clicked
   useEffect(() => {
     const handler = () => {
+      const restoreScroll = () => { pendingScrollRestoreRef.current = scrollPosRef.current; };
       setShowRecentlyDeleted((current) => {
-        if (!current) return current;
-        pendingScrollRestoreRef.current = scrollPosRef.current;
-        return false;
+        if (current) { restoreScroll(); return false; }
+        return current;
+      });
+      setShowAdvancedNotifications((current) => {
+        if (current) { restoreScroll(); return false; }
+        return current;
       });
     };
     window.addEventListener("settingsNavClicked", handler);
@@ -117,6 +123,15 @@ export default function Settings() {
           setShowRecentlyDeleted(false);
         }} />
       </div>
+    );
+  }
+
+  if (showAdvancedNotifications) {
+    return (
+      <AdvancedNotificationSettings onBack={() => {
+        pendingScrollRestoreRef.current = scrollPosRef.current;
+        setShowAdvancedNotifications(false);
+      }} />
     );
   }
 
@@ -180,7 +195,12 @@ export default function Settings() {
 
       <CalendarOrderSection />
 
-      <NotificationsPanel />
+      <NotificationsPanel
+        onOpenAdvanced={() => {
+          scrollPosRef.current = window.scrollY;
+          setShowAdvancedNotifications(true);
+        }}
+      />
 
     </div>
   );

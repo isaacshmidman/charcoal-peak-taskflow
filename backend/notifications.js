@@ -17,6 +17,13 @@ const DEFAULT_SETTINGS = {
   allDayTime: "9:00AM",
   includeExternalEvents: false,
   missedGraceMinutes: 120,
+  // Advanced (mirrored to src/lib/notifications.js).
+  requireInteraction: true,
+  vibrate: true,
+  showDescription: false,
+  snoozeAction: false,
+  doneAction: false,
+  silent: false,
 };
 
 const MAX_OFFSET_MINUTES = 7 * 24 * 60;
@@ -82,6 +89,13 @@ export function sanitizeNotificationSettings(input = {}, existing = {}) {
     allDayTime: minutesToTaskTime(parseTaskTime(source.allDayTime) ?? parseTaskTime(DEFAULT_SETTINGS.allDayTime)),
     includeExternalEvents: Boolean(source.includeExternalEvents),
     missedGraceMinutes: clampInteger(source.missedGraceMinutes, 0, MAX_GRACE_MINUTES, DEFAULT_SETTINGS.missedGraceMinutes),
+    // Advanced.
+    requireInteraction: source.requireInteraction !== false,
+    vibrate: source.vibrate !== false,
+    showDescription: Boolean(source.showDescription),
+    snoozeAction: Boolean(source.snoozeAction),
+    doneAction: Boolean(source.doneAction),
+    silent: Boolean(source.silent),
   };
 }
 
@@ -315,7 +329,7 @@ export async function runNotificationSweep(
         continue;
       }
       const scheduledFor = scheduledAt.toISOString();
-      const payload = buildTaskNotificationPayload(task, scheduledFor);
+      const payload = buildTaskNotificationPayload(task, scheduledFor, settings);
       for (const subscription of subscriptions) {
         const inserted = insertPendingDelivery(db, {
           appId: config.appId,
@@ -404,17 +418,25 @@ function zonedDateTimeToDate(ymd, minutes, timeZone) {
  *   1. Task title (NotificationOptions.title)
  *   2. "{One-time | Recurring}, {Timed | All-day}"  ← body line 1
  *   3. "{Day}, {Mon DD} • {time}"                    ← body line 2
+ *   4. (optional, when settings.showDescription) task.description    ← body line 3
  *
  * macOS / iOS Safari also inject the website/PWA name (e.g. "Zephyrly")
  * as a subtitle between (1) and (2); that's OS chrome we can't suppress
  * from the Notification API. Android Chrome does not inject it.
  *
- * @param {{ id: string, title?: string, task_time?: string, due_date: string, task_type?: string }} task
+ * Advanced fields the SW honors when present:
+ *   - requireInteraction: keep visible until user dismisses
+ *   - vibrate: vibration pattern (Android only)
+ *   - silent: mute sound
+ *   - actions: in-notification buttons (Android / desktop Chrome)
+ *
+ * @param {{ id: string, title?: string, task_time?: string, due_date: string, task_type?: string, description?: string }} task
  * @param {string} scheduledFor  ISO timestamp; used as part of `tag` so
  *   the same task can re-notify on later dates without being collapsed
  *   by the OS.
+ * @param {ReturnType<typeof sanitizeNotificationSettings>} [settings]
  */
-function buildTaskNotificationPayload(task, scheduledFor) {
+function buildTaskNotificationPayload(task, scheduledFor, settings = sanitizeNotificationSettings()) {
   const title = String(task.title || "Untitled task").slice(0, 120);
   const taskTime = task.task_time || "";
   const isTimed = parseTaskTime(taskTime) != null;
@@ -423,18 +445,34 @@ function buildTaskNotificationPayload(task, scheduledFor) {
   const dateLabel = formatDateLabel(task.due_date);
   const timeLabel = isTimed ? formatTimeLabel(taskTime) : "All day";
   const dateBody = dateLabel ? `${dateLabel} • ${timeLabel}` : timeLabel;
-  const body = `${typeLabel}, ${timingLabel}\n${dateBody}`;
+  const bodyLines = [`${typeLabel}, ${timingLabel}`, dateBody];
+  if (settings.showDescription && task.description) {
+    const desc = String(task.description).trim();
+    if (desc) bodyLines.push(desc.length > 200 ? `${desc.slice(0, 197)}…` : desc);
+  }
+  const body = bodyLines.join("\n");
   const params = new URLSearchParams({
     date: task.due_date,
     task: task.id,
     view: "day",
   });
+  const actions = [];
+  if (settings.snoozeAction) {
+    actions.push({ action: "snooze", title: "Snooze 10m" });
+  }
+  if (settings.doneAction) {
+    actions.push({ action: "done", title: "Mark done" });
+  }
   return {
     title,
     body,
     icon: "/zephyrly-logo.png",
     badge: "/zephyrly-logo.png",
     tag: `zephyrly-${task.id}-${scheduledFor}`,
+    requireInteraction: settings.requireInteraction,
+    silent: settings.silent,
+    vibrate: settings.vibrate ? [200, 100, 200] : undefined,
+    actions: actions.length ? actions : undefined,
     data: {
       url: `/Calendar?${params.toString()}`,
       taskId: task.id,
