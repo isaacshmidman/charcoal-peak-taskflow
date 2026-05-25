@@ -86,11 +86,12 @@ export async function subscribeCurrentDevice(vapidPublicKey) {
 export function sanitizeVapidPublicKey(raw) {
   if (raw == null) return "";
   let s = String(raw).trim();
-  // Strip wrapping quotes that sometimes survive env parsers.
-  s = s.replace(/^['"]+|['"]+$/g, "");
-  // Strip BOM.
+  // Wrapping characters that survive copy-paste from docs / templates:
+  // quotes ('"`), angle brackets (<>), square brackets ([]), parens.
+  s = s.replace(/^[<\[("'`]+|[>\])"'`]+$/g, "");
+  // BOM.
   s = s.replace(/^﻿/, "");
-  // Strip trailing base64 padding (urlBase64ToUint8Array re-adds it).
+  // Trailing base64 padding (urlBase64ToUint8Array re-adds it).
   s = s.replace(/=+$/, "");
   // Must contain only base64url alphabet.
   if (!/^[A-Za-z0-9_-]+$/.test(s)) return "";

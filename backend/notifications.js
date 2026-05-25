@@ -58,8 +58,12 @@ export function getNotificationAvailability(config) {
 function sanitizeVapidKey(raw) {
   if (raw == null) return "";
   let s = String(raw).trim();
-  s = s.replace(/^['"]+|['"]+$/g, "");
+  // Wrapping characters that survive copy-paste from docs / templates:
+  // quotes ('"`), angle brackets (<>), square brackets ([]), parens.
+  s = s.replace(/^[<\[("'`]+|[>\])"'`]+$/g, "");
+  // BOM.
   s = s.replace(/^﻿/, "");
+  // Trailing base64 padding (urlsafe base64 is unpadded).
   s = s.replace(/=+$/, "");
   return /^[A-Za-z0-9_-]+$/.test(s) ? s : "";
 }
