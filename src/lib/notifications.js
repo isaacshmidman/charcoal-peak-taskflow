@@ -63,10 +63,38 @@ export async function subscribeCurrentDevice(vapidPublicKey) {
   if (!registration?.pushManager) throw new Error("Push notifications are not supported in this browser.");
   const existing = await registration.pushManager.getSubscription();
   if (existing) return existing;
+  const cleanKey = sanitizeVapidPublicKey(vapidPublicKey);
+  if (!cleanKey) {
+    throw new Error("Notifications are not configured on this server (missing VAPID public key).");
+  }
   return registration.pushManager.subscribe({
     userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+    applicationServerKey: urlBase64ToUint8Array(cleanKey),
   });
+}
+
+/**
+ * Strip stray whitespace, surrounding quotes, BOM, and trailing base64
+ * padding `=` from a server-supplied VAPID public key. Returns "" if
+ * what's left isn't a plausible base64url string — pushManager.subscribe
+ * throws "The string contains invalid characters" on the slightest
+ * malformation, so we defend at the door.
+ *
+ * @param {string | null | undefined} raw
+ * @returns {string}
+ */
+export function sanitizeVapidPublicKey(raw) {
+  if (raw == null) return "";
+  let s = String(raw).trim();
+  // Strip wrapping quotes that sometimes survive env parsers.
+  s = s.replace(/^['"]+|['"]+$/g, "");
+  // Strip BOM.
+  s = s.replace(/^﻿/, "");
+  // Strip trailing base64 padding (urlBase64ToUint8Array re-adds it).
+  s = s.replace(/=+$/, "");
+  // Must contain only base64url alphabet.
+  if (!/^[A-Za-z0-9_-]+$/.test(s)) return "";
+  return s;
 }
 
 export async function unsubscribeCurrentDevice() {
@@ -78,9 +106,18 @@ export async function unsubscribeCurrentDevice() {
 }
 
 export function urlBase64ToUint8Array(base64String) {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = `${base64String}${padding}`.replace(/-/g, "+").replace(/_/g, "/");
-  const rawData = window.atob(base64);
+  const cleaned = sanitizeVapidPublicKey(base64String);
+  if (!cleaned) {
+    throw new Error("Push subscription failed: VAPID public key is empty or contains invalid characters.");
+  }
+  const padding = "=".repeat((4 - (cleaned.length % 4)) % 4);
+  const base64 = `${cleaned}${padding}`.replace(/-/g, "+").replace(/_/g, "/");
+  let rawData;
+  try {
+    rawData = window.atob(base64);
+  } catch {
+    throw new Error("Push subscription failed: VAPID public key is not valid base64url.");
+  }
   const outputArray = new Uint8Array(rawData.length);
   for (let i = 0; i < rawData.length; i += 1) {
     outputArray[i] = rawData.charCodeAt(i);

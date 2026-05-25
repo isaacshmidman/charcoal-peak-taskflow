@@ -31,16 +31,37 @@ let loopRunning = false;
 let configuredVapidKey = "";
 
 export function isNotificationsConfigured(config) {
-  return Boolean(config?.vapidPublicKey && config?.vapidPrivateKey);
+  return Boolean(sanitizeVapidKey(config?.vapidPublicKey) && sanitizeVapidKey(config?.vapidPrivateKey));
 }
 
 export function getNotificationAvailability(config) {
-  const available = isNotificationsConfigured(config);
+  const publicKey = sanitizeVapidKey(config?.vapidPublicKey);
+  const privateKey = sanitizeVapidKey(config?.vapidPrivateKey);
+  const available = Boolean(publicKey && privateKey);
   return {
     available,
-    vapidPublicKey: available ? String(config.vapidPublicKey || "") : "",
+    vapidPublicKey: available ? publicKey : "",
     reason: available ? "" : "Web Push is not configured on this server.",
   };
+}
+
+/**
+ * Defensive trim of a VAPID key from env. Strips whitespace, wrapping
+ * quotes, BOM, and trailing `=` padding (urlsafe base64 is unpadded).
+ * Returns "" if what's left isn't a plausible base64url string.
+ * Keeps the wire response clean so the browser doesn't see characters
+ * its `atob` chokes on.
+ *
+ * @param {string | null | undefined} raw
+ * @returns {string}
+ */
+function sanitizeVapidKey(raw) {
+  if (raw == null) return "";
+  let s = String(raw).trim();
+  s = s.replace(/^['"]+|['"]+$/g, "");
+  s = s.replace(/^﻿/, "");
+  s = s.replace(/=+$/, "");
+  return /^[A-Za-z0-9_-]+$/.test(s) ? s : "";
 }
 
 export function defaultNotificationSettings(overrides = {}) {
@@ -337,9 +358,25 @@ function zonedDateTimeToDate(ymd, minutes, timeZone) {
   return Number.isNaN(zoned.getTime()) ? null : zoned;
 }
 
+/**
+ * Build a notification payload modeled after Google Calendar's reminders
+ * on Apple devices: title = task title only, body = a single short line
+ * "{Day}, {MonDay} • {time}" (timed) or "{Day}, {MonDay} • All day"
+ * (all-day). Keeps the icon stable so iOS/Android both render Zephyrly's
+ * branding. The OS already shows the app name above the title.
+ *
+ * @param {{ id: string, title?: string, task_time?: string, due_date: string }} task
+ * @param {string} scheduledFor  ISO timestamp; used as part of `tag` so
+ *   the same task can re-notify on later dates without being collapsed
+ *   by the OS.
+ */
 function buildTaskNotificationPayload(task, scheduledFor) {
   const title = String(task.title || "Untitled task").slice(0, 120);
-  const isTimed = parseTaskTime(task.task_time) != null;
+  const taskTime = task.task_time || "";
+  const isTimed = parseTaskTime(taskTime) != null;
+  const dateLabel = formatDateLabel(task.due_date);
+  const timeLabel = isTimed ? formatTimeLabel(taskTime) : "All day";
+  const body = dateLabel ? `${dateLabel} • ${timeLabel}` : timeLabel;
   const params = new URLSearchParams({
     date: task.due_date,
     task: task.id,
@@ -347,9 +384,7 @@ function buildTaskNotificationPayload(task, scheduledFor) {
   });
   return {
     title,
-    body: isTimed
-      ? `Due ${task.task_time}`
-      : "All-day task due today",
+    body,
     icon: "/zephyrly-logo.png",
     badge: "/zephyrly-logo.png",
     tag: `zephyrly-${task.id}-${scheduledFor}`,
@@ -360,6 +395,38 @@ function buildTaskNotificationPayload(task, scheduledFor) {
       scheduledFor,
     },
   };
+}
+
+/**
+ * "2026-05-25" → "Mon, May 25". Returns "" for an invalid input.
+ * @param {string} ymd
+ */
+function formatDateLabel(ymd) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(ymd || ""))) return "";
+  const [year, month, day] = ymd.split("-").map(Number);
+  const d = new Date(Date.UTC(year, month - 1, day));
+  if (Number.isNaN(d.getTime())) return "";
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      timeZone: "UTC",
+    }).format(d);
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * "9:00AM" → "9:00 AM" (matches Apple/Google's spacing). Returns input
+ * unchanged when it doesn't match the task_time shape.
+ * @param {string} taskTime
+ */
+function formatTimeLabel(taskTime) {
+  const m = String(taskTime || "").trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!m) return String(taskTime || "");
+  return `${m[1]}:${m[2]} ${m[3].toUpperCase()}`;
 }
 
 function insertPendingDelivery(db, { appId, userId, subscriptionId, taskId, scheduledFor }) {
@@ -412,13 +479,12 @@ async function defaultSendNotification(config, subscription, payload) {
 }
 
 function configureWebPush(config) {
-  const key = `${config.vapidSubject}|${config.vapidPublicKey}|${config.vapidPrivateKey}`;
+  const publicKey = sanitizeVapidKey(config?.vapidPublicKey);
+  const privateKey = sanitizeVapidKey(config?.vapidPrivateKey);
+  const subject = String(config?.vapidSubject || "mailto:notifications@localhost").trim();
+  const key = `${subject}|${publicKey}|${privateKey}`;
   if (configuredVapidKey === key) return;
-  webpush.setVapidDetails(
-    String(config.vapidSubject || "mailto:notifications@localhost"),
-    String(config.vapidPublicKey || ""),
-    String(config.vapidPrivateKey || "")
-  );
+  webpush.setVapidDetails(subject, publicKey, privateKey);
   configuredVapidKey = key;
 }
 

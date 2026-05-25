@@ -1,4 +1,4 @@
-const CACHE_NAME = 'zephyrly-v2';
+const CACHE_NAME = 'zephyrly-v3';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -15,16 +15,29 @@ self.addEventListener('push', (event) => {
   try {
     payload = event.data ? event.data.json() : {};
   } catch {
-    payload = { body: event.data ? event.data.text() : "" };
+    payload = { body: event.data ? event.data.text() : '' };
   }
 
+  // Title = task title only (Google Calendar pattern on Apple devices).
+  // The OS shows the app name "Zephyrly" above this automatically via the
+  // PWA manifest, so duplicating it here would look like "Zephyrly —
+  // Zephyrly: <task>".
   const title = payload.title || 'Zephyrly';
   const options = {
     body: payload.body || '',
     icon: payload.icon || '/zephyrly-logo.png',
     badge: payload.badge || '/zephyrly-logo.png',
     tag: payload.tag || undefined,
+    // renotify lets the OS re-announce a re-issued tag (e.g. snoozed task
+    // firing a second time) instead of silently replacing the previous.
     renotify: Boolean(payload.tag),
+    // Default behavior on iOS: auto-dismiss after user interaction. We do
+    // NOT want requireInteraction; users dismiss with a swipe like Google
+    // Calendar reminders.
+    requireInteraction: false,
+    silent: false,
+    lang: 'en',
+    dir: 'auto',
     data: payload.data || {},
   };
 

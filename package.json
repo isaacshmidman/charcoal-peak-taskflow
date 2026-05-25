@@ -26,6 +26,7 @@
     "test:e2e:headed": "playwright test --headed",
     "typecheck": "tsc -p ./jsconfig.json",
     "preview": "vite preview",
+    "vapid:generate": "node scripts/generate-vapid.mjs",
     "verify": "npm run lint && npm run typecheck && npm run test:run && npm run build",
     "verify:all": "npm run verify && npm run test:e2e"
   },
