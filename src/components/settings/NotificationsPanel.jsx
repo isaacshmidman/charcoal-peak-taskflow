@@ -330,7 +330,7 @@ export default function NotificationsPanel() {
 
           {/* Remind me — reminder timing options. */}
           <SettingBox className="space-y-3">
-            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Remind me</p>
+            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Adjust Notification Timing</p>
 
             <div className="space-y-2">
               <label className="block text-xs font-medium text-slate-600 dark:text-slate-300">Timed tasks</label>
