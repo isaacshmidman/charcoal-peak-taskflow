@@ -9,6 +9,7 @@ import { requireAuthenticatedUser } from "../auth.js";
 import {
   getNotificationSettingsResponse,
   sendTestNotification,
+  sendWelcomeNotification,
   unsubscribeNotificationSubscription,
   updateUserNotificationSettings,
   upsertNotificationSubscription,
@@ -56,6 +57,10 @@ export async function handleNotificationsRoute(request, response, { config, db, 
       subscription: body.subscription || body,
       userAgent: String(request.headers["user-agent"] || ""),
     });
+    // Fire-and-forget welcome push so the user sees a confirming buzz
+    // immediately. Failure here doesn't fail the subscribe — push errors
+    // are surfaced via the subscription row's last_error column.
+    sendWelcomeNotification(db, config, { subscription }).catch(() => {});
     sendJson(response, 200, { success: true, subscription_id: subscription.id });
     return true;
   }

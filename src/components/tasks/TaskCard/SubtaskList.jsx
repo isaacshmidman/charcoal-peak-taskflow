@@ -71,7 +71,7 @@ export default function SubtaskList({
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="px-3 pb-3 ml-10 space-y-1.5 border-l-2 border-white dark:border-[#343434] overflow-hidden"
+            className="px-3 pb-3 ml-10 space-y-1.5 border-l-2 border-slate-200/60 dark:border-[#343434] overflow-hidden"
           >
             {subtasks.map((sub, subIdx) => {
               const subOverdue = sub.due_date && new Date(sub.due_date + "T00:00:00") < new Date(new Date().setHours(0,0,0,0)) && sub.status !== "done";

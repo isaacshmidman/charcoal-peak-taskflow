@@ -129,7 +129,7 @@ export default function Settings() {
         </div>
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-2 text-slate-900 dark:text-slate-100 hover:text-red-400 dark:hover:text-red-300 hover:border-red-200 dark:hover:border-red-800 text-sm font-medium shrink-0">
+            <Button variant="outline" size="sm" className="gap-2 text-red-500 dark:text-red-300 border-red-200 dark:border-red-900 hover:bg-red-50 dark:hover:bg-[#2a1116] hover:text-red-600 dark:hover:text-red-200 hover:border-red-300 dark:hover:border-red-800 text-sm font-medium shrink-0">
               <LogOut className="w-4 h-4" />
               Log out
             </Button>

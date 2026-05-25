@@ -163,6 +163,34 @@ export function unsubscribeNotificationSubscription(db, { appId, user, endpoint 
 }
 
 /**
+ * Push a welcome notification immediately after a device subscribes so
+ * the user gets a confirming buzz the moment they grant permission.
+ *
+ * @param {any} db
+ * @param {any} config
+ * @param {{ subscription: any, sendNotification?: (config: any, subscription: any, payload: any) => Promise<any> }} opts
+ */
+export async function sendWelcomeNotification(db, config, opts) {
+  const { subscription, sendNotification = defaultSendNotification } = opts;
+  if (!isNotificationsConfigured(config) && sendNotification === defaultSendNotification) return;
+  if (!subscription) return;
+  const payload = {
+    title: "Zephyrly",
+    body: "Zephyrly will deliver notifications to this device.",
+    icon: "/zephyrly-logo.png",
+    badge: "/zephyrly-logo.png",
+    tag: `zephyrly-welcome-${subscription.id}`,
+    data: { url: "/Settings#notifications" },
+  };
+  try {
+    await sendNotification(config, subscriptionToPushObject(subscription), payload);
+    markSubscriptionOk(db, subscription.id);
+  } catch (err) {
+    handleSubscriptionSendError(db, subscription, err);
+  }
+}
+
+/**
  * @param {any} db
  * @param {any} config
  * @param {{ appId: string, user: any, sendNotification?: (config: any, subscription: any, payload: any) => Promise<any> }} opts
@@ -266,6 +294,12 @@ export async function runNotificationSweep(
 
     const tasks = listNotificationCandidateTasks(db, config.appId, user);
     for (const task of tasks) {
+      // Defense in depth: the SQL filter already drops subtasks, but
+      // belt-and-suspenders in case a future change there regresses.
+      if (task.parent_id) {
+        skipped += 1;
+        continue;
+      }
       if (task.source_kind === "event" && !settings.includeExternalEvents) {
         skipped += 1;
         continue;
@@ -364,12 +398,18 @@ function zonedDateTimeToDate(ymd, minutes, timeZone) {
 
 /**
  * Build a notification payload modeled after Google Calendar's reminders
- * on Apple devices: title = task title only, body = a single short line
- * "{Day}, {MonDay} • {time}" (timed) or "{Day}, {MonDay} • All day"
- * (all-day). Keeps the icon stable so iOS/Android both render Zephyrly's
- * branding. The OS already shows the app name above the title.
+ * on Apple devices.
  *
- * @param {{ id: string, title?: string, task_time?: string, due_date: string }} task
+ * Layout (OS renders top-to-bottom):
+ *   1. Task title (NotificationOptions.title)
+ *   2. "{One-time | Recurring}, {Timed | All-day}"  ← body line 1
+ *   3. "{Day}, {Mon DD} • {time}"                    ← body line 2
+ *
+ * macOS / iOS Safari also inject the website/PWA name (e.g. "Zephyrly")
+ * as a subtitle between (1) and (2); that's OS chrome we can't suppress
+ * from the Notification API. Android Chrome does not inject it.
+ *
+ * @param {{ id: string, title?: string, task_time?: string, due_date: string, task_type?: string }} task
  * @param {string} scheduledFor  ISO timestamp; used as part of `tag` so
  *   the same task can re-notify on later dates without being collapsed
  *   by the OS.
@@ -378,9 +418,12 @@ function buildTaskNotificationPayload(task, scheduledFor) {
   const title = String(task.title || "Untitled task").slice(0, 120);
   const taskTime = task.task_time || "";
   const isTimed = parseTaskTime(taskTime) != null;
+  const typeLabel = task.task_type === "recurring" ? "Recurring" : "One-time";
+  const timingLabel = isTimed ? "Timed" : "All-day";
   const dateLabel = formatDateLabel(task.due_date);
   const timeLabel = isTimed ? formatTimeLabel(taskTime) : "All day";
-  const body = dateLabel ? `${dateLabel} • ${timeLabel}` : timeLabel;
+  const dateBody = dateLabel ? `${dateLabel} • ${timeLabel}` : timeLabel;
+  const body = `${typeLabel}, ${timingLabel}\n${dateBody}`;
   const params = new URLSearchParams({
     date: task.due_date,
     task: task.id,

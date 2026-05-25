@@ -23,6 +23,7 @@ import { Bell, BellOff, Loader2, ShieldOff, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import TimeInput from "@/components/tasks/TaskForm/TimeInput.jsx";
 import { apiClient } from "@/api/apiClient";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useIntegrationsConnected } from "@/hooks/useIntegrations";
@@ -31,11 +32,9 @@ import {
   getBrowserTimeZone,
   getCurrentPushSubscription,
   isPushSupported,
-  nativeTimeToTaskTime,
   normalizeNotificationSettings,
   offsetToCustomParts,
   subscribeCurrentDevice,
-  taskTimeToNativeTime,
   unsubscribeCurrentDevice,
 } from "@/lib/notifications";
 import { cn } from "@/lib/utils";
@@ -244,7 +243,7 @@ export default function NotificationsPanel() {
             <BellOff className="w-5 h-5 text-slate-400 dark:text-slate-500 shrink-0" />
           )}
           <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
-            Notifications {draft.enabled ? "on" : "off"}
+            Notifications
           </p>
         </div>
         <Toggle
@@ -282,7 +281,7 @@ export default function NotificationsPanel() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="h-8 gap-2 text-xs"
+                  className="h-8 gap-2 text-xs text-red-500 dark:text-red-300 border-red-200 dark:border-red-900 hover:bg-red-50 dark:hover:bg-[#2a1116] hover:text-red-600 dark:hover:text-red-200 hover:border-red-300 dark:hover:border-red-800"
                   disabled={deviceBusy || offline}
                   onClick={() => unsubscribeMutation.mutate()}
                 >
@@ -406,7 +405,7 @@ export default function NotificationsPanel() {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="space-y-1 text-xs font-medium text-slate-600 dark:text-slate-300">
+              <div className="space-y-1 text-xs font-medium text-slate-600 dark:text-slate-300">
                 <span>All-day tasks</span>
                 <div className="flex items-center gap-2">
                   <input
@@ -414,17 +413,16 @@ export default function NotificationsPanel() {
                     checked={draft.allDayEnabled}
                     disabled={offline}
                     onChange={(e) => patchDraft({ allDayEnabled: e.target.checked })}
-                    className="h-4 w-4 accent-slate-900 dark:accent-slate-100"
+                    className="h-4 w-4 accent-slate-900 dark:accent-slate-100 shrink-0"
                   />
-                  <Input
-                    type="time"
-                    value={taskTimeToNativeTime(draft.allDayTime)}
-                    disabled={offline || !draft.allDayEnabled}
-                    onChange={(e) => patchDraft({ allDayTime: nativeTimeToTaskTime(e.target.value) })}
-                    className="h-9 text-sm"
-                  />
+                  <div className={cn("flex-1", (!draft.allDayEnabled || offline) && "opacity-50 pointer-events-none")}>
+                    <TimeInput
+                      value={draft.allDayTime || "9:00AM"}
+                      onChange={(value) => patchDraft({ allDayTime: value })}
+                    />
+                  </div>
                 </div>
-              </label>
+              </div>
 
               <label className="space-y-1 text-xs font-medium text-slate-600 dark:text-slate-300">
                 <span>Missed reminders</span>
