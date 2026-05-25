@@ -9,7 +9,7 @@ import { startOfMonth } from "date-fns/startOfMonth";
 import { startOfWeek } from "date-fns/startOfWeek";
 import { startOfYear } from "date-fns/startOfYear";
 import { cn } from "@/lib/utils";
-import { toDateStr } from "./MonthCalendar";
+import { toDateStr } from "@/lib/dates";
 
 const WEEKDAY_LETTERS = ["S", "M", "T", "W", "T", "F", "S"];
 

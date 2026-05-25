@@ -7,14 +7,10 @@ import { CheckSquare } from "lucide-react";
 import { format } from "date-fns/format";
 import { cn } from "@/lib/utils";
 import { colorBg, isDarkColor } from "@/lib/colors";
+import { fromDateStr, toDateStr } from "@/lib/dates";
 
 /** @typedef {import("@/types/tasks").TaskRecord} TaskRecord */
 /** @typedef {import("@/types/tasks").PriorityOption} PriorityOption */
-
-/** @param {Date} date */
-const toDateStr = (date) => format(date, "yyyy-MM-dd");
-/** @param {string} str */
-const fromDateStr = (str) => new Date(str + "T00:00:00");
 
 /**
  * @param {{

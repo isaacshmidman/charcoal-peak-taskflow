@@ -152,12 +152,3 @@ export function deriveCalendars(tasks) {
   });
 }
 
-/**
- * @param {TaskRecord} task
- * @returns {string}
- */
-export function calendarKeyForTask(task) {
-  const calId = task.source_calendar_id || "";
-  const provider = task.source_provider || "";
-  return calId ? `${provider}:${calId}` : "zephyrly";
-}

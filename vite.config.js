@@ -73,7 +73,7 @@ export default defineConfig(({ mode }) => {
               "@radix-ui/react-slot",
             ],
             motion: ["framer-motion"],
-            dnd: ["@dnd-kit/core", "@dnd-kit/modifiers"],
+            dnd: ["@dnd-kit/core"],
             "date-picker": ["react-day-picker", "date-fns"],
             icons: ["lucide-react"],
           },

@@ -2,20 +2,11 @@
 /**
  * @file 2-column grid: priority picker (or calendar-name display, when
  * editing an external provider event) + one-time/recurring type radio.
- * The colorDotClass map duplicates colorDot from @/lib/colors — Phase 5
- * of the cleanup plan will consolidate.
  */
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { hexToRgba } from "@/lib/colors";
-
-const colorDotClass = {
-  red: "bg-red-400", orange: "bg-orange-400", yellow: "bg-yellow-400",
-  green: "bg-green-400", blue: "bg-blue-400", violet: "bg-violet-400",
-  pink: "bg-pink-400", teal: "bg-teal-400", cyan: "bg-cyan-400",
-  rose: "bg-rose-400", slate: "bg-slate-400",
-};
+import { colorDot, hexToRgba } from "@/lib/colors";
 
 export default function PriorityAndType({
   form,
@@ -54,7 +45,7 @@ export default function PriorityAndType({
               {priorities.map(p => (
                 <SelectItem key={p.id} value={p.id}>
                   <span className="flex items-center gap-2">
-                    <span className={cn("inline-block w-2.5 h-2.5 rounded-full shrink-0", colorDotClass[p.color] || colorDotClass.slate)} />
+                    <span className={cn("inline-block w-2.5 h-2.5 rounded-full shrink-0", colorDot[p.color] || colorDot.slate)} />
                     {p.name}
                   </span>
                 </SelectItem>

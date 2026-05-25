@@ -14,13 +14,12 @@ import { Calendar, CheckSquare, Trash2 } from "lucide-react";
 import { format } from "date-fns/format";
 import { cn } from "@/lib/utils";
 import { colorBg, isDarkColor } from "@/lib/colors";
+import { fromDateStr, toDateStr } from "@/lib/dates";
 import TagsRow from "./TagsRow.jsx";
 import SubtaskList from "./SubtaskList.jsx";
 
 const parseDateLocal = (str) => new Date(str + "T00:00:00");
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const toDateStr = (date) => format(date, "yyyy-MM-dd");
-const fromDateStr = (str) => new Date(str + "T00:00:00");
 
 function buildRecurrenceShortLabel(task) {
   if (task.task_type !== "recurring" || !task.recurrence || task.recurrence === "none") return null;

@@ -19,10 +19,8 @@ import { startOfDay } from "date-fns/startOfDay";
 import { startOfMonth } from "date-fns/startOfMonth";
 import { startOfWeek } from "date-fns/startOfWeek";
 import { startOfYear } from "date-fns/startOfYear";
-import {
-  deriveCalendars,
-  calendarKeyForTask,
-} from "@/components/calendar/CalendarVisibilityDropdown";
+import { deriveCalendars } from "@/components/calendar/CalendarVisibilityDropdown";
+import { calendarKeyForTask } from "@/lib/calendar-order";
 import {
   compareDueDateTime,
   compareTaskTime,

@@ -13,9 +13,7 @@ import { Calendar as CalendarIcon } from "lucide-react";
 import { format } from "date-fns/format";
 import { cn } from "@/lib/utils";
 import { getNextRecurrenceDate } from "@/lib/recurrence";
-
-const toDateStr = (date) => format(date, "yyyy-MM-dd");
-const fromDateStr = (str) => new Date(str + "T00:00:00");
+import { fromDateStr, toDateStr } from "@/lib/dates";
 
 const WEEKDAYS = [
   { label: "S", fullLabel: "Sun", value: 0 },

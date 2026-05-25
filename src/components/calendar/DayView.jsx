@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import MiniMiniTaskCard from "./MiniMiniTaskCard";
 import { parseTaskTime, compareTaskTime } from "@/lib/sort-helpers";
 import { layoutTimedTasks } from "@/lib/calendar-layout";
-import { toDateStr } from "./MonthCalendar";
+import { toDateStr } from "@/lib/dates";
 
 const HOUR_HEIGHT = 48; // px per hour slot
 const HOURS = Array.from({ length: 24 }, (_, i) => i);

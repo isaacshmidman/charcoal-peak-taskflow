@@ -11,10 +11,8 @@ import { startOfDay } from "date-fns/startOfDay";
 import { startOfMonth } from "date-fns/startOfMonth";
 import { startOfWeek } from "date-fns/startOfWeek";
 import { cn } from "@/lib/utils";
+import { fromDateStr, toDateStr } from "@/lib/dates";
 import MiniMiniTaskCard from "./MiniMiniTaskCard";
-
-const toDateStr = (date) => format(date, "yyyy-MM-dd");
-const fromDateStr = (str) => new Date(str + "T00:00:00");
 
 function DayCell({
   date,
@@ -183,5 +181,3 @@ export default function MonthCalendar({
     </div>
   );
 }
-
-export { toDateStr, fromDateStr };

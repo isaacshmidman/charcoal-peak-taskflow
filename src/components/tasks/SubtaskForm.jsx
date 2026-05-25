@@ -11,14 +11,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as CalendarIcon, Trash2 } from "lucide-react";
 import { format } from "date-fns/format";
 import { useOutsideClick } from "@/hooks/useOutsideClick";
+import { fromDateStr, toDateStr } from "@/lib/dates";
 
 /**
  * @typedef {import("@/types/tasks").TaskCreateInput} TaskCreateInput
  * @typedef {import("@/types/tasks").TaskRecord} TaskRecord
  */
-
-const toDateStr = (date) => format(date, "yyyy-MM-dd");
-const fromDateStr = (str) => new Date(str + "T00:00:00");
 
 /**
  * @param {{

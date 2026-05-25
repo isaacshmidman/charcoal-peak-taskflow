@@ -10,10 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { format } from "date-fns/format";
+import { fromDateStr, toDateStr } from "@/lib/dates";
 import TimeInput, { addMinutes } from "./TimeInput.jsx";
-
-const toDateStr = (date) => format(date, "yyyy-MM-dd");
-const fromDateStr = (str) => new Date(str + "T00:00:00");
 
 export default function TimeFields({ form, setForm, endTouchedRef }) {
   return (
