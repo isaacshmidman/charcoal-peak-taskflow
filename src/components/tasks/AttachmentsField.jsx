@@ -66,6 +66,10 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
   const uploadMutation = useMutation({
     mutationFn: ({ file }) => apiClient.attachments.upload(taskId, file),
     onSuccess: (created) => {
+      // Defensive: if the backend ever returned a non-object body we'd
+      // splat undefined into the cache, which would later crash the
+      // chip render. Skip the cache update in that case.
+      if (!created || typeof created !== "object" || !created.id) return;
       queryClient.setQueryData(["taskAttachments", taskId], (prev = []) => [...prev, created]);
       // Mirror server-side: bump the cached task's attachment_count so
       // TaskCard's paperclip badge updates without a list refetch.
@@ -75,6 +79,9 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
           t.id === taskId ? { ...t, attachment_count: (t.attachment_count || 0) + 1 } : t
         );
       });
+    },
+    onError: (err) => {
+      setTopLevelError(err?.message || "Couldn't upload that file.");
     },
   });
 
@@ -221,19 +228,24 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
  * returns. Exported as a helper so TaskForm doesn't need to know about
  * the mutation internals.
  *
+ * Returns the per-file results so the caller can surface failures.
+ *
  * @param {string} taskId
  * @param {File[]} files
- * @returns {Promise<void>}
+ * @returns {Promise<Array<{ file: File, ok: boolean, error?: string }>>}
  */
 export async function flushPendingUploads(taskId, files) {
-  if (!taskId || !files?.length) return;
+  if (!taskId || !files?.length) return [];
+  const results = [];
   for (const file of files) {
     try {
       await apiClient.attachments.upload(taskId, file);
+      results.push({ file, ok: true });
     } catch (err) {
-      // Don't block the whole batch on one bad file; surface a console
-      // error so a future "upload failed" toast can catch it.
-      console.warn("Attachment upload failed for", file.name, err);
+      const msg = err?.message || "Upload failed";
+      console.warn("Attachment upload failed for", file.name, msg);
+      results.push({ file, ok: false, error: msg });
     }
   }
+  return results;
 }

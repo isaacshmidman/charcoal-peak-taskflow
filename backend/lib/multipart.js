@@ -12,13 +12,31 @@
  * supported: multi-file fields (yet). For Zephyrly's "upload one
  * attachment per request" pattern, this is exactly enough.
  *
- * (@ts-nocheck because the @types/node typings for Buffer methods
- * don't model the Buffer-vs-Uint8Array overloads we use; this file's
- * runtime correctness is covered by unit tests.)
+ * Wire format reminder (RFC 7578 / RFC 2046):
+ *
+ *   --<boundary>\r\n               ← opening boundary
+ *   Content-Disposition: ...\r\n
+ *   Content-Type: ...\r\n          ← optional
+ *   \r\n
+ *   <part body bytes>\r\n          ← body may be binary
+ *   --<boundary>\r\n               ← next-part boundary
+ *   ...
+ *   --<boundary>--\r\n             ← closing boundary (trailing "--")
+ *
+ * Strategy: split the body on `--<boundary>` (no leading CRLF). The
+ * resulting chunks are the preamble (usually empty), each part
+ * (surrounded by CRLFs from the wrapping boundaries), and the
+ * postamble (starts with `--\r\n`). Trim the CRLF padding on each
+ * part and you have its raw header+body.
+ *
+ * The previous version used `\r\n--<boundary>` as the delim, which
+ * matched the CRLF that comes AFTER the opening boundary, eating the
+ * headers + first 2 bytes of the body.
  */
 import { HttpError } from "../http.js";
 
-const CRLF = Buffer.from("\r\n");
+const CR = 0x0D;
+const LF = 0x0A;
 const DOUBLE_CRLF = Buffer.from("\r\n\r\n");
 
 /**
@@ -34,49 +52,54 @@ export async function parseMultipart(req, { maxBytes }) {
   }
 
   const body = await readBody(req, maxBytes);
-
   const boundaryDelim = Buffer.from(`--${boundary}`);
-  const parts = splitBuffer(body, Buffer.concat([CRLF, boundaryDelim]));
-  // First chunk before the first boundary is the preamble — typically empty
-  // or "--{boundary}\r\n". Drop it and the trailing "--" terminator chunk.
-  parts.shift();
-  if (parts.length && parts[parts.length - 1].slice(0, 2).equals(Buffer.from("--"))) {
-    parts.pop();
-  }
+  const chunks = splitBuffer(body, boundaryDelim);
+
+  // chunks layout:
+  //   [0]    preamble (usually empty or just "\r\n")
+  //   [1..N-2] each part — leading CRLF + headers + CRLF + CRLF + body + trailing CRLF
+  //   [N-1]  postamble (begins with "--" — the closing boundary's tail — possibly "--\r\n")
 
   /** @type {Record<string, string>} */
   const fields = {};
   /** @type {{ fieldName: string, filename: string, mimeType: string, data: Buffer } | null} */
   let file = null;
 
-  for (const raw of parts) {
-    // Each part starts with its own \r\n after the boundary marker that
-    // split() left behind, so trim the leading CRLF if present.
-    const part = raw.indexOf(CRLF) === 0 ? raw.slice(2) : raw;
-    const headerEnd = part.indexOf(DOUBLE_CRLF);
-    if (headerEnd === -1) continue;
-    const headerText = part.slice(0, headerEnd).toString("utf8");
-    // Drop the trailing CRLF that precedes the next boundary in our split.
-    const body = part.slice(headerEnd + DOUBLE_CRLF.length).slice(0, -2);
+  for (let i = 1; i < chunks.length - 1; i++) {
+    let chunk = chunks[i];
+    // Trim leading CRLF that came right after the opening boundary line.
+    if (chunk.length >= 2 && chunk[0] === CR && chunk[1] === LF) {
+      chunk = chunk.slice(2);
+    }
+    // Trim trailing CRLF that precedes the next boundary marker.
+    if (chunk.length >= 2 && chunk[chunk.length - 2] === CR && chunk[chunk.length - 1] === LF) {
+      chunk = chunk.slice(0, -2);
+    }
 
-    const disposition = headerText.split(/\r?\n/).find((line) => /^content-disposition:/i.test(line));
-    if (!disposition) continue;
-    const nameMatch = disposition.match(/name="([^"]*)"/i);
-    const filenameMatch = disposition.match(/filename="([^"]*)"/i);
+    const headerEnd = chunk.indexOf(DOUBLE_CRLF);
+    if (headerEnd === -1) continue;
+    const headerText = chunk.slice(0, headerEnd).toString("utf8");
+    const partBody = chunk.slice(headerEnd + DOUBLE_CRLF.length);
+
+    const headerLines = headerText.split(/\r?\n/);
+    const dispositionLine = headerLines.find((line) => /^content-disposition:/i.test(line));
+    if (!dispositionLine) continue;
+    const nameMatch = dispositionLine.match(/name="([^"]*)"/i);
+    const filenameMatch = dispositionLine.match(/filename="([^"]*)"/i);
     if (!nameMatch) continue;
     const fieldName = nameMatch[1];
 
     if (filenameMatch) {
-      const mimeMatch = headerText.split(/\r?\n/).find((line) => /^content-type:/i.test(line));
-      const mimeType = mimeMatch ? mimeMatch.replace(/^content-type:\s*/i, "").trim() : "application/octet-stream";
+      const mimeLine = headerLines.find((line) => /^content-type:/i.test(line));
+      const mimeType = mimeLine ? mimeLine.replace(/^content-type:\s*/i, "").trim() : "application/octet-stream";
       file = {
         fieldName,
         filename: filenameMatch[1],
         mimeType,
-        data: body,
+        data: partBody,
       };
     } else {
-      fields[fieldName] = body.toString("utf8");
+      fields[fieldName] = partBody.toString("utf8");
     }
   }
 
