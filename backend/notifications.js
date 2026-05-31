@@ -416,13 +416,15 @@ function zonedDateTimeToDate(ymd, minutes, timeZone) {
  *
  * Layout (OS renders top-to-bottom):
  *   1. Task title (NotificationOptions.title)
- *   2. "{One-time | Recurring}, {Timed | All-day}"  ← body line 1
- *   3. "{Day}, {Mon DD} • {time}"                    ← body line 2
- *   4. (optional, when settings.showDescription) task.description    ← body line 3
+ *   2. "Sun, May 31"  or  "Sun, May 31 • 9:45 AM"   ← body line 1
+ *      (date always shown; time only if the task has one)
+ *   3. (optional) "Weekly" / "Daily" / "Mon, Wed, Fri" / …  ← body line 2
+ *      (only included for recurring tasks; omitted for one-time)
+ *   4. (optional, when settings.showDescription) task.description  ← body line 3
  *
  * macOS / iOS Safari also inject the website/PWA name (e.g. "Zephyrly")
- * as a subtitle between (1) and (2); that's OS chrome we can't suppress
- * from the Notification API. Android Chrome does not inject it.
+ * as a subtitle between (1) and the body; that's OS chrome we can't
+ * suppress from the Notification API. Android Chrome does not inject it.
  *
  * Advanced fields the SW honors when present:
  *   - requireInteraction: keep visible until user dismisses
@@ -430,7 +432,7 @@ function zonedDateTimeToDate(ymd, minutes, timeZone) {
  *   - silent: mute sound
  *   - actions: in-notification buttons (Android / desktop Chrome)
  *
- * @param {{ id: string, title?: string, task_time?: string, due_date: string, task_type?: string, description?: string }} task
+ * @param {{ id: string, title?: string, task_time?: string, due_date: string, task_type?: string, recurrence?: string, recurrence_days_json?: string, description?: string }} task
  * @param {string} scheduledFor  ISO timestamp; used as part of `tag` so
  *   the same task can re-notify on later dates without being collapsed
  *   by the OS.
@@ -440,16 +442,27 @@ function buildTaskNotificationPayload(task, scheduledFor, settings = sanitizeNot
   const title = String(task.title || "Untitled task").slice(0, 120);
   const taskTime = task.task_time || "";
   const isTimed = parseTaskTime(taskTime) != null;
-  const typeLabel = task.task_type === "recurring" ? "Recurring" : "One-time";
-  const timingLabel = isTimed ? "Timed" : "All-day";
   const dateLabel = formatDateLabel(task.due_date);
-  const timeLabel = isTimed ? formatTimeLabel(taskTime) : "All day";
-  const dateBody = dateLabel ? `${dateLabel} • ${timeLabel}` : timeLabel;
-  const bodyLines = [`${typeLabel}, ${timingLabel}`, dateBody];
+  const timeLabel = isTimed ? formatTimeLabel(taskTime) : "";
+
+  // Line 1: date, optionally with the time after a bullet separator.
+  // No time = no bullet, no "All day" text.
+  const bodyLines = [];
+  if (dateLabel) {
+    bodyLines.push(timeLabel ? `${dateLabel} • ${timeLabel}` : dateLabel);
+  } else if (timeLabel) {
+    bodyLines.push(timeLabel);
+  }
+
+  // Line 2: recurrence label, only when the task actually recurs.
+  const recurLabel = buildRecurrenceLabel(task);
+  if (recurLabel) bodyLines.push(recurLabel);
+
   if (settings.showDescription && task.description) {
     const desc = String(task.description).trim();
     if (desc) bodyLines.push(desc.length > 200 ? `${desc.slice(0, 197)}…` : desc);
   }
+
   const body = bodyLines.join("\n");
   const params = new URLSearchParams({
     date: task.due_date,
@@ -512,6 +525,45 @@ function formatTimeLabel(taskTime) {
   const m = String(taskTime || "").trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
   if (!m) return String(taskTime || "");
   return `${m[1]}:${m[2]} ${m[3].toUpperCase()}`;
+}
+
+const RECURRENCE_DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const RECURRENCE_LABELS = {
+  daily: "Daily",
+  weekdays: "Weekdays",
+  weekly: "Weekly",
+  biweekly: "Biweekly",
+  monthly: "Monthly",
+  quarterly: "Quarterly",
+  yearly: "Yearly",
+};
+
+/**
+ * Returns a human label for the task's recurrence ("Weekly",
+ * "Mon, Wed, Fri", …) or null for non-recurring tasks. Mirrors the
+ * `buildRecurrenceShortLabel` helper in TaskCard so the notification
+ * reads the same as the inline badge.
+ *
+ * @param {{ task_type?: string, recurrence?: string, recurrence_days_json?: string }} task
+ */
+function buildRecurrenceLabel(task) {
+  if (task.task_type !== "recurring") return null;
+  const recurrence = String(task.recurrence || "").toLowerCase();
+  if (!recurrence || recurrence === "none") return null;
+
+  if (recurrence === "custom_days") {
+    let days = [];
+    try { days = JSON.parse(task.recurrence_days_json || "[]"); } catch { days = []; }
+    const filtered = (Array.isArray(days) ? days : [])
+      .map((d) => Number(d))
+      .filter((d) => Number.isInteger(d) && d >= 0 && d <= 6);
+    if (filtered.length) {
+      return filtered.map((d) => RECURRENCE_DAY_LABELS[d]).join(", ");
+    }
+    return "Custom days";
+  }
+
+  return RECURRENCE_LABELS[recurrence] || "Repeats";
 }
 
 function insertPendingDelivery(db, { appId, userId, subscriptionId, taskId, scheduledFor }) {
