@@ -33,9 +33,9 @@ import { useLocation } from "react-router-dom";
 import {
   Bell,
   Calendar,
+  Check,
   ChevronLeft,
   ChevronRight,
-  CheckSquare,
   LogOut,
   Palette,
   Trash2,
@@ -101,14 +101,20 @@ function SubPage({ title, onBack, children }) {
 }
 
 /** Top-level category card: icon + label/subtitle + chevron. */
-function SettingsCard({ icon: Icon, label, subtitle, onClick, iconClassName }) {
+function SettingsCard({ icon: Icon, iconEl, label, subtitle, onClick, iconClassName }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className="w-full flex items-center gap-3 bg-white dark:bg-[#111111] border border-slate-100 dark:border-[#303030] rounded-xl px-4 py-3.5 hover:border-slate-200 dark:hover:border-[#454545] transition-colors text-left"
     >
-      <Icon className={cn("w-5 h-5 shrink-0", iconClassName || "text-slate-500 dark:text-slate-400")} />
+      {/* Either a custom React element (e.g. the checked-task mini-box for
+          Tasks) or a lucide icon component. */}
+      <span className="shrink-0">
+        {iconEl
+          ? iconEl
+          : <Icon className={cn("w-5 h-5", iconClassName || "text-slate-500 dark:text-slate-400")} />}
+      </span>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{label}</p>
         {subtitle && (
@@ -117,6 +123,19 @@ function SettingsCard({ icon: Icon, label, subtitle, onClick, iconClassName }) {
       </div>
       <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 shrink-0" />
     </button>
+  );
+}
+
+/**
+ * Mini "checked task" box — pixel-matches the filled state of the
+ * completion button in TaskCard so the Tasks settings card visually
+ * uses the same icon the user sees when they check a task.
+ */
+function TasksCardIcon() {
+  return (
+    <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900">
+      <Check className="w-3 h-3" strokeWidth={3} />
+    </span>
   );
 }
 
@@ -279,7 +298,7 @@ export default function Settings() {
           onClick={() => openSection("appearance")}
         />
         <SettingsCard
-          icon={CheckSquare}
+          iconEl={<TasksCardIcon />}
           label="Tasks"
           subtitle="Priorities and tags"
           onClick={() => openSection("tasks")}
@@ -299,8 +318,8 @@ export default function Settings() {
         <SettingsCard
           icon={Trash2}
           iconClassName="text-red-400"
-          label="Data"
-          subtitle="Recently deleted tasks"
+          label="Recently Deleted"
+          subtitle="Restore tasks deleted in the last 7 days"
           onClick={() => openSection("recentlyDeleted")}
         />
       </div>
