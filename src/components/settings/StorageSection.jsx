@@ -15,12 +15,19 @@ import { Database, FileText, Loader2 } from "lucide-react";
 import { apiClient } from "@/api/apiClient";
 import { cn } from "@/lib/utils";
 
+/**
+ * SI units (1 KB = 1000 bytes, 1 MB = 10^6, 1 GB = 10^9) so the
+ * displayed number matches what users mean by "1 GB". With binary
+ * units (2^30 = 1.073e9), 82 KB used would display as "1023.9 MB
+ * free of 1 GB", which reads as "more than 1 GB free of 1 GB"
+ * — confusing nonsense.
+ */
 function formatBytes(bytes) {
   if (!Number.isFinite(bytes) || bytes < 0) return "0 B";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
+  if (bytes < 1000) return `${bytes} B`;
+  if (bytes < 1_000_000) return `${(bytes / 1000).toFixed(1)} KB`;
+  if (bytes < 1_000_000_000) return `${(bytes / 1_000_000).toFixed(1)} MB`;
+  return `${(bytes / 1_000_000_000).toFixed(2)} GB`;
 }
 
 export default function StorageSection() {

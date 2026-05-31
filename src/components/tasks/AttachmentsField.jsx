@@ -32,7 +32,8 @@ import { cn } from "@/lib/utils";
 import AttachmentChip from "./AttachmentChip.jsx";
 import AttachmentLightbox from "./AttachmentLightbox.jsx";
 
-const MAX_FILE_BYTES = 25 * 1024 * 1024;
+// SI units (10^6) to match the backend cap so error messages line up.
+const MAX_FILE_BYTES = 25 * 1_000_000;
 const MAX_PER_TASK = 10;
 
 function validateFile(file, existingCount) {

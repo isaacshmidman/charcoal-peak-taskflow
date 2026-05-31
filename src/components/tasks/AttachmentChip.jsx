@@ -21,7 +21,7 @@
  *   }} props
  */
 import { useEffect, useState } from "react";
-import { Download, FileText, Image as ImageIcon, Loader2, X } from "lucide-react";
+import { Download, FileText, Image as ImageIcon, ImageOff, Loader2, X } from "lucide-react";
 import { apiClient } from "@/api/apiClient";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +37,9 @@ export default function AttachmentChip({ attachment, localFile, uploading, uploa
   // For a queued local file (no attachment id yet), make an object URL
   // so we can show a preview before the upload completes.
   const [localPreviewUrl, setLocalPreviewUrl] = useState(null);
+  // If the thumbnail fetch fails (e.g. backend served a HEIC-disguised-as-
+  // JPG and the browser can't decode it), fall back to the file icon.
+  const [thumbError, setThumbError] = useState(false);
   useEffect(() => {
     if (!localFile || !localFile.type?.startsWith("image/")) {
       setLocalPreviewUrl(null);
@@ -46,6 +49,10 @@ export default function AttachmentChip({ attachment, localFile, uploading, uploa
     setLocalPreviewUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [localFile]);
+  // Reset the error state when the underlying attachment changes so
+  // re-uploading the same chip doesn't stay stuck in the icon-only
+  // fallback.
+  useEffect(() => { setThumbError(false); }, [attachment?.id]);
 
   const isImage = attachment?.is_image || (localFile?.type?.startsWith("image/") ?? false);
   const filename = attachment?.filename || localFile?.name || "Attachment";
@@ -56,6 +63,7 @@ export default function AttachmentChip({ attachment, localFile, uploading, uploa
   const thumbnailUrl = attachment?.id
     ? apiClient.attachments.urlFor(attachment.id, { thumb: true })
     : localPreviewUrl;
+  const showImageThumb = isImage && thumbnailUrl && !thumbError;
 
   return (
     <div className={cn(
@@ -63,7 +71,7 @@ export default function AttachmentChip({ attachment, localFile, uploading, uploa
       uploadError && "border-red-300 dark:border-red-900"
     )}>
       {/* Thumbnail or icon */}
-      {isImage && thumbnailUrl ? (
+      {showImageThumb ? (
         <button
           type="button"
           onClick={() => attachment && onPreview && onPreview(attachment)}
@@ -76,13 +84,16 @@ export default function AttachmentChip({ attachment, localFile, uploading, uploa
             alt=""
             loading="lazy"
             className="w-full h-full object-cover"
+            onError={() => setThumbError(true)}
           />
         </button>
       ) : (
         <div className="shrink-0 w-10 h-10 rounded-md flex items-center justify-center bg-slate-100 dark:bg-[#161616] border border-slate-200 dark:border-[#343434]">
-          {isImage
-            ? <ImageIcon className="w-4 h-4 text-slate-500 dark:text-slate-400" />
-            : <FileText className="w-4 h-4 text-slate-500 dark:text-slate-400" />}
+          {isImage && thumbError
+            ? <ImageOff className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+            : isImage
+              ? <ImageIcon className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+              : <FileText className="w-4 h-4 text-slate-500 dark:text-slate-400" />}
         </div>
       )}
 
