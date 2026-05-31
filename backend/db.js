@@ -276,6 +276,23 @@ export function createDatabase(config = backendConfig) {
     CREATE INDEX IF NOT EXISTS idx_integration_calendars_integration ON integration_calendars(integration_id);
     CREATE INDEX IF NOT EXISTS idx_notification_subscriptions_user ON notification_subscriptions(app_id, user_id, status);
     CREATE INDEX IF NOT EXISTS idx_task_notification_deliveries_due ON task_notification_deliveries(app_id, user_id, scheduled_for, status);
+
+    CREATE TABLE IF NOT EXISTS task_attachments (
+      id TEXT PRIMARY KEY,
+      app_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      task_id TEXT NOT NULL,
+      filename TEXT NOT NULL,            -- original filename (preserved for download UX)
+      mime_type TEXT NOT NULL,
+      size_bytes INTEGER NOT NULL,
+      storage_path TEXT NOT NULL,        -- relative path under attachments dir
+      is_image INTEGER NOT NULL DEFAULT 0,
+      width INTEGER,
+      height INTEGER,
+      created_date TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_task_attachments_task ON task_attachments(app_id, task_id);
+    CREATE INDEX IF NOT EXISTS idx_task_attachments_user ON task_attachments(app_id, user_id);
   `);
 
   // Migration: add task_end_time to existing databases.
@@ -296,6 +313,13 @@ export function createDatabase(config = backendConfig) {
   }
   try {
     db.exec(`ALTER TABLE calendar_integrations ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0`);
+  } catch {
+    // Column already exists — ignore
+  }
+  // Denormalized attachment count on tasks so TaskCard can show a
+  // paperclip + count without an N+1 fetch. Maintained by attachments.js.
+  try {
+    db.exec(`ALTER TABLE tasks ADD COLUMN attachment_count INTEGER NOT NULL DEFAULT 0`);
   } catch {
     // Column already exists — ignore
   }

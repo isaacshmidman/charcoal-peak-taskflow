@@ -1,7 +1,8 @@
 // @ts-check
 import { randomUUID } from "node:crypto";
 import { HttpError } from "./http.js";
-import { getDeletedTaskRetentionMs } from "./config.js";
+import { backendConfig, getDeletedTaskRetentionMs } from "./config.js";
+import { deleteAttachmentsForTask } from "./attachments.js";
 
 const ENTITY_DEFINITIONS = {
   Task: {
@@ -596,13 +597,17 @@ export function deleteEntityRecord(db, { entityName, appId, user, id }) {
     ...scope.params(user)
   );
 
-  // Cascade: when deleting a Task, also remove its subtasks
+  // Cascade: when deleting a Task, also remove its subtasks and the
+  // associated file attachments (both DB rows and on-disk files).
+  // NB: This runs for permanent deletes only; soft-delete goes through
+  // a separate path that keeps attachments around for the restore.
   if (entityName === "Task") {
     db.prepare(`DELETE FROM ${definition.table} WHERE parent_id = ? AND app_id = ?${scope.clause}`).run(
       id,
       appId,
       ...scope.params(user)
     );
+    deleteAttachmentsForTask(db, backendConfig, { appId, taskId: id });
   }
 
   return { success: true };

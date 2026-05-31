@@ -10,7 +10,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar, CheckSquare, Trash2 } from "lucide-react";
+import { Calendar, CheckSquare, Paperclip, Trash2 } from "lucide-react";
 import { format } from "date-fns/format";
 import { cn } from "@/lib/utils";
 import { colorBg, isDarkColor } from "@/lib/colors";
@@ -265,6 +265,20 @@ export default function TaskCard({
               {/* Recurrence badge/dot */}
               {recurrenceLabel && (
                 <RecurrenceBadge label={recurrenceLabel} />
+              )}
+
+              {/* Attachment indicator — visible when the task has any
+                  files. Reads the denormalized count maintained by
+                  backend/attachments.js. Tapping the card opens the
+                  form where the attachments live. */}
+              {task.attachment_count > 0 && (
+                <span
+                  className="inline-flex items-center gap-0.5 text-[11px] text-slate-400 dark:text-slate-500 px-1.5 py-0.5 rounded"
+                  title={`${task.attachment_count} attachment${task.attachment_count === 1 ? "" : "s"}`}
+                >
+                  <Paperclip className="w-3 h-3" />
+                  {task.attachment_count}
+                </span>
               )}
 
               {/* Due date — inline popover */}

@@ -58,6 +58,12 @@ import { loadFromCache, saveToCache } from "@/lib/offlineCache";
  *     setPrimaryCalendar: (id: string, externalCalendarId: string) => Promise<any>,
  *     setCalendarColor: (id: string, externalCalendarId: string, colorHex: string) => Promise<any>,
  *   },
+ *   attachments: {
+ *     list: (taskId: string) => Promise<any[]>,
+ *     upload: (taskId: string, file: File) => Promise<any>,
+ *     delete: (id: string) => Promise<any>,
+ *     urlFor: (id: string, opts?: { download?: boolean }) => string,
+ *   },
  *   cleanup: () => void,
  * }} ApiClient
  */
@@ -516,6 +522,68 @@ const liveApiClient = {
       return apiRequest(`/apps/${appConfig.appId}/notifications/test`, {
         method: "POST",
       });
+    },
+  },
+  attachments: {
+    async list(taskId) {
+      const result = await apiRequest(`/apps/${appConfig.appId}/tasks/${taskId}/attachments`);
+      return result?.attachments || [];
+    },
+    /**
+     * Upload a single file (multipart/form-data). Returns the created
+     * attachment metadata row.
+     * @param {string} taskId
+     * @param {File} file
+     */
+    async upload(taskId, file) {
+      const url = buildApiUrl(`/apps/${appConfig.appId}/tasks/${taskId}/attachments`);
+      const formData = new FormData();
+      formData.append("file", file, file.name);
+      const response = await fetch(url, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          // Intentionally NOT setting Content-Type — the browser will
+          // set it to "multipart/form-data; boundary=..." with the
+          // correct boundary derived from the FormData body.
+          Accept: "application/json",
+          ...(appConfig.appId ? { "X-App-Id": String(appConfig.appId) } : {}),
+          ...(currentToken ? { Authorization: `Bearer ${currentToken}` } : {}),
+        },
+        body: formData,
+      });
+      const payload = await parseResponseBody(response);
+      if (!response.ok) {
+        const err = new Error(
+          (payload && (payload.message || payload.error)) ||
+            `Upload failed (${response.status})`
+        );
+        // Surface the structured error code so the UI can branch on it.
+        // @ts-ignore — non-standard property for callers
+        err.code = payload?.code;
+        // @ts-ignore
+        err.status = response.status;
+        throw err;
+      }
+      return payload;
+    },
+    async delete(id) {
+      return apiRequest(`/apps/${appConfig.appId}/attachments/${id}`, {
+        method: "DELETE",
+      });
+    },
+    /**
+     * Build the same-origin URL for downloading or previewing an
+     * attachment. Used as the src= for <img> tags (browser sends the
+     * session cookie automatically) and as the href= for download links.
+     * @param {string} id
+     * @param {{ download?: boolean }} [opts]
+     */
+    urlFor(id, { download = false } = {}) {
+      return buildApiUrl(
+        `/apps/${appConfig.appId}/attachments/${id}`,
+        download ? { download: "1" } : undefined
+      );
     },
   },
   async getPublicSettings() {

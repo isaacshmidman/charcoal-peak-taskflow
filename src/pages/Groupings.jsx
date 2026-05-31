@@ -361,13 +361,15 @@ export default function Groupings() {
             for (let i = 0; i < subtaskTitles.length; i++) {
               await createTask({ title: subtaskTitles[i], status: "todo", task_type: "one_time", parent_id: editingTask.id, order: existingSubCount + i });
             }
-          } else {
-            const created = await createTask(data);
-            for (let i = 0; i < subtaskTitles.length; i++) {
-              await createTask({ title: subtaskTitles[i], status: "todo", task_type: "one_time", parent_id: created.id, order: i });
-            }
+            setEditingTask(null); setAddSubtaskParent(null);
+            return undefined;
+          }
+          const created = await createTask(data);
+          for (let i = 0; i < subtaskTitles.length; i++) {
+            await createTask({ title: subtaskTitles[i], status: "todo", task_type: "one_time", parent_id: created.id, order: i });
           }
           setEditingTask(null); setAddSubtaskParent(null);
+          return created;
         }}
       />
 

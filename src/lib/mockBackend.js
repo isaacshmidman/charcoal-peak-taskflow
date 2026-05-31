@@ -244,6 +244,24 @@ export function createE2EApiClient() {
         return { sent: 1, failed: 0 };
       },
     },
+    attachments: {
+      // E2E mock keeps attachments in-memory only; no real file uploads
+      // happen here. Returning empty lists keeps the UI usable in tests
+      // without exercising the file pipeline (which is covered by real
+      // backend tests on the server side).
+      async list(_taskId) {
+        return [];
+      },
+      async upload(_taskId, _file) {
+        return null;
+      },
+      async delete(_id) {
+        return { success: true };
+      },
+      urlFor(id, _opts) {
+        return `#mock-attachment-${id}`;
+      },
+    },
     cleanup() {},
     setToken(token) {
       backend.lastToken = token;

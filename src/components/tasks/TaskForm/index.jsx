@@ -27,6 +27,7 @@ import RecurrenceFields from "./RecurrenceFields.jsx";
 import TimeFields from "./TimeFields.jsx";
 import TagsField from "./TagsField.jsx";
 import SubtasksField from "./SubtasksField.jsx";
+import AttachmentsField, { flushPendingUploads } from "../AttachmentsField.jsx";
 
 const defaultTask = {
   title: "",
@@ -48,6 +49,10 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
   const [form, setForm] = useState(defaultTask);
   const [showEndDate, setShowEndDate] = useState(false);
   const [dayError, setDayError] = useState(false);
+  // Pending file attachments — only relevant when creating a NEW task
+  // (we don't have a task id yet, so the upload has to wait for the
+  // create to land). For edits, AttachmentsField uploads immediately.
+  const [pendingFiles, setPendingFiles] = useState([]);
   const endTouchedRef = useRef(false);
   const queryClient = useQueryClient();
 
@@ -104,10 +109,11 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
     }
     endTouchedRef.current = false;
     setDayError(false);
+    setPendingFiles([]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task, open, prioritiesKey]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.title.trim()) return;
     if (
@@ -126,8 +132,26 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
     delete data.subtask_titles;
     // Persist any new tags to SavedTag
     if (data.tags?.length) persistNewTags(data.tags);
-    onSubmit(data, subtaskTitles);
+    // Close the modal first so the user sees instant feedback; the
+    // pending-file upload happens in the background. (Existing-task
+    // edits had attachments uploaded immediately by AttachmentsField,
+    // so pendingFiles is always [] in that branch.)
+    const filesToFlush = pendingFiles;
+    const submitResult = onSubmit(data, subtaskTitles);
     onOpenChange(false);
+    if (!task && filesToFlush.length) {
+      try {
+        const result = await submitResult;
+        const createdId = result?.id || result?.task?.id || null;
+        if (createdId) {
+          await flushPendingUploads(createdId, filesToFlush);
+          queryClient.invalidateQueries({ queryKey: ["tasks"] });
+          queryClient.invalidateQueries({ queryKey: ["taskAttachments", createdId] });
+        }
+      } catch {
+        // Errors are surfaced inside AttachmentsField on the next open.
+      }
+    }
   };
 
   // Source-aware mode flags. A "source" task came from a calendar provider
@@ -217,6 +241,18 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
               onToggleSubtask={onToggleSubtask}
               onDeleteSubtask={onDeleteSubtask}
               onEditSubtask={onEditSubtask}
+            />
+          )}
+
+          {/* Attachments — for new tasks the chips queue locally and
+              upload after handleSubmit creates the task; for edits they
+              upload immediately to the live task id. */}
+          {!parentId && (
+            <AttachmentsField
+              taskId={task?.id || null}
+              pendingFiles={pendingFiles}
+              setPendingFiles={setPendingFiles}
+              readOnly={isReadOnly}
             />
           )}
 

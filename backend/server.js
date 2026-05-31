@@ -13,6 +13,7 @@ import { startNotificationLoop } from "./notifications.js";
 import { handleAuthRoute } from "./routes/auth.js";
 import { handleIntegrationsRoute } from "./routes/integrations.js";
 import { handleNotificationsRoute } from "./routes/notifications.js";
+import { handleAttachmentsRoute } from "./routes/attachments.js";
 import { handleEntitiesRoute } from "./routes/entities.js";
 
 const distRoot = resolve(projectRoot, "dist");
@@ -196,6 +197,9 @@ export function createRequestHandler(config = backendConfig, db = getDatabase(co
       if (await handleAuthRoute(request, response, ctx)) return;
       if (await handleIntegrationsRoute(request, response, ctx)) return;
       if (await handleNotificationsRoute(request, response, ctx)) return;
+      // Attachments before entities so /tasks/:id/attachments wins over
+      // the generic /tasks/:id PUT/DELETE dispatch in entities.
+      if (await handleAttachmentsRoute(request, response, ctx)) return;
       if (await handleEntitiesRoute(request, response, ctx)) return;
 
       throw new HttpError(404, "Route not found.", "not_found");
