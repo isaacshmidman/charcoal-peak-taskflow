@@ -1,25 +1,45 @@
 // @ts-nocheck
 /**
- * @file Settings page — composes the section subcomponents under
- * @/components/settings/. Stays as the implementation file (not a shim
- * to a sub-dir) because it also exports `NAV_OPTIONS` consumed by
- * @/lib/navigation.js; keeping it here avoids an explicit re-export
- * dance for that single named symbol.
+ * @file Settings page — iOS-style category cards + two quick-toggle
+ * shortcuts at the top.
  *
- * Sections rendered, in order:
- *   AppearanceSection
- *   DefaultsSection       (Default View + Nav Order)
- *   PrioritiesSection
- *   TagsSection
- *   <Recently Deleted trigger — short-circuits the page render>
- *   IntegrationsPanel
- *   DefaultCalendarViewSection
- *   CalendarOrderSection  (renders nothing if no calendars discovered)
- *   NotificationsPanel
+ * Top-level structure:
+ *   1. Header (page title + email + Log out)
+ *   2. Quick-toggles card (Appearance segmented + Notifications switch)
+ *   3. Five category cards (Appearance / Tasks / Calendars /
+ *      Notifications / Data). Tapping a card flips `activeSection`
+ *      and the page early-returns to that sub-page; back-arrow on the
+ *      sub-page clears `activeSection` and restores the saved scroll
+ *      position.
+ *
+ * Sub-pages:
+ *   - "appearance"            → AppearanceSection + DefaultsSection
+ *   - "tasks"                 → PrioritiesSection + TagsSection
+ *   - "calendars"             → IntegrationsPanel + Default Calendar
+ *                                View + Calendar Order
+ *   - "notifications"         → NotificationsPanel (Advanced still
+ *                                opens from inside it as a sub-sub-page)
+ *   - "advancedNotifications" → AdvancedNotificationSettings; back
+ *                                arrow returns to "notifications" (not
+ *                                main) so the back-stack feels natural
+ *   - "recentlyDeleted"       → RecentlyDeleted (renders its own
+ *                                chrome; we just route to it)
+ *
+ * Stays as the implementation file (not a shim under settings/)
+ * because it also exports NAV_OPTIONS, consumed by @/lib/navigation.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { ChevronRight, LogOut, Trash2 } from "lucide-react";
+import {
+  Bell,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  CheckSquare,
+  LogOut,
+  Palette,
+  Trash2,
+} from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,6 +62,9 @@ import PrioritiesSection from "@/components/settings/PrioritiesSection";
 import TagsSection from "@/components/settings/TagsSection";
 import DefaultCalendarViewSection from "@/components/settings/DefaultCalendarViewSection";
 import CalendarOrderSection from "@/components/settings/CalendarOrderSection";
+import QuickThemeToggle from "@/components/settings/QuickThemeToggle";
+import QuickNotificationsToggle from "@/components/settings/QuickNotificationsToggle";
+import { cn } from "@/lib/utils";
 
 export const NAV_OPTIONS = [
   { value: "/Active", label: "All Tasks" },
@@ -51,92 +74,168 @@ export const NAV_OPTIONS = [
   { value: "/Completed", label: "Completed" },
 ];
 
+// ── Tiny inline UI primitives used only inside this file ─────────
+
+/** Sub-page chrome: back-arrow + title, then children. */
+function SubPage({ title, onBack, children }) {
+  return (
+    <div className="space-y-4 max-w-xl mx-auto">
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+          onClick={onBack}
+          aria-label="Back to Settings"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </Button>
+        <h1 className="text-base font-semibold text-slate-900 dark:text-slate-100">{title}</h1>
+      </div>
+      <div className="space-y-8">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/** Top-level category card: icon + label/subtitle + chevron. */
+function SettingsCard({ icon: Icon, label, subtitle, onClick, iconClassName }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full flex items-center gap-3 bg-white dark:bg-[#111111] border border-slate-100 dark:border-[#303030] rounded-xl px-4 py-3.5 hover:border-slate-200 dark:hover:border-[#454545] transition-colors text-left"
+    >
+      <Icon className={cn("w-5 h-5 shrink-0", iconClassName || "text-slate-500 dark:text-slate-400")} />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{label}</p>
+        {subtitle && (
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 truncate">{subtitle}</p>
+        )}
+      </div>
+      <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 shrink-0" />
+    </button>
+  );
+}
+
+// ── Page ────────────────────────────────────────────────────────
+
 export default function Settings() {
-  const [showRecentlyDeleted, setShowRecentlyDeleted] = useState(false);
-  const [showAdvancedNotifications, setShowAdvancedNotifications] = useState(false);
+  /** @type {[null | "appearance" | "tasks" | "calendars" | "notifications" | "advancedNotifications" | "recentlyDeleted", any]} */
+  const [activeSection, setActiveSection] = useState(null);
   const scrollPosRef = useRef(0);
   const pendingScrollRestoreRef = useRef(null);
   const { user, logout } = useAuth();
   const location = useLocation();
 
-  // Scroll to section (e.g. from Calendar page deep link).
+  // Deep links from elsewhere in the app:
+  //   - Calendar page's "Connect Calendars in Settings" → state.scrollTo === "bottom"
+  //   - Google OAuth callback redirect → hash #calendar-integrations
+  //   - Notification subscribe-confirmation click → hash #notifications
+  // Each maps to the right category sub-page so the user lands where
+  // they expected, without scrolling.
   useEffect(() => {
-    const id = location.state?.scrollTo;
-    if (!id) return;
-    if (id === "bottom") {
-      // Content may still be loading (queries, lazy images). Re-scroll to the
-      // bottom while the document height is still growing, up to ~1.5s.
-      let cancelled = false;
-      let lastHeight = -1;
-      let attempts = 0;
-      const maxAttempts = 15;
-      const tick = () => {
-        if (cancelled) return;
-        const h = document.documentElement.scrollHeight;
-        window.scrollTo({ top: h, left: 0, behavior: attempts === 0 ? "auto" : "smooth" });
-        attempts += 1;
-        if (h !== lastHeight && attempts < maxAttempts) {
-          lastHeight = h;
-          setTimeout(tick, 100);
-        }
-      };
-      requestAnimationFrame(tick);
-      return () => { cancelled = true; };
+    const scrollTarget = location.state?.scrollTo;
+    const hash = (location.hash || "").replace(/^#/, "");
+    let next = null;
+    if (scrollTarget === "bottom" || scrollTarget === "integrations" || hash === "calendar-integrations" || hash === "integrations") {
+      next = "calendars";
+    } else if (scrollTarget === "notifications" || hash === "notifications") {
+      next = "notifications";
     }
-    const el = document.getElementById(id);
-    if (el) {
-      // Defer so the section has mounted.
-      requestAnimationFrame(() => {
-        el.scrollIntoView({ behavior: "smooth", block: "start" });
-      });
-    }
-  }, [location.state]);
+    if (next) setActiveSection(next);
+  }, [location.state, location.hash]);
 
+  // Restore scroll when returning to main from any sub-page.
   useLayoutEffect(() => {
-    if (showRecentlyDeleted || showAdvancedNotifications || pendingScrollRestoreRef.current === null) return;
+    if (activeSection !== null || pendingScrollRestoreRef.current === null) return;
     window.scrollTo({ top: pendingScrollRestoreRef.current, left: 0, behavior: "auto" });
     pendingScrollRestoreRef.current = null;
-  }, [showRecentlyDeleted, showAdvancedNotifications]);
+  }, [activeSection]);
 
-  // Return to main Settings (restoring scroll) when the top Settings icon is clicked
+  // Top-nav Settings icon → return to main from any depth.
   useEffect(() => {
     const handler = () => {
-      const restoreScroll = () => { pendingScrollRestoreRef.current = scrollPosRef.current; };
-      setShowRecentlyDeleted((current) => {
-        if (current) { restoreScroll(); return false; }
-        return current;
-      });
-      setShowAdvancedNotifications((current) => {
-        if (current) { restoreScroll(); return false; }
-        return current;
+      setActiveSection((current) => {
+        if (current === null) return current;
+        pendingScrollRestoreRef.current = scrollPosRef.current;
+        return null;
       });
     };
     window.addEventListener("settingsNavClicked", handler);
     return () => window.removeEventListener("settingsNavClicked", handler);
   }, []);
 
-  if (showRecentlyDeleted) {
+  // Helpers for card → sub-page navigation.
+  const openSection = (id) => {
+    scrollPosRef.current = window.scrollY;
+    setActiveSection(id);
+  };
+  const returnToMain = () => {
+    pendingScrollRestoreRef.current = scrollPosRef.current;
+    setActiveSection(null);
+  };
+
+  // ── Sub-page renders (early return, in order of likelihood) ───
+
+  if (activeSection === "appearance") {
     return (
-      <div>
-        <RecentlyDeleted onBack={() => {
-          pendingScrollRestoreRef.current = scrollPosRef.current;
-          setShowRecentlyDeleted(false);
-        }} />
-      </div>
+      <SubPage title="Appearance" onBack={returnToMain}>
+        <AppearanceSection />
+        <DefaultsSection navOptions={NAV_OPTIONS} />
+      </SubPage>
     );
   }
 
-  if (showAdvancedNotifications) {
+  if (activeSection === "tasks") {
     return (
-      <AdvancedNotificationSettings onBack={() => {
-        pendingScrollRestoreRef.current = scrollPosRef.current;
-        setShowAdvancedNotifications(false);
-      }} />
+      <SubPage title="Tasks" onBack={returnToMain}>
+        <PrioritiesSection />
+        <TagsSection />
+      </SubPage>
     );
   }
+
+  if (activeSection === "calendars") {
+    return (
+      <SubPage title="Calendars" onBack={returnToMain}>
+        <IntegrationsPanel />
+        <DefaultCalendarViewSection />
+        <CalendarOrderSection />
+      </SubPage>
+    );
+  }
+
+  if (activeSection === "notifications") {
+    return (
+      <SubPage title="Notifications" onBack={returnToMain}>
+        <NotificationsPanel
+          onOpenAdvanced={() => setActiveSection("advancedNotifications")}
+        />
+      </SubPage>
+    );
+  }
+
+  if (activeSection === "advancedNotifications") {
+    // Back-stack: Advanced → Notifications (not main).
+    return (
+      <AdvancedNotificationSettings onBack={() => setActiveSection("notifications")} />
+    );
+  }
+
+  if (activeSection === "recentlyDeleted") {
+    return (
+      <RecentlyDeleted onBack={returnToMain} />
+    );
+  }
+
+  // ── Main page (cards + quick toggles) ─────────────────────────
 
   return (
-    <div className="space-y-8 max-w-xl mx-auto">
+    <div className="space-y-4 max-w-xl mx-auto">
+      {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <h1 className="text-base font-semibold text-slate-900 dark:text-slate-100">Settings</h1>
@@ -144,7 +243,11 @@ export default function Settings() {
         </div>
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-2 text-red-500 dark:text-red-300 border-red-200 dark:border-red-900 hover:bg-red-50 dark:hover:bg-[#2a1116] hover:text-red-600 dark:hover:text-red-200 hover:border-red-300 dark:hover:border-red-800 text-sm font-medium shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 text-red-500 dark:text-red-300 border-red-200 dark:border-red-900 hover:bg-red-50 dark:hover:bg-[#2a1116] hover:text-red-600 dark:hover:text-red-200 hover:border-red-300 dark:hover:border-red-800 text-sm font-medium shrink-0"
+            >
               <LogOut className="w-4 h-4" />
               Log out
             </Button>
@@ -161,47 +264,46 @@ export default function Settings() {
         </AlertDialog>
       </div>
 
-      <AppearanceSection />
+      {/* Quick toggles — two rows in one rounded card with a divider */}
+      <div className="rounded-xl border border-slate-100 dark:border-[#303030] bg-white dark:bg-[#111111] divide-y divide-slate-100 dark:divide-[#303030]">
+        <QuickThemeToggle />
+        <QuickNotificationsToggle />
+      </div>
 
-      <DefaultsSection navOptions={NAV_OPTIONS} />
-
-      <PrioritiesSection />
-
-      <TagsSection />
-
-      {/* Recently Deleted */}
-      <section>
-        <button
-          onClick={() => { scrollPosRef.current = window.scrollY; setShowRecentlyDeleted(true); }}
-          className="w-full flex items-center justify-between bg-white dark:bg-[#111111] border border-slate-100 dark:border-[#303030] rounded-xl px-4 py-3 hover:border-slate-200 dark:hover:border-[#454545] transition-colors"
-        >
-          <span className="text-sm font-medium text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <Trash2 className="w-4 h-4 text-red-400" />
-            Recently Deleted
-          </span>
-          <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600" />
-        </button>
-      </section>
-
-      <IntegrationsPanel />
-
-      {/* Calendar-specific config grouped right under the Integrations
-          (Connect Google / Apple) panel for a logical flow:
-            1. Connect a calendar provider
-            2. Pick which calendar view opens by default
-            3. Set order + visibility of those calendars on other pages
-          Order matches the user's mental model of "set up, then tune". */}
-      <DefaultCalendarViewSection />
-
-      <CalendarOrderSection />
-
-      <NotificationsPanel
-        onOpenAdvanced={() => {
-          scrollPosRef.current = window.scrollY;
-          setShowAdvancedNotifications(true);
-        }}
-      />
-
+      {/* Category cards */}
+      <div className="space-y-2">
+        <SettingsCard
+          icon={Palette}
+          label="Appearance"
+          subtitle="Theme, default view, navigation order"
+          onClick={() => openSection("appearance")}
+        />
+        <SettingsCard
+          icon={CheckSquare}
+          label="Tasks"
+          subtitle="Priorities and tags"
+          onClick={() => openSection("tasks")}
+        />
+        <SettingsCard
+          icon={Calendar}
+          label="Calendars"
+          subtitle="Connected calendars and display"
+          onClick={() => openSection("calendars")}
+        />
+        <SettingsCard
+          icon={Bell}
+          label="Notifications"
+          subtitle="Reminders for tasks with due dates"
+          onClick={() => openSection("notifications")}
+        />
+        <SettingsCard
+          icon={Trash2}
+          iconClassName="text-red-400"
+          label="Data"
+          subtitle="Recently deleted tasks"
+          onClick={() => openSection("recentlyDeleted")}
+        />
+      </div>
     </div>
   );
 }

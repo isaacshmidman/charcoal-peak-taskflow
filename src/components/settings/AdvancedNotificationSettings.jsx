@@ -28,31 +28,7 @@ import {
   normalizeNotificationSettings,
 } from "@/lib/notifications";
 import { cn } from "@/lib/utils";
-
-/** Pill toggle, mirrored from NotificationsPanel for visual consistency. */
-function Toggle({ checked, onChange, disabled }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={cn(
-        "relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none shrink-0",
-        checked ? "bg-slate-900 dark:bg-slate-100" : "bg-slate-200 dark:bg-[#222222]",
-        disabled && "opacity-40 cursor-not-allowed"
-      )}
-    >
-      <span
-        className={cn(
-          "inline-block h-4 w-4 transform rounded-full bg-white dark:bg-slate-900 shadow transition-transform duration-200",
-          checked ? "translate-x-6" : "translate-x-1"
-        )}
-      />
-    </button>
-  );
-}
+import SettingsToggle from "@/components/settings/SettingsToggle";
 
 /** A single toggle row in a SettingBox. Greys out when unsupported. */
 function OptionRow({ title, description, checked, onChange, disabled, supported = true }) {
@@ -67,7 +43,7 @@ function OptionRow({ title, description, checked, onChange, disabled, supported 
           {!supported ? "Not supported on this device" : description}
         </p>
       </div>
-      <Toggle
+      <SettingsToggle
         checked={supported && checked}
         disabled={disabled || !supported}
         onChange={onChange}
