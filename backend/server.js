@@ -43,8 +43,14 @@ function getPublicSettings(config) {
     app_id: config.appId,
     name: config.appName || "Zephyrly",
     auth_providers: {
+      // hasGoogleCredentials is computed in config.js from the Google
+      // client id + secret env vars; surfaced here so the Login page
+      // knows whether to enable the "Sign in with Google" button.
       google: !!config.hasGoogleCredentials,
-      email_password: !!config.allowEmailPasswordLogin,
+      // Email/password login is gated by the same flag that actually
+      // accepts the request inside loginWithEmailPassword — keeps the
+      // login UI honest about what will work.
+      email_password: !!config.allowAnyPassword,
     },
     deleted_task_retention_days: config.deletedTaskRetentionDays,
   };

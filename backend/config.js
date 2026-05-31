@@ -118,6 +118,7 @@ export const backendConfig = {
   allowAnyPassword: parseBoolean(process.env.TASKFLOW_ALLOW_ANY_PASSWORD, false),
   googleClientId,
   googleClientSecret,
+  hasGoogleCredentials,
   googleMode:
     process.env.TASKFLOW_GOOGLE_MODE ||
     (hasGoogleCredentials ? "oauth" : process.env.NODE_ENV === "production" ? "disabled" : "disabled"),

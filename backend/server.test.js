@@ -105,6 +105,7 @@ beforeAll(() => {
     allowAnyPassword: true,
     googleClientId: "",
     googleClientSecret: "",
+    hasGoogleCredentials: false,
     googleMode: "disabled",
     googleCalendarClientId: "",
     googleCalendarClientSecret: "",
