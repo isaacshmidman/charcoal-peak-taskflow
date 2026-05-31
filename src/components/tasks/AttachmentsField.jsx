@@ -3,28 +3,30 @@
  * @file Attachments section inside TaskForm.
  *
  * Two modes:
- *   - EXISTING TASK (taskId set): uploads + deletes hit the backend
- *     immediately. Reads via useQuery so the list stays fresh.
+ *   - EXISTING TASK (taskId set): clicking a file IMMEDIATELY adds an
+ *     uploading chip + bumps TaskCard's paperclip count optimistically.
+ *     The upload runs in the background; on success the temporary chip
+ *     is swapped for the real one (no visual jump). On failure the
+ *     chip + count bump are rolled back and an error appears.
  *   - NEW TASK (taskId null): files queue locally; the parent
- *     TaskForm calls `flushPendingUploads(newTaskId)` after the task
- *     is created in handleSubmit, uploading each pending file in
- *     sequence. The chips render with their object-URL previews
- *     in the meantime.
+ *     TaskForm calls `flushPendingUploads(newTaskId, pending)` after
+ *     the task is created in handleSubmit, uploading each pending
+ *     file in sequence.
  *
  * Drop zone + file picker — both bound to a hidden <input type="file">.
- * No batched picker; each file uploads independently so a per-file
- * error doesn't block siblings.
+ * Multiple files run in PARALLEL on existing tasks (each its own
+ * mutation) so picking five at once doesn't serialize.
  *
  * Props:
  *   @param {{
  *     taskId: string | null,
- *     pendingFiles: File[],
- *     setPendingFiles: (next: File[]) => void,
+ *     pendingFiles: Array<{ tempId: string, file: File }>,
+ *     setPendingFiles: (next: Array<{ tempId: string, file: File }>) => void,
  *     readOnly?: boolean,
  *   }} props
  */
 import { useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Label } from "@/components/ui/label";
 import { Paperclip, Upload } from "lucide-react";
 import { apiClient } from "@/api/apiClient";
@@ -36,12 +38,16 @@ import AttachmentLightbox from "./AttachmentLightbox.jsx";
 const MAX_FILE_BYTES = 25 * 1_000_000;
 const MAX_PER_TASK = 10;
 
+function makeTempId() {
+  return `temp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
 function validateFile(file, existingCount) {
   if (existingCount >= MAX_PER_TASK) {
     return `Too many attachments (max ${MAX_PER_TASK}).`;
   }
   if (file.size > MAX_FILE_BYTES) {
-    return `“${file.name}” is too large (max ${MAX_FILE_BYTES / 1024 / 1024} MB).`;
+    return `“${file.name}” is too large (max ${MAX_FILE_BYTES / 1_000_000} MB).`;
   }
   // Mirror the backend blocklist so the user gets immediate feedback.
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
@@ -49,6 +55,18 @@ function validateFile(file, existingCount) {
     return `“.${ext}” files are not allowed.`;
   }
   return null;
+}
+
+/** Bump the cached task's attachment_count by `delta` (positive or negative). */
+function patchCachedTaskCount(queryClient, taskId, delta) {
+  queryClient.setQueryData(["tasks"], (prev) => {
+    if (!Array.isArray(prev)) return prev;
+    return prev.map((t) =>
+      t.id === taskId
+        ? { ...t, attachment_count: Math.max(0, (t.attachment_count || 0) + delta) }
+        : t
+    );
+  });
 }
 
 export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles, readOnly }) {
@@ -64,65 +82,67 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
     enabled: !!taskId,
   });
 
-  const uploadMutation = useMutation({
-    mutationFn: ({ file }) => apiClient.attachments.upload(taskId, file),
-    onSuccess: (created) => {
-      // Defensive: if the backend ever returned a non-object body we'd
-      // splat undefined into the cache, which would later crash the
-      // chip render. Skip the cache update in that case.
-      if (!created || typeof created !== "object" || !created.id) return;
-      queryClient.setQueryData(["taskAttachments", taskId], (prev = []) => [...prev, created]);
-      // Mirror server-side: bump the cached task's attachment_count so
-      // TaskCard's paperclip badge updates without a list refetch.
-      queryClient.setQueryData(["tasks"], (prev) => {
-        if (!Array.isArray(prev)) return prev;
-        return prev.map((t) =>
-          t.id === taskId ? { ...t, attachment_count: (t.attachment_count || 0) + 1 } : t
-        );
-      });
-    },
-    onError: (err) => {
-      setTopLevelError(err?.message || "Couldn't upload that file.");
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id) => apiClient.attachments.delete(id),
-    onSuccess: (_, id) => {
-      queryClient.setQueryData(["taskAttachments", taskId], (prev = []) => prev.filter((a) => a.id !== id));
-      queryClient.setQueryData(["tasks"], (prev) => {
-        if (!Array.isArray(prev)) return prev;
-        return prev.map((t) =>
-          t.id === taskId
-            ? { ...t, attachment_count: Math.max(0, (t.attachment_count || 0) - 1) }
-            : t
-        );
-      });
-    },
-  });
-
   const totalCount = (serverAttachments?.length || 0) + (pendingFiles?.length || 0);
+
+  /** Existing-task path: fire upload, swap chip on success, roll back on error. */
+  const startUploadInBackground = async (file, tempId) => {
+    setTopLevelError("");
+    patchCachedTaskCount(queryClient, taskId, +1);  // optimistic
+    try {
+      const created = await apiClient.attachments.upload(taskId, file);
+      // Remove the pending chip
+      setPendingFiles((current) => current.filter((p) => p.tempId !== tempId));
+      // Add the real attachment to the query cache
+      if (created?.id) {
+        queryClient.setQueryData(["taskAttachments", taskId], (prev = []) => [...prev, created]);
+      } else {
+        // Defensive: server returned something weird. Refetch to be safe.
+        queryClient.invalidateQueries({ queryKey: ["taskAttachments", taskId] });
+      }
+    } catch (err) {
+      // Roll back the count + remove the pending chip + surface error.
+      setPendingFiles((current) => current.filter((p) => p.tempId !== tempId));
+      patchCachedTaskCount(queryClient, taskId, -1);
+      setTopLevelError(err?.message || `Couldn't upload “${file.name}”.`);
+    }
+  };
 
   const handleFiles = (files) => {
     setTopLevelError("");
     const fileList = Array.from(files || []);
     if (!fileList.length) return;
     for (let i = 0; i < fileList.length; i++) {
-      const file = fileList[i];
-      const validation = validateFile(file, totalCount + i);
+      const validation = validateFile(fileList[i], totalCount + i);
       if (validation) {
         setTopLevelError(validation);
         return;
       }
     }
+    const newPending = fileList.map((file) => ({ tempId: makeTempId(), file }));
+    setPendingFiles([...(pendingFiles || []), ...newPending]);
     if (taskId) {
-      // Existing task — upload immediately.
-      fileList.forEach((file) => {
-        uploadMutation.mutate({ file });
-      });
-    } else {
-      // New task — queue locally; parent flushes after task creation.
-      setPendingFiles([...(pendingFiles || []), ...fileList]);
+      // Existing task — start uploads in the background, in parallel.
+      newPending.forEach(({ file, tempId }) => startUploadInBackground(file, tempId));
+    }
+    // For NEW task: parent's handleSubmit will call flushPendingUploads.
+  };
+
+  /** Existing-task path: instant remove, roll back on error. */
+  const handleDelete = async (id) => {
+    setTopLevelError("");
+    const prev = queryClient.getQueryData(["taskAttachments", taskId]) || [];
+    const removed = prev.find((a) => a.id === id);
+    if (!removed) return;
+    // Optimistic
+    queryClient.setQueryData(["taskAttachments", taskId], prev.filter((a) => a.id !== id));
+    patchCachedTaskCount(queryClient, taskId, -1);
+    try {
+      await apiClient.attachments.delete(id);
+    } catch (err) {
+      // Restore the chip + count.
+      queryClient.setQueryData(["taskAttachments", taskId], (curr = []) => [...curr, removed]);
+      patchCachedTaskCount(queryClient, taskId, +1);
+      setTopLevelError(err?.message || "Couldn't remove that file.");
     }
   };
 
@@ -198,17 +218,20 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
               key={att.id}
               attachment={att}
               onPreview={(a) => a.is_image && setPreviewing(a)}
-              onDelete={readOnly ? undefined : () => deleteMutation.mutate(att.id)}
+              onDelete={readOnly ? undefined : () => handleDelete(att.id)}
             />
           ))}
-          {pendingFiles.map((file, idx) => (
+          {pendingFiles.map(({ tempId, file }) => (
             <AttachmentChip
-              key={`pending-${idx}-${file.name}`}
+              key={tempId}
               attachment={null}
               localFile={file}
-              uploading={false}
+              // For existing tasks the upload is firing right now; for
+              // new tasks it'll fire after the user clicks Create — show
+              // the spinner only in the former case.
+              uploading={Boolean(taskId)}
               onDelete={readOnly ? undefined : () => {
-                setPendingFiles(pendingFiles.filter((_, i) => i !== idx));
+                setPendingFiles(pendingFiles.filter((p) => p.tempId !== tempId));
               }}
             />
           ))}
@@ -232,13 +255,13 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
  * Returns the per-file results so the caller can surface failures.
  *
  * @param {string} taskId
- * @param {File[]} files
+ * @param {Array<{ tempId: string, file: File }>} pending
  * @returns {Promise<Array<{ file: File, ok: boolean, error?: string }>>}
  */
-export async function flushPendingUploads(taskId, files) {
-  if (!taskId || !files?.length) return [];
+export async function flushPendingUploads(taskId, pending) {
+  if (!taskId || !pending?.length) return [];
   const results = [];
-  for (const file of files) {
+  for (const { file } of pending) {
     try {
       await apiClient.attachments.upload(taskId, file);
       results.push({ file, ok: true });

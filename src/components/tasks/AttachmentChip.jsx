@@ -82,7 +82,8 @@ export default function AttachmentChip({ attachment, localFile, uploading, uploa
           <img
             src={thumbnailUrl}
             alt=""
-            loading="lazy"
+            // No loading="lazy" — the chip is already visible when the
+            // user opens TaskForm, and lazy can flake on mobile.
             className="w-full h-full object-cover"
             onError={() => setThumbError(true)}
           />
@@ -147,25 +148,25 @@ export default function AttachmentChip({ attachment, localFile, uploading, uploa
       ) : (
         <div className="flex items-center gap-1 shrink-0">
           {attachment?.id && (
-            // Download is a primary, predictable action — always visible
-            // so it works on touch devices too (where there's no hover).
-            <a
-              href={apiClient.attachments.urlFor(attachment.id, { download: true })}
-              download={attachment.filename}
-              onClick={(e) => e.stopPropagation()}
+            // Programmatic download — a <button type="button"> rather
+            // than an <a> so the click can't bubble into the parent
+            // form's submit handler. Builds a throwaway anchor and
+            // clicks it; browser fires the save dialog immediately.
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                triggerDownload(attachment);
+              }}
               className="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition-colors p-1 -m-1 rounded"
               aria-label={`Download ${filename}`}
               title="Download"
             >
               <Download className="w-4 h-4" />
-            </a>
+            </button>
           )}
           {onDelete && (
-            // Delete is destructive — keep it hover/focus-revealed on
-            // desktop so it isn't a tap target by mistake; on touch the
-            // chip itself doesn't need a hover state because the user
-            // can also swipe... actually they can't here, so reveal on
-            // press too via opacity:active.
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onDelete(); }}
@@ -180,4 +181,21 @@ export default function AttachmentChip({ attachment, localFile, uploading, uploa
       )}
     </div>
   );
+}
+
+/**
+ * Build a one-shot anchor element, dispatch a click on it, and clean
+ * it up. Bypasses any weirdness around <a download> inside a <form>
+ * (where some browsers delay the download until the form blurs).
+ */
+function triggerDownload(attachment) {
+  if (!attachment?.id) return;
+  const url = apiClient.attachments.urlFor(attachment.id, { download: true });
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = attachment.filename || "download";
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
