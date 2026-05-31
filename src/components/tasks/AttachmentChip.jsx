@@ -50,8 +50,11 @@ export default function AttachmentChip({ attachment, localFile, uploading, uploa
   const isImage = attachment?.is_image || (localFile?.type?.startsWith("image/") ?? false);
   const filename = attachment?.filename || localFile?.name || "Attachment";
   const sizeBytes = attachment?.size_bytes ?? localFile?.size ?? 0;
+  // Prefer the server-generated thumbnail URL when available (Pri 2).
+  // Falls back to the original (backend serves it when no thumb exists),
+  // or the local blob URL while an upload is pending.
   const thumbnailUrl = attachment?.id
-    ? apiClient.attachments.urlFor(attachment.id)
+    ? apiClient.attachments.urlFor(attachment.id, { thumb: true })
     : localPreviewUrl;
 
   return (

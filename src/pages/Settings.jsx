@@ -36,6 +36,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  Database,
   LogOut,
   Palette,
   Trash2,
@@ -56,6 +57,7 @@ import RecentlyDeleted from "@/pages/RecentlyDeleted";
 import IntegrationsPanel from "@/components/settings/IntegrationsPanel";
 import NotificationsPanel from "@/components/settings/NotificationsPanel";
 import AdvancedNotificationSettings from "@/components/settings/AdvancedNotificationSettings";
+import StorageSection from "@/components/settings/StorageSection";
 import AppearanceSection from "@/components/settings/AppearanceSection";
 import DefaultsSection from "@/components/settings/DefaultsSection";
 import PrioritiesSection from "@/components/settings/PrioritiesSection";
@@ -142,7 +144,7 @@ function TasksCardIcon() {
 // ── Page ────────────────────────────────────────────────────────
 
 export default function Settings() {
-  /** @type {[null | "appearance" | "tasks" | "calendars" | "notifications" | "advancedNotifications" | "recentlyDeleted", any]} */
+  /** @type {[null | "appearance" | "tasks" | "calendars" | "notifications" | "advancedNotifications" | "storage" | "recentlyDeleted", any]} */
   const [activeSection, setActiveSection] = useState(null);
   const scrollPosRef = useRef(0);
   const pendingScrollRestoreRef = useRef(null);
@@ -244,6 +246,14 @@ export default function Settings() {
     );
   }
 
+  if (activeSection === "storage") {
+    return (
+      <SubPage title="Storage" onBack={returnToMain}>
+        <StorageSection />
+      </SubPage>
+    );
+  }
+
   if (activeSection === "recentlyDeleted") {
     return (
       <RecentlyDeleted onBack={returnToMain} />
@@ -314,6 +324,12 @@ export default function Settings() {
           label="Notifications"
           subtitle="Reminders for tasks with due dates"
           onClick={() => openSection("notifications")}
+        />
+        <SettingsCard
+          icon={Database}
+          label="Storage"
+          subtitle="How much space your attachments are using"
+          onClick={() => openSection("storage")}
         />
         <SettingsCard
           icon={Trash2}

@@ -4,15 +4,18 @@ import { mkdtempSync, rmSync, readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import sharp from "sharp";
 import { createDatabase } from "./db.js";
 import {
   createAttachment,
   deleteAttachment,
   deleteAttachmentsForTask,
   getAttachment,
+  getStorageOverview,
   getUserStorageBytes,
   listAttachmentsForTask,
   MAX_FILE_BYTES,
+  MAX_TOTAL_BYTES_PER_USER,
 } from "./attachments.js";
 
 let tempDir = "";
@@ -35,14 +38,23 @@ function makeConfig(dbFile) {
   };
 }
 
-function seedTask(db) {
+function seedTask(db, { id = TASK_ID, title = "Test task" } = {}) {
   const now = new Date().toISOString();
   db.prepare(
     `INSERT INTO tasks (
       id, app_id, title, status, task_type, recurrence, recurrence_days_json,
       tags_json, created_date, updated_date, created_by_id, created_by, is_sample
     ) VALUES (?, ?, ?, 'todo', 'one_time', 'none', '[]', '[]', ?, ?, ?, ?, 0)`
-  ).run(TASK_ID, APP_ID, "Test task", now, now, USER.id, USER.email);
+  ).run(id, APP_ID, title, now, now, USER.id, USER.email);
+}
+
+/** Generate a real, tiny PNG that sharp can decode. */
+async function realPng({ width = 20, height = 20 } = {}) {
+  return sharp({
+    create: { width, height, channels: 3, background: "#ff0000" },
+  })
+    .png()
+    .toBuffer();
 }
 
 beforeEach(() => {
@@ -58,13 +70,13 @@ afterEach(() => {
 });
 
 describe("attachments", () => {
-  it("upload → list → get → delete round-trip", () => {
+  it("upload → list → get → delete round-trip", async () => {
     const file = {
       filename: "screenshot.png",
       mimeType: "image/png",
       data: Buffer.from("fake-png-bytes"),
     };
-    const created = createAttachment(db, config, { appId: APP_ID, user: USER, taskId: TASK_ID, file });
+    const created = await createAttachment(db, config, { appId: APP_ID, user: USER, taskId: TASK_ID, file });
     expect(created.id).toMatch(/^att_/);
     expect(created.filename).toBe("screenshot.png");
     expect(created.is_image).toBe(true);
@@ -84,14 +96,14 @@ describe("attachments", () => {
     expect(listAttachmentsForTask(db, { appId: APP_ID, user: USER, taskId: TASK_ID })).toHaveLength(0);
   });
 
-  it("bumps and decrements the task's attachment_count column", () => {
+  it("bumps and decrements the task's attachment_count column", async () => {
     const file = (n) => ({
       filename: `file-${n}.txt`,
       mimeType: "text/plain",
       data: Buffer.from("x".repeat(10 * n)),
     });
-    createAttachment(db, config, { appId: APP_ID, user: USER, taskId: TASK_ID, file: file(1) });
-    createAttachment(db, config, { appId: APP_ID, user: USER, taskId: TASK_ID, file: file(2) });
+    await createAttachment(db, config, { appId: APP_ID, user: USER, taskId: TASK_ID, file: file(1) });
+    await createAttachment(db, config, { appId: APP_ID, user: USER, taskId: TASK_ID, file: file(2) });
 
     let row = db.prepare("SELECT attachment_count FROM tasks WHERE id = ?").get(TASK_ID);
     expect(row.attachment_count).toBe(2);
@@ -103,35 +115,35 @@ describe("attachments", () => {
     expect(row.attachment_count).toBe(1);
   });
 
-  it("rejects files past the size limit", () => {
+  it("rejects files past the size limit", async () => {
     const file = {
       filename: "huge.bin",
       mimeType: "application/octet-stream",
       data: Buffer.alloc(MAX_FILE_BYTES + 1),
     };
-    expect(() =>
+    await expect(
       createAttachment(db, config, { appId: APP_ID, user: USER, taskId: TASK_ID, file })
-    ).toThrowError(/too large/i);
+    ).rejects.toThrow(/too large/i);
   });
 
-  it("rejects blocked extensions", () => {
+  it("rejects blocked extensions", async () => {
     const file = {
       filename: "evil.exe",
       mimeType: "application/octet-stream",
       data: Buffer.from("MZ"),
     };
-    expect(() =>
+    await expect(
       createAttachment(db, config, { appId: APP_ID, user: USER, taskId: TASK_ID, file })
-    ).toThrowError(/not allowed/i);
+    ).rejects.toThrow(/not allowed/i);
   });
 
-  it("denies cross-user access on get + delete", () => {
+  it("denies cross-user access on get + delete", async () => {
     const file = {
       filename: "secret.txt",
       mimeType: "text/plain",
       data: Buffer.from("secret"),
     };
-    const created = createAttachment(db, config, { appId: APP_ID, user: USER, taskId: TASK_ID, file });
+    const created = await createAttachment(db, config, { appId: APP_ID, user: USER, taskId: TASK_ID, file });
     const intruder = { id: "user-2", email: "intruder@example.com" };
     expect(() =>
       getAttachment(db, config, { appId: APP_ID, user: intruder, id: created.id })
@@ -141,24 +153,24 @@ describe("attachments", () => {
     ).toThrowError(/not your attachment|forbidden/i);
   });
 
-  it("tracks per-user storage bytes", () => {
+  it("tracks per-user storage bytes", async () => {
     const file = (size) => ({
       filename: `f-${size}.txt`,
       mimeType: "text/plain",
       data: Buffer.alloc(size, "a"),
     });
-    createAttachment(db, config, { appId: APP_ID, user: USER, taskId: TASK_ID, file: file(100) });
-    createAttachment(db, config, { appId: APP_ID, user: USER, taskId: TASK_ID, file: file(200) });
+    await createAttachment(db, config, { appId: APP_ID, user: USER, taskId: TASK_ID, file: file(100) });
+    await createAttachment(db, config, { appId: APP_ID, user: USER, taskId: TASK_ID, file: file(200) });
     expect(getUserStorageBytes(db, { appId: APP_ID, userId: USER.id })).toBe(300);
   });
 
-  it("cascade: deleteAttachmentsForTask wipes rows AND files", () => {
+  it("cascade: deleteAttachmentsForTask wipes rows AND files", async () => {
     const file = {
       filename: "doc.pdf",
       mimeType: "application/pdf",
       data: Buffer.from("pdf"),
     };
-    const created = createAttachment(db, config, { appId: APP_ID, user: USER, taskId: TASK_ID, file });
+    const created = await createAttachment(db, config, { appId: APP_ID, user: USER, taskId: TASK_ID, file });
     const { absolutePath } = getAttachment(db, config, { appId: APP_ID, user: USER, id: created.id });
     expect(existsSync(absolutePath)).toBe(true);
 
@@ -166,5 +178,69 @@ describe("attachments", () => {
 
     expect(existsSync(absolutePath)).toBe(false);
     expect(listAttachmentsForTask(db, { appId: APP_ID, user: USER, taskId: TASK_ID })).toHaveLength(0);
+  });
+
+  it("generates a thumbnail for valid PNGs and serves it on ?thumb=1", async () => {
+    const pngBytes = await realPng({ width: 800, height: 600 });
+    const file = {
+      filename: "photo.png",
+      mimeType: "image/png",
+      data: pngBytes,
+    };
+    const created = await createAttachment(db, config, { appId: APP_ID, user: USER, taskId: TASK_ID, file });
+    expect(created.has_thumb).toBe(true);
+
+    // Default get → original file
+    const orig = getAttachment(db, config, { appId: APP_ID, user: USER, id: created.id });
+    expect(orig.servingThumb).toBe(false);
+    expect(readFileSync(orig.absolutePath).length).toBe(pngBytes.length);
+
+    // ?thumb=1 → smaller WebP buffer
+    const thumb = getAttachment(db, config, { appId: APP_ID, user: USER, id: created.id, thumb: true });
+    expect(thumb.servingThumb).toBe(true);
+    expect(existsSync(thumb.absolutePath)).toBe(true);
+    expect(readFileSync(thumb.absolutePath).length).toBeLessThan(pngBytes.length);
+
+    // Cleanup also removes the thumbnail file on disk.
+    deleteAttachment(db, config, { appId: APP_ID, user: USER, id: created.id });
+    expect(existsSync(thumb.absolutePath)).toBe(false);
+  });
+
+  it("falls back to original when thumbnail generation fails on a fake-image MIME", async () => {
+    const file = {
+      filename: "broken.png",
+      mimeType: "image/png",
+      data: Buffer.from("not actually a png"),
+    };
+    const created = await createAttachment(db, config, { appId: APP_ID, user: USER, taskId: TASK_ID, file });
+    expect(created.has_thumb).toBe(false);
+
+    // ?thumb=1 should still resolve to the original when no thumb exists.
+    const thumb = getAttachment(db, config, { appId: APP_ID, user: USER, id: created.id, thumb: true });
+    expect(thumb.servingThumb).toBe(false);
+  });
+
+  it("getStorageOverview returns used bytes + largest tasks", async () => {
+    // Second task to verify grouping.
+    seedTask(db, { id: "task-2", title: "Second task" });
+
+    const file = (name, size) => ({
+      filename: name,
+      mimeType: "text/plain",
+      data: Buffer.alloc(size, "a"),
+    });
+
+    await createAttachment(db, config, { appId: APP_ID, user: USER, taskId: TASK_ID, file: file("a.txt", 1000) });
+    await createAttachment(db, config, { appId: APP_ID, user: USER, taskId: TASK_ID, file: file("b.txt", 2000) });
+    await createAttachment(db, config, { appId: APP_ID, user: USER, taskId: "task-2", file: file("c.txt", 500) });
+
+    const usage = getStorageOverview(db, { appId: APP_ID, user: USER });
+    expect(usage.used_bytes).toBe(3500);
+    expect(usage.max_bytes).toBe(MAX_TOTAL_BYTES_PER_USER);
+    expect(usage.biggest_tasks).toHaveLength(2);
+    expect(usage.biggest_tasks[0].task_id).toBe(TASK_ID);
+    expect(usage.biggest_tasks[0].total_bytes).toBe(3000);
+    expect(usage.biggest_tasks[0].file_count).toBe(2);
+    expect(usage.biggest_tasks[1].task_id).toBe("task-2");
   });
 });

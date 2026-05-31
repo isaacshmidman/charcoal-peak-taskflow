@@ -62,7 +62,8 @@ import { loadFromCache, saveToCache } from "@/lib/offlineCache";
  *     list: (taskId: string) => Promise<any[]>,
  *     upload: (taskId: string, file: File) => Promise<any>,
  *     delete: (id: string) => Promise<any>,
- *     urlFor: (id: string, opts?: { download?: boolean }) => string,
+ *     urlFor: (id: string, opts?: { download?: boolean, thumb?: boolean }) => string,
+ *     usage: () => Promise<{ used_bytes: number, max_bytes: number, biggest_tasks: any[] }>,
  *   },
  *   cleanup: () => void,
  * }} ApiClient
@@ -576,14 +577,25 @@ const liveApiClient = {
      * Build the same-origin URL for downloading or previewing an
      * attachment. Used as the src= for <img> tags (browser sends the
      * session cookie automatically) and as the href= for download links.
+     *
+     * Pass `{ thumb: true }` to ask for the server-generated thumbnail
+     * (small WebP). The backend falls back to the original if no thumb
+     * exists, so it's safe to set thumb=true even for pre-Pri-2 rows.
+     *
      * @param {string} id
-     * @param {{ download?: boolean }} [opts]
+     * @param {{ download?: boolean, thumb?: boolean }} [opts]
      */
-    urlFor(id, { download = false } = {}) {
+    urlFor(id, { download = false, thumb = false } = {}) {
+      const query = {};
+      if (download) query.download = "1";
+      if (thumb) query.thumb = "1";
       return buildApiUrl(
         `/apps/${appConfig.appId}/attachments/${id}`,
-        download ? { download: "1" } : undefined
+        Object.keys(query).length ? query : undefined
       );
+    },
+    async usage() {
+      return apiRequest(`/apps/${appConfig.appId}/attachments/usage`);
     },
   },
   async getPublicSettings() {

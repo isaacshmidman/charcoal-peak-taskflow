@@ -17,6 +17,7 @@ import {
   createAttachment,
   deleteAttachment,
   getAttachment,
+  getStorageOverview,
   listAttachmentsForTask,
   sendAttachmentFile,
   MAX_FILE_BYTES,
@@ -53,10 +54,22 @@ export async function handleAttachmentsRoute(request, response, { config, db, ur
     if (request.method === "POST" && segments.length === 6) {
       const { file } = await parseMultipart(request, { maxBytes: MAX_FILE_BYTES + 1024 });
       if (!file) throw new HttpError(400, "Expected a `file` form field.", "no_file");
-      const attachment = createAttachment(db, config, { appId, user, taskId, file });
+      const attachment = await createAttachment(db, config, { appId, user, taskId, file });
       sendJson(response, 201, attachment);
       return true;
     }
+  }
+
+  // ─ /api/apps/:appId/attachments/usage ─
+  if (
+    request.method === "GET" &&
+    segments[3] === "attachments" &&
+    segments[4] === "usage" &&
+    segments.length === 5
+  ) {
+    const user = requireAuthenticatedUser(db, config, request, appId);
+    sendJson(response, 200, getStorageOverview(db, { appId, user }));
+    return true;
   }
 
   // ─ /api/apps/:appId/attachments/:id ─
@@ -65,12 +78,16 @@ export async function handleAttachmentsRoute(request, response, { config, db, ur
     const id = segments[4];
 
     if (request.method === "GET" && segments.length === 5) {
-      const { row, absolutePath } = getAttachment(db, config, { appId, user, id });
+      const asThumb = url.searchParams.get("thumb") === "1";
+      const { row, absolutePath, servingThumb } = getAttachment(db, config, { appId, user, id, thumb: asThumb });
       const asDownload = url.searchParams.get("download") === "1";
+      // Thumbnails are always WebP regardless of the original MIME, so
+      // override the response Content-Type when we serve one.
+      const mimeType = servingThumb ? "image/webp" : row.mime_type;
       sendAttachmentFile(
         response,
         absolutePath,
-        { filename: row.filename, mimeType: row.mime_type },
+        { filename: row.filename, mimeType },
         { asDownload }
       );
       return true;

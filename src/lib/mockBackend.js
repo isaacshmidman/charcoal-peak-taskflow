@@ -261,6 +261,9 @@ export function createE2EApiClient() {
       urlFor(id, _opts) {
         return `#mock-attachment-${id}`;
       },
+      async usage() {
+        return { used_bytes: 0, max_bytes: 1024 * 1024 * 1024, biggest_tasks: [] };
+      },
     },
     cleanup() {},
     setToken(token) {
