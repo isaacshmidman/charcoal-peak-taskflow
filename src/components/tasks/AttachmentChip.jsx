@@ -21,7 +21,7 @@
  *   }} props
  */
 import { useEffect, useState } from "react";
-import { FileText, Image as ImageIcon, Loader2, X } from "lucide-react";
+import { Download, FileText, Image as ImageIcon, Loader2, X } from "lucide-react";
 import { apiClient } from "@/api/apiClient";
 import { cn } from "@/lib/utils";
 
@@ -86,15 +86,33 @@ export default function AttachmentChip({ attachment, localFile, uploading, uploa
       {/* Filename + size or status */}
       <div className="flex-1 min-w-0">
         {attachment?.id ? (
-          <a
-            href={apiClient.attachments.urlFor(attachment.id, { download: true })}
-            download={attachment.filename}
-            className="block text-sm font-medium text-slate-900 dark:text-slate-100 hover:underline truncate"
-            title={attachment.filename}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {filename}
-          </a>
+          // Clicking the title PREVIEWS the file:
+          //   - images open in the in-app lightbox (onPreview),
+          //   - everything else opens in a new browser tab where the
+          //     OS / browser renders it inline (PDFs, text, video, …).
+          // Use <a> for non-images so right-click → "Open in new tab"
+          // / "Save link as" continues to work as users expect.
+          isImage ? (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); if (onPreview) onPreview(attachment); }}
+              className="block w-full text-left text-sm font-medium text-slate-900 dark:text-slate-100 hover:underline truncate"
+              title={`Preview ${filename}`}
+            >
+              {filename}
+            </button>
+          ) : (
+            <a
+              href={apiClient.attachments.urlFor(attachment.id)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block text-sm font-medium text-slate-900 dark:text-slate-100 hover:underline truncate"
+              title={`Open ${filename}`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {filename}
+            </a>
+          )
         ) : (
           <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate" title={filename}>
             {filename}
@@ -109,20 +127,42 @@ export default function AttachmentChip({ attachment, localFile, uploading, uploa
         </p>
       </div>
 
-      {/* Status / remove */}
+      {/* Status / actions */}
       {uploading ? (
         <Loader2 className="w-4 h-4 text-slate-400 dark:text-slate-500 animate-spin shrink-0" />
       ) : (
-        onDelete && (
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onDelete(); }}
-            className="shrink-0 text-slate-300 dark:text-slate-600 hover:text-red-400 dark:hover:text-red-300 transition-colors opacity-0 group-hover/att:opacity-100 focus:opacity-100"
-            aria-label="Remove attachment"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        )
+        <div className="flex items-center gap-1 shrink-0">
+          {attachment?.id && (
+            // Download is a primary, predictable action — always visible
+            // so it works on touch devices too (where there's no hover).
+            <a
+              href={apiClient.attachments.urlFor(attachment.id, { download: true })}
+              download={attachment.filename}
+              onClick={(e) => e.stopPropagation()}
+              className="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition-colors p-1 -m-1 rounded"
+              aria-label={`Download ${filename}`}
+              title="Download"
+            >
+              <Download className="w-4 h-4" />
+            </a>
+          )}
+          {onDelete && (
+            // Delete is destructive — keep it hover/focus-revealed on
+            // desktop so it isn't a tap target by mistake; on touch the
+            // chip itself doesn't need a hover state because the user
+            // can also swipe... actually they can't here, so reveal on
+            // press too via opacity:active.
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              className="text-slate-300 dark:text-slate-600 hover:text-red-400 dark:hover:text-red-300 transition-colors p-1 -m-1 rounded opacity-60 group-hover/att:opacity-100 focus:opacity-100"
+              aria-label={`Remove ${filename}`}
+              title="Remove"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
