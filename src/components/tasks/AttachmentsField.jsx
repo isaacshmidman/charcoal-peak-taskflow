@@ -6,22 +6,26 @@
  *   - EXISTING TASK (taskId set): clicking a file IMMEDIATELY adds an
  *     uploading chip + bumps TaskCard's paperclip count optimistically.
  *     The upload runs in the background; on success the temporary chip
- *     is swapped for the real one (no visual jump). On failure the
- *     chip + count bump are rolled back and an error appears.
+ *     is swapped for the real one. On failure the chip flips to an
+ *     error state with a Retry button (no re-picking required) and the
+ *     count is rolled back.
  *   - NEW TASK (taskId null): files queue locally; the parent
  *     TaskForm calls `flushPendingUploads(newTaskId, pending)` after
  *     the task is created in handleSubmit, uploading each pending
  *     file in sequence.
  *
- * Drop zone + file picker — both bound to a hidden <input type="file">.
- * Multiple files run in PARALLEL on existing tasks (each its own
- * mutation) so picking five at once doesn't serialize.
+ * Internal state shape:
+ *   pendingFiles: Array<{ tempId, file, status, error? }>
+ *   status ∈ "queued" | "uploading" | "error"
+ *
+ * "queued" is used for NEW-task flow (file is staged until Save).
+ * "uploading" + "error" are used for EXISTING-task flow (live upload).
  *
  * Props:
  *   @param {{
  *     taskId: string | null,
- *     pendingFiles: Array<{ tempId: string, file: File }>,
- *     setPendingFiles: (next: Array<{ tempId: string, file: File }>) => void,
+ *     pendingFiles: Array<{ tempId: string, file: File, status?: string, error?: string }>,
+ *     setPendingFiles: (next: any) => void,
  *     readOnly?: boolean,
  *   }} props
  */
@@ -84,26 +88,37 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
 
   const totalCount = (serverAttachments?.length || 0) + (pendingFiles?.length || 0);
 
-  /** Existing-task path: fire upload, swap chip on success, roll back on error. */
-  const startUploadInBackground = async (file, tempId) => {
+  /** Mutate a single pending file's status by tempId. */
+  const patchPending = (tempId, patch) => {
+    setPendingFiles((current = []) =>
+      current.map((p) => (p.tempId === tempId ? { ...p, ...patch } : p))
+    );
+  };
+
+  const removePending = (tempId) => {
+    setPendingFiles((current = []) => current.filter((p) => p.tempId !== tempId));
+  };
+
+  /** Existing-task path: fire upload, swap chip on success, flip to error on failure. */
+  const startUploadInBackground = async (file, tempId, isRetry = false) => {
     setTopLevelError("");
-    patchCachedTaskCount(queryClient, taskId, +1);  // optimistic
+    patchPending(tempId, { status: "uploading", error: undefined });
+    if (!isRetry) patchCachedTaskCount(queryClient, taskId, +1);  // bump on first try only
     try {
       const created = await apiClient.attachments.upload(taskId, file);
-      // Remove the pending chip
-      setPendingFiles((current) => current.filter((p) => p.tempId !== tempId));
-      // Add the real attachment to the query cache
+      removePending(tempId);
       if (created?.id) {
         queryClient.setQueryData(["taskAttachments", taskId], (prev = []) => [...prev, created]);
       } else {
-        // Defensive: server returned something weird. Refetch to be safe.
         queryClient.invalidateQueries({ queryKey: ["taskAttachments", taskId] });
       }
     } catch (err) {
-      // Roll back the count + remove the pending chip + surface error.
-      setPendingFiles((current) => current.filter((p) => p.tempId !== tempId));
+      // Keep the chip — flip it to "error" so the user can hit Retry
+      // without re-picking the file. Roll back the count bump (we'll
+      // re-bump on retry).
+      const msg = err?.message || `Couldn't upload “${file.name}”.`;
+      patchPending(tempId, { status: "error", error: msg });
       patchCachedTaskCount(queryClient, taskId, -1);
-      setTopLevelError(err?.message || `Couldn't upload “${file.name}”.`);
     }
   };
 
@@ -118,11 +133,20 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
         return;
       }
     }
-    const newPending = fileList.map((file) => ({ tempId: makeTempId(), file }));
+    const newPending = fileList.map((file) => ({
+      tempId: makeTempId(),
+      file,
+      status: taskId ? "uploading" : "queued",
+    }));
     setPendingFiles([...(pendingFiles || []), ...newPending]);
     if (taskId) {
-      // Existing task — start uploads in the background, in parallel.
-      newPending.forEach(({ file, tempId }) => startUploadInBackground(file, tempId));
+      // Existing task — start uploads in parallel.
+      newPending.forEach(({ file, tempId }) => {
+        // Bump count once now (before status flip); startUploadInBackground
+        // is called with isRetry=true to avoid a second bump.
+        patchCachedTaskCount(queryClient, taskId, +1);
+        startUploadInBackground(file, tempId, /* isRetry */ true);
+      });
     }
     // For NEW task: parent's handleSubmit will call flushPendingUploads.
   };
@@ -133,13 +157,11 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
     const prev = queryClient.getQueryData(["taskAttachments", taskId]) || [];
     const removed = prev.find((a) => a.id === id);
     if (!removed) return;
-    // Optimistic
     queryClient.setQueryData(["taskAttachments", taskId], prev.filter((a) => a.id !== id));
     patchCachedTaskCount(queryClient, taskId, -1);
     try {
       await apiClient.attachments.delete(id);
     } catch (err) {
-      // Restore the chip + count.
       queryClient.setQueryData(["taskAttachments", taskId], (curr = []) => [...curr, removed]);
       patchCachedTaskCount(queryClient, taskId, +1);
       setTopLevelError(err?.message || "Couldn't remove that file.");
@@ -221,18 +243,17 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
               onDelete={readOnly ? undefined : () => handleDelete(att.id)}
             />
           ))}
-          {pendingFiles.map(({ tempId, file }) => (
+          {pendingFiles.map(({ tempId, file, status, error }) => (
             <AttachmentChip
               key={tempId}
               attachment={null}
               localFile={file}
-              // For existing tasks the upload is firing right now; for
-              // new tasks it'll fire after the user clicks Create — show
-              // the spinner only in the former case.
-              uploading={Boolean(taskId)}
-              onDelete={readOnly ? undefined : () => {
-                setPendingFiles(pendingFiles.filter((p) => p.tempId !== tempId));
-              }}
+              uploading={status === "uploading"}
+              uploadError={status === "error" ? (error || "Upload failed") : null}
+              onRetry={status === "error" && taskId
+                ? () => startUploadInBackground(file, tempId, /* isRetry */ false)
+                : undefined}
+              onDelete={readOnly ? undefined : () => removePending(tempId)}
             />
           ))}
         </div>

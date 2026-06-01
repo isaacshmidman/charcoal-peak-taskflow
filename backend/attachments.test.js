@@ -91,7 +91,7 @@ describe("attachments", () => {
     expect(existsSync(absolutePath)).toBe(true);
     expect(readFileSync(absolutePath).equals(file.data)).toBe(true);
 
-    deleteAttachment(db, config, { appId: APP_ID, user: USER, id: created.id });
+    await deleteAttachment(db, config, { appId: APP_ID, user: USER, id: created.id });
     expect(existsSync(absolutePath)).toBe(false);
     expect(listAttachmentsForTask(db, { appId: APP_ID, user: USER, taskId: TASK_ID })).toHaveLength(0);
   });
@@ -109,7 +109,7 @@ describe("attachments", () => {
     expect(row.attachment_count).toBe(2);
 
     const list = listAttachmentsForTask(db, { appId: APP_ID, user: USER, taskId: TASK_ID });
-    deleteAttachment(db, config, { appId: APP_ID, user: USER, id: list[0].id });
+    await deleteAttachment(db, config, { appId: APP_ID, user: USER, id: list[0].id });
 
     row = db.prepare("SELECT attachment_count FROM tasks WHERE id = ?").get(TASK_ID);
     expect(row.attachment_count).toBe(1);
@@ -145,12 +145,16 @@ describe("attachments", () => {
     };
     const created = await createAttachment(db, config, { appId: APP_ID, user: USER, taskId: TASK_ID, file });
     const intruder = { id: "user-2", email: "intruder@example.com" };
+    // getAttachment is synchronous → toThrow works directly.
     expect(() =>
       getAttachment(db, config, { appId: APP_ID, user: intruder, id: created.id })
     ).toThrowError(/not your attachment|forbidden/i);
-    expect(() =>
+    // deleteAttachment is async → use .rejects.toThrow so the failure
+    // is observed inside the test rather than firing as an unhandled
+    // rejection after db.close().
+    await expect(
       deleteAttachment(db, config, { appId: APP_ID, user: intruder, id: created.id })
-    ).toThrowError(/not your attachment|forbidden/i);
+    ).rejects.toThrow(/not your attachment|forbidden/i);
   });
 
   it("tracks per-user storage bytes", async () => {
@@ -202,7 +206,7 @@ describe("attachments", () => {
     expect(readFileSync(thumb.absolutePath).length).toBeLessThan(pngBytes.length);
 
     // Cleanup also removes the thumbnail file on disk.
-    deleteAttachment(db, config, { appId: APP_ID, user: USER, id: created.id });
+    await deleteAttachment(db, config, { appId: APP_ID, user: USER, id: created.id });
     expect(existsSync(thumb.absolutePath)).toBe(false);
   });
 

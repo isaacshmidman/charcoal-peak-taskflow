@@ -2,38 +2,51 @@
 /**
  * @file Single attachment row used by AttachmentsField. Two visual
  * modes:
- *   - image:   small square thumbnail (browser-scaled from the
- *              original; we don't generate server-side thumbnails in
- *              v1) + filename + size + remove X. Click thumbnail to
- *              open the lightbox.
- *   - file:    file-type icon + filename + size + remove X. Click
- *              filename to download.
+ *   - image:   small square thumbnail + filename + size + remove X.
+ *              Click thumbnail OR filename to open the lightbox.
+ *   - file:    file-type icon + filename + size + download + remove X.
+ *              Click filename to open inline in a new tab.
+ *
+ * Pending states (no `attachment.id` yet):
+ *   - uploading: shows the local file's preview (blob URL) + spinner
+ *     + "Uploading…" status text.
+ *   - error: shows the local preview + a Retry button + the error
+ *     message in red. The user can retry without re-picking the file.
  *
  * Props:
  *   @param {{
  *     attachment: { id: string, filename: string, mime_type: string,
  *                   size_bytes: number, is_image: boolean } | null,
- *     localFile?: File,           — only set for queued uploads (no id yet)
- *     uploading?: boolean,
+ *     localFile?: File,           — only set for queued / failed uploads
+ *     uploading?: boolean,        — true while the POST is in flight
  *     uploadError?: string | null,
+ *     onRetry?: () => void,       — only meaningful when uploadError set
  *     onPreview?: (a: any) => void,
  *     onDelete?: () => void,
  *   }} props
  */
 import { useEffect, useState } from "react";
-import { Download, FileText, Image as ImageIcon, ImageOff, Loader2, X } from "lucide-react";
+import { Download, FileText, Image as ImageIcon, ImageOff, Loader2, RefreshCw, X } from "lucide-react";
 import { apiClient } from "@/api/apiClient";
 import { cn } from "@/lib/utils";
 
-/** "1234567" → "1.2 MB" */
+/** "1234567" → "1.2 MB" using SI units (matches the Settings → Storage page). */
 function formatSize(bytes) {
   if (!Number.isFinite(bytes) || bytes < 0) return "";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  if (bytes < 1000) return `${bytes} B`;
+  if (bytes < 1_000_000) return `${(bytes / 1000).toFixed(1)} KB`;
+  return `${(bytes / 1_000_000).toFixed(1)} MB`;
 }
 
-export default function AttachmentChip({ attachment, localFile, uploading, uploadError, onPreview, onDelete }) {
+export default function AttachmentChip({
+  attachment,
+  localFile,
+  uploading,
+  uploadError,
+  onRetry,
+  onPreview,
+  onDelete,
+}) {
   // For a queued local file (no attachment id yet), make an object URL
   // so we can show a preview before the upload completes.
   const [localPreviewUrl, setLocalPreviewUrl] = useState(null);
@@ -57,13 +70,17 @@ export default function AttachmentChip({ attachment, localFile, uploading, uploa
   const isImage = attachment?.is_image || (localFile?.type?.startsWith("image/") ?? false);
   const filename = attachment?.filename || localFile?.name || "Attachment";
   const sizeBytes = attachment?.size_bytes ?? localFile?.size ?? 0;
-  // Prefer the server-generated thumbnail URL when available (Pri 2).
-  // Falls back to the original (backend serves it when no thumb exists),
-  // or the local blob URL while an upload is pending.
   const thumbnailUrl = attachment?.id
     ? apiClient.attachments.urlFor(attachment.id, { thumb: true })
     : localPreviewUrl;
   const showImageThumb = isImage && thumbnailUrl && !thumbError;
+
+  // Status line under the filename. Drives the spinner / retry button
+  // visibility in the actions area on the right.
+  let statusText;
+  if (uploadError) statusText = <span className="text-red-500 dark:text-red-300">{uploadError}</span>;
+  else if (uploading) statusText = "Uploading…";
+  else statusText = formatSize(sizeBytes);
 
   return (
     <div className={cn(
@@ -82,8 +99,6 @@ export default function AttachmentChip({ attachment, localFile, uploading, uploa
           <img
             src={thumbnailUrl}
             alt=""
-            // No loading="lazy" — the chip is already visible when the
-            // user opens TaskForm, and lazy can flake on mobile.
             className="w-full h-full object-cover"
             onError={() => setThumbError(true)}
           />
@@ -101,12 +116,6 @@ export default function AttachmentChip({ attachment, localFile, uploading, uploa
       {/* Filename + size or status */}
       <div className="flex-1 min-w-0">
         {attachment?.id ? (
-          // Clicking the title PREVIEWS the file:
-          //   - images open in the in-app lightbox (onPreview),
-          //   - everything else opens in a new browser tab where the
-          //     OS / browser renders it inline (PDFs, text, video, …).
-          // Use <a> for non-images so right-click → "Open in new tab"
-          // / "Save link as" continues to work as users expect.
           isImage ? (
             <button
               type="button"
@@ -133,52 +142,52 @@ export default function AttachmentChip({ attachment, localFile, uploading, uploa
             {filename}
           </p>
         )}
-        <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 truncate">
-          {uploading
-            ? "Uploading…"
-            : uploadError
-              ? <span className="text-red-500 dark:text-red-300">{uploadError}</span>
-              : formatSize(sizeBytes)}
-        </p>
+        <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 truncate">{statusText}</p>
       </div>
 
-      {/* Status / actions */}
-      {uploading ? (
-        <Loader2 className="w-4 h-4 text-slate-400 dark:text-slate-500 animate-spin shrink-0" />
-      ) : (
-        <div className="flex items-center gap-1 shrink-0">
-          {attachment?.id && (
-            // Programmatic download — a <button type="button"> rather
-            // than an <a> so the click can't bubble into the parent
-            // form's submit handler. Builds a throwaway anchor and
-            // clicks it; browser fires the save dialog immediately.
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                triggerDownload(attachment);
-              }}
-              className="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition-colors p-1 -m-1 rounded"
-              aria-label={`Download ${filename}`}
-              title="Download"
-            >
-              <Download className="w-4 h-4" />
-            </button>
-          )}
-          {onDelete && (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onDelete(); }}
-              className="text-slate-300 dark:text-slate-600 hover:text-red-400 dark:hover:text-red-300 transition-colors p-1 -m-1 rounded opacity-60 group-hover/att:opacity-100 focus:opacity-100"
-              aria-label={`Remove ${filename}`}
-              title="Remove"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-      )}
+      {/* Right-side actions */}
+      <div className="flex items-center gap-1 shrink-0">
+        {uploadError && onRetry && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onRetry(); }}
+            className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors p-1 -m-1 rounded"
+            aria-label="Retry upload"
+            title="Retry"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+        )}
+        {uploading && !uploadError && (
+          <Loader2 className="w-4 h-4 text-slate-400 dark:text-slate-500 animate-spin" />
+        )}
+        {attachment?.id && !uploading && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              triggerDownload(attachment);
+            }}
+            className="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition-colors p-1 -m-1 rounded"
+            aria-label={`Download ${filename}`}
+            title="Download"
+          >
+            <Download className="w-4 h-4" />
+          </button>
+        )}
+        {onDelete && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            className="text-slate-300 dark:text-slate-600 hover:text-red-400 dark:hover:text-red-300 transition-colors p-1 -m-1 rounded opacity-60 group-hover/att:opacity-100 focus:opacity-100"
+            aria-label={`Remove ${filename}`}
+            title="Remove"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
     </div>
   );
 }
