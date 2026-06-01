@@ -6,26 +6,14 @@ import { useAuth } from "@/lib/AuthContext";
 import { sanitizeNavRoute } from "@/lib/navigation";
 
 // Tracks which provider the user successfully signed in with last on this
-// device, so we can show a "Last used" hint on the login screen. This helps
-// users avoid creating duplicate accounts (signing up with Google when their
-// real account is email/password, or vice versa). Per-device only — not
-// synced server-side.
+// device. Per-device only — not synced server-side. Retained because
+// AuthCallback records it on Google sign-in; the on-screen "Last used"
+// badge was removed since there's effectively a single login method, so
+// the hint added noise without value.
 const LAST_SIGNIN_KEY = "lastSignInMethod";
 
 export function recordLastSignIn(method) {
   try { localStorage.setItem(LAST_SIGNIN_KEY, method); } catch {}
-}
-
-function readLastSignIn() {
-  try { return localStorage.getItem(LAST_SIGNIN_KEY) || ""; } catch { return ""; }
-}
-
-function LastUsedBadge() {
-  return (
-    <span className="ml-2 inline-flex items-center rounded-full bg-amber-50 dark:bg-[#29230e] px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-[#73621d]">
-      Last used
-    </span>
-  );
 }
 
 function buildDefaultReturnUrl() {
@@ -56,7 +44,6 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const isOffline = typeof navigator !== "undefined" && !navigator.onLine;
-  const lastUsed = readLastSignIn();
 
   const hasSession = Boolean(isAuthenticated);
   const googleEnabled = !isOffline && appPublicSettings?.auth_providers?.google === true;
@@ -177,7 +164,6 @@ export default function Login() {
                 className="w-full h-12 rounded-2xl bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 text-sm font-medium hover:bg-slate-800 dark:hover:bg-slate-200 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center"
               >
                 <span>{isLoadingAuth ? "Signing in..." : "Sign In"}</span>
-                {lastUsed === "email" ? <LastUsedBadge /> : null}
               </button>
             </form>
 
@@ -203,7 +189,6 @@ export default function Login() {
             <path fill="#4285F4" d="M18.1 19.1c1.8-1.7 2.7-4.1 2.7-7.1 0-.6-.1-1-.1-1.4H12v3.9h5.4c-.2 1.1-.8 2.1-1.7 2.8l3 2.3Z" />
           </svg>
           <span>Sign In with Google</span>
-          {lastUsed === "google" ? <LastUsedBadge /> : null}
         </button>
 
         <div className="mt-5 rounded-2xl bg-slate-50 dark:bg-[#161616] border border-slate-200 dark:border-[#343434] px-4 py-3">

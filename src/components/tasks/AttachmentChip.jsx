@@ -84,7 +84,10 @@ export default function AttachmentChip({
 
   return (
     <div className={cn(
-      "flex items-center gap-2.5 bg-white dark:bg-[#0c0c0c] border border-slate-200 dark:border-[#343434] rounded-lg px-2.5 py-2 group/att",
+      // min-w-0 + w-full so a long unbroken filename truncates inside the
+      // chip instead of forcing the chip (and the whole TaskForm dialog)
+      // to grow horizontally.
+      "flex items-center gap-2.5 w-full min-w-0 bg-white dark:bg-[#0c0c0c] border border-slate-200 dark:border-[#343434] rounded-lg px-2.5 py-2 group/att",
       uploadError && "border-red-300 dark:border-red-900"
     )}>
       {/* Thumbnail or icon */}

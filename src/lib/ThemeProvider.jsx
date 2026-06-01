@@ -30,7 +30,7 @@ const STORAGE_KEY = "appearance";
  */
 
 /** @type {Appearance} */
-const DEFAULT_APPEARANCE = "light";
+const DEFAULT_APPEARANCE = "system";
 const VALID = /** @type {Set<Appearance>} */ (new Set(["system", "light", "dark"]));
 
 /** @returns {Appearance} */

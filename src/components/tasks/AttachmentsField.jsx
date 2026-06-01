@@ -180,7 +180,7 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
   };
 
   return (
-    <div>
+    <div className="min-w-0">
       <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-1.5 block">
         Attachments
       </Label>

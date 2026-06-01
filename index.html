@@ -22,7 +22,7 @@
     <script>
       (function () {
         try {
-          var v = localStorage.getItem("appearance") || "light";
+          var v = localStorage.getItem("appearance") || "system";
           var dark = v === "dark" ||
             (v === "system" && window.matchMedia &&
              window.matchMedia("(prefers-color-scheme: dark)").matches);
@@ -42,7 +42,7 @@
       }
 
       html.dark {
-        background: radial-gradient(circle at 100% 100%, rgba(245, 245, 160, 0.18) 0%, rgba(245, 245, 160, 0.07) 18%, #000000 48%, #000000 100%);
+        background: radial-gradient(circle at 100% 100%, #343422 0%, #1d1d14 16%, #0b0b08 38%, #000000 66%);
         color-scheme: dark;
       }
 
