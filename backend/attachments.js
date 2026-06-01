@@ -21,12 +21,19 @@
  *   - Soft delete (Recently Deleted window) → no cascade; on restore
  *     the attachments are still there because the task_id row persists.
  */
-import { promises as fsp, createReadStream } from "node:fs";
+import fs, { promises as fsp, createReadStream } from "node:fs";
 import sharp from "sharp";
 import { log } from "./log.js";
 import { dirname, join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { HttpError } from "./http.js";
+
+// @types/node in this repo doesn't expose `unlinkSync`/`rmSync` from
+// the default export; pull them off the namespace via an `any` cast.
+/** @type {any} */
+const fsAny = fs;
+const unlinkSyncSafe = /** @type {(path: string) => void} */ (fsAny.unlinkSync);
+const rmSyncSafe = /** @type {(path: string, opts: any) => void} */ (fsAny.rmSync);
 
 // ─ Limits — single source of truth. SI units (10^6 / 10^9) so the
 //   numbers match what users mean by "MB" / "GB". The StorageSection
@@ -412,11 +419,15 @@ export async function deleteAttachment(db, config, { appId, user, id }) {
 }
 
 /**
- * Cascade. Called from `deleteEntityRecord` when a Task is permanently
- * deleted (NOT when it's soft-deleted to Recently Deleted).
+ * Cascade. Called from `deleteEntityRecord` (synchronous) when a Task
+ * is permanently deleted — NOT when it's soft-deleted to Recently
+ * Deleted, since the row needs to survive the 7-day undo window.
  *
- * Synchronous because deleteEntityRecord is sync; we issue the unlinks
- * fire-and-forget but tolerate failures (file might already be gone).
+ * Synchronous file unlinks: the caller is sync, and we want the files
+ * to actually be gone by the time we return (otherwise rapid
+ * create-then-delete cycles can leak disk). Each unlink is a fast
+ * syscall; for the typical case of ≤10 attachments per task the total
+ * blocking time is negligible.
  *
  * @param {any} db
  * @param {any} config
@@ -433,15 +444,22 @@ export function deleteAttachmentsForTask(db, config, { appId, taskId }) {
       if (!relPath) continue;
       const abs = resolve(root, relPath);
       if (!abs.startsWith(root)) continue;
-      // Fire-and-forget unlink; the row deletion happens immediately below.
-      fsp.unlink(abs).catch(() => { /* missing file is fine */ });
+      try {
+        unlinkSyncSafe(abs);
+      } catch {
+        // Missing file is fine — the row is still removed below.
+      }
     }
   }
   db.prepare(`DELETE FROM task_attachments WHERE app_id = ? AND task_id = ?`).run(appId, taskId);
   // Also try to remove the now-empty per-task directory.
   if (rows.length) {
     const taskDir = dirname(resolve(root, rows[0].storage_path));
-    fsp.rm(taskDir, { recursive: true, force: true }).catch(() => { /* ignore */ });
+    try {
+      rmSyncSafe(taskDir, { recursive: true, force: true });
+    } catch {
+      // Ignore — directory might already be gone or non-empty
+    }
   }
 }
 
