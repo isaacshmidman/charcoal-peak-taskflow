@@ -216,10 +216,13 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
       <input
         ref={inputRef}
         type="file"
-        // No `accept` restriction — backend handles all types. `capture` on
-        // mobile makes the photo picker offer the camera as an option.
+        // No `accept` restriction — backend handles all types.
+        // No `capture` attribute either: on iOS, `capture` forces the
+        // camera to open immediately, skipping the standard action
+        // sheet. Without it, Safari shows the full menu — "Photo
+        // Library", "Take Photo or Video", "Choose Files" — which is
+        // what the user expects on Apple devices.
         multiple
-        capture
         className="hidden"
         onChange={(e) => {
           handleFiles(e.target.files);
