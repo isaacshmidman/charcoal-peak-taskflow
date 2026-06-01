@@ -41,6 +41,9 @@ import AttachmentLightbox from "./AttachmentLightbox.jsx";
 // SI units (10^6) to match the backend cap so error messages line up.
 const MAX_FILE_BYTES = 25 * 1_000_000;
 const MAX_PER_TASK = 10;
+// Cap simultaneous in-flight uploads so picking ten files doesn't open
+// ten parallel connections (saturates the link, makes each bar crawl).
+const MAX_CONCURRENT_UPLOADS = 3;
 
 function makeTempId() {
   return `temp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -80,6 +83,32 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
   const [previewing, setPreviewing] = useState(null);
   const [topLevelError, setTopLevelError] = useState("");
 
+  // ── Shared upload semaphore ───────────────────────────────────
+  // Caps concurrency across ALL add batches (not per-batch), so adding
+  // 5 files then 5 more never exceeds MAX_CONCURRENT_UPLOADS in flight.
+  // Files waiting for a slot show as "queued"; they flip to "uploading"
+  // the moment acquire() resolves.
+  const activeUploadsRef = useRef(0);
+  const waitQueueRef = useRef(/** @type {Array<() => void>} */ ([]));
+  const acquireSlot = () =>
+    new Promise((resolve) => {
+      if (activeUploadsRef.current < MAX_CONCURRENT_UPLOADS) {
+        activeUploadsRef.current += 1;
+        resolve();
+      } else {
+        waitQueueRef.current.push(resolve);
+      }
+    });
+  const releaseSlot = () => {
+    const next = waitQueueRef.current.shift();
+    if (next) {
+      // Hand the slot directly to the next waiter (count stays the same).
+      next();
+    } else {
+      activeUploadsRef.current = Math.max(0, activeUploadsRef.current - 1);
+    }
+  };
+
   const { data: serverAttachments = [] } = useQuery({
     queryKey: ["taskAttachments", taskId],
     queryFn: () => apiClient.attachments.list(taskId),
@@ -99,13 +128,23 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
     setPendingFiles((current = []) => current.filter((p) => p.tempId !== tempId));
   };
 
-  /** Existing-task path: fire upload, swap chip on success, flip to error on failure. */
-  const startUploadInBackground = async (file, tempId, isRetry = false) => {
+  /**
+   * Existing-task path: wait for a concurrency slot, then upload with
+   * live progress, swap chip on success, flip to error on failure.
+   * The caller is responsible for the optimistic count bump (done once
+   * per file in handleFiles / on retry here).
+   */
+  const startUploadInBackground = async (file, tempId, { bumpCount = false } = {}) => {
     setTopLevelError("");
-    patchPending(tempId, { status: "uploading", error: undefined });
-    if (!isRetry) patchCachedTaskCount(queryClient, taskId, +1);  // bump on first try only
+    if (bumpCount) patchCachedTaskCount(queryClient, taskId, +1);
+    // Stay "queued" until a slot frees up, then flip to "uploading".
+    patchPending(tempId, { status: "queued", error: undefined, progress: 0 });
+    await acquireSlot();
+    patchPending(tempId, { status: "uploading", error: undefined, progress: 0 });
     try {
-      const created = await apiClient.attachments.upload(taskId, file);
+      const created = await apiClient.attachments.upload(taskId, file, {
+        onProgress: (percent) => patchPending(tempId, { progress: percent }),
+      });
       removePending(tempId);
       if (created?.id) {
         queryClient.setQueryData(["taskAttachments", taskId], (prev = []) => [...prev, created]);
@@ -117,8 +156,10 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
       // without re-picking the file. Roll back the count bump (we'll
       // re-bump on retry).
       const msg = err?.message || `Couldn't upload “${file.name}”.`;
-      patchPending(tempId, { status: "error", error: msg });
+      patchPending(tempId, { status: "error", error: msg, progress: 0 });
       patchCachedTaskCount(queryClient, taskId, -1);
+    } finally {
+      releaseSlot();
     }
   };
 
@@ -136,16 +177,14 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
     const newPending = fileList.map((file) => ({
       tempId: makeTempId(),
       file,
-      status: taskId ? "uploading" : "queued",
+      status: taskId ? "queued" : "queued",
+      progress: 0,
     }));
     setPendingFiles([...(pendingFiles || []), ...newPending]);
     if (taskId) {
-      // Existing task — start uploads in parallel.
+      // Existing task — schedule uploads; the semaphore caps concurrency.
       newPending.forEach(({ file, tempId }) => {
-        // Bump count once now (before status flip); startUploadInBackground
-        // is called with isRetry=true to avoid a second bump.
-        patchCachedTaskCount(queryClient, taskId, +1);
-        startUploadInBackground(file, tempId, /* isRetry */ true);
+        startUploadInBackground(file, tempId, { bumpCount: true });
       });
     }
     // For NEW task: parent's handleSubmit will call flushPendingUploads.
@@ -246,15 +285,16 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
               onDelete={readOnly ? undefined : () => handleDelete(att.id)}
             />
           ))}
-          {pendingFiles.map(({ tempId, file, status, error }) => (
+          {pendingFiles.map(({ tempId, file, status, error, progress }) => (
             <AttachmentChip
               key={tempId}
               attachment={null}
               localFile={file}
-              uploading={status === "uploading"}
+              uploading={status === "uploading" || status === "queued"}
+              progress={status === "uploading" ? progress : null}
               uploadError={status === "error" ? (error || "Upload failed") : null}
               onRetry={status === "error" && taskId
-                ? () => startUploadInBackground(file, tempId, /* isRetry */ false)
+                ? () => startUploadInBackground(file, tempId, { bumpCount: true })
                 : undefined}
               onDelete={readOnly ? undefined : () => removePending(tempId)}
             />

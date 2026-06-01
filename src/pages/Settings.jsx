@@ -36,7 +36,7 @@ import {
   CheckSquare,
   ChevronLeft,
   ChevronRight,
-  Database,
+  FolderOpen,
   LogOut,
   Palette,
   Trash2,
@@ -58,6 +58,7 @@ import IntegrationsPanel from "@/components/settings/IntegrationsPanel";
 import NotificationsPanel from "@/components/settings/NotificationsPanel";
 import AdvancedNotificationSettings from "@/components/settings/AdvancedNotificationSettings";
 import StorageSection from "@/components/settings/StorageSection";
+import FilesSection from "@/components/settings/FilesSection";
 import AppearanceSection from "@/components/settings/AppearanceSection";
 import DefaultsSection from "@/components/settings/DefaultsSection";
 import PrioritiesSection from "@/components/settings/PrioritiesSection";
@@ -125,7 +126,7 @@ function SettingsCard({ icon: Icon, label, subtitle, onClick, iconClassName }) {
 // ── Page ────────────────────────────────────────────────────────
 
 export default function Settings() {
-  /** @type {[null | "appearance" | "tasks" | "calendars" | "notifications" | "advancedNotifications" | "storage" | "recentlyDeleted", any]} */
+  /** @type {[null | "appearance" | "tasks" | "calendars" | "notifications" | "advancedNotifications" | "files" | "recentlyDeleted", any]} */
   const [activeSection, setActiveSection] = useState(null);
   const scrollPosRef = useRef(0);
   const pendingScrollRestoreRef = useRef(null);
@@ -227,10 +228,14 @@ export default function Settings() {
     );
   }
 
-  if (activeSection === "storage") {
+  if (activeSection === "files") {
     return (
-      <SubPage title="Storage" onBack={returnToMain}>
-        <StorageSection />
+      <SubPage title="Files" onBack={returnToMain}>
+        <FilesSection />
+        <div>
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Storage</h2>
+          <StorageSection />
+        </div>
       </SubPage>
     );
   }
@@ -307,10 +312,10 @@ export default function Settings() {
           onClick={() => openSection("notifications")}
         />
         <SettingsCard
-          icon={Database}
-          label="Storage"
-          subtitle="How much space your attachments are using"
-          onClick={() => openSection("storage")}
+          icon={FolderOpen}
+          label="Files"
+          subtitle="Search attachments and check storage"
+          onClick={() => openSection("files")}
         />
         <SettingsCard
           icon={Trash2}

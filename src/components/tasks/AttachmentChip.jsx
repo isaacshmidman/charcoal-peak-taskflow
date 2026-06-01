@@ -18,7 +18,8 @@
  *     attachment: { id: string, filename: string, mime_type: string,
  *                   size_bytes: number, is_image: boolean } | null,
  *     localFile?: File,           — only set for queued / failed uploads
- *     uploading?: boolean,        — true while the POST is in flight
+ *     uploading?: boolean,        — true while queued or in flight
+ *     progress?: number | null,   — 0–100 while uploading; null = indeterminate
  *     uploadError?: string | null,
  *     onRetry?: () => void,       — only meaningful when uploadError set
  *     onPreview?: (a: any) => void,
@@ -42,6 +43,7 @@ export default function AttachmentChip({
   attachment,
   localFile,
   uploading,
+  progress,
   uploadError,
   onRetry,
   onPreview,
@@ -77,17 +79,25 @@ export default function AttachmentChip({
 
   // Status line under the filename. Drives the spinner / retry button
   // visibility in the actions area on the right.
+  // While uploading: show a % when we have determinate progress, else
+  // a plain "Uploading…" (covers the queued-waiting-for-a-slot state).
   let statusText;
   if (uploadError) statusText = <span className="text-red-500 dark:text-red-300">{uploadError}</span>;
-  else if (uploading) statusText = "Uploading…";
+  else if (uploading) statusText = typeof progress === "number" ? `Uploading… ${progress}%` : "Uploading…";
   else statusText = formatSize(sizeBytes);
+
+  // Determinate bar width: the measured progress while uploading, or a
+  // thin indeterminate sliver while queued (progress null).
+  const hasBar = uploading && !uploadError;
+  const barWidth = typeof progress === "number" ? `${progress}%` : "15%";
 
   return (
     <div className={cn(
       // min-w-0 + w-full so a long unbroken filename truncates inside the
       // chip instead of forcing the chip (and the whole TaskForm dialog)
-      // to grow horizontally.
-      "flex items-center gap-2.5 w-full min-w-0 bg-white dark:bg-[#0c0c0c] border border-slate-200 dark:border-[#343434] rounded-lg px-2.5 py-2 group/att",
+      // to grow horizontally. relative + overflow-hidden so the progress
+      // bar can pin to the bottom edge inside the rounded corners.
+      "relative overflow-hidden flex items-center gap-2.5 w-full min-w-0 bg-white dark:bg-[#0c0c0c] border border-slate-200 dark:border-[#343434] rounded-lg px-2.5 py-2 group/att",
       uploadError && "border-red-300 dark:border-red-900"
     )}>
       {/* Thumbnail or icon */}
@@ -191,6 +201,18 @@ export default function AttachmentChip({
           </button>
         )}
       </div>
+
+      {/* Upload progress bar — pinned to the bottom edge inside the
+          chip's rounded corners. Determinate width tracks bytes sent;
+          while queued (progress null) it shows a thin sliver. */}
+      {hasBar && (
+        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-100 dark:bg-[#222222]">
+          <div
+            className="h-full bg-slate-900 dark:bg-slate-100 transition-[width] duration-200 ease-out"
+            style={{ width: barWidth }}
+          />
+        </div>
+      )}
     </div>
   );
 }

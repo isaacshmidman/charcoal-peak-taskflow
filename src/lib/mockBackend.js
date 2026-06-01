@@ -252,7 +252,8 @@ export function createE2EApiClient() {
       async list(_taskId) {
         return [];
       },
-      async upload(_taskId, _file) {
+      async upload(_taskId, _file, opts) {
+        if (opts && typeof opts.onProgress === "function") opts.onProgress(100);
         return null;
       },
       async delete(_id) {
@@ -262,7 +263,10 @@ export function createE2EApiClient() {
         return `#mock-attachment-${id}`;
       },
       async usage() {
-        return { used_bytes: 0, max_bytes: 1024 * 1024 * 1024, biggest_tasks: [] };
+        return { used_bytes: 0, max_bytes: 1_000_000_000, biggest_tasks: [] };
+      },
+      async search(_q) {
+        return [];
       },
     },
     cleanup() {},

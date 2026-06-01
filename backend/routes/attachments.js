@@ -28,6 +28,7 @@ import {
   getAttachment,
   getStorageOverview,
   listAttachmentsForTask,
+  searchAttachments,
   sendAttachmentFile,
   MAX_FILE_BYTES,
 } from "../attachments.js";
@@ -84,6 +85,22 @@ export async function handleAttachmentsRoute(request, response, { config, db, ur
   ) {
     const user = requireAuthenticatedUser(db, config, request, appId);
     sendJson(response, 200, getStorageOverview(db, { appId, user }));
+    return true;
+  }
+
+  // ─ /api/apps/:appId/attachments?q=… (search across all the user's files) ─
+  if (
+    request.method === "GET" &&
+    segments[3] === "attachments" &&
+    segments.length === 4
+  ) {
+    const user = requireAuthenticatedUser(db, config, request, appId);
+    const q = url.searchParams.get("q") || "";
+    const rawLimit = Number.parseInt(url.searchParams.get("limit") || "50", 10);
+    const limit = Number.isFinite(rawLimit) ? Math.min(100, Math.max(1, rawLimit)) : 50;
+    sendJson(response, 200, {
+      attachments: searchAttachments(db, { appId, user, q, limit }),
+    });
     return true;
   }
 

@@ -501,6 +501,47 @@ export function getStorageOverview(db, { appId, user, limit = 10 }) {
 }
 
 /**
+ * Search the user's attachments by filename (case-insensitive
+ * substring). Returns the same serialized shape as listAttachmentsForTask
+ * plus the parent task's title for display. Scoped to the user — never
+ * leaks another user's files.
+ *
+ * @param {any} db
+ * @param {{ appId: string, user: any, q: string, limit?: number }} args
+ */
+export function searchAttachments(db, { appId, user, q, limit = 50 }) {
+  const term = String(q || "").trim();
+  // Empty query → most-recent attachments (acts as a "browse all" view).
+  const like = `%${term.replace(/[%_]/g, (m) => `\\${m}`)}%`;
+  const rows = term
+    ? db
+        .prepare(
+          `SELECT a.*, t.title AS task_title
+           FROM task_attachments a
+           LEFT JOIN tasks t ON t.id = a.task_id AND t.app_id = a.app_id
+           WHERE a.app_id = ? AND a.user_id = ?
+             AND LOWER(a.filename) LIKE LOWER(?) ESCAPE '\\'
+           ORDER BY a.created_date DESC
+           LIMIT ?`
+        )
+        .all(appId, user.id, like, limit)
+    : db
+        .prepare(
+          `SELECT a.*, t.title AS task_title
+           FROM task_attachments a
+           LEFT JOIN tasks t ON t.id = a.task_id AND t.app_id = a.app_id
+           WHERE a.app_id = ? AND a.user_id = ?
+           ORDER BY a.created_date DESC
+           LIMIT ?`
+        )
+        .all(appId, user.id, limit);
+  return rows.map((row) => ({
+    ...serializeAttachment(row),
+    task_title: row.task_title || "(deleted task)",
+  }));
+}
+
+/**
  * Stream a file to a response with the right headers. Async stat to
  * avoid blocking the event loop on slow disks.
  *

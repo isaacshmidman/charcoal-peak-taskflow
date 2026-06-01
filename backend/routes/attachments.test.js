@@ -237,6 +237,61 @@ describe("attachment route end-to-end", () => {
     expect(got.equals(tricky)).toBe(true);
   });
 
+  it("searches attachments by filename across tasks", async () => {
+    // Two tasks, three files with distinct names.
+    const mkTask = async (title) => {
+      const r = await fetch(`http://127.0.0.1:${port}/api/apps/${APP_ID}/entities/Task`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: cookie },
+        body: JSON.stringify({ title, status: "todo" }),
+      });
+      return (await r.json()).id;
+    };
+    const upload = async (taskId, filename) => {
+      const { body, contentType } = buildMultipart(filename, "text/plain", Buffer.from("data"));
+      const r = await fetch(
+        `http://127.0.0.1:${port}/api/apps/${APP_ID}/tasks/${taskId}/attachments`,
+        { method: "POST", headers: { "Content-Type": contentType, Cookie: cookie }, body }
+      );
+      expect(r.status).toBe(201);
+    };
+
+    const taskA = await mkTask("Alpha task");
+    const taskB = await mkTask("Beta task");
+    await upload(taskA, "budget-report.txt");
+    await upload(taskA, "vacation-photo-notes.txt");
+    await upload(taskB, "budget-2026.txt");
+
+    // Search "budget" → 2 matches across both tasks.
+    const searchRes = await fetch(
+      `http://127.0.0.1:${port}/api/apps/${APP_ID}/attachments?q=budget`,
+      { headers: { Cookie: cookie } }
+    );
+    expect(searchRes.status).toBe(200);
+    const { attachments } = await searchRes.json();
+    expect(attachments).toHaveLength(2);
+    const names = attachments.map((a) => a.filename).sort();
+    expect(names).toEqual(["budget-2026.txt", "budget-report.txt"]);
+    // Each result carries its parent task title for display.
+    expect(attachments.every((a) => typeof a.task_title === "string" && a.task_title.length > 0)).toBe(true);
+
+    // Empty query → all three (browse-all).
+    const allRes = await fetch(
+      `http://127.0.0.1:${port}/api/apps/${APP_ID}/attachments?q=`,
+      { headers: { Cookie: cookie } }
+    );
+    const all = await allRes.json();
+    expect(all.attachments).toHaveLength(3);
+
+    // No match → empty.
+    const noneRes = await fetch(
+      `http://127.0.0.1:${port}/api/apps/${APP_ID}/attachments?q=zzzznomatch`,
+      { headers: { Cookie: cookie } }
+    );
+    const none = await noneRes.json();
+    expect(none.attachments).toHaveLength(0);
+  });
+
   it("returns 400 when the multipart body has no file field", async () => {
     const taskRes = await fetch(`http://127.0.0.1:${port}/api/apps/${APP_ID}/entities/Task`, {
       method: "POST",
