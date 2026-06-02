@@ -34,6 +34,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Label } from "@/components/ui/label";
 import { Paperclip, Upload } from "lucide-react";
 import { apiClient } from "@/api/apiClient";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import * as attachmentQueue from "@/lib/attachmentQueue";
 import { cn } from "@/lib/utils";
 import AttachmentChip from "./AttachmentChip.jsx";
 import AttachmentLightbox from "./AttachmentLightbox.jsx";
@@ -78,10 +80,20 @@ function patchCachedTaskCount(queryClient, taskId, delta) {
 
 export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles, readOnly }) {
   const queryClient = useQueryClient();
+  const online = useOnlineStatus();
   const inputRef = useRef(null);
   const [dragOver, setDragOver] = useState(false);
   const [previewing, setPreviewing] = useState(null);
   const [topLevelError, setTopLevelError] = useState("");
+
+  // Files queued in IndexedDB while offline, for THIS task. The replay
+  // driver (useAttachmentQueue, mounted in Layout) uploads them on
+  // reconnect and invalidates this query.
+  const { data: offlineQueued = [] } = useQuery({
+    queryKey: ["offlineAttachments", taskId],
+    queryFn: () => attachmentQueue.listForTask(taskId),
+    enabled: !!taskId,
+  });
 
   // ── Shared upload semaphore ───────────────────────────────────
   // Caps concurrency across ALL add batches (not per-batch), so adding
@@ -115,7 +127,10 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
     enabled: !!taskId,
   });
 
-  const totalCount = (serverAttachments?.length || 0) + (pendingFiles?.length || 0);
+  const totalCount =
+    (serverAttachments?.length || 0) +
+    (pendingFiles?.length || 0) +
+    (offlineQueued?.length || 0);
 
   /** Mutate a single pending file's status by tempId. */
   const patchPending = (tempId, patch) => {
@@ -174,20 +189,43 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
         return;
       }
     }
+    // ── Offline path (existing task only) ──────────────────────
+    // Stash the files in IndexedDB; the replay driver uploads them on
+    // reconnect. We do NOT touch pendingFiles for these — they render
+    // from the offlineAttachments query as "queued (offline)" chips.
+    if (taskId && !online) {
+      if (String(taskId).startsWith("offline_")) {
+        // The task itself was created offline and hasn't synced; its
+        // server id will differ, so we can't queue an upload against it.
+        setTopLevelError("Reconnect to the internet to attach files to a newly created task.");
+        return;
+      }
+      Promise.all(fileList.map((file) => attachmentQueue.enqueue({ taskId, file })))
+        .then(() => queryClient.invalidateQueries({ queryKey: ["offlineAttachments", taskId] }))
+        .catch(() => setTopLevelError("Couldn't queue files for offline upload on this device."));
+      return;
+    }
+
     const newPending = fileList.map((file) => ({
       tempId: makeTempId(),
       file,
-      status: taskId ? "queued" : "queued",
+      status: "queued",
       progress: 0,
     }));
     setPendingFiles([...(pendingFiles || []), ...newPending]);
     if (taskId) {
-      // Existing task — schedule uploads; the semaphore caps concurrency.
+      // Existing task, online — schedule uploads; the semaphore caps concurrency.
       newPending.forEach(({ file, tempId }) => {
         startUploadInBackground(file, tempId, { bumpCount: true });
       });
     }
     // For NEW task: parent's handleSubmit will call flushPendingUploads.
+  };
+
+  /** Remove an offline-queued (not-yet-uploaded) file from IndexedDB. */
+  const removeOfflineQueued = async (id) => {
+    await attachmentQueue.remove(id);
+    queryClient.invalidateQueries({ queryKey: ["offlineAttachments", taskId] });
   };
 
   /** Existing-task path: instant remove, roll back on error. */
@@ -274,8 +312,14 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
         <p className="mt-2 text-xs text-red-500 dark:text-red-300">{topLevelError}</p>
       )}
 
-      {/* Existing + pending chips */}
-      {(serverAttachments.length > 0 || pendingFiles.length > 0) && (
+      {!online && taskId && (
+        <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500">
+          Offline — files you attach now upload automatically when you reconnect.
+        </p>
+      )}
+
+      {/* Existing + pending + offline-queued chips */}
+      {(serverAttachments.length > 0 || pendingFiles.length > 0 || offlineQueued.length > 0) && (
         <div className="mt-2 space-y-1.5">
           {serverAttachments.map((att) => (
             <AttachmentChip
@@ -297,6 +341,15 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
                 ? () => startUploadInBackground(file, tempId, { bumpCount: true })
                 : undefined}
               onDelete={readOnly ? undefined : () => removePending(tempId)}
+            />
+          ))}
+          {offlineQueued.map((item) => (
+            <AttachmentChip
+              key={item.id}
+              attachment={null}
+              localFile={attachmentQueue.toFile(item)}
+              offlineQueued
+              onDelete={readOnly ? undefined : () => removeOfflineQueued(item.id)}
             />
           ))}
         </div>

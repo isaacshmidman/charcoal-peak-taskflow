@@ -3,6 +3,7 @@ import { ListTodo, CalendarDays, LayoutGrid, Settings, Sun, WifiOff, CheckCircle
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { useOfflineData } from "@/hooks/useOfflineData";
+import { useAttachmentQueue } from "@/hooks/useAttachmentQueue";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import DeleteToast from "@/components/tasks/DeleteToast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -37,6 +38,7 @@ export default function Layout() {
   const [defaultNav, setDefaultNav] = useState(getDefaultNav);
   const online = useOnlineStatus();
   useOfflineData();
+  useAttachmentQueue();
 
   // Listen for nav order/default changes from Settings
   useEffect(() => {

@@ -20,6 +20,7 @@
  *     localFile?: File,           — only set for queued / failed uploads
  *     uploading?: boolean,        — true while queued or in flight
  *     progress?: number | null,   — 0–100 while uploading; null = indeterminate
+ *     offlineQueued?: boolean,    — stored in IndexedDB, awaiting reconnect
  *     uploadError?: string | null,
  *     onRetry?: () => void,       — only meaningful when uploadError set
  *     onPreview?: (a: any) => void,
@@ -27,7 +28,7 @@
  *   }} props
  */
 import { useEffect, useState } from "react";
-import { Download, FileText, Image as ImageIcon, ImageOff, Loader2, RefreshCw, X } from "lucide-react";
+import { CloudOff, Download, FileText, Image as ImageIcon, ImageOff, Loader2, RefreshCw, X } from "lucide-react";
 import { apiClient } from "@/api/apiClient";
 import { cn } from "@/lib/utils";
 
@@ -44,6 +45,7 @@ export default function AttachmentChip({
   localFile,
   uploading,
   progress,
+  offlineQueued,
   uploadError,
   onRetry,
   onPreview,
@@ -83,6 +85,7 @@ export default function AttachmentChip({
   // a plain "Uploading…" (covers the queued-waiting-for-a-slot state).
   let statusText;
   if (uploadError) statusText = <span className="text-red-500 dark:text-red-300">{uploadError}</span>;
+  else if (offlineQueued) statusText = "Queued — uploads when you're back online";
   else if (uploading) statusText = typeof progress === "number" ? `Uploading… ${progress}%` : "Uploading…";
   else statusText = formatSize(sizeBytes);
 
@@ -160,6 +163,9 @@ export default function AttachmentChip({
 
       {/* Right-side actions */}
       <div className="flex items-center gap-1 shrink-0">
+        {offlineQueued && (
+          <CloudOff className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+        )}
         {uploadError && onRetry && (
           <button
             type="button"
@@ -171,7 +177,7 @@ export default function AttachmentChip({
             <RefreshCw className="w-4 h-4" />
           </button>
         )}
-        {uploading && !uploadError && (
+        {uploading && !uploadError && !offlineQueued && (
           <Loader2 className="w-4 h-4 text-slate-400 dark:text-slate-500 animate-spin" />
         )}
         {attachment?.id && !uploading && (
