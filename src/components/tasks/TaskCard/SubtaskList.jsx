@@ -13,7 +13,10 @@
  * can still guard against accidental clicks during a horizontal swipe
  * on the parent card.
  */
-import { useEffect, useRef, useState } from "react";
+// React default import is required: vitest's esbuild transform compiles
+// JSX in this file to classic React.createElement calls (the app build
+// uses the automatic runtime and doesn't need it).
+import React, { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns/format";
 import {
@@ -48,48 +51,62 @@ export default function SubtaskList({
     prevSubtaskCount.current = subtasks.length;
   }, [subtasks.length]);
 
-  if (!subtasks.length) return null;
-
+  const hasSubtasks = subtasks.length > 0;
+  const showRows = subtasksExpanded && hasSubtasks;
   const doneSubtasks = subtasks.filter((s) => s.status === "done").length;
   const wasSwipe = () => !!didSwipeRef?.current;
 
+  // OUTER collapse — the whole section (chevron row + subtask rows)
+  // animates closed when the LAST subtask is deleted, instead of
+  // unmounting at a render boundary. The early
+  // `if (!subtasks.length) return null` we used to have made
+  // TaskCard's root `motion.div layout` see a discrete height drop
+  // at that boundary and scale-animate the card — squashing the
+  // card's text during the contraction. With a CSS grid collapse the
+  // height change happens gradually BETWEEN framer snapshots, so the
+  // projection tree never sees a jump and the text never distorts.
   return (
-    <>
-      <div className="px-3 pb-2">
-        <button
-          onClick={() => setSubtasksExpanded(!subtasksExpanded)}
-          className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center gap-0.5"
-        >
-          {subtasksExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-          {doneSubtasks}/{subtasks.length} subtasks
-        </button>
-      </div>
-
-      {/* Expand/collapse is a pure CSS grid-rows transition (0fr ↔ 1fr,
-          the Radix-accordion trick) instead of a framer height tween.
-          Why: TaskCard's root is a `motion.div layout` — a JS-driven
-          height animation inside it makes framer's layout projection
-          try to spring-animate the same size change the tween is
-          already driving, and the two fight (the "laggy points").
-          A CSS transition changes height between framer snapshots, so
-          the projection tree never contests it and the cards below
-          reflow natively every frame. Content stays mounted; `inert`
-          keeps the collapsed content out of the tab order. */}
-      <div
-        className={cn(
-          "grid transition-[grid-template-rows] duration-200 ease-out",
-          subtasksExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-        )}
-        inert={subtasksExpanded ? undefined : ""}
-        aria-hidden={!subtasksExpanded}
-      >
-        <div className="overflow-hidden min-h-0">
-          <div
-            className={cn(
-              "px-3 pb-3 ml-10 space-y-1.5 transition-opacity duration-200",
-              subtasksExpanded ? "opacity-100" : "opacity-0"
-            )}
+    <div
+      className={cn(
+        "grid transition-[grid-template-rows] duration-200 ease-out",
+        hasSubtasks ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+      )}
+      inert={hasSubtasks ? undefined : ""}
+      aria-hidden={!hasSubtasks}
+    >
+      <div className="overflow-hidden min-h-0">
+        <div className="px-3 pb-2">
+          <button
+            onClick={() => setSubtasksExpanded(!subtasksExpanded)}
+            className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center gap-0.5"
           >
+            {subtasksExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+            {doneSubtasks}/{subtasks.length} subtasks
+          </button>
+        </div>
+
+        {/* INNER collapse — the user-driven expand/collapse. Pure CSS
+            grid-rows transition (0fr ↔ 1fr, the Radix-accordion trick)
+            instead of a framer height tween, for the same reason as
+            above: CSS changes height between framer snapshots, so the
+            root card's layout projection never contests it and the
+            cards below reflow natively every frame. Content stays
+            mounted; `inert` keeps it out of the tab order. */}
+        <div
+          className={cn(
+            "grid transition-[grid-template-rows] duration-200 ease-out",
+            showRows ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+          )}
+          inert={showRows ? undefined : ""}
+          aria-hidden={!showRows}
+        >
+          <div className="overflow-hidden min-h-0">
+            <div
+              className={cn(
+                "px-3 pb-3 ml-10 space-y-1.5 transition-opacity duration-200",
+                showRows ? "opacity-100" : "opacity-0"
+              )}
+            >
             {/* Per-item AnimatePresence so deleting a subtask collapses
                 its row before siblings reflow. layout="position" (NOT
                 bare `layout`) on the rows: position-only FLIP translates
@@ -159,17 +176,18 @@ export default function SubtaskList({
                 );
               })}
             </AnimatePresence>
-            {onAddSubtask && (
-              <button
-                onClick={() => onAddSubtask(task)}
-                className="text-[10px] text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 flex items-center gap-1 mt-1 transition-colors"
-              >
-                <Plus className="w-3 h-3" /> Add subtask
-              </button>
-            )}
+              {onAddSubtask && (
+                <button
+                  onClick={() => onAddSubtask(task)}
+                  className="text-[10px] text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 flex items-center gap-1 mt-1 transition-colors"
+                >
+                  <Plus className="w-3 h-3" /> Add subtask
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }

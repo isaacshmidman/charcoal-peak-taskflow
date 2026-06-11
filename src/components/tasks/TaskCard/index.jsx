@@ -190,7 +190,15 @@ export default function TaskCard({
 
   return (
     <motion.div
-      layout
+      // layout="position", NOT bare `layout`: position-only FLIP keeps
+      // the nice slide-into-place when the list reflows, but never
+      // scale-animates the card's own SIZE changes. Bare `layout`
+      // implements size animation with scaleY transforms, which
+      // visibly squashes/stretches the card's text whenever its height
+      // changes at a render boundary (e.g. the subtask section
+      // unmounting). Size changes now come from CSS transitions inside
+      // SubtaskList, so they're smooth without framer's involvement.
+      layout="position"
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.97 }}

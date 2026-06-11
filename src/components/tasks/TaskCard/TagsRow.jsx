@@ -4,6 +4,11 @@
  * `hidden sm:flex`. Renders up to 2 tags as inline chips with a
  * "+N more" counter when overflowing.
  */
+// React default import is required: vitest's esbuild transform compiles
+// JSX in this file to classic React.createElement calls (the app build
+// uses the automatic runtime and doesn't need it).
+import React from "react";
+
 export default function TagsRow({ tags }) {
   if (!tags?.length) return null;
   return (
