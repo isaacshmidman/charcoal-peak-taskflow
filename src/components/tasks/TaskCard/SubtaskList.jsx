@@ -65,18 +65,36 @@ export default function SubtaskList({
         </button>
       </div>
 
-      <AnimatePresence>
-        {subtasksExpanded && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="px-3 pb-3 ml-10 space-y-1.5 overflow-hidden"
+      {/* Expand/collapse is a pure CSS grid-rows transition (0fr ↔ 1fr,
+          the Radix-accordion trick) instead of a framer height tween.
+          Why: TaskCard's root is a `motion.div layout` — a JS-driven
+          height animation inside it makes framer's layout projection
+          try to spring-animate the same size change the tween is
+          already driving, and the two fight (the "laggy points").
+          A CSS transition changes height between framer snapshots, so
+          the projection tree never contests it and the cards below
+          reflow natively every frame. Content stays mounted; `inert`
+          keeps the collapsed content out of the tab order. */}
+      <div
+        className={cn(
+          "grid transition-[grid-template-rows] duration-200 ease-out",
+          subtasksExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+        )}
+        inert={subtasksExpanded ? undefined : ""}
+        aria-hidden={!subtasksExpanded}
+      >
+        <div className="overflow-hidden min-h-0">
+          <div
+            className={cn(
+              "px-3 pb-3 ml-10 space-y-1.5 transition-opacity duration-200",
+              subtasksExpanded ? "opacity-100" : "opacity-0"
+            )}
           >
-            {/* Per-item AnimatePresence + layout so deleting a subtask
-                collapses its row (height + opacity) BEFORE the siblings
-                reflow — without this the remaining row visibly stretches
-                into the deleted row's space for a frame. */}
+            {/* Per-item AnimatePresence so deleting a subtask collapses
+                its row before siblings reflow. layout="position" (NOT
+                bare `layout`) on the rows: position-only FLIP translates
+                siblings into place without the scale transforms that
+                visibly stretch text mid-animation. */}
             <AnimatePresence initial={false}>
               {subtasks.map((sub, subIdx) => {
                 const subOverdue = sub.due_date && new Date(sub.due_date + "T00:00:00") < new Date(new Date().setHours(0,0,0,0)) && sub.status !== "done";
@@ -91,11 +109,15 @@ export default function SubtaskList({
                 return (
                   <motion.div
                     key={sub.id}
-                    layout
+                    layout="position"
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: "auto" }}
                     exit={{ opacity: 0, height: 0, marginTop: 0 }}
-                    transition={{ duration: 0.15, ease: "easeOut" }}
+                    transition={{
+                      duration: 0.15,
+                      ease: "easeOut",
+                      layout: { duration: 0.15, ease: "easeOut" },
+                    }}
                     className="flex items-center gap-2 group/sub cursor-pointer overflow-hidden"
                     onClick={() => { if (wasSwipe()) return; onEditSubtask ? onEditSubtask(sub) : onEdit(sub); }}
                   >
@@ -145,9 +167,9 @@ export default function SubtaskList({
                 <Plus className="w-3 h-3" /> Add subtask
               </button>
             )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+        </div>
+      </div>
     </>
   );
 }
