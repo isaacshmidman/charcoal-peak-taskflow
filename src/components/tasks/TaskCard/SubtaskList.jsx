@@ -103,15 +103,22 @@ export default function SubtaskList({
           <div className="overflow-hidden min-h-0">
             <div
               className={cn(
-                "px-3 pb-3 ml-10 space-y-1.5 transition-opacity duration-200",
+                // NB: no `space-y-*` here. space-y is a `* + *` top-margin,
+                // so deleting the FIRST row makes the new-first row lose
+                // its margin in one CSS recalc → a ~6px instant jump that
+                // desyncs from the smooth collapse. The per-row spacing is
+                // now `pb-1.5` ON each row, so it collapses WITH the row.
+                "px-3 pb-1.5 ml-10 transition-opacity duration-200",
                 showRows ? "opacity-100" : "opacity-0"
               )}
             >
-            {/* Per-item AnimatePresence so deleting a subtask collapses
-                its row before siblings reflow. layout="position" (NOT
-                bare `layout`) on the rows: position-only FLIP translates
-                siblings into place without the scale transforms that
-                visibly stretch text mid-animation. */}
+            {/* Per-item AnimatePresence collapses a deleted row's height
+                (+ its own bottom padding) to 0 over 150ms. Siblings rise
+                and the card contracts via pure document FLOW tracking that
+                single collapsing height — no framer `layout` FLIP on the
+                rows, which would add a SECOND, slightly-out-of-step force
+                on the same sibling. One animation drives everything, so
+                the sibling's rise and the card's contraction stay locked. */}
             <AnimatePresence initial={false}>
               {subtasks.map((sub, subIdx) => {
                 const subOverdue = sub.due_date && new Date(sub.due_date + "T00:00:00") < new Date(new Date().setHours(0,0,0,0)) && sub.status !== "done";
@@ -126,16 +133,15 @@ export default function SubtaskList({
                 return (
                   <motion.div
                     key={sub.id}
-                    layout="position"
+                    // No `layout` — the row's height collapse on exit is
+                    // the single source of motion; siblings + the card
+                    // follow via flow. `pb-1.5` carries this row's
+                    // spacing so it collapses together with the row.
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0, marginTop: 0 }}
-                    transition={{
-                      duration: 0.15,
-                      ease: "easeOut",
-                      layout: { duration: 0.15, ease: "easeOut" },
-                    }}
-                    className="flex items-center gap-2 group/sub cursor-pointer overflow-hidden"
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.15, ease: "easeOut" }}
+                    className="flex items-center gap-2 pb-1.5 group/sub cursor-pointer overflow-hidden"
                     onClick={() => { if (wasSwipe()) return; onEditSubtask ? onEditSubtask(sub) : onEdit(sub); }}
                   >
                     {onReorderSubtasks && (
