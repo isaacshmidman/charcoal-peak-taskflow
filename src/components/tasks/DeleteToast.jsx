@@ -1,9 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { useShortcutEvent } from "@/hooks/useShortcutEvent";
+import { SHORTCUT_EVENTS } from "@/lib/shortcuts";
 
 /**
  * Usage: call showDeleteToast({ label: "Task X was deleted", onUndo: fn })
  * This component renders itself in the bottom-left, pointer-events:none when hidden.
+ * Pressing `z` (or Mod+Z) while the toast is visible triggers Undo.
  */
 
 let _setToast = null;
@@ -14,6 +17,8 @@ export function showDeleteToast({ label, onUndo, hideUndo = false }) {
 
 export default function DeleteToast() {
   const [toast, setToast] = useState(null);
+  const toastRef = useRef(null);
+  toastRef.current = toast;
 
   useEffect(() => {
     _setToast = setToast;
@@ -25,6 +30,14 @@ export default function DeleteToast() {
     const timer = setTimeout(() => setToast(null), 3000);
     return () => clearTimeout(timer);
   }, [toast?.id]);
+
+  // Keyboard: z / Mod+Z fires Undo while the toast is on screen.
+  useShortcutEvent(SHORTCUT_EVENTS.undoDelete, () => {
+    const current = toastRef.current;
+    if (!current || current.hideUndo) return;
+    current.onUndo?.();
+    setToast(null);
+  });
 
   return (
     <div className="fixed bottom-20 left-4 z-50 pointer-events-none" data-testid="delete-toast-region">

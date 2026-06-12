@@ -22,6 +22,8 @@ import { compareDueDateTime } from "@/lib/sort-helpers";
 import { excludeExternalEvents } from "@/lib/task-filters";
 import { useCalendarOrderState } from "@/hooks/useCalendarOrder";
 import { calendarKeyForTask, compareByCalendarOrder } from "@/lib/calendar-order";
+import { useShortcutEvent } from "@/hooks/useShortcutEvent";
+import { SHORTCUT_EVENTS } from "@/lib/shortcuts";
 
 export default function Today() {
   const [showForm, setShowForm] = useState(false);
@@ -32,6 +34,12 @@ export default function Today() {
   const [recurringDeleteTask, setRecurringDeleteTask] = useState(null);
   const [search, setSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
+
+  // Keyboard shortcuts (parsed centrally in useGlobalShortcuts).
+  useShortcutEvent(SHORTCUT_EVENTS.newTask, () => {
+    setEditingTask(null); setAddSubtaskParent(null); setShowForm(true);
+  });
+  useShortcutEvent(SHORTCUT_EVENTS.search, () => setShowSearch(true));
   const [sorts, setSorts] = useState(() => {
     try {
       const saved = localStorage.getItem("sorts_today");

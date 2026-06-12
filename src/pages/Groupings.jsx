@@ -23,6 +23,8 @@ import { compareDueDateTime } from "@/lib/sort-helpers";
 import { excludeExternalEvents } from "@/lib/task-filters";
 import { useCalendarOrderState } from "@/hooks/useCalendarOrder";
 import { calendarKeyForTask, compareByCalendarOrder } from "@/lib/calendar-order";
+import { useShortcutEvent } from "@/hooks/useShortcutEvent";
+import { SHORTCUT_EVENTS } from "@/lib/shortcuts";
 
 function GroupColumn({ title, subtitle, tasks, priorities, priorityOrderMap, onToggleDone, onEdit, onDelete, onUpdate, accent, wide, sorts, calendarIndexByKey }) {
   const compareFn = (a, b, sortValue) => {
@@ -120,6 +122,12 @@ export default function Groupings() {
   const [recurringDeleteTask, setRecurringDeleteTask] = useState(null);
   const todayColRef = useRef(null);
   const scrollContainerRef = useRef(null);
+
+  // Keyboard shortcuts (parsed centrally in useGlobalShortcuts).
+  useShortcutEvent(SHORTCUT_EVENTS.newTask, () => {
+    setEditingTask(null); setAddSubtaskParent(null); setShowForm(true);
+  });
+  useShortcutEvent(SHORTCUT_EVENTS.search, () => setShowSearch(true));
 
   const { createTask, updateTask, deleteTask, completeRecurringTask, skipRecurringTask } = useOfflineMutation();
   const deleteWithUndo = useDeleteWithUndo(deleteTask, createTask);

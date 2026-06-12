@@ -199,7 +199,18 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
             </p>
           </div>
         )}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form
+          onSubmit={handleSubmit}
+          // Mod+Enter saves from anywhere in the form — including inside
+          // the rich-text description, where plain Enter just adds a line.
+          onKeyDown={(e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && !isReadOnly) {
+              e.preventDefault();
+              handleSubmit(e);
+            }
+          }}
+          className="space-y-4"
+        >
         {/* `display: contents` on the fieldset hides its box, but Tailwind's
             `space-y-*` rule on the form (`> * + * { margin-top: ... }`) only
             targets direct DOM children — the fieldset is the form's only

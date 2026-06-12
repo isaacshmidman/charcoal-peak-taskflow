@@ -5,7 +5,9 @@ import { useEffect, useState } from "react";
 import { useOfflineData } from "@/hooks/useOfflineData";
 import { useAttachmentQueue } from "@/hooks/useAttachmentQueue";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { useGlobalShortcuts } from "@/hooks/useGlobalShortcuts";
 import DeleteToast from "@/components/tasks/DeleteToast";
+import ShortcutsHelp from "@/components/ShortcutsHelp";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DEFAULT_NAV_ORDER, sanitizeNavOrder, sanitizeNavRoute } from "@/lib/navigation";
 
@@ -39,6 +41,7 @@ export default function Layout() {
   const online = useOnlineStatus();
   useOfflineData();
   useAttachmentQueue();
+  const { helpOpen, setHelpOpen } = useGlobalShortcuts();
 
   // Listen for nav order/default changes from Settings
   useEffect(() => {
@@ -159,6 +162,7 @@ export default function Layout() {
       </main>
 
       <DeleteToast />
+      <ShortcutsHelp open={helpOpen} onOpenChange={setHelpOpen} />
     </div>
   );
 }

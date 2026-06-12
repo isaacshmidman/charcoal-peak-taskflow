@@ -46,6 +46,8 @@ import { nextQuarterHour } from "@/lib/sort-helpers";
 import { toDateStr } from "@/lib/dates";
 import { useIntegrationsConnected, useIntegrations } from "@/hooks/useIntegrations";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { useShortcutEvent } from "@/hooks/useShortcutEvent";
+import { SHORTCUT_EVENTS } from "@/lib/shortcuts";
 import CalendarToolbar from "./CalendarToolbar.jsx";
 import { useCalendarFilters } from "./useCalendarFilters.js";
 import { useCalendarDnd } from "./useCalendarDnd.js";
@@ -299,6 +301,15 @@ export default function Calendar() {
     }
     setShowForm(true);
   };
+
+  // Keyboard shortcuts (parsed centrally in useGlobalShortcuts; the
+  // calendar-* events only fire while this route is active).
+  useShortcutEvent(SHORTCUT_EVENTS.newTask, openNewTask);
+  useShortcutEvent(SHORTCUT_EVENTS.search, () => setShowSearch(true));
+  useShortcutEvent(SHORTCUT_EVENTS.calendarView, (v) => handleViewChange(v));
+  useShortcutEvent(SHORTCUT_EVENTS.calendarToday, goToday);
+  useShortcutEvent(SHORTCUT_EVENTS.calendarStep, (dir) => (dir === -1 ? goPrev() : goNext()));
+  useShortcutEvent(SHORTCUT_EVENTS.calendarSync, handleSyncNow);
 
   return (
     <div className="space-y-4">

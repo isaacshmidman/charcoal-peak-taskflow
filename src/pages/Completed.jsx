@@ -22,6 +22,8 @@ import TaskForm from "@/components/tasks/TaskForm";
 import MultiSortPanel from "@/components/tasks/MultiSortPanel";
 import { excludeExternalEvents } from "@/lib/task-filters";
 import { useCalendarOrderState } from "@/hooks/useCalendarOrder";
+import { useShortcutEvent } from "@/hooks/useShortcutEvent";
+import { SHORTCUT_EVENTS } from "@/lib/shortcuts";
 
 export default function Completed() {
   const [editingTask, setEditingTask] = useState(null);
@@ -29,6 +31,9 @@ export default function Completed() {
   const [showDeleteAllDialog, setShowDeleteAllDialog] = useState(false);
   const [search, setSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
+
+  // Keyboard shortcut: "/" opens search (no New Task on this page).
+  useShortcutEvent(SHORTCUT_EVENTS.search, () => setShowSearch(true));
   const [undoingItems, setUndoingItems] = useState([]);
   const undoingTimersRef = useRef(new Map());
   const [sorts, setSorts] = useState(() => {
