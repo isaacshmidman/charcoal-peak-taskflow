@@ -3,14 +3,54 @@
  * @file Title input + rich-text Description editor. The first two fields
  * of the TaskForm dialog.
  *
- * The TipTap editor (~120 KB) is lazy-loaded so it never enters the
- * initial PWA bundle — it loads when a TaskForm first opens. While the
- * chunk is in flight, a plain textarea-shaped skeleton stands in.
+ * The TipTap editor (~133 KB gzipped) is lazy-loaded so it never enters
+ * the initial PWA bundle — it loads when a TaskForm first opens. Two
+ * fallbacks guard the load:
+ *   - Suspense: a textarea-shaped skeleton while the chunk is in flight.
+ *   - EditorLoadBoundary: if the chunk FAILS to load (e.g. the user is
+ *     offline and it isn't cached yet), degrade to a plain <textarea>
+ *     that edits the plaintext `description`. Without this boundary a
+ *     failed lazy import throws in render and unmounts the whole form
+ *     subtree (detaching the title input) — which is exactly what the
+ *     offline e2e test caught.
  */
-import { lazy, Suspense } from "react";
+import { Component, lazy, Suspense } from "react";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 const RichDescriptionEditor = lazy(() => import("@/components/tasks/RichDescriptionEditor"));
+
+/** Catches a failed lazy editor load and renders `fallback` instead. */
+class EditorLoadBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { failed: false };
+  }
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch() {
+    // Swallow — the fallback textarea keeps the form usable. (A console
+    // error here would just be noise; the offline case is expected.)
+  }
+  render() {
+    if (this.state.failed) return this.props.fallback;
+    return this.props.children;
+  }
+}
+
+/** Plain-text degradation when the rich editor can't load. Edits the
+ * plaintext mirror and clears the rich JSON (only on actual edits). */
+function PlainDescriptionFallback({ form, setForm }) {
+  return (
+    <Textarea
+      placeholder="Add details (optional)"
+      value={form.description || ""}
+      onChange={(e) => setForm((f) => ({ ...f, description: e.target.value, description_json: "" }))}
+      className="h-20 resize-none"
+    />
+  );
+}
 
 export default function TitleAndDescription({ form, setForm, task }) {
   // The editor hydrates ONCE at mount. Read its initial content straight
@@ -32,20 +72,22 @@ export default function TitleAndDescription({ form, setForm, task }) {
         data-testid="task-form-title"
       />
 
-      <Suspense
-        fallback={
-          <div className="h-20 rounded-md border border-slate-200 dark:border-[#343434] bg-white dark:bg-[#0c0c0c] px-3 py-2 text-sm text-slate-400 dark:text-slate-500">
-            Loading editor…
-          </div>
-        }
-      >
-        <RichDescriptionEditor
-          key={editorKey}
-          valueJson={task?.description_json}
-          plainFallback={task?.description}
-          onChange={({ json, text }) => setForm((f) => ({ ...f, description_json: json, description: text }))}
-        />
-      </Suspense>
+      <EditorLoadBoundary fallback={<PlainDescriptionFallback form={form} setForm={setForm} />}>
+        <Suspense
+          fallback={
+            <div className="h-20 rounded-md border border-slate-200 dark:border-[#343434] bg-white dark:bg-[#0c0c0c] px-3 py-2 text-sm text-slate-400 dark:text-slate-500">
+              Loading editor…
+            </div>
+          }
+        >
+          <RichDescriptionEditor
+            key={editorKey}
+            valueJson={task?.description_json}
+            plainFallback={task?.description}
+            onChange={({ json, text }) => setForm((f) => ({ ...f, description_json: json, description: text }))}
+          />
+        </Suspense>
+      </EditorLoadBoundary>
     </>
   );
 }
