@@ -136,3 +136,75 @@
     }
   }
 }
+
+/* ── Rich description editor (TipTap / ProseMirror) ──────────────── */
+.tiptap-prose {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: theme("colors.slate.900");
+}
+.dark .tiptap-prose {
+  color: theme("colors.slate.100");
+}
+.tiptap-prose:focus {
+  outline: none;
+}
+/* Placeholder for an empty doc (TipTap adds is-empty/is-editor-empty). */
+.tiptap-prose p.is-editor-empty:first-child::before {
+  content: "Add details (optional)";
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: theme("colors.slate.400");
+}
+.dark .tiptap-prose p.is-editor-empty:first-child::before {
+  color: theme("colors.slate.500");
+}
+.tiptap-prose p {
+  margin: 0 0 0.25rem;
+}
+.tiptap-prose ul,
+.tiptap-prose ol {
+  padding-left: 1.4rem;
+  margin: 0.15rem 0;
+}
+/* Bullet markers default to disc; circle/dash set inline via the
+   listStyleType attribute (see orderedListStyle.js). */
+.tiptap-prose ul { list-style-type: disc; }
+.tiptap-prose ol { list-style-type: decimal; }
+.tiptap-prose li { margin: 0.1rem 0; }
+.tiptap-prose li > p { margin: 0; }
+/* Checklist: hide the native marker, render a checkbox; strike done. */
+.tiptap-prose ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0.2rem;
+}
+.tiptap-prose ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+.tiptap-prose ul[data-type="taskList"] li > label {
+  margin-top: 0.15rem;
+  user-select: none;
+}
+.tiptap-prose ul[data-type="taskList"] li > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.tiptap-prose ul[data-type="taskList"] li[data-checked="true"] > div {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+.tiptap-prose ul[data-type="taskList"] input[type="checkbox"] {
+  accent-color: theme("colors.slate.900");
+  cursor: pointer;
+}
+.dark .tiptap-prose ul[data-type="taskList"] input[type="checkbox"] {
+  accent-color: theme("colors.slate.100");
+}
+.tiptap-prose mark {
+  border-radius: 0.15rem;
+  padding: 0 0.1em;
+}
+.tiptap-prose a { color: inherit; text-decoration: underline; }

@@ -337,6 +337,20 @@ export function createDatabase(config = backendConfig) {
   } catch {
     // Column already exists — ignore
   }
+  // Rich-text description: ProseMirror/TipTap JSON (stringified). The
+  // existing `description` column is kept as a plaintext mirror so
+  // notifications/search/restore stay plaintext with no rich-text deps.
+  // Null on pre-richtext rows → the editor hydrates from plaintext.
+  try {
+    db.exec(`ALTER TABLE tasks ADD COLUMN description_json TEXT`);
+  } catch {
+    // Column already exists — ignore
+  }
+  try {
+    db.exec(`ALTER TABLE deleted_tasks ADD COLUMN description_json TEXT`);
+  } catch {
+    // Column already exists — ignore
+  }
 
   // Backfill: for any (app_id, user_id) that has active integrations but no
   // current default, promote the oldest active one. Without this, users who

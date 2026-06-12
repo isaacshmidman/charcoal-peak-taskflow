@@ -32,6 +32,7 @@ import AttachmentsField, { flushPendingUploads } from "../AttachmentsField.jsx";
 const defaultTask = {
   title: "",
   description: "",
+  description_json: "",
   priority_id: "",
   status: "todo",
   task_type: "one_time",
@@ -206,7 +207,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
             inside collapse together (no gap between title and description).
             Re-applying `space-y-4` on the fieldset restores the cadence. */}
         <fieldset disabled={isReadOnly} className="contents [&>*+*]:mt-4">
-          <TitleAndDescription form={form} setForm={setForm} />
+          <TitleAndDescription form={form} setForm={setForm} task={task} />
 
           <PriorityAndType
             form={form}

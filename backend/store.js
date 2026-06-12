@@ -13,6 +13,7 @@ const ENTITY_DEFINITIONS = {
     fieldMap: { order: "sort_order", recurrence_days: "recurrence_days_json", tags: "tags_json" },
     defaults: {
       description: "",
+      description_json: "",
       priority_id: "",
       status: "todo",
       task_type: "one_time",
@@ -38,6 +39,7 @@ const ENTITY_DEFINITIONS = {
       "parent_id",
       "title",
       "description",
+      "description_json",
       "priority_id",
       "status",
       "task_type",
@@ -72,6 +74,7 @@ const ENTITY_DEFINITIONS = {
     },
     defaults: {
       description: "",
+      description_json: "",
       priority_id: "",
       priority_color: "",
       status: "todo",
@@ -93,6 +96,7 @@ const ENTITY_DEFINITIONS = {
       "task_id",
       "title",
       "description",
+      "description_json",
       "priority_id",
       "priority_color",
       "status",

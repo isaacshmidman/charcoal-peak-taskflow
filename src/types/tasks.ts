@@ -17,6 +17,8 @@ export interface TaskRecord {
   parent_id?: string;
   title?: string;
   description?: string;
+  /** Rich-text (TipTap/ProseMirror) JSON, stringified. "" when none. */
+  description_json?: string;
   priority_id?: string;
   status?: TaskStatus;
   task_type?: TaskType;
@@ -47,6 +49,7 @@ export interface DeletedTaskRecord {
   task_id: string;
   title: string;
   description?: string;
+  description_json?: string;
   priority_id?: string;
   priority_color?: string;
   status?: TaskStatus;

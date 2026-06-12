@@ -46,6 +46,7 @@ export function buildTaskPayload(task, overrides = {}) {
   const payload = {
     title: task.title || "",
     description: task.description || "",
+    description_json: task.description_json || "",
     priority_id: task.priority_id || "",
     status: task.status || "todo",
     task_type: task.task_type || "one_time",

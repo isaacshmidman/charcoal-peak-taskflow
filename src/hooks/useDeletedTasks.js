@@ -77,6 +77,7 @@ export function useDeletedTasks() {
       task_id: task.id,
       title: task.title,
       description: task.description || '',
+      description_json: task.description_json || '',
       priority_id: task.priority_id || '',
       priority_color: snapshotPriority?.color || '',
       status: task.status || 'todo',
