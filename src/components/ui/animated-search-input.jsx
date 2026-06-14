@@ -24,6 +24,16 @@ import { cn } from "@/lib/utils";
  */
 export function AnimatedSearchInput({ open, value, onChange, onClose, placeholder = "Search...", className }) {
   const wrapperRef = /** @type {import("react").MutableRefObject<HTMLDivElement | null>} */ (useRef(null));
+  const inputRef = /** @type {import("react").MutableRefObject<HTMLInputElement | null>} */ (useRef(null));
+
+  // Focus the field whenever the box opens. `autoFocus` only fires on the
+  // initial mount, so re-opening an already-mounted input (via the toggle
+  // button or the "/" keyboard shortcut) wouldn't move the caret without this.
+  // Focus synchronously after commit (not via rAF, which is paused in
+  // background tabs) — the input is always mounted, so it's focusable here.
+  useEffect(() => {
+    if (open) inputRef.current?.focus();
+  }, [open]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -51,10 +61,10 @@ export function AnimatedSearchInput({ open, value, onChange, onClose, placeholde
       )}
     >
       <Input
+        ref={inputRef}
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        autoFocus={open}
         tabIndex={open ? 0 : -1}
         className={cn(
           "h-9 w-full text-sm bg-white dark:bg-[#0c0c0c] border-slate-100 dark:border-[#303030] whitespace-nowrap",
