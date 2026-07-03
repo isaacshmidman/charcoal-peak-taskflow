@@ -1,0 +1,96 @@
+/* ─────────────────────────────────────────────────────────────────
+   Zephyrly — Color tokens
+   Observed from charcoal-peak-taskflow (shadcn/ui neutral base, but the
+   product code reaches for Tailwind `slate` directly, so slate IS the
+   real neutral ramp). The brand signature is a warm-yellow radial glow
+   anchored to the bottom-right corner of every screen.
+   ───────────────────────────────────────────────────────────────── */
+:root {
+  /* ── Brand ───────────────────────────────────────────────── */
+  --brand-glow-1: #f5f5a0;   /* corner stop — warmest */
+  --brand-glow-2: #fdfdcf;   /* mid stop */
+  --brand-yellow: #f3e23f;   /* logo wave accent, saturated */
+  --brand-yellow-soft: #faf6c4;
+  --brand-ink: #0a0a0a;      /* logo "Z" */
+  /* The signature page background. Apply to <body>; fixed, no-repeat. */
+  --brand-bg-light: radial-gradient(circle at 100% 100%, #f5f5a0 0%, #fdfdcf 12%, #ffffff 40%);
+  --brand-bg-dark: radial-gradient(circle at 100% 100%, #343422 0%, #1d1d14 16%, #0b0b08 38%, #000000 66%);
+
+  /* ── Slate neutral ramp (primary neutral) ────────────────── */
+  --slate-50:  #f8fafc;
+  --slate-100: #f1f5f9;
+  --slate-200: #e2e8f0;
+  --slate-300: #cbd5e1;
+  --slate-400: #94a3b8;
+  --slate-500: #64748b;
+  --slate-600: #475569;
+  --slate-700: #334155;
+  --slate-800: #1e293b;
+  --slate-900: #0f172a;
+  --slate-950: #020617;
+
+  /* ── Semantic aliases (light) ────────────────────────────── */
+  --background: #ffffff;
+  --foreground: var(--slate-900);
+
+  --surface-card: #ffffff;        /* default card */
+  --surface-card-glass: rgba(255,255,255,0.80); /* sticky header (backdrop-blur) */
+  --surface-muted: var(--slate-50);    /* inset rows, hints */
+
+  --border: var(--slate-100);     /* default hairline */
+  --border-strong: var(--slate-200);   /* inputs, dividers */
+
+  --text-body: var(--slate-900);
+  --text-secondary: var(--slate-500);
+  --text-muted: var(--slate-400);   /* counts, meta, placeholders */
+  --text-faint: var(--slate-300);   /* empty date chips */
+
+  --primary: var(--slate-900);    /* near-black solid action */
+  --primary-hover: var(--slate-800);
+  --primary-foreground: #ffffff;
+
+  --secondary: var(--slate-100);
+  --secondary-foreground: var(--slate-900);
+
+  --ring: var(--slate-900);
+
+  /* ── Status ──────────────────────────────────────────────── */
+  --destructive: #ef4444;         /* red-500 */
+  --destructive-soft: #f87171;    /* red-400 — overdue bar, swipe peek */
+  --destructive-bg: #fef2f2;      /* red-50 */
+  --destructive-foreground: #ffffff;
+  --accent-recurring: #7c3aed;    /* violet-600 — recurring dot/chip */
+  --accent-recurring-bg: #f5f3ff; /* violet-50 */
+}
+
+/* ── Dark theme scope ──────────────────────────────────────── */
+.dark {
+  --background: #000000;
+  --foreground: #ededed;          /* hsl(0 0% 92%) */
+
+  --surface-card: #111111;
+  --surface-card-glass: #000000;  /* dark header is opaque black */
+  --surface-muted: #161616;
+
+  --border: #303030;
+  --border-strong: #343434;
+
+  --text-body: #ededed;
+  --text-secondary: #94a3b8;      /* slate-400 still reads well */
+  --text-muted: #64748b;          /* slate-500 */
+  --text-faint: #475569;          /* slate-600 */
+
+  --primary: #f1f5f9;             /* inverts to light in dark mode */
+  --primary-hover: #e2e8f0;
+  --primary-foreground: #0f172a;
+
+  --secondary: #161616;
+  --secondary-foreground: #ededed;
+
+  --ring: #d4d4d4;
+
+  --destructive: #ef4444;
+  --destructive-bg: #2a1116;
+  --accent-recurring: #c4b5fd;    /* violet-300 in dark */
+  --accent-recurring-bg: #201735;
+}

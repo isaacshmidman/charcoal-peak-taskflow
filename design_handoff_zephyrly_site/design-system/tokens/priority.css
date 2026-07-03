@@ -1,0 +1,33 @@
+/* ─────────────────────────────────────────────────────────────────
+   Zephyrly — Priority / label palette
+   The product lets users color tasks. Dots use the -400 step; task-card
+   surfaces use a tinted -50/-100 wash with a matching hairline. Mirrors
+   src/lib/colors.js (COLOR_OPTIONS / colorDot / colorBg).
+   ───────────────────────────────────────────────────────────────── */
+:root {
+  /* Dot / swatch (saturated, -400) */
+  --pri-red:    #f87171;
+  --pri-orange: #fb923c;
+  --pri-yellow: #facc15;
+  --pri-green:  #4ade80;
+  --pri-blue:   #60a5fa;
+  --pri-violet: #a78bfa;
+  --pri-pink:   #f472b6;
+  --pri-teal:   #2dd4bf;
+  --pri-cyan:   #22d3ee;
+  --pri-rose:   #fb7185;
+  --pri-slate:  #94a3b8;
+  --pri-brown:  #b45309;  /* amber-700 */
+
+  /* Card surface wash (-50) + hairline (-100) — light mode */
+  --pri-red-bg:    #fef2f2;  --pri-red-border:    #fee2e2;
+  --pri-orange-bg: #fff7ed;  --pri-orange-border: #ffedd5;
+  --pri-yellow-bg: #fefce8;  --pri-yellow-border: #fef9c3;
+  --pri-green-bg:  #f0fdf4;  --pri-green-border:  #dcfce7;
+  --pri-blue-bg:   #eff6ff;  --pri-blue-border:   #dbeafe;
+  --pri-violet-bg: #f5f3ff;  --pri-violet-border: #ede9fe;
+  --pri-pink-bg:   #fdf2f8;  --pri-pink-border:   #fce7f3;
+  --pri-teal-bg:   #f0fdfa;  --pri-teal-border:   #ccfbf1;
+  --pri-cyan-bg:   #ecfeff;  --pri-cyan-border:   #cffafe;
+  --pri-rose-bg:   #fff1f2;  --pri-rose-border:   #ffe4e6;
+}

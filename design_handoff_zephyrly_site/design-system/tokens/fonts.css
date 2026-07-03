@@ -1,0 +1,43 @@
+/* ─────────────────────────────────────────────────────────────────
+   Zephyrly — Webfont: Plus Jakarta Sans (self-hosted .woff2)
+   A humanist geometric sans chosen for Zephyrly: airy, friendly and
+   modern (in step with the "zephyr" / light-breeze brand) yet legible
+   at the product's small, dense UI sizes. One family, five weights —
+   400/500/600/700 carry the UI; 800 (ExtraBold) sets the wordmark "Z".
+   Files live in /assets/fonts; paths are relative to this CSS file.
+   ───────────────────────────────────────────────────────────────── */
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../assets/fonts/plus-jakarta-sans-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("../assets/fonts/plus-jakarta-sans-500.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("../assets/fonts/plus-jakarta-sans-600.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../assets/fonts/plus-jakarta-sans-700.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("../assets/fonts/plus-jakarta-sans-800.woff2") format("woff2");
+}

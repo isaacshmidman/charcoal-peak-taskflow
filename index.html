@@ -35,6 +35,10 @@
       })();
     </script>
     <style>
+      /* Pre-CSS FOUC guard: paints the brand glow before any stylesheet
+         loads, so these MUST stay literal hex. Canonical values live in
+         --brand-bg-light / --brand-bg-dark (src/styles/zephyrly.css) —
+         keep the two in sync when the brand gradient changes. */
       html {
         min-height: 100%;
         background: radial-gradient(circle at 100% 100%, #f5f5a0 0%, #fdfdcf 12%, #ffffff 40%);

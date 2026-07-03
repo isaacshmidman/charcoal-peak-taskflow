@@ -1,0 +1,48 @@
+/* ─────────────────────────────────────────────────────────────────
+   Zephyrly — Spacing, radii, shadows, motion
+   4px base scale (Tailwind). Radii are generous: cards 12px, inputs 8px,
+   pills/login fields 16px+. Shadows are whisper-soft — the brand reads
+   calm, so elevation is barely-there.
+   ───────────────────────────────────────────────────────────────── */
+:root {
+  /* Spacing (4px base) */
+  --space-0-5: 2px;
+  --space-1: 4px;
+  --space-1-5: 6px;
+  --space-2: 8px;
+  --space-2-5: 10px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+
+  /* Layout */
+  --container-max: 72rem;   /* max-w-6xl content column */
+  --header-height: 56px;    /* h-14 sticky top nav */
+  --control-height: 36px;   /* h-9 buttons / inputs / selects */
+  --control-height-lg: 48px;/* h-12 login fields, primary CTA */
+
+  /* Radii — base --radius is 8px, others derive from it */
+  --radius: 8px;            /* lg */
+  --radius-sm: 4px;         /* radius - 4 */
+  --radius-md: 6px;         /* radius - 2 — buttons, checkboxes */
+  --radius-lg: 8px;         /* cards-small, chips */
+  --radius-xl: 12px;        /* task cards, panels */
+  --radius-2xl: 16px;       /* login inputs, info blocks */
+  --radius-3xl: 28px;       /* hero / auth card */
+  --radius-full: 9999px;    /* dots, avatars */
+
+  /* Shadows — soft, low-contrast */
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --shadow-pop: 0 8px 28px rgba(15, 23, 42, 0.12);  /* popovers, menus */
+  --shadow-hero: 0 24px 80px rgba(15, 23, 42, 0.08); /* auth card */
+
+  /* Motion — quick, gentle, no bounce */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1); /* @kind other */
+  --duration-fast: 100ms; /* @kind other */
+  --duration-base: 200ms; /* @kind other */
+}

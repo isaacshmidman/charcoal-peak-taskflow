@@ -1,0 +1,10 @@
+/* ─────────────────────────────────────────────────────────────────
+   Zephyrly Design System — global entry point.
+   Consumers link THIS file. It is an @import manifest only; never add
+   rules here. Everything reachable from here ships to consumers.
+   ───────────────────────────────────────────────────────────────── */
+@import "./tokens/fonts.css";
+@import "./tokens/colors.css";
+@import "./tokens/priority.css";
+@import "./tokens/typography.css";
+@import "./tokens/spacing.css";

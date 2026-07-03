@@ -1,0 +1,165 @@
+/* ─────────────────────────────────────────────────────────────────
+   Zephyrly Design System — distilled tokens + brand typeface.
+   Source of truth: design_handoff_zephyrly_site/ (README + tokens/).
+
+   Deliberately NOT a verbatim copy of the handoff's colors.css: names
+   that collide with the shadcn HSL-triplet variables in index.css
+   (--background, --foreground, --primary, --secondary, --ring,
+   --border, --destructive*) are omitted — those stay in shadcn triplet
+   format because tailwind.config.js consumes them as hsl(var(--x)).
+   Everything else from the handoff lives here under its documented
+   name so new work can build against var(--*) instead of raw hex.
+   ───────────────────────────────────────────────────────────────── */
+
+/* ── Brand typeface: Plus Jakarta Sans (self-hosted) ─────────────
+   400/500/600/700 carry the UI; 800 sets the wordmark "Z". */
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/plus-jakarta-sans-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/plus-jakarta-sans-500.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/plus-jakarta-sans-600.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/plus-jakarta-sans-700.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("/fonts/plus-jakarta-sans-800.woff2") format("woff2");
+}
+
+:root {
+  /* ── Brand ──────────────────────────────────────────────────
+     The yellow is atmosphere, not a fill — no colored brand button. */
+  --brand-glow-1: #f5f5a0;
+  --brand-glow-2: #fdfdcf;
+  --brand-yellow: #f3e23f;
+  --brand-yellow-soft: #faf6c4;
+  --brand-ink: #0a0a0a;
+  /* THE signature: warm radial glow, bottom-right of every screen.
+     Applied to <body> (fixed, no-repeat) in index.css. index.html
+     keeps a hex copy as the pre-CSS FOUC guard — update both. */
+  --brand-bg-light: radial-gradient(circle at 100% 100%, #f5f5a0 0%, #fdfdcf 12%, #ffffff 40%);
+  /* Opaque warm-dark → black stops; translucent stops band hard. */
+  --brand-bg-dark: radial-gradient(circle at 100% 100%, #343422 0%, #1d1d14 16%, #0b0b08 38%, #000000 66%);
+
+  /* ── Slate ramp (the real neutral; identical to Tailwind slate) ── */
+  --slate-50:  #f8fafc;
+  --slate-100: #f1f5f9;
+  --slate-200: #e2e8f0;
+  --slate-300: #cbd5e1;
+  --slate-400: #94a3b8;
+  --slate-500: #64748b;
+  --slate-600: #475569;
+  --slate-700: #334155;
+  --slate-800: #1e293b;
+  --slate-900: #0f172a;
+  --slate-950: #020617;
+
+  /* ── Surfaces & borders (light) ───────────────────────────── */
+  --surface-card: #ffffff;
+  --surface-card-glass: rgba(255, 255, 255, 0.8); /* sticky header + blur */
+  --surface-muted: var(--slate-50);
+  --border-hairline: var(--slate-100); /* handoff --border; renamed: shadcn owns --border */
+  --border-strong: var(--slate-200);   /* inputs, dividers */
+
+  /* ── Text roles (light) ───────────────────────────────────── */
+  --text-body: var(--slate-900);
+  --text-secondary: var(--slate-500);
+  --text-muted: var(--slate-400);
+  --text-faint: var(--slate-300);
+
+  /* ── Action & status ──────────────────────────────────────── */
+  --primary-hover: var(--slate-800);
+  --destructive-soft: #f87171; /* overdue bar, swipe peel */
+  --destructive-bg: #fef2f2;
+  --accent-recurring: #7c3aed;
+  --accent-recurring-bg: #f5f3ff;
+
+  /* ── Priority palette (mirrors src/lib/colors.js) ─────────── */
+  --pri-red: #f87171;    --pri-red-bg: #fef2f2;    --pri-red-border: #fee2e2;
+  --pri-orange: #fb923c; --pri-orange-bg: #fff7ed; --pri-orange-border: #ffedd5;
+  --pri-yellow: #facc15; --pri-yellow-bg: #fefce8; --pri-yellow-border: #fef9c3;
+  --pri-green: #4ade80;  --pri-green-bg: #f0fdf4;  --pri-green-border: #dcfce7;
+  --pri-blue: #60a5fa;   --pri-blue-bg: #eff6ff;   --pri-blue-border: #dbeafe;
+  --pri-violet: #a78bfa; --pri-violet-bg: #f5f3ff; --pri-violet-border: #ede9fe;
+  --pri-pink: #f472b6;   --pri-pink-bg: #fdf2f8;   --pri-pink-border: #fce7f3;
+  --pri-teal: #2dd4bf;   --pri-teal-bg: #f0fdfa;   --pri-teal-border: #ccfbf1;
+  --pri-cyan: #22d3ee;   --pri-cyan-bg: #ecfeff;   --pri-cyan-border: #cffafe;
+  --pri-rose: #fb7185;   --pri-rose-bg: #fff1f2;   --pri-rose-border: #ffe4e6;
+  --pri-slate: #94a3b8;
+  --pri-brown: #b45309;
+
+  /* ── Typography ───────────────────────────────────────────── */
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-logo: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --weight-logo: 800;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --text-2xs: 10px;  /* date chips, tiny meta */
+  --text-xs2: 11px;  /* counts, captions */
+  --tracking-tight: -0.02em;
+
+  /* ── Layout / control metrics ─────────────────────────────── */
+  --container-max: 72rem;
+  --header-height: 56px;
+  --control-height: 36px;
+  --control-height-lg: 48px;
+
+  /* ── Radii beyond the shadcn base (--radius stays in index.css) ── */
+  --radius-xl: 12px;  /* task cards, panels */
+  --radius-2xl: 16px; /* auth inputs, info blocks */
+  --radius-3xl: 28px; /* hero / auth card */
+
+  /* ── Shadows — whisper-soft ───────────────────────────────── */
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --shadow-pop: 0 8px 28px rgba(15, 23, 42, 0.12);
+  --shadow-hero: 0 24px 80px rgba(15, 23, 42, 0.08);
+
+  /* ── Motion — quick and gentle, no bounce ─────────────────── */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-fast: 100ms;
+  --duration-base: 200ms;
+}
+
+/* ── Dark scope (matches the app's established dark hex) ─────── */
+.dark {
+  --surface-card: #111111;
+  --surface-card-glass: #000000; /* dark header is opaque black */
+  --surface-muted: #161616;
+  --border-hairline: #303030;
+  --border-strong: #343434;
+
+  --text-body: #ededed;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --text-faint: #475569;
+
+  --primary-hover: var(--slate-200); /* primary inverts to light in dark */
+  --destructive-bg: #2a1116;
+  --accent-recurring: #c4b5fd;
+  --accent-recurring-bg: #201735;
+}

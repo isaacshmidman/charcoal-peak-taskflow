@@ -1,3 +1,5 @@
+const defaultTheme = require("tailwindcss/defaultTheme");
+
 /** @type {import('tailwindcss').Config} */
 module.exports = {
     darkMode: ["class"],
@@ -8,12 +10,35 @@ module.exports = {
       screens: {
         'xs': '420px',
       },
+      fontFamily: {
+        // Brand typeface (self-hosted; @font-face in src/styles/zephyrly.css).
+        // Preflight applies fontFamily.sans to <html>, so this restyles the app.
+        sans: ['"Plus Jakarta Sans"', ...defaultTheme.fontFamily.sans],
+      },
+      fontSize: {
+        // Zephyrly micro sizes — named forms of the text-[10px]/text-[11px]
+        // already used for date chips and counts.
+        '2xs': ['10px', { lineHeight: '1.25' }],
+        'xs2': ['11px', { lineHeight: '1.3' }],
+      },
+      boxShadow: {
+        pop: 'var(--shadow-pop)',   // popovers, menus
+        hero: 'var(--shadow-hero)', // auth card
+      },
   		borderRadius: {
   			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',
   			sm: 'calc(var(--radius) - 4px)'
   		},
   		colors: {
+  			// Zephyrly DS surfaces/borders — var()-backed so .dark swaps them.
+  			// For NEW work; existing dark:bg-[#111111]-style literals migrate
+  			// gradually (the values are identical).
+  			'surface-card': 'var(--surface-card)',
+  			'surface-glass': 'var(--surface-card-glass)',
+  			'surface-muted': 'var(--surface-muted)',
+  			'border-strong': 'var(--border-strong)',
+  			'border-hairline': 'var(--border-hairline)',
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
   			card: {

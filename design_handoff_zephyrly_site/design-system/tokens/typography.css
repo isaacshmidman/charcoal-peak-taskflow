@@ -1,0 +1,41 @@
+/* ─────────────────────────────────────────────────────────────────
+   Zephyrly — Typography
+   Brand typeface: Plus Jakarta Sans (self-hosted, see fonts.css). A
+   humanist geometric sans — airy and friendly, but crisp at the
+   product's small, dense UI sizes. The system stack trails it as a
+   fallback. The wordmark/app-icon "Z" uses the same family at 800
+   (ExtraBold) for a strong, cohesive heavy form.
+   Scale is compact and small; UI text rarely exceeds 14px.
+   ───────────────────────────────────────────────────────────────── */
+:root {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  /* Logo wordmark — the heavy "Z", set in the brand family at 800. */
+  --font-logo: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --weight-logo: 800;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Type scale (px) — small & dense */
+  --text-2xs: 10px;   /* date chips, tiny meta */
+  --text-xs2: 11px;   /* counts, captions */
+  --text-xs:  12px;   /* secondary / labels */
+  --text-sm:  14px;   /* body & most UI text */
+  --text-base: 16px;  /* mobile inputs (anti-zoom), large headings */
+  --text-lg:  18px;
+  --text-xl:  20px;
+  --text-2xl: 24px;   /* login headline / page hero */
+
+  /* Weights */
+  --weight-normal: 400;
+  --weight-medium: 500;   /* default for interactive text */
+  --weight-semibold: 600; /* headings, emphasis */
+
+  /* Line height */
+  --leading-tight: 1.25;
+  --leading-snug: 1.375;
+  --leading-normal: 1.5;
+
+  /* Tracking */
+  --tracking-tight: -0.02em; /* headings */
+  --tracking-normal: 0;
+}

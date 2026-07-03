@@ -10,8 +10,10 @@
     --card-foreground: 0 0% 3.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
+    /* slate-900 — the DS primary (see design_handoff_zephyrly_site).
+       Was neutral 0 0% 9%; slate reads slightly cooler. */
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 0 0% 100%;
     --secondary: 0 0% 96.1%;
     --secondary-foreground: 0 0% 9%;
     --muted: 0 0% 96.1%;
@@ -22,7 +24,7 @@
     --destructive-foreground: 0 0% 98%;
     --border: 0 0% 89.8%;
     --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
+    --ring: 222.2 47.4% 11.2%; /* slate-900, matches --primary */
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
@@ -46,8 +48,9 @@
     --card-foreground: 0 0% 98%;
     --popover: 0 0% 5%;
     --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
+    /* Primary inverts to light in dark mode — slate-100 on slate-900. */
+    --primary: 210 40% 96.1%;
+    --primary-foreground: 222.2 47.4% 11.2%;
     --secondary: 0 0% 9%;
     --secondary-foreground: 0 0% 98%;
     --muted: 0 0% 9%;
@@ -79,16 +82,15 @@
 
 @layer base {
   html {
-    background: radial-gradient(circle at 100% 100%, #f5f5a0 0%, #fdfdcf 12%, #ffffff 40%);
+    background: var(--brand-bg-light);
     color-scheme: light;
   }
 
   html.dark {
-    /* Opaque hex stops (not translucent-yellow-over-black) with a long,
-       gradual falloff — translucent stops composite into a tiny near-black
-       range and band hard ("blocky"). These warm-dark → black stops blend
-       smoothly, matching the light gradient's feel. */
-    background: radial-gradient(circle at 100% 100%, #343422 0%, #1d1d14 16%, #0b0b08 38%, #000000 66%);
+    /* Opaque hex stops (not translucent-yellow-over-black) — translucent
+       stops composite into a tiny near-black range and band hard. The
+       stops live in --brand-bg-dark (src/styles/zephyrly.css). */
+    background: var(--brand-bg-dark);
     color-scheme: dark;
   }
 
@@ -98,13 +100,14 @@
 
   body {
     @apply text-foreground;
-    /* Radial yellow glow emanating from the bottom-right corner.
-       Warm at the corner, fading to pure white by roughly one-third
-       of the viewport's longest axis — circular, so it also fades
-       out vertically at that same radius. */
-    background: radial-gradient(circle at 100% 100%, #f5f5a0 0%, #fdfdcf 12%, #ffffff 40%);
+    /* THE brand element: radial yellow glow emanating from the
+       bottom-right corner, warm at the corner, fading out by roughly
+       one-third of the viewport's longest axis. Fixed so it stays
+       anchored to the viewport corner while content scrolls. */
+    background: var(--brand-bg-light);
     background-attachment: fixed;
     background-repeat: no-repeat;
+    font-family: var(--font-sans);
     min-height: 100vh;
   }
 
@@ -112,7 +115,7 @@
      reads black instead of blue while preserving Zephyrly's warm corner.
      Opaque stops (see html.dark above) to avoid banding. */
   html.dark body {
-    background: radial-gradient(circle at 100% 100%, #343422 0%, #1d1d14 16%, #0b0b08 38%, #000000 66%);
+    background: var(--brand-bg-dark);
     background-attachment: fixed;
     background-repeat: no-repeat;
     color: hsl(0 0% 92%);
