@@ -10,7 +10,9 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground shadow hover:bg-primary/90",
+          // Contract: slate-900 fill, hover slate-800; inverts in dark.
+          // --primary-hover swaps per theme (src/styles/zephyrly.css).
+          "bg-primary text-primary-foreground shadow hover:bg-[var(--primary-hover)]",
         destructive:
           "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
         outline:
