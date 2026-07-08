@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
-import { CheckSquare } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns/format";
 import { cn } from "@/lib/utils";
 import { colorBg, isDarkColor } from "@/lib/colors";
@@ -33,7 +33,7 @@ export default function CompactTaskCard({ task, priorities, onToggleDone, onEdit
   const isDarkCard = isDarkColor(priority?.color);
   const isRecurring = task.task_type === "recurring" && task.recurrence && task.recurrence !== "none";
 
-  const cardStyle = priority ? (colorBg[priority.color] || colorBg.slate) : "bg-white dark:bg-[#111111] border-slate-100 dark:border-[#303030]";
+  const cardStyle = priority ? (colorBg[priority.color] || colorBg.slate) : "bg-surface-card border-border-hairline";
 
   return (
     <motion.div
@@ -47,16 +47,13 @@ export default function CompactTaskCard({ task, priorities, onToggleDone, onEdit
         cardStyle,
         isDone && "opacity-50"
       )}>
-      {/* Checkbox */}
-      <button
-        onClick={(e) => { e.stopPropagation(); if (task.status !== "done") setOptimisticDone(true); onToggleDone(task); }}
-        className={cn(
-          "shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-all",
-          isDone ? "bg-slate-900 border-slate-900 text-white dark:bg-slate-100 dark:border-slate-100 dark:text-slate-900" : "border-slate-300 dark:border-slate-600 hover:border-slate-500 bg-white dark:bg-[#0c0c0c]"
-        )}
-      >
-        {isDone && <CheckSquare className="w-2.5 h-2.5" />}
-      </button>
+      {/* Checkbox — the DS ink-fill primitive at its dense-row size */}
+      <Checkbox
+        size="sm"
+        checked={isDone}
+        onClick={(e) => e.stopPropagation()}
+        onCheckedChange={() => { if (task.status !== "done") setOptimisticDone(true); onToggleDone(task); }}
+      />
 
       {/* Title */}
       <span

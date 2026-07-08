@@ -9,8 +9,9 @@ import React, { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar, CheckSquare, Paperclip, Trash2 } from "lucide-react";
+import { Calendar, Paperclip, Trash2 } from "lucide-react";
 import { format } from "date-fns/format";
 import { cn } from "@/lib/utils";
 import { colorBg, isDarkColor } from "@/lib/colors";
@@ -173,7 +174,7 @@ export default function TaskCard({
 
   const recurrenceLabel = buildRecurrenceShortLabel(task);
 
-  const cardBg = priority ? colorBg[priority.color] || colorBg.slate : "bg-white dark:bg-[#111111] border-slate-100 dark:border-[#303030]";
+  const cardBg = priority ? colorBg[priority.color] || colorBg.slate : "bg-surface-card border-border-hairline";
   const isDarkCard = isDarkColor(priority?.color);
 
   // Overdue: has a due_date, not done, and date is in the past (before today)
@@ -236,19 +237,18 @@ export default function TaskCard({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 px-3 py-2.5">
-            {/* Completion button */}
-            <button
+            {/* Completion button — the origin of the DS ink-fill Checkbox,
+                now rendered through it. onClick's stopPropagation +
+                preventDefault run BEFORE the toggle (swipe-row hygiene,
+                composed by the primitive, never suppresses the check). */}
+            <Checkbox
+              size="task"
+              checked={isDone && !optimisticUndone}
               onPointerDown={(e) => { e.stopPropagation(); }}
-              onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleToggle(); }}
+              onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
+              onCheckedChange={handleToggle}
               data-testid={`task-toggle-${task.id}`}
-              className={cn(
-                "shrink-0 w-7 h-7 rounded-md border-2 flex items-center justify-center transition-all touch-manipulation",
-                isDone && !optimisticUndone ? "bg-slate-900 border-slate-900 text-white dark:bg-slate-100 dark:border-slate-100 dark:text-slate-900" :
-                "border-slate-300 dark:border-slate-600 hover:border-slate-500 bg-white dark:bg-[#0c0c0c]"
-              )}
-            >
-              {isDone && !optimisticUndone && <CheckSquare className="w-3.5 h-3.5" />}
-            </button>
+            />
 
             {/* Title — clickable to edit */}
             <div

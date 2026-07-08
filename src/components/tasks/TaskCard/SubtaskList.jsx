@@ -22,12 +22,12 @@ import { format } from "date-fns/format";
 import {
   ArrowDown,
   ArrowUp,
-  CheckSquare,
   ChevronDown,
   ChevronRight,
   Plus,
   X,
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 
 export default function SubtaskList({
@@ -155,15 +155,11 @@ export default function SubtaskList({
                       </div>
                     )}
                     {subOverdue && <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onToggleDone(sub); }}
-                      className={cn(
-                        "shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-all touch-manipulation",
-                        sub.status === "done" ? "bg-slate-900 border-slate-900 text-white dark:bg-slate-100 dark:border-slate-100 dark:text-slate-900" : "border-slate-300 dark:border-slate-600 hover:border-slate-500 bg-white dark:bg-[#0c0c0c]"
-                      )}
-                    >
-                      {sub.status === "done" && <CheckSquare className="w-2.5 h-2.5" />}
-                    </button>
+                    <Checkbox
+                      checked={sub.status === "done"}
+                      onClick={(e) => e.stopPropagation()}
+                      onCheckedChange={() => onToggleDone(sub)}
+                    />
                     <span className={cn("text-xs font-medium text-slate-900 dark:text-slate-100 flex-1 truncate", sub.status === "done" && "line-through text-slate-400 dark:text-slate-500")}>
                       {sub.title}
                     </span>
