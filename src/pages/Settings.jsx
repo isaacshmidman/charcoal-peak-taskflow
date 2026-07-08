@@ -43,6 +43,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -109,7 +110,7 @@ function SettingsCard({ icon: Icon, label, subtitle, onClick, iconClassName }) {
     <button
       type="button"
       onClick={onClick}
-      className="w-full flex items-center gap-3 bg-white dark:bg-[#111111] border border-slate-100 dark:border-[#303030] rounded-xl px-4 py-3.5 hover:border-slate-200 dark:hover:border-[#454545] transition-colors text-left"
+      className="w-full flex items-center gap-3 bg-surface-card border border-border-hairline rounded-xl px-4 py-3.5 hover:border-slate-200 dark:hover:border-[#454545] transition-colors text-left"
     >
       <Icon className={cn("w-5 h-5 shrink-0", iconClassName || "text-slate-500 dark:text-slate-400")} />
       <div className="flex-1 min-w-0">
@@ -280,10 +281,10 @@ export default function Settings() {
       </div>
 
       {/* Quick toggles — two rows in one rounded card with a divider */}
-      <div className="rounded-xl border border-slate-100 dark:border-[#303030] bg-white dark:bg-[#111111] divide-y divide-slate-100 dark:divide-[#303030]">
+      <Card className="divide-y divide-slate-100 dark:divide-[#303030]">
         <QuickThemeToggle />
         <QuickNotificationsToggle />
-      </div>
+      </Card>
 
       {/* Category cards */}
       <div className="space-y-2">

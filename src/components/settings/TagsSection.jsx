@@ -12,6 +12,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Tag, X } from "lucide-react";
 import { apiClient } from "@/api/apiClient";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
@@ -92,7 +93,7 @@ export default function TagsSection() {
     <section>
       <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Tags</h2>
 
-      <div className="border border-slate-100 dark:border-[#303030] rounded-xl overflow-hidden bg-white dark:bg-[#111111]">
+      <Card className="overflow-hidden">
         {savedTags.slice(-20).length === 0 ?
           <p className="text-xs text-slate-400 px-4 py-3">No saved tags yet</p> :
 
@@ -107,7 +108,7 @@ export default function TagsSection() {
             </div>
           )
         }
-      </div>
+      </Card>
 
       <div className="flex gap-2 mt-3">
         <Input

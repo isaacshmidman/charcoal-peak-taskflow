@@ -22,6 +22,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, BellOff, ChevronRight, Loader2, ShieldOff, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import TimeInput from "@/components/tasks/TaskForm/TimeInput.jsx";
@@ -56,14 +57,9 @@ function presetForOffset(offset) {
 
 function SettingBox({ children, className = "" }) {
   return (
-    <div
-      className={cn(
-        "rounded-xl border border-slate-100 dark:border-[#303030] bg-white dark:bg-[#111111] px-4 py-3",
-        className
-      )}
-    >
+    <Card className={cn("px-4 py-3", className)}>
       {children}
-    </div>
+    </Card>
   );
 }
 

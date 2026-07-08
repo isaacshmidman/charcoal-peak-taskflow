@@ -30,7 +30,8 @@ function ConnectedRow({
   offline,
 }) {
   return (
-    <div className="rounded-lg border border-slate-100 dark:border-[#303030] bg-white dark:bg-[#111111] p-3 space-y-1.5">
+    // rounded-lg: 8px — the DS "small card" radius, not the 12px panel Card.
+    <div className="rounded-lg border border-border-hairline bg-surface-card p-3 space-y-1.5">
       {/* Header row: provider title + Default badge on the left, disconnect X
           on the far right. The title flex-shrinks via `truncate` so a long
           provider/account name ellipses BEFORE pushing the badge into the X. */}
@@ -115,7 +116,7 @@ function ConnectedRow({
 
 function ConnectCard({ provider, onConnect, connecting, disabled }) {
   return (
-    <div className="rounded-lg border border-slate-100 dark:border-[#303030] bg-white dark:bg-[#111111] p-3 flex items-center justify-between">
+    <div className="rounded-lg border border-border-hairline bg-surface-card p-3 flex items-center justify-between">
       <div>
         <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{provider.label}</p>
         <p className="text-xs text-slate-400 dark:text-slate-500">

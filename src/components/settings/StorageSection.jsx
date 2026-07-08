@@ -70,7 +70,7 @@ export default function StorageSection() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-xl border border-slate-100 dark:border-[#303030] bg-white dark:bg-[#111111] px-4 py-4 space-y-3">
+      <section className="rounded-xl border border-border-hairline bg-surface-card px-4 py-4 space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
@@ -109,7 +109,7 @@ export default function StorageSection() {
             No attachments yet. Drop a file into any task to see it here.
           </p>
         ) : (
-          <ul className="rounded-xl border border-slate-100 dark:border-[#303030] bg-white dark:bg-[#111111] divide-y divide-slate-100 dark:divide-[#303030] overflow-hidden">
+          <ul className="rounded-xl border border-border-hairline bg-surface-card divide-y divide-slate-100 dark:divide-[#303030] overflow-hidden">
             {biggestTasks.map((task) => (
               <li
                 key={task.task_id}

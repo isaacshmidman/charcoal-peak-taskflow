@@ -80,7 +80,7 @@ export default function CalendarOrderSection() {
           return (
             <div
               key={c.key}
-              className="flex items-center gap-3 bg-white dark:bg-[#111111] border border-slate-100 dark:border-[#303030] rounded-xl px-3 py-2.5 hover:border-slate-200 dark:hover:border-[#454545] transition-colors"
+              className="flex items-center gap-3 bg-surface-card border border-border-hairline rounded-xl px-3 py-2.5 hover:border-slate-200 dark:hover:border-[#454545] transition-colors"
             >
               <div className="flex flex-col gap-0.5">
                 <button

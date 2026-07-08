@@ -96,7 +96,7 @@ export default function Layout() {
                     <WifiOff className="w-4 h-4" />
                   </button>
                 </PopoverTrigger>
-                <PopoverContent align="end" className="w-72 rounded-lg border-slate-200 dark:border-[#303030] bg-white dark:bg-[#111111] p-3">
+                <PopoverContent align="end" className="w-72 rounded-lg border-slate-200 dark:border-[#303030] bg-surface-card p-3">
                   <div className="space-y-2">
                     <div>
                       <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Offline mode</p>
