@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
 import { ArrowLeft, Trash2, Search, RotateCcw, CheckSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { AnimatedSearchInput } from "@/components/ui/animated-search-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AnimatePresence, motion } from "framer-motion";
@@ -274,7 +275,7 @@ export default function RecentlyDeleted({ onBack } = {}) {
       </div>
 
       {/* Retention setting */}
-      <div className="flex items-center gap-3 bg-white dark:bg-[#111111] border border-slate-100 dark:border-[#303030] rounded-xl px-4 py-3">
+      <Card className="flex items-center gap-3 px-4 py-3">
         <span className="text-xs font-medium text-slate-500 dark:text-slate-400 flex-1">Keep deleted tasks for</span>
         <Select value={retentionDays} onValueChange={handleRetentionChange}>
           <SelectTrigger className="w-32 h-8 text-xs">
@@ -286,7 +287,7 @@ export default function RecentlyDeleted({ onBack } = {}) {
             ))}
           </SelectContent>
         </Select>
-      </div>
+      </Card>
 
       {displayedTasks.length === 0 ? (
         <div className="py-14 text-center">

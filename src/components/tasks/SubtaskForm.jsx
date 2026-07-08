@@ -189,7 +189,7 @@ function TimeInput({ value, onChange }) {
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-3 py-1.5 border border-slate-200 dark:border-[#343434] rounded-lg bg-white dark:bg-[#111111] text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#222222] transition-colors"
+        className="w-full flex items-center justify-between px-3 py-1.5 border border-border-strong rounded-lg bg-surface-card text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#222222] transition-colors"
       >
         {value}
         <svg className={cn("w-3.5 h-3.5 text-slate-400 dark:text-slate-500 transition-transform", open && "rotate-180")} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -197,7 +197,7 @@ function TimeInput({ value, onChange }) {
         </svg>
       </button>
       {open && (
-        <div className="absolute z-50 mt-1 left-0 border border-slate-200 dark:border-[#343434] rounded-lg overflow-hidden bg-white dark:bg-[#111111] shadow-md w-full">
+        <div className="absolute z-50 mt-1 left-0 border border-border-strong rounded-lg overflow-hidden bg-surface-card shadow-md w-full">
           <div className="max-h-48 overflow-y-auto">
             {TIME_SLOTS.map((slot) => {
               const isSelected = slot === value;

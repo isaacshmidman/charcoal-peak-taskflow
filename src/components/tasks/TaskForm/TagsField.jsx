@@ -45,7 +45,7 @@ export default function TagsField({ form, setForm, savedTags }) {
             className=""
           />
           {tagInputFocused && filteredSuggestions.length > 0 && (
-            <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white dark:bg-[#111111] border border-slate-200 dark:border-[#343434] rounded-lg shadow-lg overflow-hidden max-h-40 overflow-y-auto">
+            <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-surface-card border border-border-strong rounded-lg shadow-lg overflow-hidden max-h-40 overflow-y-auto">
               {filteredSuggestions.map(tag => (
                 <button
                   key={tag}

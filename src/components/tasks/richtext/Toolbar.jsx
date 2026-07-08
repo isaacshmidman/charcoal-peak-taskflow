@@ -123,7 +123,7 @@ function Picker({ icon: Icon, title, open, setOpen, onOpenChange, children }) {
         <ChevronDown className="w-3 h-3" />
       </button>
       {open && (
-        <div className="absolute bottom-full left-0 mb-1 z-50 rounded-lg border border-slate-200 dark:border-[#343434] bg-white dark:bg-[#111111] shadow-lg p-1.5">
+        <div className="absolute bottom-full left-0 mb-1 z-50 rounded-lg border border-border-strong bg-surface-card shadow-lg p-1.5">
           {children}
         </div>
       )}

@@ -131,7 +131,7 @@ export default function MultiSortPanel({ sorts, onSortsChange, page = "default" 
                 .filter(Boolean)
             );
             return (
-              <div key={index} className="rounded-lg border border-slate-100 dark:border-[#303030] bg-white dark:bg-[#111111]">
+              <div key={index} className="rounded-lg border border-border-hairline bg-surface-card">
                 <div className="flex items-center gap-1 px-2 py-1.5">
                   <button
                     type="button"
@@ -194,7 +194,7 @@ export default function MultiSortPanel({ sorts, onSortsChange, page = "default" 
             <button
               type="button"
               onClick={addSort}
-              className="w-full rounded-lg border border-slate-100 dark:border-[#303030] bg-white dark:bg-[#111111] px-2 py-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-200 dark:hover:border-[#454545] flex items-center justify-center gap-2 transition-colors"
+              className="w-full rounded-lg border border-border-hairline bg-surface-card px-2 py-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-200 dark:hover:border-[#454545] flex items-center justify-center gap-2 transition-colors"
             >
               <Plus className="w-4 h-4" /> Add sort
             </button>

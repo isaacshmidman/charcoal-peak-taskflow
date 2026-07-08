@@ -6,6 +6,7 @@ import { useOfflineMutation } from "@/hooks/useOfflineMutation";
 import { formatDeleteLabel, useDeleteWithUndo } from "@/hooks/useDeleteWithUndo";
 import { showDeleteToast } from "@/components/tasks/DeleteToast";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { AnimatedSearchInput } from "@/components/ui/animated-search-input";
 import { Plus, Search } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
@@ -224,7 +225,7 @@ export default function Active() {
       {/* Active tasks */}
       {isLoading ? (
         <div className="space-y-2">
-          {[1,2,3].map(i => <div key={i} className="bg-white dark:bg-[#111111] rounded-xl border border-slate-100 dark:border-[#303030] h-12 animate-pulse" />)}
+          {[1,2,3].map(i => <Card key={i} className="h-12 animate-pulse" />)}
         </div>
       ) : activeTasks.length === 0 ? (
         <div className="py-14 text-center">

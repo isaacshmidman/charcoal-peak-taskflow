@@ -65,7 +65,7 @@ export default function TimeInput({ value, onChange, className, triggerClassName
         type="button"
         onClick={() => setOpen(!open)}
         className={cn(
-          "w-full flex items-center justify-between px-3 py-1.5 border border-slate-200 dark:border-[#343434] rounded-lg bg-white dark:bg-[#111111] text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#222222] transition-colors",
+          "w-full flex items-center justify-between px-3 py-1.5 border border-border-strong rounded-lg bg-surface-card text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#222222] transition-colors",
           triggerClassName
         )}
       >
@@ -74,7 +74,7 @@ export default function TimeInput({ value, onChange, className, triggerClassName
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1 left-0 right-0 border border-slate-200 dark:border-[#343434] rounded-lg overflow-hidden bg-white dark:bg-[#111111] shadow-md">
+        <div className="absolute z-50 mt-1 left-0 right-0 border border-border-strong rounded-lg overflow-hidden bg-surface-card shadow-md">
           <div ref={listRef} className="max-h-48 overflow-y-auto">
             {TIME_SLOTS.map((slot) => {
               const isSelected = slot === value;
