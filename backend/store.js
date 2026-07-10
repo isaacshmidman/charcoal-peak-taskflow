@@ -141,6 +141,37 @@ const ENTITY_DEFINITIONS = {
     },
     mutableFields: ["name", "is_sample"],
   },
+  Note: {
+    table: "notes",
+    idPrefix: "note",
+    jsonColumns: [],
+    booleanColumns: ["pinned", "is_sample"],
+    fieldMap: { order: "sort_order" },
+    defaults: {
+      title: "",
+      content_json: "",
+      content_text: "",
+      pinned: false,
+      order: null,
+      is_sample: false,
+    },
+    mutableFields: ["title", "content_json", "content_text", "pinned", "order", "is_sample"],
+  },
+  SavedView: {
+    table: "saved_views",
+    idPrefix: "view",
+    jsonColumns: ["filters", "sorts"],
+    booleanColumns: ["is_sample"],
+    fieldMap: { order: "sort_order", filters: "filters_json", sorts: "sorts_json" },
+    defaults: {
+      name: "",
+      filters: {},
+      sorts: [],
+      order: null,
+      is_sample: false,
+    },
+    mutableFields: ["name", "filters", "sorts", "order", "is_sample"],
+  },
 };
 
 const DEFAULT_PRIORITIES = [
@@ -395,6 +426,15 @@ function validateEntityInput(entityName, input, { mode = "create" } = {}) {
   if (entityName === "SavedTag") {
     if (mode === "create" || "name" in input) {
       assertNonEmptyString(input.name, "Tag name is required.");
+    }
+  }
+
+  // Note: no required fields — untitled notes are allowed (client shows
+  // "Untitled"); content may be empty while a draft is being typed.
+
+  if (entityName === "SavedView") {
+    if (mode === "create" || "name" in input) {
+      assertNonEmptyString(input.name, "View name is required.");
     }
   }
 }

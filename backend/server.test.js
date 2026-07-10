@@ -337,3 +337,84 @@ describe("taskflow backend contract", () => {
     expect(deleteTaskResult.body.success).toBe(true);
   });
 });
+
+describe("registry entities: Note and SavedView", () => {
+  it("supports full Note CRUD with per-user isolation", async () => {
+    const isaacToken = await login("isaac@example.com");
+    const auth = { Authorization: `Bearer ${isaacToken}` };
+
+    // Untitled notes are allowed (client renders "Untitled").
+    const created = await invoke("/api/apps/test-app/entities/Note", {
+      method: "POST",
+      headers: { ...auth, "Content-Type": "application/json" },
+      body: { title: "", content_json: "", content_text: "", pinned: false },
+    });
+    expect(created.statusCode).toBe(201);
+    expect(created.body.id).toMatch(/^note_/);
+    expect(created.body.pinned).toBe(false);
+
+    const updated = await invoke(`/api/apps/test-app/entities/Note/${created.body.id}`, {
+      method: "PUT",
+      headers: { ...auth, "Content-Type": "application/json" },
+      body: { title: "Meeting notes", content_text: "agenda", pinned: true },
+    });
+    expect(updated.statusCode).toBe(200);
+    expect(updated.body.title).toBe("Meeting notes");
+    expect(updated.body.pinned).toBe(true);
+
+    const listed = await invoke("/api/apps/test-app/entities/Note?sort=-updated_date", {
+      headers: auth,
+    });
+    expect(listed.statusCode).toBe(200);
+    expect(listed.body.some((n) => n.id === created.body.id)).toBe(true);
+
+    // Another user must not see Isaac's notes.
+    const otherToken = await login("someone-else@example.com");
+    const otherList = await invoke("/api/apps/test-app/entities/Note", {
+      headers: { Authorization: `Bearer ${otherToken}` },
+    });
+    expect(otherList.statusCode).toBe(200);
+    expect(otherList.body.some((n) => n.id === created.body.id)).toBe(false);
+
+    const deleted = await invoke(`/api/apps/test-app/entities/Note/${created.body.id}`, {
+      method: "DELETE",
+      headers: auth,
+    });
+    expect(deleted.statusCode).toBe(200);
+  });
+
+  it("supports SavedView CRUD, requires a name, round-trips JSON filters", async () => {
+    const token = await login("isaac@example.com");
+    const auth = { Authorization: `Bearer ${token}` };
+
+    const rejected = await invoke("/api/apps/test-app/entities/SavedView", {
+      method: "POST",
+      headers: { ...auth, "Content-Type": "application/json" },
+      body: { name: "", filters: {} },
+    });
+    expect(rejected.statusCode).toBe(400);
+
+    const filters = { tags: ["work"], priority_ids: ["priority_1"], due: "week", status: "active" };
+    const created = await invoke("/api/apps/test-app/entities/SavedView", {
+      method: "POST",
+      headers: { ...auth, "Content-Type": "application/json" },
+      body: { name: "Work this week", filters, sorts: ["priority_asc"] },
+    });
+    expect(created.statusCode).toBe(201);
+    expect(created.body.id).toMatch(/^view_/);
+    expect(created.body.filters).toEqual(filters);
+    expect(created.body.sorts).toEqual(["priority_asc"]);
+
+    const fetched = await invoke(`/api/apps/test-app/entities/SavedView/${created.body.id}`, {
+      headers: auth,
+    });
+    expect(fetched.statusCode).toBe(200);
+    expect(fetched.body.filters).toEqual(filters);
+
+    const deleted = await invoke(`/api/apps/test-app/entities/SavedView/${created.body.id}`, {
+      method: "DELETE",
+      headers: auth,
+    });
+    expect(deleted.statusCode).toBe(200);
+  });
+});

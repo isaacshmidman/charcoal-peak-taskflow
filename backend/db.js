@@ -197,6 +197,35 @@ export function createDatabase(config = backendConfig) {
       is_sample INTEGER NOT NULL DEFAULT 0
     );
 
+    CREATE TABLE IF NOT EXISTS notes (
+      id TEXT PRIMARY KEY,
+      app_id TEXT NOT NULL,
+      title TEXT NOT NULL DEFAULT '',
+      content_json TEXT NOT NULL DEFAULT '',
+      content_text TEXT NOT NULL DEFAULT '',
+      pinned INTEGER NOT NULL DEFAULT 0,
+      sort_order INTEGER,
+      created_date TEXT NOT NULL,
+      updated_date TEXT NOT NULL,
+      created_by_id TEXT,
+      created_by TEXT,
+      is_sample INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS saved_views (
+      id TEXT PRIMARY KEY,
+      app_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      filters_json TEXT NOT NULL DEFAULT '{}',
+      sorts_json TEXT NOT NULL DEFAULT '[]',
+      sort_order INTEGER,
+      created_date TEXT NOT NULL,
+      updated_date TEXT NOT NULL,
+      created_by_id TEXT,
+      created_by TEXT,
+      is_sample INTEGER NOT NULL DEFAULT 0
+    );
+
     CREATE TABLE IF NOT EXISTS tasks (
       id TEXT PRIMARY KEY,
       app_id TEXT NOT NULL,

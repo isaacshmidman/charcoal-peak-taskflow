@@ -13,8 +13,12 @@ import {
   updateDeletedTasksCache,
 } from '@/lib/offlineCache';
 import { apiClient } from '@/api/apiClient';
+import { registeredCacheKeys, replayRegisteredEntities } from '@/lib/offlineEntityRegistry';
 
-const CACHE_KEYS = ['tasks', 'priorities', 'savedTags', 'deletedTasks', 'integrations', 'notificationSettings'];
+const LEGACY_CACHE_KEYS = ['tasks', 'priorities', 'savedTags', 'deletedTasks', 'integrations', 'notificationSettings'];
+// Registry entities (Note, SavedView, …) join the persistence subscription
+// dynamically — no per-entity edits here when new ones are registered.
+const CACHE_KEYS = [...LEGACY_CACHE_KEYS, ...registeredCacheKeys()];
 
 /**
  * @typedef {{
@@ -67,6 +71,7 @@ export function useOfflineData() {
       try {
         // --- Task mutations ---
         const pending = getPendingMutations();
+        /** @type {Record<string, string>} */
         const idRemap = {};
         const remainingTaskMutations = [];
         for (const m of pending) {
@@ -198,6 +203,12 @@ export function useOfflineData() {
           setPendingDeletedTaskMutations(remainingDeletedTaskMutations);
           queryClient.invalidateQueries({ queryKey: ['deletedTasks'] });
         }
+
+        // --- Registry entities (Note, SavedView, …) ---
+        // Runs after the Task loop so idRemap can resolve cross-entity
+        // references to tasks created offline. Must stay inside this
+        // handler's re-entrancy guards — the registry has no listeners.
+        await replayRegisteredEntities(queryClient, idRemap);
       } finally {
         replayInFlightRef.current = false;
         if (replayRequestedRef.current) {

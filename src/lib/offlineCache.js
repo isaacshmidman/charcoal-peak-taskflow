@@ -34,6 +34,20 @@ const SCOPED_KEYS = new Set([
   'pendingDeletedTaskMutations',
 ]);
 
+/**
+ * Register additional cache keys at runtime (used by offlineEntityRegistry
+ * for new entities like Note/SavedView). Keys registered here get the same
+ * per-user scope suffix as the built-ins. Must run before the first
+ * load/save of the key — the registry does this at module load.
+ * @param {Record<string, string>} map  e.g. { notes: "taskflow_offline_notes" }
+ */
+export function defineCacheKeys(map) {
+  for (const [key, storageKey] of Object.entries(map)) {
+    KEYS[key] = storageKey;
+    SCOPED_KEYS.add(key);
+  }
+}
+
 function getScopeSuffix() {
   const session = getStoredLocalSession();
   const appId = String(appConfig.appId || localStorage.getItem("taskflow_app_id") || "default_app").trim();

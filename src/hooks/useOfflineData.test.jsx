@@ -37,6 +37,8 @@ vi.mock("@/api/apiClient", () => ({
 
 vi.mock("@/lib/offlineCache", () => ({
   saveToCache: vi.fn(),
+  loadFromCache: vi.fn(() => null),
+  defineCacheKeys: vi.fn(), // consumed by offlineEntityRegistry at module load
   getPendingMutations: () => pendingMutations,
   setPendingMutations,
   getPendingPriorityMutations: () => [],
