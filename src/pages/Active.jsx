@@ -1,8 +1,10 @@
 // @ts-nocheck
 import { useEffect, useState, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { apiClient } from "@/api/apiClient";
 import { useQuery } from "@tanstack/react-query";
 import { useOfflineMutation } from "@/hooks/useOfflineMutation";
+import { useOfflineEntityMutation } from "@/hooks/useOfflineEntityMutation";
 import { formatDeleteLabel, useDeleteWithUndo } from "@/hooks/useDeleteWithUndo";
 import { showDeleteToast } from "@/components/tasks/DeleteToast";
 import { Button } from "@/components/ui/button";
@@ -15,6 +17,10 @@ import TaskCard from "@/components/tasks/TaskCard";
 import TaskForm from "@/components/tasks/TaskForm";
 import SubtaskForm from "@/components/tasks/SubtaskForm";
 import MultiSortPanel from "@/components/tasks/MultiSortPanel";
+import ViewPicker from "@/components/tasks/ViewPicker";
+import { Badge } from "@/components/ui/badge";
+import { X } from "lucide-react";
+import { taskMatchesView } from "@/lib/viewFilter";
 import RecurringDeleteDialog from "@/components/tasks/RecurringDeleteDialog";
 import { compareDueDateTime } from "@/lib/sort-helpers";
 import { excludeExternalEvents } from "@/lib/task-filters";
@@ -75,6 +81,20 @@ export default function Active() {
     queryKey: ["savedTags"],
     queryFn: () => apiClient.entities.SavedTag.list("name", 100),
   });
+
+  // Saved views (smart lists). The active view rides the URL (?view=id)
+  // so refresh and back-navigation keep it.
+  const { data: savedViews = [] } = useQuery({
+    queryKey: ["savedViews"],
+    queryFn: () => apiClient.entities.SavedView.list("order", 100),
+  });
+  const viewMutation = useOfflineEntityMutation("SavedView");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeViewId = searchParams.get("view");
+  const activeView = savedViews.find((v) => v.id === activeViewId) || null;
+  const selectView = (id) => {
+    setSearchParams(id ? { view: id } : {}, { replace: true });
+  };
 
   // Command palette task-open handoff. In place when already here; via
   // sessionStorage when the palette navigated from another page (the key
@@ -201,17 +221,21 @@ export default function Active() {
       // Drop tasks belonging to a calendar the user has hidden in
       // Settings → Calendar Order.
       if (hiddenCalendars.has(calendarKeyForTask(t))) return false;
+      // Active saved view constrains further (tags/priorities/due).
+      if (activeView && !taskMatchesView(t, activeView.filters)) return false;
       if (!search) return true;
       return t.title?.toLowerCase().includes(q) || t.tags?.some(tag => tag.toLowerCase().includes(q));
     });
+    // A view that captured sorts wins while it's active.
+    const effectiveSorts = activeView?.sorts?.length ? activeView.sorts : sorts;
     return filtered.sort((a, b) => {
-      for (const sortValue of sorts) {
+      for (const sortValue of effectiveSorts) {
         const result = compareFn(a, b, sortValue);
         if (result !== 0) return result;
       }
       return 0;
     });
-  }, [topLevelTasks, sorts, priorityOrderMap, search, hiddenCalendars, calendarIndexByKey]);
+  }, [topLevelTasks, sorts, priorityOrderMap, search, hiddenCalendars, calendarIndexByKey, activeView]);
 
   return (
     <div className="space-y-5">
@@ -238,6 +262,22 @@ export default function Active() {
           >
             <Search className="w-4 h-4" />
           </Button>
+          <ViewPicker
+            views={savedViews}
+            activeViewId={activeViewId}
+            onSelect={selectView}
+            onSave={async (view) => {
+              const created = await viewMutation.create({ ...view, order: savedViews.length });
+              if (created?.id) selectView(created.id);
+            }}
+            onDelete={(id) => {
+              if (id === activeViewId) selectView(null);
+              viewMutation.remove(id);
+            }}
+            savedTags={savedTags}
+            priorities={priorities}
+            currentSorts={sorts}
+          />
           <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} page="active" />
           <Button onClick={() => { setEditingTask(null); setAddSubtaskParent(null); setShowForm(true); }} className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200 h-9 gap-1.5">
             <Plus className="w-4 h-4" />
@@ -245,6 +285,20 @@ export default function Active() {
           </Button>
         </div>
       </div>
+
+      {activeView && (
+        <Badge variant="secondary" className="gap-1.5 pr-1.5 font-medium text-slate-600 dark:text-slate-300" data-testid="active-view-chip">
+          {activeView.name}
+          <button
+            type="button"
+            onClick={() => selectView(null)}
+            aria-label="Clear view"
+            className="rounded hover:text-slate-900 dark:hover:text-slate-100"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </Badge>
+      )}
 
       {showQuickAdd ? (
         <QuickAdd
