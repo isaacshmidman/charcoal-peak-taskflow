@@ -132,6 +132,12 @@ export function useGlobalShortcuts() {
         return;
       }
 
+      // ── review (Today handles) ──
+      if (key === "v" || key === "V") {
+        emitShortcut(SHORTCUT_EVENTS.review);
+        return;
+      }
+
       // ── plain z → toast undo ──
       if (key === "z" || key === "Z") {
         emitShortcut(SHORTCUT_EVENTS.undoDelete);

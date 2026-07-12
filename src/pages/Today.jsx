@@ -8,7 +8,8 @@ import { showDeleteToast } from "@/components/tasks/DeleteToast";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import QuickAdd from "@/components/tasks/QuickAdd";
-import { Plus, Search } from "lucide-react";
+import ReviewDialog from "@/components/ReviewDialog";
+import { Plus, Search, Sunrise } from "lucide-react";
 import { AnimatedSearchInput } from "@/components/ui/animated-search-input";
 import { AnimatePresence } from "framer-motion";
 import { addDays } from "date-fns/addDays";
@@ -37,6 +38,7 @@ export default function Today() {
   const [search, setSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [showReview, setShowReview] = useState(false);
 
   // Keyboard shortcuts (parsed centrally in useGlobalShortcuts).
   useShortcutEvent(SHORTCUT_EVENTS.newTask, () => {
@@ -44,6 +46,7 @@ export default function Today() {
   });
   useShortcutEvent(SHORTCUT_EVENTS.search, () => setShowSearch(true));
   useShortcutEvent(SHORTCUT_EVENTS.quickAdd, () => setShowQuickAdd(true));
+  useShortcutEvent(SHORTCUT_EVENTS.review, () => setShowReview(true));
   const [sorts, setSorts] = useState(() => {
     try {
       const saved = localStorage.getItem("sorts_today");
@@ -206,6 +209,16 @@ export default function Today() {
           <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{todayAndPast.length} task{todayAndPast.length !== 1 ? "s" : ""}</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
+            title="Review the day (v)"
+            data-testid="review-button"
+            onClick={() => setShowReview(true)}
+          >
+            <Sunrise className="w-4 h-4" />
+          </Button>
           <AnimatedSearchInput
             open={showSearch}
             value={search}
@@ -315,6 +328,17 @@ export default function Today() {
           setRecurringDeleteTask(null);
         }}
         onDeleteAll={() => { deleteWithUndo(recurringDeleteTask, {}); setRecurringDeleteTask(null); }}
+      />
+
+      <ReviewDialog
+        open={showReview}
+        onOpenChange={setShowReview}
+        tasks={tasks}
+        onMoveToToday={(ids) => {
+          const today = new Date();
+          const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+          ids.forEach((id) => updateTask(id, { due_date: todayStr }));
+        }}
       />
 
       <TaskForm

@@ -23,6 +23,7 @@ export const SHORTCUT_EVENTS = {
   newTask: "shortcut:new-task",
   quickAdd: "shortcut:quick-add",
   editTask: "shortcut:edit-task", // detail: { id } — palette → page TaskForm
+  review: "shortcut:review",
   search: "shortcut:search",
   undoDelete: "shortcut:undo-delete",
   calendarView: "shortcut:calendar-view",   // detail: "day"|"week"|"month"|"year"
