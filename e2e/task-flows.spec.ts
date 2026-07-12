@@ -372,6 +372,29 @@ test("offline task creation is replayed and survives a reload when connectivity 
   await context.close();
 });
 
+test("quick add parses natural language into a task with chips confirming the parse", async ({ page }) => {
+  const api = await installMockBackend(page, {
+    tasks: [],
+    priorities: [defaultPriority],
+  });
+
+  await page.goto("/Today");
+  await expect(page.getByText("Clear skies. Add something when you're ready.")).toBeVisible();
+
+  await page.getByTestId("quickadd-affordance").click();
+  // A time with no date implies today, so the task stays visible on /Today.
+  await page.getByTestId("quickadd-input").fill("buy milk 2pm #errands");
+
+  await expect(page.getByTestId("quickadd-chip-time")).toContainText("2:00PM");
+  await expect(page.getByTestId("quickadd-chip-tag")).toContainText("errands");
+
+  await page.getByTestId("quickadd-input").press("Enter");
+
+  await expect(taskCardByTitle(page, "buy milk")).toBeVisible();
+  const counters = await api.getCounters();
+  expect(counters.taskCreates).toBe(1);
+});
+
 test("email sign-in and settings logout return to the login screen", async ({ page }) => {
   const api = await installMockBackend(page, {
     tasks: [recurringTask()],

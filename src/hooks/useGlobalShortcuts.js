@@ -116,6 +116,12 @@ export function useGlobalShortcuts() {
         return;
       }
 
+      // ── quick add (natural-language input; Today/All Tasks handle) ──
+      if (key === "q" || key === "Q") {
+        emitShortcut(SHORTCUT_EVENTS.quickAdd);
+        return;
+      }
+
       // ── plain z → toast undo ──
       if (key === "z" || key === "Z") {
         emitShortcut(SHORTCUT_EVENTS.undoDelete);

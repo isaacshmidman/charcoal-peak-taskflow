@@ -21,6 +21,7 @@ import { DEFAULT_NAV_ORDER, sanitizeNavOrder } from "@/lib/navigation";
 /** Semantic events pages can subscribe to (via useShortcutEvent). */
 export const SHORTCUT_EVENTS = {
   newTask: "shortcut:new-task",
+  quickAdd: "shortcut:quick-add",
   search: "shortcut:search",
   undoDelete: "shortcut:undo-delete",
   calendarView: "shortcut:calendar-view",   // detail: "day"|"week"|"month"|"year"

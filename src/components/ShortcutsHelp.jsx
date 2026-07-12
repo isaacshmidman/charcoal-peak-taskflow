@@ -67,6 +67,7 @@ export default function ShortcutsHelp({ open, onOpenChange }) {
 
           <Section title="Actions">
             <Row keys={["n"]} label="New task (new note on the Notes page)" />
+            <Row keys={["q"]} label="Quick add — natural language with #tags and !priority" />
             <Row keys={["/"]} label="Search the current page" />
             <Row keys={["z"]} label="Undo a just-deleted task (while the toast shows)" />
             <Row keys={["Esc"]} label="Close dialog / search" />
