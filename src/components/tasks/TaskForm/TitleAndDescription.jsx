@@ -20,8 +20,9 @@ import { Textarea } from "@/components/ui/textarea";
 
 const RichDescriptionEditor = lazy(() => import("@/components/tasks/RichDescriptionEditor"));
 
-/** Catches a failed lazy editor load and renders `fallback` instead. */
-class EditorLoadBoundary extends Component {
+/** Catches a failed lazy editor load and renders `fallback` instead.
+ * Exported for reuse by other rich-text hosts (NoteEditor). */
+export class EditorLoadBoundary extends Component {
   constructor(props) {
     super(props);
     this.state = { failed: false };

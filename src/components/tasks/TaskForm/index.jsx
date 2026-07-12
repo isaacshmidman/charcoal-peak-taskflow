@@ -46,7 +46,7 @@ const defaultTask = {
   subtask_titles: [],
 };
 
-export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete, parentId, existingSubtasks = [], onToggleSubtask, onDeleteSubtask, onEditSubtask, defaultDueDate, defaultTaskTime }) {
+export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete, parentId, existingSubtasks = [], onToggleSubtask, onDeleteSubtask, onEditSubtask, defaultDueDate, defaultTaskTime, initialDraft }) {
   const [form, setForm] = useState(defaultTask);
   const [showEndDate, setShowEndDate] = useState(false);
   const [dayError, setDayError] = useState(false);
@@ -105,7 +105,9 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
       const dueDate = defaultDueDate ?? format(new Date(), "yyyy-MM-dd");
       const timeStart = defaultTaskTime || "";
       const timeEnd = timeStart ? addMinutes(timeStart, 60) : "";
-      setForm({ ...defaultTask, priority_id: defaultPriority?.id || "", parent_id: parentId || "", due_date: dueDate, task_time: timeStart, task_end_time: timeEnd });
+      // initialDraft: caller-provided seed values for a NEW task (e.g. the
+      // Notes "Make task" bridge prefilling the title from a selection).
+      setForm({ ...defaultTask, priority_id: defaultPriority?.id || "", parent_id: parentId || "", due_date: dueDate, task_time: timeStart, task_end_time: timeEnd, ...(initialDraft || {}) });
       setShowEndDate(false);
     }
     endTouchedRef.current = false;

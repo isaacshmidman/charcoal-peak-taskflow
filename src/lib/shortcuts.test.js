@@ -86,6 +86,7 @@ describe("shortcuts core", () => {
         g: "/Groupings",
         c: "/Calendar",
         d: "/Completed",
+        n: "/Notes",
         s: "/Settings",
       });
     });

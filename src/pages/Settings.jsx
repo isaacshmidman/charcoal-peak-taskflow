@@ -76,6 +76,7 @@ export const NAV_OPTIONS = [
   { value: "/Groupings", label: "Groupings" },
   { value: "/Calendar", label: "Calendar" },
   { value: "/Completed", label: "Completed" },
+  { value: "/Notes", label: "Notes" },
 ];
 
 // ── Tiny inline UI primitives used only inside this file ─────────

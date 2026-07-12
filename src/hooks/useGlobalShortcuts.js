@@ -87,7 +87,7 @@ export function useGlobalShortcuts() {
       }
 
       // ── digits → sidebar order ──
-      if (key >= "1" && key <= "5") {
+      if (key >= "1" && key <= "6") {
         const path = navPathForDigit(key);
         if (path) {
           e.preventDefault();

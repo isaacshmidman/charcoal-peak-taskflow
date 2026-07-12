@@ -131,7 +131,7 @@ function Picker({ icon: Icon, title, open, setOpen, onOpenChange, children }) {
   );
 }
 
-export default function Toolbar({ editor, onPickerOpenChange }) {
+export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500 }) {
   const [colorOpen, setColorOpen] = useState(false);
   const [hlOpen, setHlOpen] = useState(false);
   const [fontOpen, setFontOpen] = useState(false);
@@ -293,10 +293,10 @@ export default function Toolbar({ editor, onPickerOpenChange }) {
       <span
         className={cn(
           "ml-auto text-[10px] tabular-nums px-1.5 shrink-0",
-          words >= 500 ? "text-red-500 dark:text-red-400 font-semibold" : "text-slate-400 dark:text-slate-500"
+          words >= wordLimit ? "text-red-500 dark:text-red-400 font-semibold" : "text-slate-400 dark:text-slate-500"
         )}
       >
-        {words}/500
+        {words}/{wordLimit}
       </span>
     </div>
   );

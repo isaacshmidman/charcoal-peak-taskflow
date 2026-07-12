@@ -1,4 +1,4 @@
-export const VALID_NAV_ROUTES = ["/Today", "/Groupings", "/Calendar", "/Active", "/Completed"];
+export const VALID_NAV_ROUTES = ["/Today", "/Groupings", "/Calendar", "/Active", "/Completed", "/Notes"];
 
 export const DEFAULT_NAV_ORDER = [...VALID_NAV_ROUTES];
 

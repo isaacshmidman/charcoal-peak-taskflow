@@ -17,6 +17,7 @@ import Calendar from "@/pages/Calendar.jsx";
 import Login from "@/pages/Login.jsx";
 import Settings from "@/pages/Settings.jsx";
 import RecentlyDeleted from "@/pages/RecentlyDeleted.jsx";
+import Notes from "@/pages/Notes.jsx";
 
 function DefaultRedirect() {
   const defaultNav = sanitizeNavRoute(localStorage.getItem("defaultNav"));
@@ -82,6 +83,7 @@ const AuthenticatedApp = () => {
         <Route path="/Completed" element={<Completed />} />
         <Route path="/Groupings" element={<Groupings />} />
         <Route path="/Calendar" element={<Calendar />} />
+        <Route path="/Notes" element={<Notes />} />
         <Route path="/Settings" element={<Settings />} />
         <Route path="/RecentlyDeleted" element={<RecentlyDeleted />} />
       </Route>

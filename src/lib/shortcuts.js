@@ -36,6 +36,7 @@ export const G_SEQUENCES = {
   g: "/Groupings",
   c: "/Calendar",
   d: "/Completed", // d for "done"
+  n: "/Notes",
   s: "/Settings",
 };
 

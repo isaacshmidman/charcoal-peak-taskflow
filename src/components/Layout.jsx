@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation } from "react-router-dom";
-import { ListTodo, CalendarDays, LayoutGrid, Settings, Sun, WifiOff, CheckCircle2 } from "lucide-react";
+import { ListTodo, CalendarDays, LayoutGrid, NotebookPen, Settings, Sun, WifiOff, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { useOfflineData } from "@/hooks/useOfflineData";
@@ -17,6 +17,7 @@ const ALL_NAV_ITEMS = {
   "/Calendar":  { path: "/Calendar",  label: "Calendar",  icon: CalendarDays },
   "/Active":    { path: "/Active",    label: "All Tasks", icon: ListTodo },
   "/Completed": { path: "/Completed", label: "Completed", icon: CheckCircle2 },
+  "/Notes":     { path: "/Notes",     label: "Notes",     icon: NotebookPen },
 };
 
 function getNavItems() {

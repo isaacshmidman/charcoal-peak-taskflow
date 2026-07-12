@@ -55,17 +55,18 @@ export default function ShortcutsHelp({ open, onOpenChange }) {
 
         <div className="space-y-4">
           <Section title="Navigation">
-            <Row keys={["1"]} label="Jump to nav items (in your sidebar order, 1–5)" />
+            <Row keys={["1"]} label="Jump to nav items (in your sidebar order, 1–6)" />
             <Row keys={["g", "t"]} label="Go to Today" />
             <Row keys={["g", "a"]} label="Go to All Tasks" />
             <Row keys={["g", "g"]} label="Go to Groupings" />
             <Row keys={["g", "c"]} label="Go to Calendar" />
             <Row keys={["g", "d"]} label="Go to Completed" />
+            <Row keys={["g", "n"]} label="Go to Notes" />
             <Row keys={["g", "s"]} label="Go to Settings" />
           </Section>
 
           <Section title="Actions">
-            <Row keys={["n"]} label="New task" />
+            <Row keys={["n"]} label="New task (new note on the Notes page)" />
             <Row keys={["/"]} label="Search the current page" />
             <Row keys={["z"]} label="Undo a just-deleted task (while the toast shows)" />
             <Row keys={["Esc"]} label="Close dialog / search" />

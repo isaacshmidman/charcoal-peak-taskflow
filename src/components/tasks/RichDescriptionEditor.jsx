@@ -34,7 +34,7 @@ const NON_INSERT_KEYS = new Set([
   "Home", "End", "PageUp", "PageDown", "Tab", "Enter", "Escape",
 ]);
 
-export default function RichDescriptionEditor({ valueJson, plainFallback, onChange, disabled }) {
+export default function RichDescriptionEditor({ valueJson, plainFallback, onChange, disabled, wordLimit = WORD_LIMIT }) {
   // Hydrate once from the incoming props. We intentionally do NOT make
   // the editor a controlled mirror of valueJson on every keystroke
   // (that fights the cursor); the form re-keys the whole TaskForm on
@@ -78,7 +78,7 @@ export default function RichDescriptionEditor({ valueJson, plainFallback, onChan
         const { empty } = view.state.selection;
         // Only block when typing into an empty selection at/over the cap
         // (replacing a selection can't grow the word count).
-        if (words >= WORD_LIMIT && empty) {
+        if (words >= wordLimit && empty) {
           event.preventDefault();
           return true;
         }
@@ -86,7 +86,7 @@ export default function RichDescriptionEditor({ valueJson, plainFallback, onChan
       },
       handlePaste(view) {
         const words = editor?.storage.characterCount?.words?.() ?? 0;
-        if (words >= WORD_LIMIT) return true; // swallow the paste
+        if (words >= wordLimit) return true; // swallow the paste
         return false;
       },
     },
@@ -123,7 +123,7 @@ export default function RichDescriptionEditor({ valueJson, plainFallback, onChan
       <EditorContent editor={editor} />
       {showToolbar && (
         <div data-richtext-toolbar>
-          <Toolbar editor={editor} onPickerOpenChange={setPickerOpen} />
+          <Toolbar editor={editor} onPickerOpenChange={setPickerOpen} wordLimit={wordLimit} />
         </div>
       )}
     </div>

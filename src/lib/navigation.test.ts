@@ -7,12 +7,14 @@ describe("navigation helpers", () => {
   });
 
   it("dedupes valid routes and appends missing defaults", () => {
+    // A saved pre-/Notes order self-heals: new routes append at the end.
     expect(sanitizeNavOrder(["/Completed", "/Completed", "/Today", "/Bogus"])).toEqual([
       "/Completed",
       "/Today",
       "/Groupings",
       "/Calendar",
       "/Active",
+      "/Notes",
     ]);
   });
 
