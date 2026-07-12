@@ -22,6 +22,7 @@ import { DEFAULT_NAV_ORDER, sanitizeNavOrder } from "@/lib/navigation";
 export const SHORTCUT_EVENTS = {
   newTask: "shortcut:new-task",
   quickAdd: "shortcut:quick-add",
+  editTask: "shortcut:edit-task", // detail: { id } — palette → page TaskForm
   search: "shortcut:search",
   undoDelete: "shortcut:undo-delete",
   calendarView: "shortcut:calendar-view",   // detail: "day"|"week"|"month"|"year"

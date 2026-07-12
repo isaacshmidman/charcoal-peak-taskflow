@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { apiClient } from "@/api/apiClient";
 import { useQuery } from "@tanstack/react-query";
 import { useOfflineMutation } from "@/hooks/useOfflineMutation";
@@ -75,6 +75,21 @@ export default function Active() {
     queryKey: ["savedTags"],
     queryFn: () => apiClient.entities.SavedTag.list("name", 100),
   });
+
+  // Command palette task-open handoff. In place when already here; via
+  // sessionStorage when the palette navigated from another page (the key
+  // is consumed once tasks are loaded, so a slow query still resolves).
+  useShortcutEvent(SHORTCUT_EVENTS.editTask, ({ id } = {}) => {
+    const task = tasks.find((t) => t.id === id);
+    if (task) { setEditingTask(task); setShowForm(true); }
+  });
+  useEffect(() => {
+    const id = sessionStorage.getItem("paletteOpenTask");
+    if (!id || !tasks.length) return;
+    sessionStorage.removeItem("paletteOpenTask");
+    const task = tasks.find((t) => t.id === id);
+    if (task) { setEditingTask(task); setShowForm(true); }
+  }, [tasks]);
 
   const handleSubmit = async (data, subtaskTitles = []) => {
     if (editingTask) {

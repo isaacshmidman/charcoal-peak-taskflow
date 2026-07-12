@@ -33,6 +33,7 @@ export function useGlobalShortcuts() {
   const navigate = useNavigate();
   const location = useLocation();
   const [helpOpen, setHelpOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   // Pending `g` prefix: { until: epochMs } or null.
   const pendingGRef = useRef(null);
   // Track the route without re-binding the listener on every navigation.
@@ -49,6 +50,15 @@ export function useGlobalShortcuts() {
       const mod = e.metaKey || e.ctrlKey;
       const typing = isTypingTarget(e.target);
       const modal = isModalOpen();
+
+      // Mod+K → command palette. Standard palette behavior: fires even
+      // while typing in a field; suppressed only when a dialog is open.
+      if (mod && !e.shiftKey && (e.key === "k" || e.key === "K")) {
+        if (modal) return;
+        e.preventDefault();
+        setPaletteOpen(true);
+        return;
+      }
 
       // Mod+Z → toast undo. Only when NOT typing (text fields own their
       // undo) and no modal (dialogs own their keys).
@@ -155,5 +165,5 @@ export function useGlobalShortcuts() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [navigate]);
 
-  return { helpOpen, setHelpOpen };
+  return { helpOpen, setHelpOpen, paletteOpen, setPaletteOpen };
 }
