@@ -21,7 +21,7 @@ export default function TimeFields({ form, setForm, endTouchedRef }) {
           <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-1.5 block">Date</Label>
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="w-full justify-start h-9 text-sm font-normal">
+              <Button variant="outline" data-testid="task-form-date-trigger" className="w-full justify-start h-9 text-sm font-normal">
                 <CalendarIcon className="w-4 h-4 mr-2 text-slate-400 dark:text-slate-500" />
                 {form.due_date ? format(fromDateStr(form.due_date), "PPP") : "No date"}
               </Button>
@@ -35,7 +35,7 @@ export default function TimeFields({ form, setForm, endTouchedRef }) {
               />
               {form.due_date && (
                 <div className="p-2 border-t">
-                  <Button type="button" variant="ghost" size="sm" className="w-full text-xs" onClick={() => setForm({ ...form, due_date: "", task_time: "" })}>
+                  <Button type="button" variant="ghost" size="sm" data-testid="task-form-clear-date" className="w-full text-xs" onClick={() => setForm({ ...form, due_date: "", task_time: "" })}>
                     Clear date
                   </Button>
                 </div>

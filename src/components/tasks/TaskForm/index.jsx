@@ -50,6 +50,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
   const [form, setForm] = useState(defaultTask);
   const [showEndDate, setShowEndDate] = useState(false);
   const [dayError, setDayError] = useState(false);
+  const [saved, setSaved] = useState(false);
   // Pending file attachments — only relevant when creating a NEW task
   // (we don't have a task id yet, so the upload has to wait for the
   // create to land). For edits, AttachmentsField uploads immediately.
@@ -112,19 +113,15 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
     }
     endTouchedRef.current = false;
     setDayError(false);
+    setSaved(false);
     setPendingFiles([]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task, open, prioritiesKey]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.title.trim()) return;
-    if (
-      form.task_type === "recurring" &&
-      form.recurrence === "custom_days" &&
-      (form.recurrence_days || []).length === 0
-    ) {
-      setDayError(true);
+    if (!canSubmit) {
+      if (zeroCustomDays) setDayError(true);
       return;
     }
     const data = { ...form };
@@ -141,7 +138,10 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
     // so pendingFiles is always [] in that branch.)
     const filesToFlush = pendingFiles;
     const submitResult = onSubmit(data, subtaskTitles);
-    onOpenChange(false);
+    // Flash "Saved", then close — the task is already in the list behind
+    // the modal (optimistic), so the brief lingering is just confirmation.
+    setSaved(true);
+    setTimeout(() => onOpenChange(false), 650);
     if (!task && filesToFlush.length) {
       try {
         const result = await submitResult;
@@ -170,6 +170,15 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
     isExternal && (writableRaw === false || writableRaw === 0 || writableRaw === "0");
   const sourceCalendarName = form.source_calendar_name || "Calendar";
   const sourceColorHex = form.source_color_hex || null;
+
+  // A task can't be saved without a title AND a date (the unscheduled
+  // tray is gone — every task is scheduled). Read-only event views never
+  // submit; custom-days recurrence needs ≥1 selected day.
+  const zeroCustomDays =
+    form.task_type === "recurring" &&
+    form.recurrence === "custom_days" &&
+    (form.recurrence_days || []).length === 0;
+  const canSubmit = !isReadOnly && !!form.title.trim() && !!form.due_date && !zeroCustomDays;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -220,7 +229,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
             inside collapse together (no gap between title and description).
             Re-applying `space-y-4` on the fieldset restores the cadence. */}
         <fieldset disabled={isReadOnly} className="contents [&>*+*]:mt-4">
-          <TitleAndDescription form={form} setForm={setForm} task={task} />
+          <TitleAndDescription form={form} setForm={setForm} task={task} priorities={priorities} savedTags={savedTags} />
 
           <PriorityAndType
             form={form}
@@ -286,12 +295,15 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                 </Button>
               )}
             </div>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
+              {saved && (
+                <span className="text-[11px] text-slate-400 dark:text-slate-500" data-testid="task-form-saved">Saved</span>
+              )}
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
                 {isReadOnly ? "Close" : "Cancel"}
               </Button>
               {!isReadOnly && (
-                <Button type="submit" className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200" data-testid="task-form-submit">
+                <Button type="submit" disabled={!canSubmit} className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200" data-testid="task-form-submit">
                   {task ? "Save Changes" : "Create Task"}
                 </Button>
               )}

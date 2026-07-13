@@ -372,6 +372,26 @@ test("offline task creation is replayed and survives a reload when connectivity 
   await context.close();
 });
 
+test("the task form submit is disabled without a title and without a date", async ({ page }) => {
+  await installMockBackend(page, { tasks: [], priorities: [defaultPriority] });
+
+  await page.goto("/Today");
+  await page.getByRole("button", { name: /new task/i }).click();
+
+  const submit = page.getByTestId("task-form-submit");
+  // Empty title → disabled.
+  await expect(submit).toBeDisabled();
+
+  // Title filled; new tasks default to today's date → enabled.
+  await page.getByTestId("task-form-title").fill("needs a date");
+  await expect(submit).toBeEnabled();
+
+  // Clear the date → disabled again (every task must be scheduled).
+  await page.getByTestId("task-form-date-trigger").click();
+  await page.getByTestId("task-form-clear-date").click();
+  await expect(submit).toBeDisabled();
+});
+
 test("email sign-in and settings logout return to the login screen", async ({ page }) => {
   const api = await installMockBackend(page, {
     tasks: [recurringTask()],

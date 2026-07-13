@@ -15,8 +15,8 @@
  *     offline e2e test caught.
  */
 import { Component, lazy, Suspense } from "react";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import TitleTokenInput from "@/components/tasks/QuickAdd/TitleTokenInput";
 
 const RichDescriptionEditor = lazy(() => import("@/components/tasks/RichDescriptionEditor"));
 
@@ -53,7 +53,7 @@ function PlainDescriptionFallback({ form, setForm }) {
   );
 }
 
-export default function TitleAndDescription({ form, setForm, task }) {
+export default function TitleAndDescription({ form, setForm, task, priorities = [], savedTags = [] }) {
   // The editor hydrates ONCE at mount. Read its initial content straight
   // from the `task` prop (available on first render) rather than from
   // `form.description_json` — the form's hydration effect runs after the
@@ -64,13 +64,17 @@ export default function TitleAndDescription({ form, setForm, task }) {
   const editorKey = task?.id || "new";
   return (
     <>
-      <Input
+      {/* Title understands in-title tokens: !priority / #tag (dropdown),
+          and natural-language dates/times/"every…" recurrence, applied to
+          the real fields on completion. */}
+      <TitleTokenInput
+        form={form}
+        setForm={setForm}
+        grammar={{ dates: true, times: true, recurrence: true, tags: true, priority: true }}
+        priorities={priorities}
+        savedTags={savedTags}
         placeholder="What needs to be done?"
-        value={form.title}
-        onChange={(e) => setForm({ ...form, title: e.target.value })}
-        className=""
-        autoFocus={false}
-        data-testid="task-form-title"
+        testid="task-form-title"
       />
 
       <EditorLoadBoundary fallback={<PlainDescriptionFallback form={form} setForm={setForm} />}>

@@ -2,8 +2,8 @@
 import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import TitleTokenInput from "@/components/tasks/QuickAdd/TitleTokenInput";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
@@ -31,6 +31,7 @@ import { fromDateStr, toDateStr } from "@/lib/dates";
 export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubmit, onDelete }) {
   /** @type {[TaskCreateInput, import("react").Dispatch<import("react").SetStateAction<TaskCreateInput>>]} */
   const [form, setForm] = useState({ title: "", description: "", due_date: "", task_time: "" });
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     if (task) {
@@ -44,6 +45,7 @@ export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubm
       const todayStr = format(new Date(), "yyyy-MM-dd");
       setForm({ title: "", description: "", due_date: todayStr, task_time: "" });
     }
+    setSaved(false);
   }, [task, open]);
 
   /**
@@ -53,7 +55,8 @@ export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubm
     e.preventDefault();
     if (!form.title.trim()) return;
     onSubmit(parentId ? { ...form, parent_id: parentId } : form);
-    onOpenChange(false);
+    setSaved(true);
+    setTimeout(() => onOpenChange(false), 650);
   };
 
   return (
@@ -65,12 +68,13 @@ export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubm
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
+          {/* Title parses natural-language dates/times only (subtasks
+              have no tags/priority/recurrence). */}
+          <TitleTokenInput
+            form={form}
+            setForm={setForm}
+            grammar={{ dates: true, times: true, recurrence: false, tags: false, priority: false }}
             placeholder="What needs to be done?"
-            value={form.title}
-            onChange={(e) => setForm({ ...form, title: e.target.value })}
-            className=""
-            autoFocus={false}
           />
 
           <Textarea
@@ -140,9 +144,12 @@ export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubm
                 </Button>
               )}
             </div>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
+              {saved && (
+                <span className="text-[11px] text-slate-400 dark:text-slate-500">Saved</span>
+              )}
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-              <Button type="submit" className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200">
+              <Button type="submit" disabled={!form.title.trim()} className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200">
                 {task ? "Save Changes" : "Create Subtask"}
               </Button>
             </div>
