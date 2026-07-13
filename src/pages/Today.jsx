@@ -7,7 +7,6 @@ import { formatDeleteLabel, useDeleteWithUndo } from "@/hooks/useDeleteWithUndo"
 import { showDeleteToast } from "@/components/tasks/DeleteToast";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import QuickAdd from "@/components/tasks/QuickAdd";
 import ReviewDialog from "@/components/ReviewDialog";
 import { Plus, Search, Sunrise } from "lucide-react";
 import { AnimatedSearchInput } from "@/components/ui/animated-search-input";
@@ -37,7 +36,6 @@ export default function Today() {
   const [recurringDeleteTask, setRecurringDeleteTask] = useState(null);
   const [search, setSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
-  const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [showReview, setShowReview] = useState(false);
 
   // Keyboard shortcuts (parsed centrally in useGlobalShortcuts).
@@ -45,7 +43,6 @@ export default function Today() {
     setEditingTask(null); setAddSubtaskParent(null); setShowForm(true);
   });
   useShortcutEvent(SHORTCUT_EVENTS.search, () => setShowSearch(true));
-  useShortcutEvent(SHORTCUT_EVENTS.quickAdd, () => setShowQuickAdd(true));
   useShortcutEvent(SHORTCUT_EVENTS.review, () => setShowReview(true));
   const [sorts, setSorts] = useState(() => {
     try {
@@ -75,12 +72,6 @@ export default function Today() {
   const { data: priorities = [] } = useQuery({
     queryKey: ["priorities"],
     queryFn: () => apiClient.entities.Priority.list("order", 50),
-  });
-
-  // Tag names feed QuickAdd's # autocomplete.
-  const { data: savedTags = [] } = useQuery({
-    queryKey: ["savedTags"],
-    queryFn: () => apiClient.entities.SavedTag.list("name", 100),
   });
 
   const priorityOrderMap = useMemo(() => {
@@ -242,26 +233,6 @@ export default function Today() {
           </Button>
         </div>
       </div>
-
-      {showQuickAdd ? (
-        <QuickAdd
-          open={showQuickAdd}
-          onOpenChange={setShowQuickAdd}
-          priorities={priorities}
-          savedTags={savedTags}
-          onCreate={(data) => createTask(data)}
-        />
-      ) : (
-        <button
-          type="button"
-          data-testid="quickadd-affordance"
-          onClick={() => setShowQuickAdd(true)}
-          className="w-full text-left px-3 py-2 rounded-lg border border-dashed border-slate-200 dark:border-[#303030] text-xs text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:border-slate-300 dark:hover:border-[#454545] transition-colors"
-        >
-          Quick add — dates, #tags and !priority as you type
-          <kbd className="ml-1.5 px-1 py-0.5 rounded border border-slate-200 dark:border-[#303030] bg-slate-50 dark:bg-[#161616] font-sans text-[10px]">q</kbd>
-        </button>
-      )}
 
       {isLoading ? (
         <div className="space-y-2">

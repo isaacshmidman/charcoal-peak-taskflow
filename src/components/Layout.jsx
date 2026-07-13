@@ -64,22 +64,21 @@ export default function Layout() {
             <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">Zephyrly</span>
           </Link>
 
-          <nav className="hidden sm:flex items-center gap-0.5">
+          <nav className="hidden sm:flex items-center gap-1">
             {navItems.map((item) => {
               const isActive = location.pathname === item.path;
               return (
                 <Link
                   key={item.path}
                   to={item.path}
+                  title={item.label}
+                  aria-label={item.label}
                   className={cn(
-                    "px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200",
+                    "flex items-center justify-center w-10 h-9 rounded-lg transition-all duration-200",
                     isActive ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950" : "text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-[#161616]"
                   )}
                 >
-                  <span className="flex items-center gap-1.5">
-                    <item.icon className="w-3.5 h-3.5" />
-                    {item.label}
-                  </span>
+                  <item.icon className="w-[18px] h-[18px]" />
                 </Link>
               );
             })}
@@ -145,13 +144,14 @@ export default function Layout() {
               <Link
                 key={item.path}
                 to={item.path}
+                title={item.label}
+                aria-label={item.label}
                 className={cn(
-                  "flex flex-col items-center gap-0.5 px-1.5 py-1.5 rounded-lg text-[11px] font-medium transition-all touch-manipulation flex-1 min-w-0",
+                  "flex items-center justify-center py-2 rounded-lg transition-all touch-manipulation flex-1",
                   isActive ? "text-slate-900 dark:text-slate-100 bg-slate-100/80 dark:bg-[#161616]" : "text-slate-400 dark:text-slate-500"
                 )}
               >
-                <item.icon className="w-5 h-5" />
-                <span className="truncate max-w-full">{item.label}</span>
+                <item.icon className="w-[22px] h-[22px]" />
               </Link>
             );
           })}

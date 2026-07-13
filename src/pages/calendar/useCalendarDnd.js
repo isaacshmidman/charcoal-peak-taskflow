@@ -20,8 +20,6 @@ import {
   minutesToTaskTime,
   parseTaskTime,
 } from "@/lib/sort-helpers";
-import { isExternalEvent } from "@/lib/task-filters";
-import { showDeleteToast } from "@/components/tasks/DeleteToast";
 
 export function useCalendarDnd({ updateTask, onTaskReschedule }) {
   const sensors = useSensors(
@@ -64,22 +62,6 @@ export function useCalendarDnd({ updateTask, onTaskReschedule }) {
     if (!over || !task) return;
     const overData = over.data?.current || {};
     const kind = overData.kind;
-
-    if (kind === "unscheduled") {
-      // Dropping into the tray clears the schedule. Recurring tasks are a
-      // no-op — due_date drives series advancement (getNextRecurringDueDate),
-      // so unscheduling one silently breaks its series. External calendar
-      // events aren't ours to unschedule.
-      if (isExternalEvent(task)) return;
-      if (task.task_type === "recurring") {
-        showDeleteToast({ label: "Recurring tasks keep their date", hideUndo: true });
-        return;
-      }
-      if (task.due_date || task.task_time) {
-        updateTask(task.id, { due_date: "", task_time: "", task_end_time: "" });
-      }
-      return;
-    }
 
     if (kind === "allday") {
       const patch = { task_time: "", task_end_time: "" };

@@ -21,7 +21,6 @@ import { DEFAULT_NAV_ORDER, sanitizeNavOrder } from "@/lib/navigation";
 /** Semantic events pages can subscribe to (via useShortcutEvent). */
 export const SHORTCUT_EVENTS = {
   newTask: "shortcut:new-task",
-  quickAdd: "shortcut:quick-add",
   editTask: "shortcut:edit-task", // detail: { id } — palette → page TaskForm
   review: "shortcut:review",
   search: "shortcut:search",

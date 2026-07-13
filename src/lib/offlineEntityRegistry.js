@@ -166,9 +166,3 @@ export const NoteOffline = registerOfflineEntity({
   cacheKey: "notes",
   queueKey: "pendingNoteMutations",
 });
-
-export const SavedViewOffline = registerOfflineEntity({
-  name: "SavedView",
-  cacheKey: "savedViews",
-  queueKey: "pendingSavedViewMutations",
-});

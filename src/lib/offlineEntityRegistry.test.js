@@ -6,7 +6,6 @@ vi.mock("@/api/apiClient", () => ({
   apiClient: {
     entities: {
       Note: { create: vi.fn(), update: vi.fn(), delete: vi.fn() },
-      SavedView: { create: vi.fn(), update: vi.fn(), delete: vi.fn() },
       Linked: { create: vi.fn(), update: vi.fn(), delete: vi.fn() },
     },
   },
@@ -40,7 +39,6 @@ describe("offlineEntityRegistry", () => {
   it("registers cache keys for persistence subscription", () => {
     const keys = registeredCacheKeys();
     expect(keys).toContain("notes");
-    expect(keys).toContain("savedViews");
     expect(keys).toContain("linked");
   });
 

@@ -338,7 +338,7 @@ describe("taskflow backend contract", () => {
   });
 });
 
-describe("registry entities: Note and SavedView", () => {
+describe("registry entities: Note", () => {
   it("supports full Note CRUD with per-user isolation", async () => {
     const isaacToken = await login("isaac@example.com");
     const auth = { Authorization: `Bearer ${isaacToken}` };
@@ -377,41 +377,6 @@ describe("registry entities: Note and SavedView", () => {
     expect(otherList.body.some((n) => n.id === created.body.id)).toBe(false);
 
     const deleted = await invoke(`/api/apps/test-app/entities/Note/${created.body.id}`, {
-      method: "DELETE",
-      headers: auth,
-    });
-    expect(deleted.statusCode).toBe(200);
-  });
-
-  it("supports SavedView CRUD, requires a name, round-trips JSON filters", async () => {
-    const token = await login("isaac@example.com");
-    const auth = { Authorization: `Bearer ${token}` };
-
-    const rejected = await invoke("/api/apps/test-app/entities/SavedView", {
-      method: "POST",
-      headers: { ...auth, "Content-Type": "application/json" },
-      body: { name: "", filters: {} },
-    });
-    expect(rejected.statusCode).toBe(400);
-
-    const filters = { tags: ["work"], priority_ids: ["priority_1"], due: "week", status: "active" };
-    const created = await invoke("/api/apps/test-app/entities/SavedView", {
-      method: "POST",
-      headers: { ...auth, "Content-Type": "application/json" },
-      body: { name: "Work this week", filters, sorts: ["priority_asc"] },
-    });
-    expect(created.statusCode).toBe(201);
-    expect(created.body.id).toMatch(/^view_/);
-    expect(created.body.filters).toEqual(filters);
-    expect(created.body.sorts).toEqual(["priority_asc"]);
-
-    const fetched = await invoke(`/api/apps/test-app/entities/SavedView/${created.body.id}`, {
-      headers: auth,
-    });
-    expect(fetched.statusCode).toBe(200);
-    expect(fetched.body.filters).toEqual(filters);
-
-    const deleted = await invoke(`/api/apps/test-app/entities/SavedView/${created.body.id}`, {
       method: "DELETE",
       headers: auth,
     });

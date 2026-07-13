@@ -42,8 +42,6 @@ import DayView from "@/components/calendar/DayView";
 import WeekView from "@/components/calendar/WeekView";
 import YearView from "@/components/calendar/YearView";
 import MiniMiniTaskCard from "@/components/calendar/MiniMiniTaskCard";
-import UnscheduledTray from "@/components/calendar/UnscheduledTray";
-import { isExternalEvent } from "@/lib/task-filters";
 import { nextQuarterHour } from "@/lib/sort-helpers";
 import { toDateStr } from "@/lib/dates";
 import { useIntegrationsConnected, useIntegrations } from "@/hooks/useIntegrations";
@@ -203,17 +201,6 @@ export default function Calendar() {
     handleDragCancel,
   } = useCalendarDnd({ updateTask, onTaskReschedule: handleTaskReschedule });
 
-  // Tray contents: dateless, not done, top-level, ours (not imported
-  // events). Derived from filteredTasks so the page's search, calendar
-  // visibility toggles, and sorts apply to the tray for free.
-  const unscheduledTasks = useMemo(
-    () =>
-      filteredTasks.filter(
-        (t) => !t.due_date && t.status !== "done" && !t.parent_id && !isExternalEvent(t)
-      ),
-    [filteredTasks]
-  );
-
   const timezone = useMemo(() => {
     try {
       return Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -361,56 +348,41 @@ export default function Calendar() {
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        {/* Unscheduled tray rides beside the view on desktop (Year has no
-            droppables, so no tray there) and floats as a pill on mobile. */}
-        <div className="sm:flex sm:items-start sm:gap-3">
-          <div className="flex-1 min-w-0">
-            {view === "day" && (
-              <DayView
-                anchorDate={anchorDate}
-                tasks={filteredTasks}
-                priorities={priorities}
-                onTaskClick={handleTaskClick}
-                onToggleDone={handleToggleDone}
-              />
-            )}
-            {view === "week" && (
-              <WeekView
-                anchorDate={anchorDate}
-                tasks={filteredTasks}
-                priorities={priorities}
-                onTaskClick={handleTaskClick}
-                onToggleDone={handleToggleDone}
-                onDayClick={handleDayEmptyClick}
-              />
-            )}
-            {view === "month" && (
-              <MonthCalendar
-                anchorDate={anchorDate}
-                tasks={filteredTasks}
-                priorities={priorities}
-                onTaskClick={handleTaskClick}
-                onToggleDone={handleToggleDone}
-                onDayEmptyClick={handleDayEmptyClick}
-              />
-            )}
-            {view === "year" && (
-              <YearView
-                anchorDate={anchorDate}
-                onDayClick={handleYearDayClick}
-              />
-            )}
-          </div>
-          {view !== "year" && (
-            <UnscheduledTray
-              tasks={unscheduledTasks}
-              priorities={priorities}
-              onTaskClick={handleTaskClick}
-              onToggleDone={handleToggleDone}
-              dragActive={!!activeTask}
-            />
-          )}
-        </div>
+        {view === "day" && (
+          <DayView
+            anchorDate={anchorDate}
+            tasks={filteredTasks}
+            priorities={priorities}
+            onTaskClick={handleTaskClick}
+            onToggleDone={handleToggleDone}
+          />
+        )}
+        {view === "week" && (
+          <WeekView
+            anchorDate={anchorDate}
+            tasks={filteredTasks}
+            priorities={priorities}
+            onTaskClick={handleTaskClick}
+            onToggleDone={handleToggleDone}
+            onDayClick={handleDayEmptyClick}
+          />
+        )}
+        {view === "month" && (
+          <MonthCalendar
+            anchorDate={anchorDate}
+            tasks={filteredTasks}
+            priorities={priorities}
+            onTaskClick={handleTaskClick}
+            onToggleDone={handleToggleDone}
+            onDayEmptyClick={handleDayEmptyClick}
+          />
+        )}
+        {view === "year" && (
+          <YearView
+            anchorDate={anchorDate}
+            onDayClick={handleYearDayClick}
+          />
+        )}
 
         <DragOverlay>
           {activeTask ? (

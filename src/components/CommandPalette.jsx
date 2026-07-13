@@ -29,7 +29,6 @@ import {
   Search,
   Settings,
   Sun,
-  Zap,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { SHORTCUT_EVENTS, emitShortcut } from "@/lib/shortcuts";
@@ -64,13 +63,6 @@ const ACTION_COMMANDS = [
     icon: NotebookPen,
     routes: ["/Notes"],
     run: () => emitShortcut(SHORTCUT_EVENTS.newTask), // Notes maps n/new to a note
-  },
-  {
-    key: "action:quick-add",
-    label: "Quick add (natural language)",
-    icon: Zap,
-    routes: ["/Today", "/Active"],
-    run: () => emitShortcut(SHORTCUT_EVENTS.quickAdd),
   },
   {
     key: "action:search",

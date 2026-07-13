@@ -67,7 +67,6 @@ export default function ShortcutsHelp({ open, onOpenChange }) {
 
           <Section title="Actions">
             <Row keys={["n"]} label="New task (new note on the Notes page)" />
-            <Row keys={["q"]} label="Quick add — natural language with #tags and !priority" />
             <Row keys={[mod, "K"]} label="Command palette — actions, navigation, task search" />
             <Row keys={["v"]} label="Review the day (on Today)" />
             <Row keys={["/"]} label="Search the current page" />
