@@ -22,7 +22,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { AnimatedSearchInput } from "@/components/ui/animated-search-input";
 import { showDeleteToast } from "@/components/tasks/DeleteToast";
+import MultiSortPanel from "@/components/tasks/MultiSortPanel";
 import NoteEditor from "@/components/notes/NoteEditor";
+import NotePreview from "@/components/notes/NotePreview";
 import { cn } from "@/lib/utils";
 
 export default function Notes() {
@@ -30,6 +32,18 @@ export default function Notes() {
   const [showSearch, setShowSearch] = useState(false);
   const [openNoteId, setOpenNoteId] = useState(null);
   const [showEditor, setShowEditor] = useState(false);
+  const [sorts, setSorts] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("sorts_notes") || "null");
+      return saved?.length ? saved : ["priority_asc", "date_desc"];
+    } catch {
+      return ["priority_asc", "date_desc"];
+    }
+  });
+  const handleSortsChange = (next) => {
+    setSorts(next);
+    localStorage.setItem("sorts_notes", JSON.stringify(next));
+  };
 
   const noteMutation = useOfflineEntityMutation("Note");
   const { createTask, deleteTask } = useOfflineMutation();
@@ -70,9 +84,12 @@ export default function Notes() {
   useShortcutEvent(SHORTCUT_EVENTS.newTask, newNote);
   useShortcutEvent(SHORTCUT_EVENTS.search, () => setShowSearch(true));
 
-  const submitNote = (data) => {
-    if (openNote) noteMutation.update(openNote.id, data);
-    else noteMutation.create(data);
+  // Upsert used by the editor's autosave — create on the first valid
+  // write (returning the new record so the editor tracks its id), then
+  // update. Returns the saved record either way.
+  const saveNote = async (id, data) => {
+    if (id) { await noteMutation.update(id, data); return { id, ...data }; }
+    return noteMutation.create(data);
   };
 
   // Delete → toast with undo (recreates from the in-memory snapshot).
@@ -88,9 +105,11 @@ export default function Notes() {
   };
 
   // Make task: create a dated task carrying the note's title/description/
-  // tags/priority (tasks require a date → default today), remove the note.
-  const makeTask = async (draft) => {
-    const noteSnapshot = openNote ? (() => { const s = { ...openNote }; delete s.id; return s; })() : null;
+  // tags/priority (tasks require a date → default today), remove the note
+  // (by the id the editor autosaved it under).
+  const makeTask = async (draft, noteId) => {
+    const source = notes.find((n) => n.id === noteId) || null;
+    const noteSnapshot = source ? (() => { const s = { ...source }; delete s.id; return s; })() : null;
     const created = await createTask({
       title: draft.title || "Untitled",
       description: draft.description || "",
@@ -101,7 +120,7 @@ export default function Notes() {
       task_type: "one_time",
       due_date: format(new Date(), "yyyy-MM-dd"),
     });
-    if (openNote) noteMutation.remove(openNote.id);
+    if (noteId) noteMutation.remove(noteId);
     showDeleteToast({
       label: "Task created",
       onUndo: () => {
@@ -203,7 +222,7 @@ export default function Notes() {
         note={openNote}
         priorities={priorities}
         savedTags={savedTags}
-        onSubmit={submitNote}
+        onSave={saveNote}
         onDelete={deleteNote}
         onMakeTask={makeTask}
       />

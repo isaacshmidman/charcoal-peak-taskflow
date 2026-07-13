@@ -15,8 +15,8 @@ export const SORT_OPTIONS = [
   { value: "date_desc", label: "Date: Newest → Oldest", hideOnScope: ["calendar"], group: "date" },
   { value: "deleted_asc", label: "Deleted: Oldest → Newest", scope: "deleted", group: "deleted" },
   { value: "deleted_desc", label: "Deleted: Newest → Oldest", scope: "deleted", group: "deleted" },
-  { value: "completed_first", label: "Completed First", group: "completion" },
-  { value: "uncompleted_first", label: "Uncompleted First", group: "completion" },
+  { value: "completed_first", label: "Completed First", hideOnScope: ["notes"], group: "completion" },
+  { value: "uncompleted_first", label: "Uncompleted First", hideOnScope: ["notes"], group: "completion" },
   // All-day sort is calendar-only — on the timed grid the start time
   // already does the work. In Day/Week views it changes whether all-day
   // entries are listed before or after timed ones; in Month/Year cells
@@ -26,11 +26,11 @@ export const SORT_OPTIONS = [
   { value: "priority_asc", label: "Priority: Highest → Lowest", group: "priority" },
   { value: "priority_desc", label: "Priority: Lowest → Highest", group: "priority" },
   { value: "tag_az", label: "Tag: A → Z", group: "tag" },
-  { value: "recurrence", label: "Recurrence Type", group: "recurrence" },
+  { value: "recurrence", label: "Recurrence Type", hideOnScope: ["notes"], group: "recurrence" },
   // Sorts by the user-configured calendar order (Settings → Calendar Order).
   // Hidden on the calendar page itself — that page shows everything by
   // calendar already and has its own visibility dropdown.
-  { value: "calendar_order", label: "Calendar Order", hideOnScope: ["calendar"], group: "calendar_order" },
+  { value: "calendar_order", label: "Calendar Order", hideOnScope: ["calendar", "notes"], group: "calendar_order" },
 ];
 
 /** @param {string} value */
