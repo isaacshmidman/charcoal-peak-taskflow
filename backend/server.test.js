@@ -356,11 +356,14 @@ describe("registry entities: Note", () => {
     const updated = await invoke(`/api/apps/test-app/entities/Note/${created.body.id}`, {
       method: "PUT",
       headers: { ...auth, "Content-Type": "application/json" },
-      body: { title: "Meeting notes", content_text: "agenda", pinned: true },
+      body: { title: "Meeting notes", content_text: "agenda", pinned: true, tags: ["work", "q3"], priority_id: "priority_1" },
     });
     expect(updated.statusCode).toBe(200);
     expect(updated.body.title).toBe("Meeting notes");
     expect(updated.body.pinned).toBe(true);
+    // Notes share tags + priority with tasks (JSON tags round-trip).
+    expect(updated.body.tags).toEqual(["work", "q3"]);
+    expect(updated.body.priority_id).toBe("priority_1");
 
     const listed = await invoke("/api/apps/test-app/entities/Note?sort=-updated_date", {
       headers: auth,

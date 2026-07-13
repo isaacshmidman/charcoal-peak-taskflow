@@ -196,7 +196,7 @@ export default function Settings() {
 
   if (activeSection === "tasks") {
     return (
-      <SubPage title="Tasks" onBack={returnToMain}>
+      <SubPage title="Tasks and Notes" onBack={returnToMain}>
         <PrioritiesSection />
         <TagsSection />
       </SubPage>
@@ -297,8 +297,8 @@ export default function Settings() {
         />
         <SettingsCard
           icon={CheckSquare}
-          label="Tasks"
-          subtitle="Priorities and tags"
+          label="Tasks and Notes"
+          subtitle="Shared priorities and tags"
           onClick={() => openSection("tasks")}
         />
         <SettingsCard

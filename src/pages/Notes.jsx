@@ -1,9 +1,9 @@
 // @ts-nocheck
 /**
  * @file Notes — standalone rich-text notes, the app's second first-class
- * object. Grid of cards; open one to edit in the shared TipTap editor
- * (autosaving). "Make task" bridges a selection (or the title) into a
- * prefilled TaskForm.
+ * object. Grid of cards; open one to edit in the TaskForm-style NoteEditor
+ * (explicit save). Notes share tags + priority with tasks. "Make task"
+ * converts a note to a dated task and removes the note (with undo).
  *
  * Data: ["notes"] query + useOfflineEntityMutation("Note") — offline
  * cache/queue/replay ride the entity registry, no bespoke code here.
@@ -11,6 +11,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { NotebookPen, Pin, Plus, Search } from "lucide-react";
+import { format } from "date-fns/format";
 import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
 import { apiClient } from "@/api/apiClient";
 import { useOfflineEntityMutation } from "@/hooks/useOfflineEntityMutation";
@@ -20,8 +21,8 @@ import { SHORTCUT_EVENTS } from "@/lib/shortcuts";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { AnimatedSearchInput } from "@/components/ui/animated-search-input";
+import { showDeleteToast } from "@/components/tasks/DeleteToast";
 import NoteEditor from "@/components/notes/NoteEditor";
-import TaskForm from "@/components/tasks/TaskForm";
 import { cn } from "@/lib/utils";
 
 export default function Notes() {
@@ -29,15 +30,21 @@ export default function Notes() {
   const [showSearch, setShowSearch] = useState(false);
   const [openNoteId, setOpenNoteId] = useState(null);
   const [showEditor, setShowEditor] = useState(false);
-  const [taskDraft, setTaskDraft] = useState(null);
-  const [showTaskForm, setShowTaskForm] = useState(false);
 
   const noteMutation = useOfflineEntityMutation("Note");
-  const { createTask } = useOfflineMutation();
+  const { createTask, deleteTask } = useOfflineMutation();
 
   const { data: notes = [], isLoading } = useQuery({
     queryKey: ["notes"],
     queryFn: () => apiClient.entities.Note.list("-updated_date", 500),
+  });
+  const { data: priorities = [] } = useQuery({
+    queryKey: ["priorities"],
+    queryFn: () => apiClient.entities.Priority.list("order", 50),
+  });
+  const { data: savedTags = [] } = useQuery({
+    queryKey: ["savedTags"],
+    queryFn: () => apiClient.entities.SavedTag.list("name", 100),
   });
 
   const openNote = notes.find((n) => n.id === openNoteId) || null;
@@ -57,23 +64,52 @@ export default function Notes() {
     });
   }, [notes, search]);
 
-  const newNote = async () => {
-    // Create first, edit after — empty notes are valid; an abandoned one
-    // is deleted quietly when the editor closes still-empty.
-    const created = await noteMutation.create({
-      title: "",
-      content_json: "",
-      content_text: "",
-      pinned: false,
-    });
-    setOpenNoteId(created.id);
-    setShowEditor(true);
-  };
+  // New note = blank editor (created only on submit — no empty-note litter).
+  const newNote = () => { setOpenNoteId(null); setShowEditor(true); };
 
-  // Keyboard: n = new note here (same key, page-appropriate action),
-  // / = search — both delivered by the global listener's event bus.
   useShortcutEvent(SHORTCUT_EVENTS.newTask, newNote);
   useShortcutEvent(SHORTCUT_EVENTS.search, () => setShowSearch(true));
+
+  const submitNote = (data) => {
+    if (openNote) noteMutation.update(openNote.id, data);
+    else noteMutation.create(data);
+  };
+
+  // Delete → toast with undo (recreates from the in-memory snapshot).
+  // Phase 5 upgrades this to a recoverable Recently-Deleted record.
+  const deleteNote = (note) => {
+    const snapshot = { ...note };
+    delete snapshot.id;
+    noteMutation.remove(note.id);
+    showDeleteToast({
+      label: "Note deleted",
+      onUndo: () => noteMutation.create(snapshot),
+    });
+  };
+
+  // Make task: create a dated task carrying the note's title/description/
+  // tags/priority (tasks require a date → default today), remove the note.
+  const makeTask = async (draft) => {
+    const noteSnapshot = openNote ? (() => { const s = { ...openNote }; delete s.id; return s; })() : null;
+    const created = await createTask({
+      title: draft.title || "Untitled",
+      description: draft.description || "",
+      description_json: draft.description_json || "",
+      tags: draft.tags || [],
+      priority_id: draft.priority_id || "",
+      status: "todo",
+      task_type: "one_time",
+      due_date: format(new Date(), "yyyy-MM-dd"),
+    });
+    if (openNote) noteMutation.remove(openNote.id);
+    showDeleteToast({
+      label: "Task created",
+      onUndo: () => {
+        if (created?.id) deleteTask(created.id);
+        if (noteSnapshot) noteMutation.create(noteSnapshot);
+      },
+    });
+  };
 
   return (
     <div className="space-y-5">
@@ -101,9 +137,10 @@ export default function Notes() {
           >
             <Search className="w-4 h-4" />
           </Button>
-          <Button onClick={newNote} className="h-9" data-testid="new-note-button">
+          {/* Same button as Today's New Task — condenses to a plus on small screens. */}
+          <Button onClick={newNote} className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200 h-9 gap-1.5" data-testid="new-note-button">
             <Plus className="w-4 h-4" />
-            <span className="hidden xs:inline">New note</span>
+            <span className="hidden sm:inline">New note</span>
           </Button>
         </div>
       </div>
@@ -164,38 +201,11 @@ export default function Notes() {
           if (!open) setOpenNoteId(null);
         }}
         note={openNote}
-        onSave={(id, data) => noteMutation.update(id, data)}
-        onDelete={(id, { silent } = {}) => {
-          noteMutation.remove(id);
-          if (!silent) { setShowEditor(false); setOpenNoteId(null); }
-        }}
-        onMakeTask={(title) => {
-          setTaskDraft({ title });
-          setShowTaskForm(true);
-        }}
-      />
-
-      <TaskForm
-        open={showTaskForm}
-        onOpenChange={(open) => {
-          setShowTaskForm(open);
-          if (!open) setTaskDraft(null);
-        }}
-        task={null}
-        initialDraft={taskDraft}
-        onSubmit={async (data, subtaskTitles = []) => {
-          const created = await createTask(data);
-          for (let index = 0; index < subtaskTitles.length; index += 1) {
-            await createTask({
-              title: subtaskTitles[index],
-              status: "todo",
-              task_type: "one_time",
-              parent_id: created.id,
-              order: index,
-            });
-          }
-          return created;
-        }}
+        priorities={priorities}
+        savedTags={savedTags}
+        onSubmit={submitNote}
+        onDelete={deleteNote}
+        onMakeTask={makeTask}
       />
     </div>
   );

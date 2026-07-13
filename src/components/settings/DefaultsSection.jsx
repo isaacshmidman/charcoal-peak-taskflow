@@ -19,6 +19,7 @@ const NAV_LABELS = {
   "/Groupings": "Groupings",
   "/Calendar": "Calendar",
   "/Completed": "Completed",
+  "/Notes": "Notes",
 };
 
 function getSavedNavOrder() {

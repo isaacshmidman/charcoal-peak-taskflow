@@ -1,17 +1,13 @@
 // @ts-nocheck
 /**
- * @file Note editor dialog. Reuses the task-description TipTap editor
- * (lazy chunk + load boundary) at a higher word cap, and autosaves on a
- * debounce instead of an explicit save button — notes should feel like
- * paper, not forms.
- *
- * Lifecycle: the parent creates the note record BEFORE opening (empty
- * notes are valid server-side), so this dialog only ever edits an
- * existing record. On close, a note that is still completely empty is
- * deleted quietly — no litter from opened-then-abandoned notes.
+ * @file Note editor dialog — modeled on TaskForm's chrome. Explicit save
+ * (Create Note / Save Changes / Cancel), not autosave: a note is created
+ * only on submit, and must have a title OR content (never blank). Notes
+ * share tags + priority with tasks. "Make task" converts the note into a
+ * dated task and removes the note, with a "Task created" undo toast.
  */
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { NotebookPen, Pin, PinOff, Trash2 } from "lucide-react";
+import { Pin, PinOff, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -19,119 +15,90 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EditorLoadBoundary } from "@/components/tasks/TaskForm/TitleAndDescription";
+import TitleTokenInput from "@/components/tasks/QuickAdd/TitleTokenInput";
+import TagsField from "@/components/tasks/TaskForm/TagsField";
+import { colorDot } from "@/lib/colors";
 import { cn } from "@/lib/utils";
 
 const RichDescriptionEditor = lazy(() => import("@/components/tasks/RichDescriptionEditor"));
 
 const NOTE_WORD_LIMIT = 5000;
-const AUTOSAVE_MS = 800;
 
-export default function NoteEditor({ open, onOpenChange, note, onSave, onDelete, onMakeTask }) {
-  const [title, setTitle] = useState("");
-  const [saveState, setSaveState] = useState("idle"); // idle | waiting | saved
+const emptyNote = { title: "", content_json: "", content_text: "", tags: [], priority_id: "", pinned: false };
+
+export default function NoteEditor({ open, onOpenChange, note, priorities = [], savedTags = [], onSubmit, onDelete, onMakeTask }) {
+  const [form, setForm] = useState(emptyNote);
+  const [saved, setSaved] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  // Latest content the editor reported — saved on debounce + on close.
-  const contentRef = useRef({ json: "", text: "" });
-  const timerRef = useRef(null);
-  const noteRef = useRef(note);
-  noteRef.current = note;
 
   useEffect(() => {
     if (!open) return;
-    setTitle(note?.title || "");
-    contentRef.current = { json: note?.content_json || "", text: note?.content_text || "" };
-    setSaveState("idle");
+    setForm(note ? { ...emptyNote, ...note, tags: note.tags || [] } : emptyNote);
+    setSaved(false);
     setConfirmDelete(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, note?.id]);
 
-  useEffect(() => () => clearTimeout(timerRef.current), []);
+  const canSubmit = !!(form.title.trim() || form.content_text.trim());
+  const editorKey = note?.id || "new";
 
-  const flush = () => {
-    const current = noteRef.current;
-    if (!current) return;
-    onSave(current.id, {
-      title: title,
-      content_json: contentRef.current.json,
-      content_text: contentRef.current.text,
+  const handleSubmit = (e) => {
+    e?.preventDefault?.();
+    if (!canSubmit) return;
+    onSubmit({
+      title: form.title,
+      content_json: form.content_json,
+      content_text: form.content_text,
+      tags: form.tags,
+      priority_id: form.priority_id,
+      pinned: form.pinned,
     });
-    setSaveState("saved");
-  };
-
-  const scheduleSave = () => {
-    setSaveState("waiting");
-    clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(flush, AUTOSAVE_MS);
-  };
-
-  // title changes ride the same debounce as content changes.
-  const titleRef = useRef(title);
-  titleRef.current = title;
-  useEffect(() => {
-    if (!open) return;
-    if ((noteRef.current?.title || "") === title) return;
-    scheduleSave();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, open]);
-
-  const handleClose = (nextOpen) => {
-    if (!nextOpen) {
-      clearTimeout(timerRef.current);
-      const isEmpty = !titleRef.current.trim() && !contentRef.current.text.trim();
-      if (isEmpty) {
-        onDelete(noteRef.current?.id, { silent: true });
-      } else {
-        flush();
-      }
-    }
-    onOpenChange(nextOpen);
+    setSaved(true);
+    setTimeout(() => onOpenChange(false), 650);
   };
 
   const handleMakeTask = () => {
-    const selection = String(window.getSelection?.() || "").trim();
-    onMakeTask(selection || titleRef.current.trim() || "");
+    onMakeTask({
+      title: form.title,
+      description: form.content_text,
+      description_json: form.content_json,
+      tags: form.tags,
+      priority_id: form.priority_id,
+    });
+    onOpenChange(false);
   };
 
-  if (!note) return null;
-
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto" onOpenAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-sm font-semibold">
-            <NotebookPen className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-            {note.pinned ? "Pinned note" : "Note"}
-            <span
-              className={cn(
-                "ml-auto text-[10px] font-normal transition-opacity duration-200",
-                saveState === "saved" ? "text-slate-400 dark:text-slate-500 opacity-100" : "opacity-0"
-              )}
-            >
-              Saved
-            </span>
+          <DialogTitle className="text-sm font-semibold text-slate-900 dark:text-slate-100 text-center">
+            {note ? (note.pinned ? "Edit Pinned Note" : "Edit Note") : "New Note"}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-3">
-          <Input
-            placeholder="Untitled"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            data-testid="note-title-input"
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Title parses #tag / !priority (dropdown) only — notes have no dates. */}
+          <TitleTokenInput
+            form={form}
+            setForm={setForm}
+            grammar={{ dates: false, times: false, recurrence: false, tags: true, priority: true }}
+            priorities={priorities}
+            savedTags={savedTags}
+            placeholder="Title"
+            testid="note-title-input"
           />
 
           <EditorLoadBoundary
             fallback={
               <Textarea
                 placeholder="Write anything"
-                defaultValue={note.content_text || ""}
-                onChange={(e) => {
-                  contentRef.current = { json: "", text: e.target.value };
-                  scheduleSave();
-                }}
+                defaultValue={form.content_text || ""}
+                onChange={(e) => setForm((f) => ({ ...f, content_json: "", content_text: e.target.value }))}
                 className="min-h-[10rem] resize-none"
               />
             }
@@ -144,68 +111,90 @@ export default function NoteEditor({ open, onOpenChange, note, onSave, onDelete,
               }
             >
               <RichDescriptionEditor
-                key={note.id}
-                valueJson={note.content_json}
-                plainFallback={note.content_text}
+                key={editorKey}
+                valueJson={note?.content_json}
+                plainFallback={note?.content_text}
                 wordLimit={NOTE_WORD_LIMIT}
-                onChange={({ json, text }) => {
-                  contentRef.current = { json, text };
-                  scheduleSave();
-                }}
+                onChange={({ json, text }) => setForm((f) => ({ ...f, content_json: json, content_text: text }))}
               />
             </Suspense>
           </EditorLoadBoundary>
 
+          {/* Priority spans the full width (unlike TaskForm's 2-up row). */}
+          <div>
+            <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-1.5 block">Priority</Label>
+            <Select value={form.priority_id} onValueChange={(v) => setForm((f) => ({ ...f, priority_id: v }))}>
+              <SelectTrigger className="h-9"><SelectValue placeholder="Select..." /></SelectTrigger>
+              <SelectContent>
+                {priorities.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    <span className="flex items-center gap-2">
+                      <span className={cn("inline-block w-2.5 h-2.5 rounded-full shrink-0", colorDot[p.color] || colorDot.slate)} />
+                      {p.name}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <TagsField form={form} setForm={setForm} savedTags={savedTags} />
+
           <div className="flex items-center gap-2 pt-1">
+            {/* Make task — brand-yellow, black text (design system). */}
             <Button
               type="button"
-              variant="ghost"
-              size="sm"
-              className="text-slate-500 dark:text-slate-400"
-              onClick={() => onSave(note.id, { pinned: !note.pinned })}
-            >
-              {note.pinned ? <PinOff className="w-3.5 h-3.5" /> : <Pin className="w-3.5 h-3.5" />}
-              {note.pinned ? "Unpin" : "Pin"}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="text-slate-500 dark:text-slate-400"
               onClick={handleMakeTask}
+              disabled={!canSubmit}
               data-testid="note-make-task"
+              className="bg-[var(--brand-yellow)] hover:bg-[var(--brand-yellow)]/90 text-[var(--brand-ink)] h-9"
             >
               Make task
             </Button>
-            {confirmDelete ? (
-              <div className="ml-auto flex items-center gap-2">
-                <span className="text-xs text-slate-500 dark:text-slate-400">Delete this note?</span>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => { clearTimeout(timerRef.current); onDelete(note.id); }}
-                >
-                  Delete
-                </Button>
-                <Button type="button" variant="ghost" size="sm" onClick={() => setConfirmDelete(false)}>
-                  Keep
-                </Button>
-              </div>
-            ) : (
+            {note && (
               <Button
                 type="button"
                 variant="ghost"
-                size="sm"
-                className="ml-auto text-slate-400 hover:text-red-500 dark:hover:text-red-300"
-                onClick={() => setConfirmDelete(true)}
-                aria-label="Delete note"
+                size="icon"
+                className="text-slate-400 dark:text-slate-500"
+                onClick={() => setForm((f) => ({ ...f, pinned: !f.pinned }))}
+                aria-label={form.pinned ? "Unpin note" : "Pin note"}
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                {form.pinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
               </Button>
             )}
           </div>
-        </div>
+
+          {/* Footer: delete left, save/cancel right — TaskForm layout. */}
+          <div className="flex items-center justify-between pt-2">
+            <div>
+              {note && onDelete && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-[#2a1116]"
+                  data-testid="note-form-delete"
+                  onClick={() => { onDelete(note); onOpenChange(false); }}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {saved && <span className="text-[11px] text-slate-400 dark:text-slate-500" data-testid="note-form-saved">Saved</span>}
+              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+              <Button
+                type="submit"
+                disabled={!canSubmit}
+                data-testid="note-form-submit"
+                className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+              >
+                {note ? "Save Changes" : "Create Note"}
+              </Button>
+            </div>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

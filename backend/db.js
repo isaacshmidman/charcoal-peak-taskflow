@@ -203,6 +203,8 @@ export function createDatabase(config = backendConfig) {
       title TEXT NOT NULL DEFAULT '',
       content_json TEXT NOT NULL DEFAULT '',
       content_text TEXT NOT NULL DEFAULT '',
+      tags_json TEXT,
+      priority_id TEXT,
       pinned INTEGER NOT NULL DEFAULT 0,
       sort_order INTEGER,
       created_date TEXT NOT NULL,
@@ -363,6 +365,17 @@ export function createDatabase(config = backendConfig) {
   }
   try {
     db.exec(`ALTER TABLE deleted_tasks ADD COLUMN description_json TEXT`);
+  } catch {
+    // Column already exists — ignore
+  }
+  // Notes gained tags + a shared priority (Tasks and Notes share both).
+  try {
+    db.exec(`ALTER TABLE notes ADD COLUMN tags_json TEXT`);
+  } catch {
+    // Column already exists — ignore
+  }
+  try {
+    db.exec(`ALTER TABLE notes ADD COLUMN priority_id TEXT`);
   } catch {
     // Column already exists — ignore
   }

@@ -144,18 +144,20 @@ const ENTITY_DEFINITIONS = {
   Note: {
     table: "notes",
     idPrefix: "note",
-    jsonColumns: [],
+    jsonColumns: ["tags"],
     booleanColumns: ["pinned", "is_sample"],
-    fieldMap: { order: "sort_order" },
+    fieldMap: { order: "sort_order", tags: "tags_json" },
     defaults: {
       title: "",
       content_json: "",
       content_text: "",
+      tags: [],
+      priority_id: "",
       pinned: false,
       order: null,
       is_sample: false,
     },
-    mutableFields: ["title", "content_json", "content_text", "pinned", "order", "is_sample"],
+    mutableFields: ["title", "content_json", "content_text", "tags", "priority_id", "pinned", "order", "is_sample"],
   },
 };
 
