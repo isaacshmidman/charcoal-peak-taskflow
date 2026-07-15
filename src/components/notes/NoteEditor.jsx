@@ -38,6 +38,10 @@ export default function NoteEditor({ open, onOpenChange, note, priorities = [], 
   // The persisted note's id. Null until the first autosave creates it, so
   // the "New Note" heading/button never flip mid-session.
   const idRef = useRef(note?.id || null);
+  // Frozen at open: whether this opened on an existing note. Drives the
+  // heading + button label so neither flips to "New Note"/"Create Note"
+  // during the close animation (when the parent nulls `note`).
+  const [isEditMode, setIsEditMode] = useState(!!note);
 
   const editorKey = note?.id || "new";
   const isValid = !!(form.title.trim() || form.content_text.trim());
@@ -66,6 +70,7 @@ export default function NoteEditor({ open, onOpenChange, note, priorities = [], 
     const initial = note ? { ...emptyNote, ...note, tags: note.tags || [] } : emptyNote;
     setForm(initial);
     idRef.current = note?.id || null;
+    setIsEditMode(!!note);
     reset({
       title: initial.title, content_json: initial.content_json, content_text: initial.content_text,
       tags: initial.tags, priority_id: initial.priority_id, pinned: initial.pinned,
@@ -99,7 +104,7 @@ export default function NoteEditor({ open, onOpenChange, note, priorities = [], 
       <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto" onOpenAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle className="text-sm font-semibold text-slate-900 dark:text-slate-100 text-center">
-            {note ? (form.pinned ? "Edit Pinned Note" : "Edit Note") : "New Note"}
+            {isEditMode ? (form.pinned ? "Edit Pinned Note" : "Edit Note") : "New Note"}
           </DialogTitle>
         </DialogHeader>
 
@@ -211,7 +216,7 @@ export default function NoteEditor({ open, onOpenChange, note, priorities = [], 
               onClick={handleClose}
               className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
             >
-              {note ? "Save Changes" : "Create Note"}
+              {isEditMode ? "Save Changes" : "Create Note"}
             </Button>
           </div>
         </form>

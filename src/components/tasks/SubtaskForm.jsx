@@ -1,6 +1,7 @@
 // @ts-nocheck
-import { useState, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { useAutosave } from "@/hooks/useAutosave";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import TitleTokenInput from "@/components/tasks/QuickAdd/TitleTokenInput";
@@ -31,7 +32,9 @@ import { fromDateStr, toDateStr } from "@/lib/dates";
 export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubmit, onDelete }) {
   /** @type {[TaskCreateInput, import("react").Dispatch<import("react").SetStateAction<TaskCreateInput>>]} */
   const [form, setForm] = useState({ title: "", description: "", due_date: "", task_time: "" });
-  const [saved, setSaved] = useState(false);
+  // Frozen at open — keeps the button label from flipping during close.
+  const [isEditMode, setIsEditMode] = useState(!!task);
+  const idRef = useRef(task?.id || null);
 
   useEffect(() => {
     if (task) {
@@ -45,29 +48,45 @@ export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubm
       const todayStr = format(new Date(), "yyyy-MM-dd");
       setForm({ title: "", description: "", due_date: todayStr, task_time: "" });
     }
-    setSaved(false);
   }, [task, open]);
 
-  /**
-   * @param {import("react").FormEvent<HTMLFormElement>} e
-   */
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!form.title.trim()) return;
-    onSubmit(parentId ? { ...form, parent_id: parentId } : form);
-    setSaved(true);
-    setTimeout(() => onOpenChange(false), 650);
-  };
+  const isValid = !!form.title.trim();
+  const payload = useMemo(() => ({ ...form, ...(parentId ? { parent_id: parentId } : {}) }), [form, parentId]);
+
+  // Upsert: create on first valid write (parent adds parent_id), then update.
+  const saveSubtask = useCallback(async (data) => {
+    const res = await onSubmit(data, idRef.current);
+    if (res?.id) idRef.current = res.id;
+    return res;
+  }, [onSubmit]);
+
+  const { flush, reset } = useAutosave({ payload, valid: isValid, onSave: saveSubtask });
+
+  const initedRef = useRef(false);
+  useEffect(() => {
+    if (!open) { initedRef.current = false; return; }
+    if (initedRef.current) return;
+    initedRef.current = true;
+    idRef.current = task?.id || null;
+    setIsEditMode(!!task);
+    const initial = task
+      ? { title: task.title || "", description: task.description || "", due_date: task.due_date || "", task_time: task.task_time || "" }
+      : { title: "", description: "", due_date: format(new Date(), "yyyy-MM-dd"), task_time: "" };
+    reset({ ...initial, ...(parentId ? { parent_id: parentId } : {}) });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, task?.id]);
+
+  const commitAndClose = () => { if (isValid) flush(); onOpenChange(false); };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o) { commitAndClose(); } else { onOpenChange(true); } }}>
       <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto" onOpenAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-            {task ? "Edit Subtask" : "Add Subtask"}
+            {isEditMode ? "Edit Subtask" : "Add Subtask"}
           </DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
           {/* Title parses natural-language dates/times only (subtasks
               have no tags/priority/recurrence). */}
           <TitleTokenInput
@@ -144,15 +163,10 @@ export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubm
                 </Button>
               )}
             </div>
-            <div className="flex items-center gap-2">
-              {saved && (
-                <span className="text-[11px] text-slate-400 dark:text-slate-500">Saved</span>
-              )}
-              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-              <Button type="submit" disabled={!form.title.trim()} className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200">
-                {task ? "Save Changes" : "Create Subtask"}
-              </Button>
-            </div>
+            {/* Autosaves; button greys until there's a title, then closes. */}
+            <Button type="button" disabled={!isValid} onClick={commitAndClose} className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200">
+              {isEditMode ? "Save Changes" : "Create Subtask"}
+            </Button>
           </div>
         </form>
       </DialogContent>

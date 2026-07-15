@@ -362,21 +362,21 @@ export default function Groupings() {
         onToggleSubtask={(sub) => updateTask(sub.id, { status: sub.status === "done" ? "todo" : "done", completed_at: sub.status === "done" ? "" : new Date().toISOString() })}
         onDeleteSubtask={(sub) => deleteWithUndo(sub, { isSubtask: true })}
         onDelete={handleDelete}
-        onSubmit={async (data, subtaskTitles = []) => {
-          if (editingTask) {
-            await updateTask(editingTask.id, data);
-            const existingSubCount = tasks.filter(t => t.parent_id === editingTask.id).length;
+        onSubmit={async (data, subtaskTitles = [], existingId = null) => {
+          // Upsert for autosave (editing reset lives in onOpenChange).
+          const id = editingTask?.id ?? existingId;
+          if (id) {
+            await updateTask(id, data);
+            const existingSubCount = tasks.filter(t => t.parent_id === id).length;
             for (let i = 0; i < subtaskTitles.length; i++) {
-              await createTask({ title: subtaskTitles[i], status: "todo", task_type: "one_time", parent_id: editingTask.id, order: existingSubCount + i });
+              await createTask({ title: subtaskTitles[i], status: "todo", task_type: "one_time", parent_id: id, order: existingSubCount + i });
             }
-            setEditingTask(null); setAddSubtaskParent(null);
-            return undefined;
+            return { id };
           }
           const created = await createTask(data);
           for (let i = 0; i < subtaskTitles.length; i++) {
             await createTask({ title: subtaskTitles[i], status: "todo", task_type: "one_time", parent_id: created.id, order: i });
           }
-          setEditingTask(null); setAddSubtaskParent(null);
           return created;
         }}
       />

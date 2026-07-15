@@ -10,7 +10,7 @@
  * No reducer or context — preserving the original runtime shape per
  * Phase 4 plan §4.1.
  */
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiClient } from "@/api/apiClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { isOnline, queueTagMutation } from "@/lib/offlineCache";
@@ -28,6 +28,7 @@ import TimeFields from "./TimeFields.jsx";
 import TagsField from "./TagsField.jsx";
 import SubtasksField from "./SubtasksField.jsx";
 import AttachmentsField, { flushPendingUploads } from "../AttachmentsField.jsx";
+import { useAutosave } from "@/hooks/useAutosave";
 
 const defaultTask = {
   title: "",
@@ -50,7 +51,10 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
   const [form, setForm] = useState(defaultTask);
   const [showEndDate, setShowEndDate] = useState(false);
   const [dayError, setDayError] = useState(false);
-  const [saved, setSaved] = useState(false);
+  // Frozen at open: true when editing an existing task. Drives the button
+  // label so it never flips to "Create Task" during the close animation
+  // (when the parent nulls `task`, the dialog is still fading out).
+  const [isEditMode, setIsEditMode] = useState(!!task);
   // Pending file attachments — only relevant when creating a NEW task
   // (we don't have a task id yet, so the upload has to wait for the
   // create to land). For edits, AttachmentsField uploads immediately.
@@ -113,49 +117,26 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
     }
     endTouchedRef.current = false;
     setDayError(false);
-    setSaved(false);
     setPendingFiles([]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task, open, prioritiesKey]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!canSubmit) {
-      if (zeroCustomDays) setDayError(true);
-      return;
-    }
-    const data = { ...form };
-    if (parentId && !task) data.parent_id = parentId;
-    if (data.task_type !== "recurring") { data.recurrence = "none"; data.recurrence_days = []; data.recurrence_end_date = ""; }
-    if (data.recurrence !== "custom_days") data.recurrence_days = [];
-    const subtaskTitles = (data.subtask_titles || []).filter(t => t.trim());
-    delete data.subtask_titles;
-    // Persist any new tags to SavedTag
-    if (data.tags?.length) persistNewTags(data.tags);
-    // Close the modal first so the user sees instant feedback; the
-    // pending-file upload happens in the background. (Existing-task
-    // edits had attachments uploaded immediately by AttachmentsField,
-    // so pendingFiles is always [] in that branch.)
-    const filesToFlush = pendingFiles;
-    const submitResult = onSubmit(data, subtaskTitles);
-    // Flash "Saved", then close — the task is already in the list behind
-    // the modal (optimistic), so the brief lingering is just confirmation.
-    setSaved(true);
-    setTimeout(() => onOpenChange(false), 650);
-    if (!task && filesToFlush.length) {
-      try {
-        const result = await submitResult;
-        const createdId = result?.id || result?.task?.id || null;
-        if (createdId) {
-          await flushPendingUploads(createdId, filesToFlush);
-          queryClient.invalidateQueries({ queryKey: ["tasks"] });
-          queryClient.invalidateQueries({ queryKey: ["taskAttachments", createdId] });
-        }
-      } catch {
-        // Errors are surfaced inside AttachmentsField on the next open.
-      }
-    }
-  };
+  // Autosave session init — runs ONCE per open (NOT when priorities load,
+  // which would reset savedIdRef and cause a duplicate create). Sets the
+  // tracked id and re-baselines so merely opening never re-saves.
+  const initedRef = useRef(false);
+  useEffect(() => {
+    if (!open) { initedRef.current = false; return; }
+    if (initedRef.current) return;
+    initedRef.current = true;
+    savedIdRef.current = task?.id || null;
+    setIsEditMode(!!task);
+    reset(buildData(task
+      ? { ...defaultTask, ...task, tags: task.tags || [], recurrence_days: task.recurrence_days || [], recurrence_end_date: task.recurrence_end_date || "", task_time: task.task_time || "", task_end_time: task.task_end_time || "", subtask_titles: [] }
+      : { ...defaultTask, priority_id: (priorities[Math.floor(priorities.length / 2)] || priorities[0] || {}).id || "", parent_id: parentId || "", due_date: defaultDueDate ?? format(new Date(), "yyyy-MM-dd"), task_time: defaultTaskTime || "", task_end_time: defaultTaskTime ? addMinutes(defaultTaskTime, 60) : "", ...(initialDraft || {}) }
+    ).data);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, task?.id]);
 
   // Source-aware mode flags. A "source" task came from a calendar provider
   // (Google/Apple). Non-task source items render the calendar name instead of
@@ -180,8 +161,60 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
     (form.recurrence_days || []).length === 0;
   const canSubmit = !isReadOnly && !!form.title.trim() && !!form.due_date && !zeroCustomDays;
 
+  // ── Autosave ──────────────────────────────────────────────────────
+  // Normalize the form into the persisted payload (recurrence cleanup;
+  // subtask titles ride separately — they commit on close, not per key).
+  const buildData = (f) => {
+    const data = { ...f };
+    if (parentId && !task) data.parent_id = parentId;
+    if (data.task_type !== "recurring") { data.recurrence = "none"; data.recurrence_days = []; data.recurrence_end_date = ""; }
+    if (data.recurrence !== "custom_days") data.recurrence_days = [];
+    const subtaskTitles = (data.subtask_titles || []).filter((t) => t.trim());
+    delete data.subtask_titles;
+    return { data, subtaskTitles };
+  };
+
+  // Tracks the persisted task id so autosave creates once, then updates —
+  // and so the "New Task" heading/button never flip after the first save.
+  const savedIdRef = useRef(task?.id || null);
+
+  const payload = useMemo(() => buildData(form).data, [form, task, parentId]);
+
+  const onSaveTask = useCallback(async (data) => {
+    console.log("[autosave] onSaveTask CALL, existingId=", savedIdRef.current, "title=", data.title);
+    const res = await onSubmit(data, [], savedIdRef.current);
+    console.log("[autosave] onSaveTask RESULT id=", res?.id);
+    if (res?.id) savedIdRef.current = res.id;
+    if (data.tags?.length) persistNewTags(data.tags);
+    return res;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onSubmit]);
+
+  const { flush, reset } = useAutosave({ payload, valid: canSubmit, onSave: onSaveTask });
+
+  // Flush the latest fields, commit any pending subtask titles + files, close.
+  const commitAndClose = async () => {
+    if (canSubmit) await flush();
+    const { data, subtaskTitles } = buildData(form);
+    const filesToFlush = pendingFiles;
+    if (savedIdRef.current && (subtaskTitles.length || (filesToFlush.length && !task))) {
+      const res = await onSubmit(data, subtaskTitles, savedIdRef.current);
+      if (res?.id) savedIdRef.current = res.id;
+    }
+    onOpenChange(false);
+    if (!task && filesToFlush.length && savedIdRef.current) {
+      try {
+        await flushPendingUploads(savedIdRef.current, filesToFlush);
+        queryClient.invalidateQueries({ queryKey: ["tasks"] });
+        queryClient.invalidateQueries({ queryKey: ["taskAttachments", savedIdRef.current] });
+      } catch {
+        // Errors surface inside AttachmentsField on the next open.
+      }
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o) { commitAndClose(); } else { onOpenChange(true); } }}>
       <DialogContent
         className="sm:max-w-md max-h-[90vh] overflow-y-auto"
         onOpenAutoFocus={(e) => e.preventDefault()}
@@ -211,13 +244,13 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
           </div>
         )}
         <form
-          onSubmit={handleSubmit}
-          // Mod+Enter saves from anywhere in the form — including inside
-          // the rich-text description, where plain Enter just adds a line.
+          onSubmit={(e) => e.preventDefault()}
+          // Mod+Enter closes (the task is already autosaved) from anywhere
+          // in the form — including inside the rich-text description.
           onKeyDown={(e) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && !isReadOnly) {
+            if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && !isReadOnly && canSubmit) {
               e.preventDefault();
-              handleSubmit(e);
+              commitAndClose();
             }
           }}
           className="space-y-4"
@@ -296,15 +329,19 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
               )}
             </div>
             <div className="flex items-center gap-2">
-              {saved && (
-                <span className="text-[11px] text-slate-400 dark:text-slate-500" data-testid="task-form-saved">Saved</span>
-              )}
-              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-                {isReadOnly ? "Close" : "Cancel"}
-              </Button>
-              {!isReadOnly && (
-                <Button type="submit" disabled={!canSubmit} className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200" data-testid="task-form-submit">
-                  {task ? "Save Changes" : "Create Task"}
+              {/* The task autosaves; the button just greys until it's valid
+                  (title + date), then flushes + closes. No "Saved" flash. */}
+              {isReadOnly ? (
+                <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Close</Button>
+              ) : (
+                <Button
+                  type="button"
+                  disabled={!canSubmit}
+                  onClick={commitAndClose}
+                  className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+                  data-testid="task-form-submit"
+                >
+                  {isEditMode ? "Save Changes" : "Create Task"}
                 </Button>
               )}
             </div>

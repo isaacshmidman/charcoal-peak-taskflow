@@ -278,13 +278,16 @@ export default function Completed() {
           deleteWithUndo(task);
           setEditingTask(null);
         }}
-        onSubmit={async (data, subtaskTitles = []) => {
-          await updateTask(editingTask.id, data);
-          const existingSubCount = (subtaskMap[editingTask.id] || []).length;
+        onSubmit={async (data, subtaskTitles = [], existingId = null) => {
+          // Completed only edits existing tasks (autosave upserts by id;
+          // editing reset lives in onOpenChange).
+          const id = editingTask?.id ?? existingId;
+          await updateTask(id, data);
+          const existingSubCount = (subtaskMap[id] || []).length;
           for (let index = 0; index < subtaskTitles.length; index += 1) {
-            await createTask({ title: subtaskTitles[index], status: "todo", task_type: "one_time", parent_id: editingTask.id, order: existingSubCount + index });
+            await createTask({ title: subtaskTitles[index], status: "todo", task_type: "one_time", parent_id: id, order: existingSubCount + index });
           }
-          setEditingTask(null);
+          return { id };
         }}
       />
     </div>

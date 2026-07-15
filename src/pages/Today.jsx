@@ -274,13 +274,16 @@ export default function Today() {
         onOpenChange={(o) => { setShowSubtaskForm(o); if (!o) { setEditingSubtask(null); setAddSubtaskParent(null); } }}
         task={editingSubtask}
         parentId={addSubtaskParent?.id}
-        onSubmit={(data) => {
-          if (editingSubtask) {
-            updateTask(editingSubtask.id, { ...editingSubtask, ...data });
-          } else if (addSubtaskParent) {
-            createTask({ ...data, status: "todo", task_type: "one_time", parent_id: addSubtaskParent.id });
+        onSubmit={async (data, existingId = null) => {
+          // Upsert for autosave (editing reset lives in onOpenChange).
+          const id = editingSubtask?.id ?? existingId;
+          if (id) {
+            await updateTask(id, { ...(editingSubtask || {}), ...data });
+            return { id };
           }
-          setEditingSubtask(null); setAddSubtaskParent(null);
+          if (addSubtaskParent) {
+            return await createTask({ ...data, status: "todo", task_type: "one_time", parent_id: addSubtaskParent.id });
+          }
         }}
         onDelete={(sub) => { deleteWithUndo(sub, { isSubtask: true }); setEditingSubtask(null); }}
       />
@@ -321,21 +324,21 @@ export default function Today() {
         onDeleteSubtask={(sub) => deleteWithUndo(sub, { isSubtask: true })}
         onEditSubtask={(sub) => { setShowForm(false); setEditingSubtask(sub); setShowSubtaskForm(true); }}
         onDelete={handleDelete}
-        onSubmit={async (data, subtaskTitles = []) => {
-          if (editingTask) {
-            await updateTask(editingTask.id, data);
-            const existingSubCount = (subtaskMap[editingTask.id] || []).length;
+        onSubmit={async (data, subtaskTitles = [], existingId = null) => {
+          // Upsert for autosave (editing reset lives in onOpenChange).
+          const id = editingTask?.id ?? existingId;
+          if (id) {
+            await updateTask(id, data);
+            const existingSubCount = (subtaskMap[id] || []).length;
             for (let i = 0; i < subtaskTitles.length; i++) {
-              await createTask({ title: subtaskTitles[i], status: "todo", task_type: "one_time", parent_id: editingTask.id, order: existingSubCount + i });
+              await createTask({ title: subtaskTitles[i], status: "todo", task_type: "one_time", parent_id: id, order: existingSubCount + i });
             }
-            setEditingTask(null);
-            return undefined;
+            return { id };
           }
           const created = await createTask(data);
           for (let i = 0; i < subtaskTitles.length; i++) {
             await createTask({ title: subtaskTitles[i], status: "todo", task_type: "one_time", parent_id: created.id, order: i });
           }
-          setEditingTask(null);
           // Returned so TaskForm can flush queued attachments
           // against the newly-created task id.
           return created;
