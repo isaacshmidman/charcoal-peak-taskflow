@@ -68,7 +68,7 @@ export default function ShortcutsHelp({ open, onOpenChange }) {
           <Section title="Actions">
             <Row keys={["n"]} label="New task (new note on the Notes page)" />
             <Row keys={[mod, "K"]} label="Command palette — actions, navigation, task search" />
-            <Row keys={["v"]} label="Review the day (on Today)" />
+            <Row keys={["v"]} label="Move overdue tasks to today (on Today)" />
             <Row keys={["/"]} label="Search the current page" />
             <Row keys={["z"]} label="Undo a just-deleted task (while the toast shows)" />
             <Row keys={["Esc"]} label="Close dialog / search" />

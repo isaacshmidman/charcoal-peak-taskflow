@@ -7,7 +7,8 @@ import { formatDeleteLabel, useDeleteWithUndo } from "@/hooks/useDeleteWithUndo"
 import { showDeleteToast } from "@/components/tasks/DeleteToast";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import ReviewDialog from "@/components/ReviewDialog";
+import OverdueDialog from "@/components/OverdueDialog";
+import { computeOverdue } from "@/lib/reviewStats";
 import { Plus, Search, Sunrise } from "lucide-react";
 import { AnimatedSearchInput } from "@/components/ui/animated-search-input";
 import { AnimatePresence } from "framer-motion";
@@ -43,7 +44,7 @@ export default function Today() {
     setEditingTask(null); setAddSubtaskParent(null); setShowForm(true);
   });
   useShortcutEvent(SHORTCUT_EVENTS.search, () => setShowSearch(true));
-  useShortcutEvent(SHORTCUT_EVENTS.review, () => setShowReview(true));
+  useShortcutEvent(SHORTCUT_EVENTS.review, () => { if (overdueTasks.length) setShowReview(true); });
   const [sorts, setSorts] = useState(() => {
     try {
       const saved = localStorage.getItem("sorts_today");
@@ -192,6 +193,18 @@ export default function Today() {
     });
   }, [tasks, search, priorityOrderMap, todayStart, sorts, hiddenCalendars, calendarIndexByKey]);
 
+  // Overdue tasks for the Overdue dialog, ordered by the same sort settings.
+  const overdueTasks = useMemo(() => {
+    return computeOverdue(tasks).sort((a, b) => {
+      for (const sortValue of sorts) {
+        const result = compareFn(a, b, sortValue);
+        if (result !== 0) return result;
+      }
+      return 0;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks, sorts, priorityOrderMap, calendarIndexByKey]);
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
@@ -200,16 +213,18 @@ export default function Today() {
           <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{todayAndPast.length} task{todayAndPast.length !== 1 ? "s" : ""}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
-            title="Review the day (v)"
-            data-testid="review-button"
-            onClick={() => setShowReview(true)}
-          >
-            <Sunrise className="w-4 h-4" />
-          </Button>
+          {overdueTasks.length > 0 && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
+              title="Overdue tasks (v)"
+              data-testid="overdue-button"
+              onClick={() => setShowReview(true)}
+            >
+              <Sunrise className="w-4 h-4" />
+            </Button>
+          )}
           <AnimatedSearchInput
             open={showSearch}
             value={search}
@@ -304,10 +319,11 @@ export default function Today() {
         onDeleteAll={() => { deleteWithUndo(recurringDeleteTask, {}); setRecurringDeleteTask(null); }}
       />
 
-      <ReviewDialog
+      <OverdueDialog
         open={showReview}
         onOpenChange={setShowReview}
-        tasks={tasks}
+        overdueTasks={overdueTasks}
+        priorities={priorities}
         onMoveToToday={(ids) => {
           const today = new Date();
           const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
