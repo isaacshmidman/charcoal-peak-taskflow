@@ -63,20 +63,70 @@ export default function Notes() {
 
   const openNote = notes.find((n) => n.id === openNoteId) || null;
 
-  const visibleNotes = useMemo(() => {
+  const priorityOrderMap = useMemo(() => {
+    const map = {};
+    priorities.forEach((p) => { map[p.id] = p.order; });
+    return map;
+  }, [priorities]);
+
+  // Sort comparator for notes. "date" here is the CREATED date; pinned
+  // notes always float to the top of their section.
+  const compareNotes = (a, b, sortValue) => {
+    if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+    const pa = priorityOrderMap[a.priority_id] ?? 99;
+    const pb = priorityOrderMap[b.priority_id] ?? 99;
+    const ca = String(a.created_date || "");
+    const cb = String(b.created_date || "");
+    const ta = (a.tags?.[0] || "");
+    const tb = (b.tags?.[0] || "");
+    switch (sortValue) {
+      case "date_asc": return ca.localeCompare(cb);
+      case "date_desc": return cb.localeCompare(ca);
+      case "priority_asc": return pa - pb;
+      case "priority_desc": return pb - pa;
+      case "tag_az":
+        if (!ta && tb) return 1;
+        if (ta && !tb) return -1;
+        return ta.localeCompare(tb);
+      default: return 0;
+    }
+  };
+
+  const sortNotes = (list) => [...list].sort((a, b) => {
+    for (const s of sorts) { const r = compareNotes(a, b, s); if (r !== 0) return r; }
+    return 0;
+  });
+
+  const filteredNotes = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const matched = q
+    return q
       ? notes.filter(
           (n) =>
             (n.title || "").toLowerCase().includes(q) ||
             (n.content_text || "").toLowerCase().includes(q)
         )
       : notes;
-    return [...matched].sort((a, b) => {
-      if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
-      return String(b.updated_date || "").localeCompare(String(a.updated_date || ""));
-    });
   }, [notes, search]);
+
+  // Grouped by tag (heading = the tag name), untagged under "By Date".
+  // A multi-tag note appears under each of its tags (Groupings behavior).
+  // Empty sections are dropped.
+  const groups = useMemo(() => {
+    const tagNames = [...new Set(filteredNotes.flatMap((n) => n.tags || []))].sort((a, b) =>
+      String(a).toLowerCase().localeCompare(String(b).toLowerCase())
+    );
+    const out = tagNames
+      .map((tag) => ({
+        key: `tag:${tag}`,
+        title: tag,
+        notes: sortNotes(filteredNotes.filter((n) => (n.tags || []).includes(tag))),
+      }))
+      .filter((g) => g.notes.length > 0);
+    const untagged = sortNotes(filteredNotes.filter((n) => !(n.tags || []).length));
+    if (untagged.length) out.push({ key: "by-date", title: "By Date", notes: untagged });
+    return out;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredNotes, sorts, priorityOrderMap]);
 
   // New note = blank editor (created only on submit — no empty-note litter).
   const newNote = () => { setOpenNoteId(null); setShowEditor(true); };
@@ -156,6 +206,7 @@ export default function Notes() {
           >
             <Search className="w-4 h-4" />
           </Button>
+          <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} page="notes" />
           {/* Same button as Today's New Task — condenses to a plus on small screens. */}
           <Button onClick={newNote} className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200 h-9 gap-1.5" data-testid="new-note-button">
             <Plus className="w-4 h-4" />
@@ -168,7 +219,7 @@ export default function Notes() {
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((i) => <Card key={i} className="h-28 animate-pulse" />)}
         </div>
-      ) : visibleNotes.length === 0 ? (
+      ) : groups.length === 0 ? (
         <div className="text-center py-14">
           <NotebookPen className="w-5 h-5 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
           <p className="text-xs text-slate-400 dark:text-slate-500">
@@ -176,39 +227,46 @@ export default function Notes() {
           </p>
         </div>
       ) : (
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {visibleNotes.map((note) => (
-            <Card
-              key={note.id}
-              role="button"
-              tabIndex={0}
-              data-testid={`note-card-${note.id}`}
-              className="p-4 cursor-pointer text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              onClick={() => { setOpenNoteId(note.id); setShowEditor(true); }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") { setOpenNoteId(note.id); setShowEditor(true); }
-              }}
-            >
-              <div className="flex items-start gap-2">
-                <p className={cn(
-                  "text-sm font-medium flex-1 min-w-0 truncate",
-                  note.title ? "text-slate-900 dark:text-slate-100" : "text-slate-400 dark:text-slate-500"
-                )}>
-                  {note.title || "Untitled"}
-                </p>
-                {note.pinned && <Pin className="w-3 h-3 shrink-0 mt-0.5 text-slate-400 dark:text-slate-500" />}
+        <div className="space-y-6">
+          {groups.map((group) => (
+            <section key={group.key}>
+              <h2 className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-2">{group.title}</h2>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {group.notes.map((note) => (
+                  <Card
+                    key={note.id}
+                    role="button"
+                    tabIndex={0}
+                    data-testid={`note-card-${note.id}`}
+                    className="p-4 cursor-pointer text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    onClick={() => { setOpenNoteId(note.id); setShowEditor(true); }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") { setOpenNoteId(note.id); setShowEditor(true); }
+                    }}
+                  >
+                    <div className="flex items-start gap-2">
+                      <p className={cn(
+                        "text-sm font-medium flex-1 min-w-0 truncate",
+                        note.title ? "text-slate-900 dark:text-slate-100" : "text-slate-400 dark:text-slate-500"
+                      )}>
+                        {note.title || "Untitled"}
+                      </p>
+                      {note.pinned && <Pin className="w-3 h-3 shrink-0 mt-0.5 text-slate-400 dark:text-slate-500" />}
+                    </div>
+                    <NotePreview
+                      contentJson={note.content_json}
+                      contentText={note.content_text}
+                      className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-3"
+                    />
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2">
+                      {note.updated_date
+                        ? formatDistanceToNow(new Date(note.updated_date), { addSuffix: true })
+                        : ""}
+                    </p>
+                  </Card>
+                ))}
               </div>
-              {note.content_text?.trim() && (
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-3 whitespace-pre-line">
-                  {note.content_text}
-                </p>
-              )}
-              <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2">
-                {note.updated_date
-                  ? formatDistanceToNow(new Date(note.updated_date), { addSuffix: true })
-                  : ""}
-              </p>
-            </Card>
+            </section>
           ))}
         </div>
       )}
