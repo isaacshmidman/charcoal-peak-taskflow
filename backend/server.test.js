@@ -386,3 +386,48 @@ describe("registry entities: Note", () => {
     expect(deleted.statusCode).toBe(200);
   });
 });
+
+describe("registry entities: DeletedNote", () => {
+  it("supports CRUD, defaults expiry from retention, and purges expired records lazily", async () => {
+    const token = await login("isaac@example.com");
+    const auth = { Authorization: `Bearer ${token}` };
+
+    // Create with defaults — deleted_at/expires_at are stamped server-side.
+    const created = await invoke("/api/apps/test-app/entities/DeletedNote", {
+      method: "POST",
+      headers: { ...auth, "Content-Type": "application/json" },
+      body: { note_id: "note_x", title: "Trash me", content_text: "body", tags: ["work"], pinned: true },
+    });
+    expect(created.statusCode).toBe(201);
+    expect(created.body.id).toMatch(/^delnote_/);
+    expect(created.body.deleted_at).toBeTruthy();
+    // retention default is 7 days — expires after deleted_at
+    expect(new Date(created.body.expires_at) > new Date(created.body.deleted_at)).toBe(true);
+    expect(created.body.tags).toEqual(["work"]);
+    expect(created.body.pinned).toBe(true);
+
+    // An already-expired record gets swept on the next list (lazy purge).
+    const expired = await invoke("/api/apps/test-app/entities/DeletedNote", {
+      method: "POST",
+      headers: { ...auth, "Content-Type": "application/json" },
+      body: {
+        note_id: "note_y",
+        title: "Long gone",
+        deleted_at: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+        expires_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+    });
+    expect(expired.statusCode).toBe(201);
+
+    const listed = await invoke("/api/apps/test-app/entities/DeletedNote", { headers: auth });
+    expect(listed.statusCode).toBe(200);
+    expect(listed.body.some((r) => r.id === created.body.id)).toBe(true);
+    expect(listed.body.some((r) => r.id === expired.body.id)).toBe(false); // purged
+
+    const removed = await invoke(`/api/apps/test-app/entities/DeletedNote/${created.body.id}`, {
+      method: "DELETE",
+      headers: auth,
+    });
+    expect(removed.statusCode).toBe(200);
+  });
+});

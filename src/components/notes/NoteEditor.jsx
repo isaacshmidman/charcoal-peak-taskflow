@@ -36,8 +36,11 @@ const emptyNote = { title: "", content_json: "", content_text: "", tags: [], pri
 export default function NoteEditor({ open, onOpenChange, note, priorities = [], savedTags = [], onSave, onDelete, onMakeTask }) {
   const [form, setForm] = useState(emptyNote);
   // The persisted note's id. Null until the first autosave creates it, so
-  // the "New Note" heading/button never flip mid-session.
+  // the "New Note" heading/button never flip mid-session. Mirrored into
+  // state (savedId) because a ref write alone doesn't re-render — without
+  // it the Delete/Pin buttons never appear on a freshly-autosaved note.
   const idRef = useRef(note?.id || null);
+  const [savedId, setSavedId] = useState(note?.id || null);
   // Frozen at open: whether this opened on an existing note. Drives the
   // heading + button label so neither flips to "New Note"/"Create Note"
   // during the close animation (when the parent nulls `note`).
@@ -59,7 +62,7 @@ export default function NoteEditor({ open, onOpenChange, note, priorities = [], 
   // then update. onSave(id, data) → the saved record.
   const saveNote = useCallback(async (data) => {
     const rec = await onSave(idRef.current, data);
-    if (rec?.id) idRef.current = rec.id;
+    if (rec?.id) { idRef.current = rec.id; setSavedId(rec.id); }
     return rec;
   }, [onSave]);
 
@@ -70,6 +73,7 @@ export default function NoteEditor({ open, onOpenChange, note, priorities = [], 
     const initial = note ? { ...emptyNote, ...note, tags: note.tags || [] } : emptyNote;
     setForm(initial);
     idRef.current = note?.id || null;
+    setSavedId(note?.id || null);
     setIsEditMode(!!note);
     reset({
       title: initial.title, content_json: initial.content_json, content_text: initial.content_text,
@@ -80,7 +84,7 @@ export default function NoteEditor({ open, onOpenChange, note, priorities = [], 
 
   // Delete works for an existing note OR a brand-new one that has already
   // autosaved (idRef set while the `note` prop is still null).
-  const currentNote = note || (idRef.current ? { ...form, id: idRef.current } : null);
+  const currentNote = note || (savedId ? { ...form, id: savedId } : null);
 
   const handleClose = () => { flush(); onOpenChange(false); };
 

@@ -141,6 +141,24 @@ const ENTITY_DEFINITIONS = {
     },
     mutableFields: ["name", "is_sample"],
   },
+  DeletedNote: {
+    table: "deleted_notes",
+    idPrefix: "delnote",
+    jsonColumns: ["tags"],
+    booleanColumns: ["pinned", "is_sample"],
+    fieldMap: { tags: "tags_json" },
+    defaults: {
+      note_id: "",
+      title: "",
+      content_json: "",
+      content_text: "",
+      pinned: false,
+      tags: [],
+      priority_id: "",
+      is_sample: false,
+    },
+    mutableFields: ["note_id", "title", "content_json", "content_text", "pinned", "tags", "priority_id", "deleted_at", "expires_at", "is_sample"],
+  },
   Note: {
     table: "notes",
     idPrefix: "note",
@@ -459,12 +477,14 @@ function buildInsertRow(entityName, input, { appId, user, config, allowSystemFie
     }
   }
 
-  if (entityName === "DeletedTask") {
+  if (entityName === "DeletedTask" || entityName === "DeletedNote") {
     row.deleted_at = String(input.deleted_at || now);
     row.expires_at = String(
       input.expires_at ||
         new Date(new Date(row.deleted_at).getTime() + getDeletedTaskRetentionMs(config)).toISOString()
     );
+  }
+  if (entityName === "DeletedTask") {
     row.was_completed =
       "was_completed" in input ? (toBoolean(input.was_completed) ? 1 : 0) : row.status === "done" ? 1 : 0;
     row.subtasks_json = JSON.stringify(parseJsonColumn(input.subtasks, []));
@@ -522,6 +542,13 @@ export function purgeExpiredDeletedTasks(db, appId) {
   );
 }
 
+export function purgeExpiredDeletedNotes(db, appId) {
+  db.prepare("DELETE FROM deleted_notes WHERE app_id = ? AND expires_at <= ?").run(
+    appId,
+    new Date().toISOString()
+  );
+}
+
 function listRowsForEntity(db, entityName, appId, user) {
   const definition = ENTITY_DEFINITIONS[entityName];
   if (!definition) throw new HttpError(404, `Unknown entity: ${entityName}`, "unknown_entity");
@@ -537,6 +564,9 @@ export function listEntityRecords(db, { entityName, appId, user, sort, skip = 0,
   }
   if (entityName === "DeletedTask") {
     purgeExpiredDeletedTasks(db, appId);
+  }
+  if (entityName === "DeletedNote") {
+    purgeExpiredDeletedNotes(db, appId);
   }
 
   const records = listRowsForEntity(db, entityName, appId, user)
@@ -555,6 +585,9 @@ export function getEntityRecord(db, { entityName, appId, user, id }) {
 
   if (entityName === "DeletedTask") {
     purgeExpiredDeletedTasks(db, appId);
+  }
+  if (entityName === "DeletedNote") {
+    purgeExpiredDeletedNotes(db, appId);
   }
 
   const definition = ENTITY_DEFINITIONS[entityName];

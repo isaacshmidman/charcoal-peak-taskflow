@@ -3,7 +3,7 @@ import { useState, useMemo, useEffect } from "react";
 import { apiClient } from "@/api/apiClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
-import { ArrowLeft, Trash2, Search, RotateCcw, CheckSquare } from "lucide-react";
+import { ArrowLeft, Trash2, Search, RotateCcw, CheckSquare, NotebookPen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { AnimatedSearchInput } from "@/components/ui/animated-search-input";
@@ -14,7 +14,9 @@ import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useDeletedTasks } from "@/hooks/useDeletedTasks";
 import { useOfflineMutation } from "@/hooks/useOfflineMutation";
+import { useOfflineEntityMutation } from "@/hooks/useOfflineEntityMutation";
 import { showDeleteToast } from "@/components/tasks/DeleteToast";
+import NotePreview from "@/components/notes/NotePreview";
 import { excludeExternalEvents } from "@/lib/task-filters";
 import { formatDeleteLabel } from "@/hooks/useDeleteWithUndo";
 import {
@@ -72,13 +74,15 @@ export default function RecentlyDeleted({ onBack } = {}) {
     setRetentionDays(val);
     localStorage.setItem("deletedTaskRetentionDays", val);
     const days = parseInt(val, 10);
+    const expiry = (deletedAt) =>
+      new Date(new Date(deletedAt).getTime() + days * 24 * 60 * 60 * 1000).toISOString();
     const current = queryClient.getQueryData(["deletedTasks"]) || [];
+    const currentNotes = queryClient.getQueryData(["deletedNotes"]) || [];
 
-    await Promise.all(current.map((record) =>
-      updateDeletedTask(record.id, {
-        expires_at: new Date(new Date(record.deleted_at).getTime() + days * 24 * 60 * 60 * 1000).toISOString(),
-      })
-    ));
+    await Promise.all([
+      ...current.map((record) => updateDeletedTask(record.id, { expires_at: expiry(record.deleted_at) })),
+      ...currentNotes.map((record) => deletedNoteMutation.update(record.id, { expires_at: expiry(record.deleted_at) })),
+    ]);
   };
 
   const { data: rawDeletedTasks = [] } = useQuery({
@@ -92,6 +96,13 @@ export default function RecentlyDeleted({ onBack } = {}) {
     queryKey: ["priorities"],
     queryFn: () => apiClient.entities.Priority.list("order", 50),
   });
+
+  const { data: rawDeletedNotes = [] } = useQuery({
+    queryKey: ["deletedNotes"],
+    queryFn: () => apiClient.entities.DeletedNote.list("-deleted_at", 500),
+  });
+  const noteMutation = useOfflineEntityMutation("Note");
+  const deletedNoteMutation = useOfflineEntityMutation("DeletedNote");
 
   const priorityMap = useMemo(() => {
     const map = {};
@@ -142,6 +153,31 @@ export default function RecentlyDeleted({ onBack } = {}) {
     });
   }, [userDeletedTasks, search, sorts]);
 
+  const displayedNotes = useMemo(() => {
+    const q = search.toLowerCase();
+    const filtered = rawDeletedNotes.filter(n =>
+      !q || (n.title || "").toLowerCase().includes(q) || (n.content_text || "").toLowerCase().includes(q) || (n.tags || []).some(t => t.toLowerCase().includes(q))
+    );
+    const asc = sorts.includes("deleted_asc");
+    return [...filtered].sort((a, b) =>
+      asc ? new Date(a.deleted_at) - new Date(b.deleted_at) : new Date(b.deleted_at) - new Date(a.deleted_at)
+    );
+  }, [rawDeletedNotes, search, sorts]);
+
+  const handleRestoreNote = async (record) => {
+    await noteMutation.create({
+      title: record.title, content_json: record.content_json, content_text: record.content_text,
+      pinned: !!record.pinned, tags: record.tags || [], priority_id: record.priority_id || "",
+    });
+    await deletedNoteMutation.remove(record.id);
+    showDeleteToast({ label: formatDeleteLabel({ scenario: "restore_single", title: record.title || "Untitled" }), hideUndo: true });
+  };
+
+  const handlePermanentDeleteNote = async (record) => {
+    await deletedNoteMutation.remove(record.id);
+    showDeleteToast({ label: formatDeleteLabel({ scenario: "permanent_single", title: record.title || "Untitled" }), hideUndo: true });
+  };
+
   const handleRestore = async (record) => {
     // Re-create the task
     const taskData = {
@@ -191,8 +227,11 @@ export default function RecentlyDeleted({ onBack } = {}) {
 
   const handleEmptyRecentlyDeleted = async () => {
     setShowEmptyDialog(false);
-    const count = userDeletedTasks.length;
+    const count = userDeletedTasks.length + rawDeletedNotes.length;
     await permanentlyDeleteMany(userDeletedTasks.map((record) => record.id));
+    for (const record of rawDeletedNotes) {
+      await deletedNoteMutation.remove(record.id);
+    }
     if (count > 0) {
       showDeleteToast({
         label: formatDeleteLabel({ scenario: "permanent_bulk", count }),
@@ -223,7 +262,9 @@ export default function RecentlyDeleted({ onBack } = {}) {
           </button>
           <div>
             <h1 className="text-base font-semibold text-slate-900 dark:text-slate-100">Recently Deleted</h1>
-            <p className="text-xs text-slate-400 dark:text-slate-500">{displayedTasks.length} task{displayedTasks.length !== 1 ? "s" : ""}</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500">
+              {displayedTasks.length + displayedNotes.length} item{displayedTasks.length + displayedNotes.length !== 1 ? "s" : ""}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -237,7 +278,7 @@ export default function RecentlyDeleted({ onBack } = {}) {
             <Search className="w-4 h-4" />
           </Button>
           <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} page="deleted" />
-          {userDeletedTasks.length > 0 && (
+          {(userDeletedTasks.length > 0 || rawDeletedNotes.length > 0) && (
             <Dialog open={showEmptyDialog} onOpenChange={setShowEmptyDialog}>
               <Button
                 variant="ghost"
@@ -250,7 +291,7 @@ export default function RecentlyDeleted({ onBack } = {}) {
               </Button>
               <DialogContent className="max-w-md">
                 <DialogHeader>
-                  <DialogTitle>Permanently Delete all Recently Deleted tasks?</DialogTitle>
+                  <DialogTitle>Permanently Delete everything in Recently Deleted?</DialogTitle>
                 </DialogHeader>
                 <div className="flex flex-col gap-3 pt-2">
                   <button
@@ -276,7 +317,7 @@ export default function RecentlyDeleted({ onBack } = {}) {
 
       {/* Retention setting */}
       <Card className="flex items-center gap-3 px-4 py-3">
-        <span className="text-xs font-medium text-slate-500 dark:text-slate-400 flex-1">Keep deleted tasks for</span>
+        <span className="text-xs font-medium text-slate-500 dark:text-slate-400 flex-1">Keep deleted items for</span>
         <Select value={retentionDays} onValueChange={handleRetentionChange}>
           <SelectTrigger className="w-32 h-8 text-xs">
             <SelectValue />
@@ -289,26 +330,122 @@ export default function RecentlyDeleted({ onBack } = {}) {
         </Select>
       </Card>
 
-      {displayedTasks.length === 0 ? (
+      {displayedTasks.length === 0 && displayedNotes.length === 0 ? (
         <div className="py-14 text-center">
           <p className="text-xs text-slate-400 dark:text-slate-500">Nothing here. The bin sits empty.</p>
         </div>
       ) : (
-        <div className="space-y-2">
-          <AnimatePresence mode="popLayout">
-            {displayedTasks.map(record => (
-              <DeletedTaskCard
-                key={record.id}
-                record={record}
-                priorityMap={priorityMap}
-                onRestore={() => handleRestore(record)}
-                onDelete={() => handlePermanentDelete(record)}
-              />
-            ))}
-          </AnimatePresence>
-        </div>
+        <>
+          {/* Sections mirror the Notes page: heading only when non-empty. */}
+          {displayedTasks.length > 0 && (
+            <div className="space-y-2">
+              <h2 className="text-xs font-semibold text-slate-900 dark:text-slate-100">Tasks</h2>
+              <AnimatePresence mode="popLayout">
+                {displayedTasks.map(record => (
+                  <DeletedTaskCard
+                    key={record.id}
+                    record={record}
+                    priorityMap={priorityMap}
+                    onRestore={() => handleRestore(record)}
+                    onDelete={() => handlePermanentDelete(record)}
+                  />
+                ))}
+              </AnimatePresence>
+            </div>
+          )}
+          {displayedNotes.length > 0 && (
+            <div className="space-y-2">
+              <h2 className="text-xs font-semibold text-slate-900 dark:text-slate-100">Notes</h2>
+              <AnimatePresence mode="popLayout">
+                {displayedNotes.map(record => (
+                  <DeletedNoteCard
+                    key={record.id}
+                    record={record}
+                    priorityMap={priorityMap}
+                    onRestore={() => handleRestoreNote(record)}
+                    onDelete={() => handlePermanentDeleteNote(record)}
+                  />
+                ))}
+              </AnimatePresence>
+            </div>
+          )}
+        </>
       )}
     </div>
+  );
+}
+
+/** Trash row for a deleted note — DeletedTaskCard's chrome with a note
+ * glyph instead of the completion square and a one-line text preview. */
+function DeletedNoteCard({ record, priorityMap, onRestore, onDelete }) {
+  const priority = priorityMap[record.priority_id];
+  const colorKey = priority?.color || record.priority_color || "slate";
+  const cardBg = colorBg[colorKey] || colorBg.slate;
+  const isDarkCard = isDarkColor(colorKey);
+  const deletedDate = record.deleted_at ? format(new Date(record.deleted_at), "MMM d, yyyy") : "";
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.97 }}
+      transition={{ duration: 0.1 }}
+    >
+      <div className={cn("rounded-xl border flex overflow-hidden", cardBg)}>
+        <div className="flex-1 min-w-0 px-3 py-2.5">
+          <div className="flex items-start gap-2">
+            <div className="shrink-0 w-7 h-7 rounded-md border-2 border-slate-300 dark:border-slate-600 bg-white/80 dark:bg-[#0c0c0c] flex items-center justify-center">
+              <NotebookPen className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <p className={cn(
+                "text-sm font-medium truncate",
+                isDarkCard ? "text-white dark:text-slate-100" : "text-slate-900 dark:text-slate-100",
+                !record.title && "text-slate-400 dark:text-slate-500"
+              )}>
+                {record.title || "Untitled"}
+              </p>
+              {record.content_text?.trim() && (
+                <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                  {record.content_text}
+                </p>
+              )}
+
+              <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                <span className="text-[10px] font-medium text-red-600 dark:text-red-300 bg-red-50 dark:bg-[#2a1116] border border-red-200 dark:border-red-800 px-1.5 py-0.5 rounded">
+                  Deleted {deletedDate}
+                </span>
+                {record.tags?.length > 0 && record.tags.slice(0, 2).map(tag => (
+                  <span key={tag} className="text-[10px] font-medium text-slate-500 dark:text-slate-300 bg-white/70 dark:bg-[#0c0c0c] px-1.5 py-0.5 rounded border border-slate-200 dark:border-[#343434]">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                onClick={onRestore}
+                className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-[#10261b] transition-colors"
+                title="Restore"
+                data-testid={`restore-note-${record.id}`}
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={onDelete}
+                className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-[#2a1116] transition-colors"
+                title="Delete permanently"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </motion.div>
   );
 }
 

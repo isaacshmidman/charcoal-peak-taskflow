@@ -214,6 +214,26 @@ export function createDatabase(config = backendConfig) {
       is_sample INTEGER NOT NULL DEFAULT 0
     );
 
+    CREATE TABLE IF NOT EXISTS deleted_notes (
+      id TEXT PRIMARY KEY,
+      app_id TEXT NOT NULL,
+      note_id TEXT NOT NULL DEFAULT '',
+      title TEXT NOT NULL DEFAULT '',
+      content_json TEXT NOT NULL DEFAULT '',
+      content_text TEXT NOT NULL DEFAULT '',
+      pinned INTEGER NOT NULL DEFAULT 0,
+      tags_json TEXT NOT NULL DEFAULT '[]',
+      priority_id TEXT NOT NULL DEFAULT '',
+      deleted_at TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      created_date TEXT NOT NULL,
+      updated_date TEXT NOT NULL,
+      created_by_id TEXT,
+      created_by TEXT,
+      is_sample INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_deleted_notes_expiry ON deleted_notes(expires_at);
+
     CREATE TABLE IF NOT EXISTS tasks (
       id TEXT PRIMARY KEY,
       app_id TEXT NOT NULL,

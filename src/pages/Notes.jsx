@@ -46,6 +46,7 @@ export default function Notes() {
   };
 
   const noteMutation = useOfflineEntityMutation("Note");
+  const deletedNoteMutation = useOfflineEntityMutation("DeletedNote");
   const { createTask, deleteTask } = useOfflineMutation();
 
   const { data: notes = [], isLoading } = useQuery({
@@ -142,21 +143,34 @@ export default function Notes() {
     return noteMutation.create(data);
   };
 
-  // Delete → toast with undo (recreates from the in-memory snapshot).
-  // Phase 5 upgrades this to a recoverable Recently-Deleted record.
-  const deleteNote = (note) => {
+  // Delete → immediate + undo toast, AND a recoverable DeletedNote record
+  // so it lands in Recently Deleted (restorable beyond the 3s toast).
+  const deleteNote = async (note) => {
     const snapshot = { ...note };
     delete snapshot.id;
+    const record = await deletedNoteMutation.create({
+      note_id: note.id,
+      title: note.title || "",
+      content_json: note.content_json || "",
+      content_text: note.content_text || "",
+      pinned: !!note.pinned,
+      tags: note.tags || [],
+      priority_id: note.priority_id || "",
+    });
     noteMutation.remove(note.id);
     showDeleteToast({
       label: "Note deleted",
-      onUndo: () => noteMutation.create(snapshot),
+      onUndo: () => {
+        noteMutation.create(snapshot);
+        if (record?.id) deletedNoteMutation.remove(record.id);
+      },
     });
   };
 
   // Make task: create a dated task carrying the note's title/description/
-  // tags/priority (tasks require a date → default today), remove the note
-  // (by the id the editor autosaved it under).
+  // tags/priority (tasks require a date → default today), then retire the
+  // note into Recently Deleted (like deleteNote) so it stays recoverable
+  // even after the undo toast expires.
   const makeTask = async (draft, noteId) => {
     const source = notes.find((n) => n.id === noteId) || null;
     const noteSnapshot = source ? (() => { const s = { ...source }; delete s.id; return s; })() : null;
@@ -170,12 +184,25 @@ export default function Notes() {
       task_type: "one_time",
       due_date: format(new Date(), "yyyy-MM-dd"),
     });
+    let record = null;
+    if (source) {
+      record = await deletedNoteMutation.create({
+        note_id: source.id,
+        title: source.title || "",
+        content_json: source.content_json || "",
+        content_text: source.content_text || "",
+        pinned: !!source.pinned,
+        tags: source.tags || [],
+        priority_id: source.priority_id || "",
+      });
+    }
     if (noteId) noteMutation.remove(noteId);
     showDeleteToast({
       label: "Task created",
       onUndo: () => {
-        if (created?.id) deleteTask(created.id);
+        if (created?.id) deleteTask(created.id, { skipDeletedRecord: true });
         if (noteSnapshot) noteMutation.create(noteSnapshot);
+        if (record?.id) deletedNoteMutation.remove(record.id);
       },
     });
   };

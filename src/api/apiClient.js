@@ -98,6 +98,7 @@ const ENTITY_CACHE_KEYS = {
   // Registry-backed entities (src/lib/offlineEntityRegistry.js) — the
   // registry defines these cache keys' storage mapping at module load.
   Note: "notes",
+  DeletedNote: "deletedNotes",
 };
 
 const isRecoverableReadError = (error) =>

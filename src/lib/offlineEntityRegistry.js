@@ -166,3 +166,9 @@ export const NoteOffline = registerOfflineEntity({
   cacheKey: "notes",
   queueKey: "pendingNoteMutations",
 });
+
+export const DeletedNoteOffline = registerOfflineEntity({
+  name: "DeletedNote",
+  cacheKey: "deletedNotes",
+  queueKey: "pendingDeletedNoteMutations",
+});
