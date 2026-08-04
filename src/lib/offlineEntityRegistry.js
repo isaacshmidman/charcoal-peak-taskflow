@@ -31,8 +31,34 @@ import { apiClient } from "@/api/apiClient";
  *   name: string,        // apiClient.entities key, e.g. "Note"
  *   cacheKey: string,    // react-query key + offline cache key, e.g. "notes"
  *   queueKey: string,    // offline queue cache key, e.g. "pendingNoteMutations"
- *   remapFields?: string[], // fields that may hold offline TASK ids to remap on replay
+ *   storageKeys?: { cache?: string, queue?: string },
+ *   remapFields?: Record<string, string>,
+ *   selfRemapFields?: string[],
+ *   applyIdSwap?: (ctx: {
+ *     queryClient: import("@tanstack/react-query").QueryClient,
+ *     cacheKey: string, offlineId: string, realId: string,
+ *   }) => void,
+ *   normalizeEntry?: (entry: Record<string, any>) => Record<string, any>,
  * }} OfflineEntityDef
+ *
+ * `storageKeys` pins the localStorage names instead of deriving them —
+ * required by the legacy entities, whose queues users already hold under
+ * historical key strings (e.g. `taskflow_pending_mutations` for tasks).
+ *
+ * `remapFields` maps a field to the ENTITY whose replay produced the real
+ * id, e.g. `{ task_id: "Task" }`. Resolution uses that entity's in-run map,
+ * so registration order is replay order — reference an entity registered
+ * before this one.
+ *
+ * `selfRemapFields` remaps fields against this entity's OWN in-run map
+ * (offline subtask → offline parent chains: `["parent_id"]`).
+ *
+ * `applyIdSwap` replaces the default single-field cache id-swap when an
+ * entity needs more (Task also rewrites children's parent_id; DeletedTask
+ * additionally write-throughs to the offline cache).
+ *
+ * `normalizeEntry` runs on every queue read, letting an entity accept a
+ * historical entry shape (SavedTag's name-keyed `{type,name}` form).
  *
  * @typedef {{
  *   def: OfflineEntityDef,
@@ -40,6 +66,7 @@ import { apiClient } from "@/api/apiClient";
  *   getPending: () => Array<Record<string, any>>,
  *   setPending: (mutations: Array<Record<string, any>>) => void,
  *   dequeueCreate: (offlineId: string) => void,
+ *   dequeueCreateWhere: (predicate: (mutation: Record<string, any>) => boolean) => void,
  *   updateQueuedCreate: (offlineId: string, newData: Record<string, any>) => void,
  * }} OfflineEntityHandle
  */
@@ -53,11 +80,12 @@ const registry = new Map();
  */
 export function registerOfflineEntity(def) {
   defineCacheKeys({
-    [def.cacheKey]: `taskflow_offline_${def.cacheKey}`,
-    [def.queueKey]: `taskflow_pending_${def.cacheKey}_mutations`,
+    [def.cacheKey]: def.storageKeys?.cache || `taskflow_offline_${def.cacheKey}`,
+    [def.queueKey]: def.storageKeys?.queue || `taskflow_pending_${def.cacheKey}_mutations`,
   });
 
-  const getPending = () => loadFromCache(def.queueKey) || [];
+  const normalize = def.normalizeEntry || ((entry) => entry);
+  const getPending = () => (loadFromCache(def.queueKey) || []).map(normalize);
   const setPending = (mutations) => saveToCache(def.queueKey, mutations);
 
   /** @type {OfflineEntityHandle} */
@@ -72,6 +100,9 @@ export function registerOfflineEntity(def) {
       setPending(getPending().filter(
         (m) => !(m.type === "create" && m.data?._offlineId === offlineId)
       ));
+    },
+    dequeueCreateWhere(predicate) {
+      setPending(getPending().filter((m) => !(m.type === "create" && predicate(m))));
     },
     updateQueuedCreate(offlineId, newData) {
       setPending(getPending().map((m) =>
@@ -99,23 +130,28 @@ export function registeredCacheKeys() {
 }
 
 /**
- * Replay all registered entities' queued mutations. Standard loop modeled
- * on the Priority replay in useOfflineData: per-mutation try/catch retains
- * failures; created ids are swapped into the query cache; cross-entity
- * task-id references (remapFields) resolve through sharedIdRemap built by
- * the Task replay that runs before this.
+ * Replay every registered entity's queued mutations, in registration order.
+ * Per-mutation try/catch retains failures; created ids are swapped into the
+ * query cache; update/delete resolve through the entity's own in-run map and
+ * skip ids that are still unsynced. Each entity's map is kept so a LATER
+ * entity can resolve cross-entity references via `remapFields`
+ * (e.g. `{ task_id: "Task" }`).
  *
  * @param {import("@tanstack/react-query").QueryClient} queryClient
- * @param {Record<string, string>} [sharedIdRemap]  offline task id → real id
+ * @param {Record<string, string>} [seedTaskRemap]  transitional: ids from a
+ *   replay loop that still lives outside the registry, merged into the map
+ *   named "Task" so `remapFields` resolves during the migration.
  */
-export async function replayRegisteredEntities(queryClient, sharedIdRemap = {}) {
+export async function replayRegisteredEntities(queryClient, seedTaskRemap = {}) {
+  /** entity name → { offlineId: realId } produced during THIS run */
+  const remapsByEntity = { Task: { ...seedTaskRemap } };
+
   for (const handle of registry.values()) {
     const { def } = handle;
     const pending = handle.getPending();
     if (!pending.length) continue;
 
-    /** @type {Record<string, string>} */
-    const idRemap = {};
+    const idRemap = remapsByEntity[def.name] || (remapsByEntity[def.name] = {});
     const remaining = [];
 
     for (const m of pending) {
@@ -124,19 +160,31 @@ export async function replayRegisteredEntities(queryClient, sharedIdRemap = {}) 
           const dataToSend = { ...m.data };
           const offlineId = dataToSend._offlineId;
           delete dataToSend._offlineId;
-          for (const field of def.remapFields || []) {
-            if (dataToSend[field] && sharedIdRemap[dataToSend[field]]) {
-              dataToSend[field] = sharedIdRemap[dataToSend[field]];
+          // Cross-entity references (field → source entity's map).
+          for (const [field, sourceEntity] of Object.entries(def.remapFields || {})) {
+            const sourceMap = remapsByEntity[sourceEntity] || {};
+            if (dataToSend[field] && sourceMap[dataToSend[field]]) {
+              dataToSend[field] = sourceMap[dataToSend[field]];
+            }
+          }
+          // Self references (offline child → offline parent within this run).
+          for (const field of def.selfRemapFields || []) {
+            if (dataToSend[field] && idRemap[dataToSend[field]]) {
+              dataToSend[field] = idRemap[dataToSend[field]];
             }
           }
           const result = await apiClient.entities[def.name].create(dataToSend);
           if (result?.id && offlineId) {
             idRemap[offlineId] = result.id;
-            queryClient.setQueryData([def.cacheKey], (old = []) =>
-              /** @type {Array<Record<string, any>>} */ (old).map((r) =>
-                r.id === offlineId ? { ...r, id: result.id } : r
-              )
-            );
+            if (def.applyIdSwap) {
+              def.applyIdSwap({ queryClient, cacheKey: def.cacheKey, offlineId, realId: result.id });
+            } else {
+              queryClient.setQueryData([def.cacheKey], (old = []) =>
+                /** @type {Array<Record<string, any>>} */ (old).map((r) =>
+                  r.id === offlineId ? { ...r, id: result.id } : r
+                )
+              );
+            }
           }
         } else if (m.type === "update") {
           const resolvedId = idRemap[m.id] || m.id;

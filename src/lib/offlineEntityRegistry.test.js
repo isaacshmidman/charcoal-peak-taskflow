@@ -14,6 +14,7 @@ vi.mock("@/api/apiClient", () => ({
 import { apiClient } from "@/api/apiClient";
 import {
   NoteOffline,
+  getOfflineEntityHandle,
   registerOfflineEntity,
   registeredCacheKeys,
   replayRegisteredEntities,
@@ -24,7 +25,7 @@ const LinkedOffline = registerOfflineEntity({
   name: "Linked",
   cacheKey: "linked",
   queueKey: "pendingLinkedMutations",
-  remapFields: ["task_id"],
+  remapFields: { task_id: "Task" },
 });
 
 describe("offlineEntityRegistry", () => {
@@ -108,5 +109,97 @@ describe("offlineEntityRegistry", () => {
     expect(NoteOffline.getPending()[0].data.title).toBe("v2");
     NoteOffline.dequeueCreate("offline_e");
     expect(NoteOffline.getPending()).toEqual([]);
+  });
+});
+
+/* ── Capabilities the legacy entities need in order to migrate ────── */
+
+describe("registry capabilities for legacy entities", () => {
+  let queryClient;
+
+  beforeEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+    queryClient = new QueryClient();
+  });
+
+  it("storageKeys pins the exact legacy localStorage names", () => {
+    const Legacy = registerOfflineEntity({
+      name: "LegacyKeyed",
+      cacheKey: "legacyKeyed",
+      queueKey: "pendingLegacyKeyedMutations",
+      storageKeys: { cache: "taskflow_offline_legacy", queue: "taskflow_pending_legacy_mutations" },
+    });
+    Legacy.queueMutation({ type: "delete", id: "x" });
+    const key = Object.keys(localStorage).find((k) => k.startsWith("taskflow_pending_legacy_mutations"));
+    expect(key).toBeTruthy(); // NOT the derived taskflow_pending_legacyKeyed_mutations
+    expect(Object.keys(localStorage).some((k) => k.includes("legacyKeyed"))).toBe(false);
+  });
+
+  it("selfRemapFields resolves offline child → offline parent within one run", async () => {
+    const SelfRef = registerOfflineEntity({
+      name: "SelfRef",
+      cacheKey: "selfRef",
+      queueKey: "pendingSelfRefMutations",
+      selfRemapFields: ["parent_id"],
+    });
+    apiClient.entities.SelfRef = { create: vi.fn(), update: vi.fn(), delete: vi.fn() };
+    apiClient.entities.SelfRef.create
+      .mockResolvedValueOnce({ id: "real_parent" })
+      .mockResolvedValueOnce({ id: "real_child" });
+    SelfRef.queueMutation({ type: "create", data: { title: "p", _offlineId: "offline_p" } });
+    SelfRef.queueMutation({ type: "create", data: { title: "c", parent_id: "offline_p", _offlineId: "offline_c" } });
+
+    await replayRegisteredEntities(queryClient, {});
+
+    expect(apiClient.entities.SelfRef.create).toHaveBeenNthCalledWith(2, { title: "c", parent_id: "real_parent" });
+  });
+
+  it("applyIdSwap replaces the default cache swap", async () => {
+    const swaps = [];
+    const Custom = registerOfflineEntity({
+      name: "CustomSwap",
+      cacheKey: "customSwap",
+      queueKey: "pendingCustomSwapMutations",
+      applyIdSwap: ({ offlineId, realId }) => { swaps.push([offlineId, realId]); },
+    });
+    apiClient.entities.CustomSwap = { create: vi.fn(), update: vi.fn(), delete: vi.fn() };
+    apiClient.entities.CustomSwap.create.mockResolvedValue({ id: "real_c" });
+    queryClient.setQueryData(["customSwap"], [{ id: "offline_c", title: "x" }]);
+    Custom.queueMutation({ type: "create", data: { title: "x", _offlineId: "offline_c" } });
+
+    await replayRegisteredEntities(queryClient, {});
+
+    expect(swaps).toEqual([["offline_c", "real_c"]]);
+    // Default swap did NOT also run.
+    expect(queryClient.getQueryData(["customSwap"])).toEqual([{ id: "offline_c", title: "x" }]);
+  });
+
+  it("normalizeEntry adapts a historical entry shape on read", () => {
+    const Named = registerOfflineEntity({
+      name: "NameKeyed",
+      cacheKey: "nameKeyed",
+      queueKey: "pendingNameKeyedMutations",
+      // Mirrors SavedTag: old entries are {type:'create', name}.
+      normalizeEntry: (m) =>
+        m.type === "create" && !m.data && m.name ? { ...m, data: { name: m.name } } : m,
+    });
+    // Simulate a pre-deploy entry sitting in storage.
+    Named.setPending([{ type: "create", name: "work" }]);
+    expect(Named.getPending()[0].data).toEqual({ name: "work" });
+    // Idempotent on already-normalized entries.
+    Named.setPending([{ type: "create", data: { name: "already" } }]);
+    expect(Named.getPending()[0].data).toEqual({ name: "already" });
+  });
+
+  it("dequeueCreateWhere removes a queued create by an arbitrary predicate", () => {
+    const Named = getOfflineEntityHandle("NameKeyed");
+    Named.setPending([
+      { type: "create", data: { name: "keep" } },
+      { type: "create", data: { name: "drop" } },
+      { type: "delete", id: "d1" },
+    ]);
+    Named.dequeueCreateWhere((m) => m.data?.name === "drop");
+    expect(Named.getPending().map((m) => m.data?.name ?? m.id)).toEqual(["keep", "d1"]);
   });
 });
