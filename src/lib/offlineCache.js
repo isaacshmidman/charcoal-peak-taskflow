@@ -101,10 +101,6 @@ export function getPendingMutations() {
   return loadFromCache('pendingMutations') || [];
 }
 
-export function clearPendingMutations() {
-  localStorage.removeItem(resolveStorageKey('pendingMutations'));
-}
-
 export function setPendingMutations(mutations) {
   try {
     localStorage.setItem(resolveStorageKey('pendingMutations'), JSON.stringify(mutations));
@@ -176,10 +172,6 @@ export function getPendingPriorityMutations() {
   return loadFromCache('pendingPriorityMutations') || [];
 }
 
-export function clearPendingPriorityMutations() {
-  localStorage.removeItem(resolveStorageKey('pendingPriorityMutations'));
-}
-
 export function setPendingPriorityMutations(mutations) {
   try {
     localStorage.setItem(resolveStorageKey('pendingPriorityMutations'), JSON.stringify(mutations));
@@ -201,10 +193,6 @@ export function getPendingTagMutations() {
   return loadFromCache('pendingTagMutations') || [];
 }
 
-export function clearPendingTagMutations() {
-  localStorage.removeItem(resolveStorageKey('pendingTagMutations'));
-}
-
 export function setPendingTagMutations(mutations) {
   try {
     localStorage.setItem(resolveStorageKey('pendingTagMutations'), JSON.stringify(mutations));
@@ -224,34 +212,9 @@ export function getPendingDeletedTaskMutations() {
   return loadFromCache('pendingDeletedTaskMutations') || [];
 }
 
-export function clearPendingDeletedTaskMutations() {
-  localStorage.removeItem(resolveStorageKey('pendingDeletedTaskMutations'));
-}
-
 export function setPendingDeletedTaskMutations(mutations) {
   try {
     localStorage.setItem(resolveStorageKey('pendingDeletedTaskMutations'), JSON.stringify(mutations));
-  } catch {}
-}
-
-// Recently deleted: save a deleted task record to the local cache
-export function saveDeletedTaskToCache(record) {
-  try {
-    const existing = loadFromCache('deletedTasks') || [];
-    existing.unshift(record);
-    localStorage.setItem(resolveStorageKey('deletedTasks'), JSON.stringify(existing));
-  } catch {}
-}
-
-export function loadDeletedTasksFromCache() {
-  return loadFromCache('deletedTasks') || [];
-}
-
-export function removeDeletedTaskFromCache(id) {
-  try {
-    const existing = loadFromCache('deletedTasks') || [];
-    const updated = existing.filter(r => r.id !== id);
-    localStorage.setItem(resolveStorageKey('deletedTasks'), JSON.stringify(updated));
   } catch {}
 }
 
