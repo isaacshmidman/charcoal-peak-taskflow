@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/dialog";
 import MultiSortPanel from "@/components/tasks/MultiSortPanel";
 import { colorBg, isDarkColor } from "@/lib/colors";
-import { compareDueDateTime } from "@/lib/sort-helpers";
+import { compareDeletedNote, compareDeletedTask, sortTrash } from "@/lib/trash-sort";
 
 const RETENTION_OPTIONS = [
   { value: "7", label: "1 week" },
@@ -113,25 +113,9 @@ export default function RecentlyDeleted({ onBack } = {}) {
   // Purge expired records on mount
   useEffect(() => { purgeExpired(); }, []);
 
-  const compareFn = (a, b, sortValue) => {
-    switch (sortValue) {
-      case "deleted_desc": return new Date(b.deleted_at) - new Date(a.deleted_at);
-      case "deleted_asc": return new Date(a.deleted_at) - new Date(b.deleted_at);
-      case "completed_first": {
-        const ac = a.was_completed ? 0 : 1;
-        const bc = b.was_completed ? 0 : 1;
-        return ac - bc;
-      }
-      case "uncompleted_first": {
-        const ac = a.was_completed ? 1 : 0;
-        const bc = b.was_completed ? 1 : 0;
-        return ac - bc;
-      }
-      case "date_asc": return compareDueDateTime(a, b, "asc");
-      case "date_desc": return compareDueDateTime(a, b, "desc");
-      default: return 0;
-    }
-  };
+  /** Priority rank for a trash record (lower = higher priority; unset last).
+   * Records snapshot priority_id, so the live priority list supplies order. */
+  const priorityRank = (record) => priorityMap[record.priority_id]?.order ?? 99;
 
   const userDeletedTasks = useMemo(
     () => rawDeletedTasks,
@@ -144,25 +128,18 @@ export default function RecentlyDeleted({ onBack } = {}) {
       if (!q) return true;
       return t.title?.toLowerCase().includes(q) || t.tags?.some(tag => tag.toLowerCase().includes(q));
     });
-    return filtered.sort((a, b) => {
-      for (const s of sorts) {
-        const r = compareFn(a, b, s);
-        if (r !== 0) return r;
-      }
-      return 0;
-    });
-  }, [userDeletedTasks, search, sorts]);
+    return sortTrash(filtered, sorts, compareDeletedTask, priorityRank);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userDeletedTasks, search, sorts, priorityMap]);
 
   const displayedNotes = useMemo(() => {
     const q = search.toLowerCase();
     const filtered = rawDeletedNotes.filter(n =>
       !q || (n.title || "").toLowerCase().includes(q) || (n.content_text || "").toLowerCase().includes(q) || (n.tags || []).some(t => t.toLowerCase().includes(q))
     );
-    const asc = sorts.includes("deleted_asc");
-    return [...filtered].sort((a, b) =>
-      asc ? new Date(a.deleted_at) - new Date(b.deleted_at) : new Date(b.deleted_at) - new Date(a.deleted_at)
-    );
-  }, [rawDeletedNotes, search, sorts]);
+    return sortTrash(filtered, sorts, compareDeletedNote, priorityRank);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawDeletedNotes, search, sorts, priorityMap]);
 
   const handleRestoreNote = async (record) => {
     await noteMutation.create({

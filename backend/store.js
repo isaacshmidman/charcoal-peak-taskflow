@@ -159,12 +159,16 @@ const ENTITY_DEFINITIONS = {
     },
     mutableFields: ["note_id", "title", "content_json", "content_text", "pinned", "tags", "priority_id", "deleted_at", "expires_at", "is_sample"],
   },
+  // Notes have no manual ordering: the Notes page groups by tag and orders
+  // within each group by the sort panel (priority / created date / tag) with
+  // pinned notes floating to the top. The `sort_order` DB column is
+  // vestigial — kept so the table needs no rebuild, written by nothing.
   Note: {
     table: "notes",
     idPrefix: "note",
     jsonColumns: ["tags"],
     booleanColumns: ["pinned", "is_sample"],
-    fieldMap: { order: "sort_order", tags: "tags_json" },
+    fieldMap: { tags: "tags_json" },
     defaults: {
       title: "",
       content_json: "",
@@ -172,10 +176,9 @@ const ENTITY_DEFINITIONS = {
       tags: [],
       priority_id: "",
       pinned: false,
-      order: null,
       is_sample: false,
     },
-    mutableFields: ["title", "content_json", "content_text", "tags", "priority_id", "pinned", "order", "is_sample"],
+    mutableFields: ["title", "content_json", "content_text", "tags", "priority_id", "pinned", "is_sample"],
   },
 };
 

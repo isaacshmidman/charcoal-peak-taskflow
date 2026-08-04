@@ -26,11 +26,13 @@ export const SORT_OPTIONS = [
   { value: "priority_asc", label: "Priority: Highest → Lowest", group: "priority" },
   { value: "priority_desc", label: "Priority: Lowest → Highest", group: "priority" },
   { value: "tag_az", label: "Tag: A → Z", group: "tag" },
-  { value: "recurrence", label: "Recurrence Type", hideOnScope: ["notes"], group: "recurrence" },
+  // Hidden on "deleted" too: trash rows are snapshots, and imported
+  // calendar events never reach the trash — so neither sort can act there.
+  { value: "recurrence", label: "Recurrence Type", hideOnScope: ["notes", "deleted"], group: "recurrence" },
   // Sorts by the user-configured calendar order (Settings → Calendar Order).
   // Hidden on the calendar page itself — that page shows everything by
   // calendar already and has its own visibility dropdown.
-  { value: "calendar_order", label: "Calendar Order", hideOnScope: ["calendar", "notes"], group: "calendar_order" },
+  { value: "calendar_order", label: "Calendar Order", hideOnScope: ["calendar", "notes", "deleted"], group: "calendar_order" },
 ];
 
 /** @param {string} value */
