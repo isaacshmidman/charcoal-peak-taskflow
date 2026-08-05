@@ -23,7 +23,7 @@
  * - Failed replays are retained in the queue for the next pass.
  */
 
-import { defineCacheKeys, loadFromCache, saveToCache } from "@/lib/offlineCache";
+import { defineCacheKeys, loadFromCache, saveToCache, updateDeletedTasksCache } from "@/lib/offlineCache";
 import { apiClient } from "@/api/apiClient";
 
 /**
@@ -219,6 +219,24 @@ export const PriorityOffline = registerOfflineEntity({
   storageKeys: {
     cache: "taskflow_offline_priorities",
     queue: "taskflow_pending_priority_mutations",
+  },
+});
+
+export const DeletedTaskOffline = registerOfflineEntity({
+  name: "DeletedTask",
+  cacheKey: "deletedTasks",
+  queueKey: "pendingDeletedTaskMutations",
+  storageKeys: {
+    cache: "taskflow_offline_deletedTasks",
+    queue: "taskflow_pending_deleted_task_mutations",
+  },
+  // Beyond the query-cache swap, the trash's offline cache is written
+  // through so a reload before the next fetch still shows real ids.
+  applyIdSwap({ queryClient, cacheKey, offlineId, realId }) {
+    const cached = /** @type {Array<Record<string, any>>} */ (queryClient.getQueryData([cacheKey]) || []);
+    const updated = cached.map((r) => (r.id === offlineId ? { ...r, id: realId } : r));
+    queryClient.setQueryData([cacheKey], updated);
+    updateDeletedTasksCache(updated);
   },
 });
 

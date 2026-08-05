@@ -47,18 +47,18 @@ import { useOfflineData } from "./useOfflineData";
 import {
   getPendingMutations,
   getPendingTagMutations,
-  getPendingDeletedTaskMutations,
   queueMutation,
   queueTagMutation,
-  queueDeletedTaskMutation,
   loadFromCache,
 } from "@/lib/offlineCache";
-// Priority migrated to the registry — same queue, same storage key, so the
-// behavioral assertions below are untouched; only the helper moved.
-import { PriorityOffline } from "@/lib/offlineEntityRegistry";
+// Migrated to the registry — same queues, same storage keys, so the
+// behavioral assertions below are untouched; only the helpers moved.
+import { DeletedTaskOffline, PriorityOffline } from "@/lib/offlineEntityRegistry";
 
 const queuePriorityMutation = (m) => PriorityOffline.queueMutation(m);
 const getPendingPriorityMutations = () => PriorityOffline.getPending();
+const queueDeletedTaskMutation = (m) => DeletedTaskOffline.queueMutation(m);
+const getPendingDeletedTaskMutations = () => DeletedTaskOffline.getPending();
 
 /** The exact legacy storage keys users already have data under. */
 const LEGACY_KEYS = {

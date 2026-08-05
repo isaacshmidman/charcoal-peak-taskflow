@@ -6,9 +6,6 @@ import {
   setPendingMutations,
   getPendingTagMutations,
   setPendingTagMutations,
-  getPendingDeletedTaskMutations,
-  setPendingDeletedTaskMutations,
-  updateDeletedTasksCache,
 } from '@/lib/offlineCache';
 import { apiClient } from '@/api/apiClient';
 import { registeredCacheKeys, replayRegisteredEntities } from '@/lib/offlineEntityRegistry';
@@ -128,44 +125,7 @@ export function useOfflineData() {
           queryClient.invalidateQueries({ queryKey: ['savedTags'] });
         }
 
-        // --- DeletedTask mutations ---
-        const pendingDeleted = getPendingDeletedTaskMutations();
-        const deletedIdRemap = {};
-        const remainingDeletedTaskMutations = [];
-        for (const m of pendingDeleted) {
-          try {
-            if (m.type === 'create') {
-              const dataToSend = { ...m.data };
-              const offlineId = dataToSend._offlineId;
-              delete dataToSend._offlineId;
-              const result = await apiClient.entities.DeletedTask.create(dataToSend);
-              if (result?.id && offlineId) {
-                deletedIdRemap[offlineId] = result.id;
-                // Update local cache with real id
-                const cached = /** @type {Array<Record<string, any>>} */ (queryClient.getQueryData(['deletedTasks']) || []);
-                const updated = cached.map(r => r.id === offlineId ? { ...r, id: result.id } : r);
-                queryClient.setQueryData(['deletedTasks'], updated);
-                updateDeletedTasksCache(updated);
-              }
-            } else if (m.type === 'update') {
-              const resolvedId = deletedIdRemap[m.id] || m.id;
-              if (!String(resolvedId).startsWith('offline_')) {
-                await apiClient.entities.DeletedTask.update(resolvedId, m.data);
-              }
-            } else if (m.type === 'delete') {
-              const resolvedId = deletedIdRemap[m.id] || m.id;
-              if (!String(resolvedId).startsWith('offline_')) {
-                await apiClient.entities.DeletedTask.delete(resolvedId);
-              }
-            }
-          } catch {
-            remainingDeletedTaskMutations.push(m);
-          }
-        }
-        if (pendingDeleted.length) {
-          setPendingDeletedTaskMutations(remainingDeletedTaskMutations);
-          queryClient.invalidateQueries({ queryKey: ['deletedTasks'] });
-        }
+        // (DeletedTask replays through the registry — see below.)
 
         // --- Registry entities (Note, SavedView, …) ---
         // Runs after the Task loop so idRemap can resolve cross-entity

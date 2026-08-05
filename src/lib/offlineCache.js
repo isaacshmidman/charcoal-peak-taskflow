@@ -150,15 +150,6 @@ export function dequeueTagCreate(name) {
   } catch {}
 }
 
-// Remove a queued offline deleted-task create by its _offlineId
-export function dequeueDeletedTaskCreate(offlineId) {
-  try {
-    const pending = loadFromCache('pendingDeletedTaskMutations') || [];
-    const updated = pending.filter(m => !(m.type === 'create' && m.data?._offlineId === offlineId));
-    localStorage.setItem(resolveStorageKey('pendingDeletedTaskMutations'), JSON.stringify(updated));
-  } catch {}
-}
-
 
 
 // Queue tag mutations for replay when back online
@@ -177,25 +168,6 @@ export function getPendingTagMutations() {
 export function setPendingTagMutations(mutations) {
   try {
     localStorage.setItem(resolveStorageKey('pendingTagMutations'), JSON.stringify(mutations));
-  } catch {}
-}
-
-// Queue deleted task mutations for replay when back online
-export function queueDeletedTaskMutation(mutation) {
-  try {
-    const pending = loadFromCache('pendingDeletedTaskMutations') || [];
-    pending.push({ ...mutation, queuedAt: Date.now() });
-    localStorage.setItem(resolveStorageKey('pendingDeletedTaskMutations'), JSON.stringify(pending));
-  } catch {}
-}
-
-export function getPendingDeletedTaskMutations() {
-  return loadFromCache('pendingDeletedTaskMutations') || [];
-}
-
-export function setPendingDeletedTaskMutations(mutations) {
-  try {
-    localStorage.setItem(resolveStorageKey('pendingDeletedTaskMutations'), JSON.stringify(mutations));
   } catch {}
 }
 
