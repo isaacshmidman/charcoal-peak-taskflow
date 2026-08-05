@@ -182,9 +182,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
   const payload = useMemo(() => buildData(form).data, [form, task, parentId]);
 
   const onSaveTask = useCallback(async (data) => {
-    console.log("[autosave] onSaveTask CALL, existingId=", savedIdRef.current, "title=", data.title);
     const res = await onSubmit(data, [], savedIdRef.current);
-    console.log("[autosave] onSaveTask RESULT id=", res?.id);
     if (res?.id) savedIdRef.current = res.id;
     if (data.tags?.length) persistNewTags(data.tags);
     return res;
