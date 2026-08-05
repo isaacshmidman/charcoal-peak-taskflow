@@ -1,7 +1,7 @@
 // @ts-check
 /**
  * @file Generic offline-aware create/update/delete for registry-backed
- * entities (Note, SavedView, …) — the standard-shape mirror of the
+ * entities (Note, DeletedNote, …) — the standard-shape mirror of the
  * Task-specific useOfflineMutation:
  * - Online: API call; recoverable connection errors fall back to the queue.
  * - Offline: optimistic cache apply + queue for replay (useOfflineData

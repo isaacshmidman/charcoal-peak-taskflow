@@ -1,16 +1,26 @@
 // @ts-check
 /**
- * @file Generic offline support for NEW entities (Note, SavedView, …).
+ * @file THE offline path for every entity. Each one declares its queue,
+ * its cache key and any special replay behavior in a single registration
+ * block below; producers call the returned handle instead of hand-rolling
+ * localStorage access, and one generic loop replays them all.
  *
- * The four legacy entities (Task, Priority, SavedTag, DeletedTask) keep
- * their bespoke queues + replay loops in offlineCache.js/useOfflineData.js
- * — each has semantics (parent_id remap, cache write-through, name-keyed
- * tag queues) that a generic loop must not silently approximate. New
- * entities fit one standard shape, implemented once here.
+ * Adding an entity is one registration. Do NOT reintroduce a bespoke
+ * replay loop — the four original ones (Task, Priority, SavedTag,
+ * DeletedTask) were folded in here precisely because four near-copies of
+ * failure-sensitive code is how silent data loss happens. Their quirks
+ * survive as declarative options (selfRemapFields, applyIdSwap,
+ * normalizeEntry), covered by
+ * src/hooks/useOfflineData.characterization.test.jsx — that suite pins the
+ * pre-migration behavior and must keep passing untouched.
  *
  * Contract:
- * - Register entities at THIS module's top level (bottom of file) so
- *   cache keys exist before anything reads them.
+ * - Register at THIS module's top level (bottom of file) so cache keys
+ *   exist before anything reads them. Registration order IS replay order:
+ *   an entity that others reference (Task) goes first.
+ * - Entities that predate the registry pin `storageKeys` to their historic
+ *   localStorage names — users can hold queued-but-unsynced mutations
+ *   there, and renaming a key would strand them.
  * - replayRegisteredEntities is called ONLY from useOfflineData's
  *   handleOnline (inside its re-entrancy guards). Do not add online/focus
  *   listeners here — double replay is a data-corruption risk.
