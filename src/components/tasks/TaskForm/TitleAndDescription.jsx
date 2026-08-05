@@ -53,7 +53,7 @@ function PlainDescriptionFallback({ form, setForm }) {
   );
 }
 
-export default function TitleAndDescription({ form, setForm, task, priorities = [], savedTags = [] }) {
+export default function TitleAndDescription({ form, setForm, task, priorities = [], savedTags = [], onTitleEnter }) {
   // The editor hydrates ONCE at mount. Read its initial content straight
   // from the `task` prop (available on first render) rather than from
   // `form.description_json` — the form's hydration effect runs after the
@@ -75,6 +75,9 @@ export default function TitleAndDescription({ form, setForm, task, priorities = 
         savedTags={savedTags}
         placeholder="What needs to be done?"
         testid="task-form-title"
+        // Enter in the title finishes the task (already autosaved); the
+        // description below keeps Enter as a paragraph break.
+        onEnter={onTitleEnter}
       />
 
       <EditorLoadBoundary fallback={<PlainDescriptionFallback form={form} setForm={setForm} />}>

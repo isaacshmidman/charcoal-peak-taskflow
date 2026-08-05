@@ -126,7 +126,18 @@ export default function NoteEditor({ open, onOpenChange, note, priorities = [], 
           </Button>
         )}
 
-        <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
+        <form
+          onSubmit={(e) => e.preventDefault()}
+          // Mod+Enter finishes from anywhere in the form — including inside
+          // the rich-text body, where a plain Enter is a paragraph break.
+          onKeyDown={(e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && isValid) {
+              e.preventDefault();
+              handleClose();
+            }
+          }}
+          className="space-y-4"
+        >
           {/* Title parses #tag / !priority (dropdown) only — notes have no dates. */}
           <TitleTokenInput
             form={form}
@@ -136,6 +147,9 @@ export default function NoteEditor({ open, onOpenChange, note, priorities = [], 
             savedTags={savedTags}
             placeholder="Title"
             testid="note-title-input"
+            // Enter in the title is "done" — the note is already autosaved,
+            // so this flushes and closes exactly like the bottom button.
+            onEnter={() => { if (isValid) handleClose(); }}
           />
 
           <EditorLoadBoundary

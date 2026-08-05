@@ -263,7 +263,14 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
             inside collapse together (no gap between title and description).
             Re-applying `space-y-4` on the fieldset restores the cadence. */}
         <fieldset disabled={isReadOnly} className="contents [&>*+*]:mt-4">
-          <TitleAndDescription form={form} setForm={setForm} task={task} priorities={priorities} savedTags={savedTags} />
+          <TitleAndDescription
+            form={form}
+            setForm={setForm}
+            task={task}
+            priorities={priorities}
+            savedTags={savedTags}
+            onTitleEnter={() => { if (!isReadOnly && canSubmit) commitAndClose(); }}
+          />
 
           <PriorityAndType
             form={form}

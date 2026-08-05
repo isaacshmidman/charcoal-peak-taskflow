@@ -94,6 +94,8 @@ export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubm
             setForm={setForm}
             grammar={{ dates: true, times: true, recurrence: false, tags: false, priority: false }}
             placeholder="What needs to be done?"
+            // Enter in the title finishes the subtask (already autosaved).
+            onEnter={() => { if (isValid) commitAndClose(); }}
           />
 
           <Textarea

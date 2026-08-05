@@ -20,6 +20,7 @@ export default function TitleTokenInput({
   placeholder = "What needs to be done?",
   testid,
   autoFocus = false,
+  onEnter,
 }) {
   const inputRef = useRef(null);
   const value = form[titleKey] || "";
@@ -49,7 +50,23 @@ export default function TitleTokenInput({
         onChange={tokens.onChange}
         onKeyUp={tokens.trackCaret}
         onClick={tokens.trackCaret}
-        onKeyDown={(e) => { tokens.handleKeyDown(e); }}
+        onKeyDown={(e) => {
+          // The token dropdown gets first refusal — while it's open, Enter
+          // accepts the highlighted suggestion rather than finishing.
+          if (tokens.handleKeyDown(e)) return;
+          // A free Enter in this single-line field means "done" (the record
+          // is already autosaved). Modified Enter is left alone so the
+          // form's own Mod+Enter handler owns it — handling both here
+          // would commit twice. isComposing guards IME candidate selection.
+          if (
+            e.key === "Enter" &&
+            !e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey &&
+            !e.nativeEvent?.isComposing
+          ) {
+            e.preventDefault();
+            onEnter?.();
+          }
+        }}
       />
       <TokenAutocomplete
         open={tokens.open}
