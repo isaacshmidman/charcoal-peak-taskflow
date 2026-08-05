@@ -372,6 +372,64 @@ test("offline task creation is replayed and survives a reload when connectivity 
   await context.close();
 });
 
+test("offline priority edits queue under the legacy key and replay when connectivity returns", async ({ browser }) => {
+  // Priority is the first legacy entity migrated onto offlineEntityRegistry.
+  // This pins the round trip end-to-end: the queue must still live under
+  // taskflow_pending_priority_mutations (pre-migration builds wrote there),
+  // and replay must reach the API.
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  const api = await installMockBackend(page, {
+    tasks: [],
+    priorities: [defaultPriority],
+  });
+
+  await page.goto("/Settings");
+  await page.getByText("Tasks and Notes").click();
+  await expect(page.getByText(defaultPriority.name)).toBeVisible();
+
+  await context.setOffline(true);
+
+  // Double-click the priority row to edit, rename it, commit with Enter.
+  await page.getByText(defaultPriority.name).dblclick();
+  // The row swaps to an inline editor; it's the first textbox in the section
+  // (the "New priority name..." field follows it).
+  const nameInput = page.getByRole("textbox").first();
+  await nameInput.fill("Renamed Offline");
+  await nameInput.press("Enter");
+
+  await expect(page.getByText("Renamed Offline")).toBeVisible();
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const key = Object.keys(localStorage).find((entry) =>
+          entry.startsWith("taskflow_pending_priority_mutations")
+        );
+        return JSON.parse(localStorage.getItem(key || "") || "[]").length;
+      })
+    )
+    .toBe(1);
+
+  await context.setOffline(false);
+  await page.evaluate(() => window.dispatchEvent(new Event("online")));
+
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const key = Object.keys(localStorage).find((entry) =>
+          entry.startsWith("taskflow_pending_priority_mutations")
+        );
+        return JSON.parse(localStorage.getItem(key || "") || "[]").length;
+      })
+    )
+    .toBe(0);
+
+  const state = await api.getState();
+  expect(state.priorities.find((p) => p.id === defaultPriority.id)?.name).toBe("Renamed Offline");
+
+  await context.close();
+});
+
 test("the task form submit is disabled without a title and without a date", async ({ page }) => {
   await installMockBackend(page, { tasks: [], priorities: [defaultPriority] });
 

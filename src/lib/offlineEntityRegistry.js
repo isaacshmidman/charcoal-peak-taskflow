@@ -207,7 +207,20 @@ export async function replayRegisteredEntities(queryClient, seedTaskRemap = {}) 
   }
 }
 
-/* ── Registrations (module load — before any cache read) ─────────── */
+/* ── Registrations (module load — before any cache read) ───────────
+ * ORDER IS REPLAY ORDER. Entities that others reference come first.
+ * Migrated legacy entities pin their historical storage keys so queues
+ * written by pre-migration builds keep replaying. */
+
+export const PriorityOffline = registerOfflineEntity({
+  name: "Priority",
+  cacheKey: "priorities",
+  queueKey: "pendingPriorityMutations",
+  storageKeys: {
+    cache: "taskflow_offline_priorities",
+    queue: "taskflow_pending_priority_mutations",
+  },
+});
 
 export const NoteOffline = registerOfflineEntity({
   name: "Note",

@@ -4,8 +4,6 @@ import {
   saveToCache,
   getPendingMutations,
   setPendingMutations,
-  getPendingPriorityMutations,
-  setPendingPriorityMutations,
   getPendingTagMutations,
   setPendingTagMutations,
   getPendingDeletedTaskMutations,
@@ -112,42 +110,7 @@ export function useOfflineData() {
           queryClient.invalidateQueries({ queryKey: ['tasks'] });
         }
 
-        // --- Priority mutations ---
-        const pendingPriorities = getPendingPriorityMutations();
-        const priorityIdRemap = {};
-        const remainingPriorityMutations = [];
-        for (const m of pendingPriorities) {
-          try {
-            if (m.type === 'create') {
-              const dataToSend = { ...m.data };
-              delete dataToSend._offlineId;
-              const result = await apiClient.entities.Priority.create(dataToSend);
-              if (result?.id && m.data?._offlineId) {
-                priorityIdRemap[m.data._offlineId] = result.id;
-                queryClient.setQueryData(['priorities'], (old = []) =>
-                  /** @type {Array<Record<string, any>>} */ (old)
-                    .map(p => p.id === m.data._offlineId ? { ...p, id: result.id } : p)
-                );
-              }
-            } else if (m.type === 'update') {
-              const resolvedId = priorityIdRemap[m.id] || m.id;
-              if (!String(resolvedId).startsWith('offline_')) {
-                await apiClient.entities.Priority.update(resolvedId, m.data);
-              }
-            } else if (m.type === 'delete') {
-              const resolvedId = priorityIdRemap[m.id] || m.id;
-              if (!String(resolvedId).startsWith('offline_')) {
-                await apiClient.entities.Priority.delete(resolvedId);
-              }
-            }
-          } catch {
-            remainingPriorityMutations.push(m);
-          }
-        }
-        if (pendingPriorities.length) {
-          setPendingPriorityMutations(remainingPriorityMutations);
-          queryClient.invalidateQueries({ queryKey: ['priorities'] });
-        }
+        // (Priority replays through the registry — see below.)
 
         // --- Tag mutations ---
         const pendingTags = getPendingTagMutations();

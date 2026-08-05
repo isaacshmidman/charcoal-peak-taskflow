@@ -18,11 +18,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { COLOR_OPTIONS } from "@/lib/colors";
-import {
-  dequeuePriorityCreate,
-  isOnline,
-  queuePriorityMutation,
-} from "@/lib/offlineCache";
+import { isOnline } from "@/lib/offlineCache";
+import { PriorityOffline } from "@/lib/offlineEntityRegistry";
 import { isRecoverableConnectionError } from "@/lib/network";
 import PriorityRow from "./PriorityRow.jsx";
 
@@ -64,14 +61,14 @@ export default function PrioritiesSection() {
           return result;
         } catch (error) {
           if (isRecoverableConnectionError(error)) {
-            queuePriorityMutation({ type: "create", data: { ...data, _offlineId: optimisticId } });
+            PriorityOffline.queueMutation({ type: "create", data: { ...data, _offlineId: optimisticId } });
             return optimistic;
           }
           applyPriority((current) => current.filter((p) => p.id !== optimisticId));
           throw error;
         }
       } else {
-        queuePriorityMutation({ type: "create", data: { ...data, _offlineId: optimisticId } });
+        PriorityOffline.queueMutation({ type: "create", data: { ...data, _offlineId: optimisticId } });
         return optimistic;
       }
     },
@@ -85,13 +82,13 @@ export default function PrioritiesSection() {
           await apiClient.entities.Priority.update(id, data);
         } catch (error) {
           if (isRecoverableConnectionError(error)) {
-            queuePriorityMutation({ type: "update", id, data });
+            PriorityOffline.queueMutation({ type: "update", id, data });
             return;
           }
           invalidatePriorities();
         }
       } else {
-        queuePriorityMutation({ type: "update", id, data });
+        PriorityOffline.queueMutation({ type: "update", id, data });
       }
     },
   });
@@ -100,7 +97,7 @@ export default function PrioritiesSection() {
     mutationFn: async (id) => {
       applyPriority((current) => current.filter((p) => p.id !== id));
       if (String(id).startsWith("offline_")) {
-        dequeuePriorityCreate(id);
+        PriorityOffline.dequeueCreate(id);
         return;
       }
       if (isOnline()) {
@@ -108,13 +105,13 @@ export default function PrioritiesSection() {
           await apiClient.entities.Priority.delete(id);
         } catch (error) {
           if (isRecoverableConnectionError(error)) {
-            queuePriorityMutation({ type: "delete", id });
+            PriorityOffline.queueMutation({ type: "delete", id });
             return;
           }
           invalidatePriorities();
         }
       } else {
-        queuePriorityMutation({ type: "delete", id });
+        PriorityOffline.queueMutation({ type: "delete", id });
       }
     },
   });

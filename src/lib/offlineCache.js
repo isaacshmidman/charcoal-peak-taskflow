@@ -43,6 +43,15 @@ const SCOPED_KEYS = new Set([
  */
 export function defineCacheKeys(map) {
   for (const [key, storageKey] of Object.entries(map)) {
+    // Re-declaring a key with the SAME string is fine (a migrated legacy
+    // entity re-declares the key this module already owns). A DIFFERENT
+    // string would silently shadow existing queues, stranding whatever
+    // users have pending — so that's a hard error.
+    if (KEYS[key] && KEYS[key] !== storageKey) {
+      throw new Error(
+        `Offline cache key "${key}" is already mapped to "${KEYS[key]}"; refusing to remap to "${storageKey}".`
+      );
+    }
     KEYS[key] = storageKey;
     SCOPED_KEYS.add(key);
   }
@@ -132,15 +141,6 @@ export function updateQueuedCreate(offlineId, newData) {
 
 
 
-// Remove a queued offline priority create by its _offlineId
-export function dequeuePriorityCreate(offlineId) {
-  try {
-    const pending = loadFromCache('pendingPriorityMutations') || [];
-    const updated = pending.filter(m => !(m.type === 'create' && m.data?._offlineId === offlineId));
-    localStorage.setItem(resolveStorageKey('pendingPriorityMutations'), JSON.stringify(updated));
-  } catch {}
-}
-
 // Remove a queued offline tag create by its name (tags queue by name, not _offlineId)
 export function dequeueTagCreate(name) {
   try {
@@ -156,25 +156,6 @@ export function dequeueDeletedTaskCreate(offlineId) {
     const pending = loadFromCache('pendingDeletedTaskMutations') || [];
     const updated = pending.filter(m => !(m.type === 'create' && m.data?._offlineId === offlineId));
     localStorage.setItem(resolveStorageKey('pendingDeletedTaskMutations'), JSON.stringify(updated));
-  } catch {}
-}
-
-// Queue priority mutations for replay when back online
-export function queuePriorityMutation(mutation) {
-  try {
-    const pending = loadFromCache('pendingPriorityMutations') || [];
-    pending.push({ ...mutation, queuedAt: Date.now() });
-    localStorage.setItem(resolveStorageKey('pendingPriorityMutations'), JSON.stringify(pending));
-  } catch {}
-}
-
-export function getPendingPriorityMutations() {
-  return loadFromCache('pendingPriorityMutations') || [];
-}
-
-export function setPendingPriorityMutations(mutations) {
-  try {
-    localStorage.setItem(resolveStorageKey('pendingPriorityMutations'), JSON.stringify(mutations));
   } catch {}
 }
 
