@@ -212,6 +212,32 @@ export async function replayRegisteredEntities(queryClient, seedTaskRemap = {}) 
  * Migrated legacy entities pin their historical storage keys so queues
  * written by pre-migration builds keep replaying. */
 
+// Task FIRST: later entities (Note's task_id, DeletedTask records) resolve
+// their references against the map this replay produces.
+export const TaskOffline = registerOfflineEntity({
+  name: "Task",
+  cacheKey: "tasks",
+  queueKey: "pendingMutations",
+  storageKeys: {
+    cache: "taskflow_offline_tasks",
+    queue: "taskflow_pending_mutations",
+  },
+  // A subtask created offline points at a parent that may also still be
+  // offline; the parent is created first, so its real id is available.
+  selfRemapFields: ["parent_id"],
+  // Two-field swap: the created row's own id AND any child rows still
+  // pointing at the old offline parent id.
+  applyIdSwap({ queryClient, cacheKey, offlineId, realId }) {
+    queryClient.setQueryData([cacheKey], (old = []) =>
+      /** @type {Array<Record<string, any>>} */ (old).map((t) => {
+        if (t.id === offlineId) return { ...t, id: realId };
+        if (t.parent_id === offlineId) return { ...t, parent_id: realId };
+        return t;
+      })
+    );
+  },
+});
+
 export const PriorityOffline = registerOfflineEntity({
   name: "Priority",
   cacheKey: "priorities",

@@ -1,17 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  saveToCache,
-  getPendingMutations,
-  setPendingMutations,
-} from '@/lib/offlineCache';
-import { apiClient } from '@/api/apiClient';
+import { saveToCache } from '@/lib/offlineCache';
 import { registeredCacheKeys, replayRegisteredEntities } from '@/lib/offlineEntityRegistry';
 
-const LEGACY_CACHE_KEYS = ['tasks', 'priorities', 'savedTags', 'deletedTasks', 'integrations', 'notificationSettings'];
-// Registry entities (Note, SavedView, …) join the persistence subscription
-// dynamically — no per-entity edits here when new ones are registered.
-const CACHE_KEYS = [...LEGACY_CACHE_KEYS, ...registeredCacheKeys()];
+// Registered entities contribute their own cache keys; these are the
+// remaining non-entity caches the app persists.
+const EXTRA_CACHE_KEYS = ['integrations', 'notificationSettings'];
+const CACHE_KEYS = [...EXTRA_CACHE_KEYS, ...registeredCacheKeys()];
 
 /**
  * @typedef {{
@@ -62,58 +57,11 @@ export function useOfflineData() {
       replayInFlightRef.current = true;
 
       try {
-        // --- Task mutations ---
-        const pending = getPendingMutations();
-        /** @type {Record<string, string>} */
-        const idRemap = {};
-        const remainingTaskMutations = [];
-        for (const m of pending) {
-          try {
-            if (m.type === 'create') {
-              const dataToSend = { ...m.data };
-              delete dataToSend._offlineId;
-              if (dataToSend.parent_id && idRemap[dataToSend.parent_id]) {
-                dataToSend.parent_id = idRemap[dataToSend.parent_id];
-              }
-              const result = await apiClient.entities.Task.create(dataToSend);
-              if (result?.id && m.data._offlineId) {
-                idRemap[m.data._offlineId] = result.id;
-                queryClient.setQueryData(['tasks'], (old = []) =>
-                  /** @type {Array<Record<string, any>>} */ (old).map(t => {
-                    if (t.id === m.data._offlineId) return { ...t, id: result.id };
-                    if (t.parent_id === m.data._offlineId) return { ...t, parent_id: result.id };
-                    return t;
-                  })
-                );
-              }
-            } else if (m.type === 'update') {
-              const resolvedId = idRemap[m.id] || m.id;
-              if (!String(resolvedId).startsWith('offline_')) {
-                await apiClient.entities.Task.update(resolvedId, m.data);
-              }
-            } else if (m.type === 'delete') {
-              if (!String(m.id).startsWith('offline_')) {
-                await apiClient.entities.Task.delete(m.id);
-              }
-            }
-          } catch {
-            remainingTaskMutations.push(m);
-          }
-        }
-        if (pending.length) {
-          setPendingMutations(remainingTaskMutations);
-          queryClient.invalidateQueries({ queryKey: ['tasks'] });
-        }
-
-        // (Priority replays through the registry — see below.)
-
-        // (SavedTag + DeletedTask replay through the registry — see below.)
-
-        // --- Registry entities (Note, SavedView, …) ---
-        // Runs after the Task loop so idRemap can resolve cross-entity
-        // references to tasks created offline. Must stay inside this
-        // handler's re-entrancy guards — the registry has no listeners.
-        await replayRegisteredEntities(queryClient, idRemap);
+        // Every entity replays through the registry, in registration order
+        // (Task first, so later entities resolve their task references).
+        // This must stay inside the re-entrancy guards above — the registry
+        // installs no listeners of its own.
+        await replayRegisteredEntities(queryClient);
       } finally {
         replayInFlightRef.current = false;
         if (replayRequestedRef.current) {

@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { isOnline, queueMutation, dequeueOfflineCreate, updateQueuedCreate } from '@/lib/offlineCache';
+import { isOnline } from '@/lib/offlineCache';
+import { TaskOffline } from '@/lib/offlineEntityRegistry';
 import { apiClient } from '@/api/apiClient';
 import { useDeletedTasks } from '@/hooks/useDeletedTasks';
 import { isRecoverableConnectionError } from '@/lib/network';
@@ -51,7 +52,7 @@ export function useOfflineMutation() {
         return result;
       } catch (error) {
         if (isRecoverableConnectionError(error)) {
-          queueMutation({ type: 'create', data: { ...data, _offlineId: optimisticId } });
+          TaskOffline.queueMutation({ type: 'create', data: { ...data, _offlineId: optimisticId } });
           return optimistic;
         }
 
@@ -59,7 +60,7 @@ export function useOfflineMutation() {
         return optimistic;
       }
     } else {
-      queueMutation({ type: 'create', data: { ...data, _offlineId: optimisticId } });
+      TaskOffline.queueMutation({ type: 'create', data: { ...data, _offlineId: optimisticId } });
       return optimistic;
     }
   };
@@ -77,15 +78,15 @@ export function useOfflineMutation() {
         await apiClient.entities.Task.update(id, data);
       } catch (error) {
         if (isRecoverableConnectionError(error)) {
-          queueMutation({ type: 'update', id, data });
+          TaskOffline.queueMutation({ type: 'update', id, data });
           return;
         }
         invalidate();
       }
     } else if (String(id).startsWith('offline_')) {
-      updateQueuedCreate(id, data);
+      TaskOffline.updateQueuedCreate(id, data);
     } else {
-      queueMutation({ type: 'update', id, data });
+      TaskOffline.queueMutation({ type: 'update', id, data });
     }
   };
 
@@ -157,8 +158,8 @@ export function useOfflineMutation() {
       const taskId = normalizedIds[index];
 
       if (taskId.startsWith('offline_')) {
-        dequeueOfflineCreate(taskId);
-        deletion.offlineSubtaskIds.forEach((subtaskId) => dequeueOfflineCreate(subtaskId));
+        TaskOffline.dequeueCreate(taskId);
+        deletion.offlineSubtaskIds.forEach((subtaskId) => TaskOffline.dequeueCreate(subtaskId));
         return;
       }
 
@@ -178,7 +179,7 @@ export function useOfflineMutation() {
         [...onlineDeleteIds].map((taskId) =>
           apiClient.entities.Task.delete(taskId).catch((error) => {
             if (isRecoverableConnectionError(error)) {
-              queueMutation({ type: 'delete', id: taskId });
+              TaskOffline.queueMutation({ type: 'delete', id: taskId });
               return;
             }
             didFail = true;
@@ -189,7 +190,7 @@ export function useOfflineMutation() {
         invalidate();
       }
     } else {
-      queuedDeleteIds.forEach((taskId) => queueMutation({ type: 'delete', id: taskId }));
+      queuedDeleteIds.forEach((taskId) => TaskOffline.queueMutation({ type: 'delete', id: taskId }));
     }
 
     await Promise.all(deletedRecordPromises);

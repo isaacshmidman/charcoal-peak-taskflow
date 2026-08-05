@@ -25,9 +25,18 @@ vi.mock("@/api/apiClient", () => ({
 
 vi.mock("@/lib/offlineCache", () => ({
   isOnline: vi.fn(() => true),
-  queueMutation,
-  dequeueOfflineCreate: vi.fn(),
-  updateQueuedCreate: vi.fn(),
+}));
+
+// Tasks queue through the registry handle now — identical entry shapes,
+// so every assertion below is unchanged; only the spy's home moved.
+vi.mock("@/lib/offlineEntityRegistry", () => ({
+  TaskOffline: {
+    queueMutation,
+    dequeueCreate: vi.fn(),
+    updateQueuedCreate: vi.fn(),
+    getPending: vi.fn(() => []),
+    setPending: vi.fn(),
+  },
 }));
 
 vi.mock("@/hooks/useDeletedTasks", () => ({

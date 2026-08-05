@@ -97,48 +97,6 @@ export function isOnline() {
   return navigator.onLine;
 }
 
-// Queue a mutation to be replayed when back online
-export function queueMutation(mutation) {
-  try {
-    const pending = loadFromCache('pendingMutations') || [];
-    pending.push({ ...mutation, queuedAt: Date.now() });
-    localStorage.setItem(resolveStorageKey('pendingMutations'), JSON.stringify(pending));
-  } catch {}
-}
-
-export function getPendingMutations() {
-  return loadFromCache('pendingMutations') || [];
-}
-
-export function setPendingMutations(mutations) {
-  try {
-    localStorage.setItem(resolveStorageKey('pendingMutations'), JSON.stringify(mutations));
-  } catch {}
-}
-
-// Remove a queued offline create by its _offlineId (used when user deletes an unsaved task)
-export function dequeueOfflineCreate(offlineId) {
-  try {
-    const pending = loadFromCache('pendingMutations') || [];
-    const updated = pending.filter(m => !(m.type === 'create' && m.data?._offlineId === offlineId));
-    localStorage.setItem(resolveStorageKey('pendingMutations'), JSON.stringify(updated));
-  } catch {}
-}
-
-// Merge new data into a queued create mutation (used when user edits an unsaved task offline)
-export function updateQueuedCreate(offlineId, newData) {
-  try {
-    const pending = loadFromCache('pendingMutations') || [];
-    const updated = pending.map(m => {
-      if (m.type === 'create' && m.data?._offlineId === offlineId) {
-        return { ...m, data: { ...m.data, ...newData, _offlineId: offlineId } };
-      }
-      return m;
-    });
-    localStorage.setItem(resolveStorageKey('pendingMutations'), JSON.stringify(updated));
-  } catch {}
-}
-
 
 
 

@@ -44,14 +44,19 @@ vi.mock("@/api/apiClient", () => ({
 }));
 
 import { useOfflineData } from "./useOfflineData";
+import { loadFromCache } from "@/lib/offlineCache";
+// All four legacy entities now ride the registry — same queues, same
+// storage keys, so the behavioral assertions below are untouched; only
+// the helpers moved.
 import {
-  getPendingMutations,
-  queueMutation,
-  loadFromCache,
-} from "@/lib/offlineCache";
-// Migrated to the registry — same queues, same storage keys, so the
-// behavioral assertions below are untouched; only the helpers moved.
-import { DeletedTaskOffline, PriorityOffline, SavedTagOffline } from "@/lib/offlineEntityRegistry";
+  DeletedTaskOffline,
+  PriorityOffline,
+  SavedTagOffline,
+  TaskOffline,
+} from "@/lib/offlineEntityRegistry";
+
+const queueMutation = (m) => TaskOffline.queueMutation(m);
+const getPendingMutations = () => TaskOffline.getPending();
 
 const queuePriorityMutation = (m) => PriorityOffline.queueMutation(m);
 const getPendingPriorityMutations = () => PriorityOffline.getPending();
