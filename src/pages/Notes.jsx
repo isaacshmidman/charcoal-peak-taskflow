@@ -10,7 +10,7 @@
  */
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { NotebookPen, Pin, Plus, Search } from "lucide-react";
+import { NotebookPen, Pin, Plus, Search, Trash2 } from "lucide-react";
 import { format } from "date-fns/format";
 import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
 import { apiClient } from "@/api/apiClient";
@@ -265,7 +265,11 @@ export default function Notes() {
                     role="button"
                     tabIndex={0}
                     data-testid={`note-card-${note.id}`}
-                    className="p-4 cursor-pointer text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    // Cards in a grid row stretch to the tallest one, so the
+                    // column is flexed and the footer pushed down (mt-auto) —
+                    // otherwise a short note's timestamp floats mid-card
+                    // while its neighbour's sits at the bottom.
+                    className="p-4 cursor-pointer text-left h-full flex flex-col focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     onClick={() => { setOpenNoteId(note.id); setShowEditor(true); }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") { setOpenNoteId(note.id); setShowEditor(true); }
@@ -285,11 +289,26 @@ export default function Notes() {
                       contentText={note.content_text}
                       className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-3"
                     />
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2">
-                      {note.updated_date
-                        ? formatDistanceToNow(new Date(note.updated_date), { addSuffix: true })
-                        : ""}
-                    </p>
+                    <div className="flex items-end justify-between gap-2 mt-auto pt-2">
+                      <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                        {note.updated_date
+                          ? formatDistanceToNow(new Date(note.updated_date), { addSuffix: true })
+                          : ""}
+                      </p>
+                      {/* Delete without opening the note. stopPropagation so
+                          the card's own open-on-click doesn't also fire. */}
+                      <button
+                        type="button"
+                        aria-label={`Delete ${note.title || "Untitled"}`}
+                        title="Delete note"
+                        data-testid={`note-card-delete-${note.id}`}
+                        className="shrink-0 -m-1 p-1 rounded-lg text-slate-300 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-[#2a1116] transition-colors"
+                        onClick={(e) => { e.stopPropagation(); deleteNote(note); }}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </Card>
                 ))}
               </div>
