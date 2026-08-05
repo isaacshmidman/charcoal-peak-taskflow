@@ -46,19 +46,20 @@ vi.mock("@/api/apiClient", () => ({
 import { useOfflineData } from "./useOfflineData";
 import {
   getPendingMutations,
-  getPendingTagMutations,
   queueMutation,
-  queueTagMutation,
   loadFromCache,
 } from "@/lib/offlineCache";
 // Migrated to the registry — same queues, same storage keys, so the
 // behavioral assertions below are untouched; only the helpers moved.
-import { DeletedTaskOffline, PriorityOffline } from "@/lib/offlineEntityRegistry";
+import { DeletedTaskOffline, PriorityOffline, SavedTagOffline } from "@/lib/offlineEntityRegistry";
 
 const queuePriorityMutation = (m) => PriorityOffline.queueMutation(m);
 const getPendingPriorityMutations = () => PriorityOffline.getPending();
 const queueDeletedTaskMutation = (m) => DeletedTaskOffline.queueMutation(m);
 const getPendingDeletedTaskMutations = () => DeletedTaskOffline.getPending();
+// Tags keep their name-keyed at-rest shape; the handle normalizes on read.
+const queueTagMutation = (m) => SavedTagOffline.queueMutation(m);
+const getPendingTagMutations = () => SavedTagOffline.getPending();
 
 /** The exact legacy storage keys users already have data under. */
 const LEGACY_KEYS = {

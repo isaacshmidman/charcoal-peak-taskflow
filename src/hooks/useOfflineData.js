@@ -4,8 +4,6 @@ import {
   saveToCache,
   getPendingMutations,
   setPendingMutations,
-  getPendingTagMutations,
-  setPendingTagMutations,
 } from '@/lib/offlineCache';
 import { apiClient } from '@/api/apiClient';
 import { registeredCacheKeys, replayRegisteredEntities } from '@/lib/offlineEntityRegistry';
@@ -109,23 +107,7 @@ export function useOfflineData() {
 
         // (Priority replays through the registry — see below.)
 
-        // --- Tag mutations ---
-        const pendingTags = getPendingTagMutations();
-        const remainingTagMutations = [];
-        for (const m of pendingTags) {
-          try {
-            if (m.type === 'create') await apiClient.entities.SavedTag.create({ name: m.name });
-            else if (m.type === 'delete') await apiClient.entities.SavedTag.delete(m.id);
-          } catch {
-            remainingTagMutations.push(m);
-          }
-        }
-        if (pendingTags.length) {
-          setPendingTagMutations(remainingTagMutations);
-          queryClient.invalidateQueries({ queryKey: ['savedTags'] });
-        }
-
-        // (DeletedTask replays through the registry — see below.)
+        // (SavedTag + DeletedTask replay through the registry — see below.)
 
         // --- Registry entities (Note, SavedView, …) ---
         // Runs after the Task loop so idRemap can resolve cross-entity

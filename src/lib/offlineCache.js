@@ -141,35 +141,7 @@ export function updateQueuedCreate(offlineId, newData) {
 
 
 
-// Remove a queued offline tag create by its name (tags queue by name, not _offlineId)
-export function dequeueTagCreate(name) {
-  try {
-    const pending = loadFromCache('pendingTagMutations') || [];
-    const updated = pending.filter(m => !(m.type === 'create' && m.name === name));
-    localStorage.setItem(resolveStorageKey('pendingTagMutations'), JSON.stringify(updated));
-  } catch {}
-}
 
-
-
-// Queue tag mutations for replay when back online
-export function queueTagMutation(mutation) {
-  try {
-    const pending = loadFromCache('pendingTagMutations') || [];
-    pending.push({ ...mutation, queuedAt: Date.now() });
-    localStorage.setItem(resolveStorageKey('pendingTagMutations'), JSON.stringify(pending));
-  } catch {}
-}
-
-export function getPendingTagMutations() {
-  return loadFromCache('pendingTagMutations') || [];
-}
-
-export function setPendingTagMutations(mutations) {
-  try {
-    localStorage.setItem(resolveStorageKey('pendingTagMutations'), JSON.stringify(mutations));
-  } catch {}
-}
 
 export function updateDeletedTasksCache(records) {
   try {

@@ -16,10 +16,9 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
-  dequeueTagCreate,
   isOnline,
-  queueTagMutation,
 } from "@/lib/offlineCache";
+import { SavedTagOffline } from "@/lib/offlineEntityRegistry";
 import { isRecoverableConnectionError } from "@/lib/network";
 
 export default function TagsSection() {
@@ -51,14 +50,14 @@ export default function TagsSection() {
           return result;
         } catch (error) {
           if (isRecoverableConnectionError(error)) {
-            queueTagMutation({ type: "create", name });
+            SavedTagOffline.queueMutation({ type: "create", name });
             return optimistic;
           }
           applyTag((current) => current.filter((tag) => tag.id !== optimistic.id));
           throw error;
         }
       } else {
-        queueTagMutation({ type: "create", name });
+        SavedTagOffline.queueMutation({ type: "create", name });
         return optimistic;
       }
     },
@@ -70,7 +69,7 @@ export default function TagsSection() {
       const tagToDelete = current.find((t) => t.id === id);
       applyTag((list) => list.filter((t) => t.id !== id));
       if (String(id).startsWith("offline_")) {
-        if (tagToDelete?.name) dequeueTagCreate(tagToDelete.name);
+        if (tagToDelete?.name) SavedTagOffline.dequeueCreateWhere((m) => m.data?.name === tagToDelete.name);
         return;
       }
       if (isOnline()) {
@@ -78,13 +77,13 @@ export default function TagsSection() {
           await apiClient.entities.SavedTag.delete(id);
         } catch (error) {
           if (isRecoverableConnectionError(error)) {
-            queueTagMutation({ type: "delete", id });
+            SavedTagOffline.queueMutation({ type: "delete", id });
             return;
           }
           invalidateTags();
         }
       } else {
-        queueTagMutation({ type: "delete", id });
+        SavedTagOffline.queueMutation({ type: "delete", id });
       }
     },
   });

@@ -240,6 +240,25 @@ export const DeletedTaskOffline = registerOfflineEntity({
   },
 });
 
+export const SavedTagOffline = registerOfflineEntity({
+  name: "SavedTag",
+  cacheKey: "savedTags",
+  queueKey: "pendingTagMutations",
+  storageKeys: {
+    cache: "taskflow_offline_savedTags",
+    queue: "taskflow_pending_tag_mutations",
+  },
+  // Tags are the one legacy entity with a non-standard entry: creates are
+  // name-keyed (`{type:'create', name}`) with no data wrapper and no
+  // _offlineId, because a tag is identified by its name and nothing ever
+  // references a tag's id. Producers still WRITE that shape, so the at-rest
+  // format is unchanged; this lifts it to the standard `data` form on read.
+  // Anything rewritten (a retained failure) stays a superset that keeps
+  // `name`, so an older build could still read it.
+  normalizeEntry: (m) =>
+    m.type === "create" && !m.data && m.name ? { ...m, data: { name: m.name } } : m,
+});
+
 export const NoteOffline = registerOfflineEntity({
   name: "Note",
   cacheKey: "notes",

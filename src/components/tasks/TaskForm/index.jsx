@@ -13,7 +13,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiClient } from "@/api/apiClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { isOnline, queueTagMutation } from "@/lib/offlineCache";
+import { isOnline } from "@/lib/offlineCache";
+import { SavedTagOffline } from "@/lib/offlineEntityRegistry";
 import { isRecoverableConnectionError } from "@/lib/network";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -86,13 +87,13 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
       newTags.forEach((name) => {
         apiClient.entities.SavedTag.create({ name }).catch((error) => {
           if (isRecoverableConnectionError(error)) {
-            queueTagMutation({ type: "create", name });
+            SavedTagOffline.queueMutation({ type: "create", name });
           }
         });
       });
       setTimeout(() => queryClient.invalidateQueries({ queryKey: ["savedTags"] }), 600);
     } else {
-      newTags.forEach(name => queueTagMutation({ type: "create", name }));
+      newTags.forEach(name => SavedTagOffline.queueMutation({ type: "create", name }));
     }
   };
 
