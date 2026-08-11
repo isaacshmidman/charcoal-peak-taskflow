@@ -20,6 +20,7 @@ import {
   refreshIntegrationCalendars,
   listIntegrationCalendars,
   setEnabledCalendars,
+  setCalendarItemKind,
   setDefaultIntegration,
   setPrimaryCalendar,
   setCalendarColor,
@@ -153,6 +154,24 @@ export async function handleIntegrationsRoute(request, response, { config, db, u
       if (typeof v === "boolean") sanitized[k] = v;
     }
     setEnabledCalendars(db, row.id, sanitized);
+
+    // Tasks/Events choice rides the same PUT so one Save in the Configure
+    // modal writes both. Applied AFTER the enable/disable pass, which
+    // deletes imported events when a calendar is switched off — running it
+    // first would re-stamp rows that are about to disappear.
+    const itemKinds = (body && typeof body.item_kinds === "object" && body.item_kinds) || {};
+    for (const [extId, kind] of Object.entries(itemKinds)) {
+      if (kind !== "task" && kind !== "event") continue;
+      const result = setCalendarItemKind(db, row.id, extId, kind);
+      if (!result.ok && result.reason === "read_only") {
+        throw new HttpError(
+          400,
+          "Read-only calendars can't hold tasks — Zephyrly can't write changes back to them.",
+          "invalid_request"
+        );
+      }
+    }
+
     sendJson(response, 200, { calendars: listIntegrationCalendars(db, row.id) });
     return true;
   }

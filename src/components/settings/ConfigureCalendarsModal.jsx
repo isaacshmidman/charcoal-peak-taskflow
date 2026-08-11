@@ -62,10 +62,17 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
 
   // Local override of sync_enabled so toggling feels instant.
   const [overrides, setOverrides] = useState(/** @type {Record<string, boolean>} */ ({}));
+  // Same pattern for the Tasks/Events choice: "task" | "event".
+  const [kindOverrides, setKindOverrides] = useState(
+    /** @type {Record<string, "task" | "event">} */ ({})
+  );
 
   // Reset overrides whenever the modal reopens for a different integration.
   useEffect(() => {
-    if (!open) setOverrides({});
+    if (!open) {
+      setOverrides({});
+      setKindOverrides({});
+    }
   }, [open, integrationId]);
 
   const rows = useMemo(() => {
@@ -73,6 +80,11 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
       .map((c) => ({
         ...c,
         enabled: overrides[c.external_calendar_id] ?? !!c.sync_enabled,
+        // Read-only calendars can't hold tasks (we can't push changes back),
+        // so they always read as events regardless of what's stored.
+        kind: c.writable
+          ? kindOverrides[c.external_calendar_id] ?? (c.item_kind === "task" ? "task" : "event")
+          : "event",
       }))
       .sort((a, b) => {
         // Primary first, then writable, then alpha.
@@ -80,16 +92,32 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
         if (a.writable !== b.writable) return a.writable ? -1 : 1;
         return (a.summary || "").localeCompare(b.summary || "");
       });
-  }, [calendars, overrides]);
+  }, [calendars, overrides, kindOverrides]);
+
+  // The read-only badge column is reserved space so the sync toggle lines up
+  // across rows — but that only matters when SOME row actually shows a badge.
+  // On an account where every calendar is writable it was costing ~88px of
+  // the calendar name's width for nothing, which got tight once the
+  // Tasks/Events control claimed a column of its own.
+  const anyReadOnly = useMemo(() => rows.some((c) => !c.writable), [rows]);
 
   const dirty = useMemo(() => {
-    return Object.keys(overrides).some(
-      (k) => overrides[k] !== !!(calendars || []).find((c) => c.external_calendar_id === k)?.sync_enabled
+    const find = (k) => (calendars || []).find((c) => c.external_calendar_id === k);
+    const syncDirty = Object.keys(overrides).some(
+      (k) => overrides[k] !== !!find(k)?.sync_enabled
     );
-  }, [overrides, calendars]);
+    const kindDirty = Object.keys(kindOverrides).some(
+      (k) => kindOverrides[k] !== (find(k)?.item_kind === "task" ? "task" : "event")
+    );
+    return syncDirty || kindDirty;
+  }, [overrides, kindOverrides, calendars]);
 
   const toggle = (extId, next) => {
     setOverrides((o) => ({ ...o, [extId]: next }));
+  };
+
+  const setKind = (extId, next) => {
+    setKindOverrides((o) => ({ ...o, [extId]: next }));
   };
 
   const handleSave = async () => {
@@ -98,8 +126,9 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
       return;
     }
     try {
-      await setCalendars(overrides);
+      await setCalendars({ updates: overrides, itemKinds: kindOverrides });
       setOverrides({});
+      setKindOverrides({});
       onOpenChange(false);
     } catch (e) {
       // The hook surfaces the error; keep the modal open so the user can retry.
@@ -108,7 +137,9 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md w-[calc(100vw-2rem)]">
+      {/* max-w-lg (not md) since the Tasks/Events control added a column —
+          at md the calendar name had almost no room left before truncating. */}
+      <DialogContent className="max-w-lg w-[calc(100vw-2rem)]">
         {/* DialogContent is a CSS Grid; grid items have an intrinsic
             `min-width: auto` ≈ `min-content`, so an unbreakable long
             calendar name (e.g. a 50-char French class title) was blowing
@@ -123,8 +154,11 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
           <DialogTitle>Configure calendars</DialogTitle>
           <DialogDescription className="min-w-0 break-words">
             Choose which calendars to sync with Zephyrly. The starred calendar
-            receives new tasks created in Zephyrly. Read-only calendars
-            (Birthdays, Holidays, etc.) appear as events that can't be edited.
+            receives new tasks created in Zephyrly. Calendars set to Events
+            appear only in Calendar — set one to Tasks when you keep to-dos on
+            it, and its items can be completed and re-dated like any Zephyrly
+            task. Read-only calendars (Birthdays, Holidays, etc.) are always
+            events.
           </DialogDescription>
         </DialogHeader>
 
@@ -271,10 +305,52 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
                       </p>
                     )}
                   </div>
-                  {/* Read-only column: always present (w-20 ≈ width of the
-                      badge), so the toggle stays in the same screen-x
-                      position regardless of whether this row is writable. */}
-                  <div className="w-[5.5rem] shrink-0 flex justify-end">
+                  {/* Tasks/Events — what this calendar's items become in
+                      Zephyrly. Its own fixed-width column so the read-only
+                      badge and sync toggle stay column-aligned (see the
+                      layout notes above). Read-only calendars get a static
+                      "events" label: the API rejects marking them Tasks,
+                      so offering the choice would be a lie. */}
+                  <div className="w-[6.75rem] shrink-0 flex justify-end">
+                    {c.writable ? (
+                      <div
+                        role="radiogroup"
+                        aria-label={`What ${c.summary || "this calendar"} holds`}
+                        className="inline-flex rounded-lg border border-slate-200 dark:border-[#303030] p-0.5 gap-0.5"
+                      >
+                        {[
+                          { value: "event", label: "Events" },
+                          { value: "task", label: "Tasks" },
+                        ].map((opt) => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            role="radio"
+                            aria-checked={c.kind === opt.value}
+                            disabled={offline}
+                            onClick={() => setKind(c.external_calendar_id, opt.value)}
+                            className={
+                              "px-2 py-0.5 text-[11px] rounded-md transition-colors disabled:opacity-50 " +
+                              (c.kind === opt.value
+                                ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
+                                : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100")
+                            }
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                        events
+                      </span>
+                    )}
+                  </div>
+                  {/* Read-only column: present for every row whenever ANY
+                      row is read-only, so the toggle stays in the same
+                      screen-x position across the list. Dropped entirely
+                      when no calendar is read-only — see anyReadOnly. */}
+                  <div className={anyReadOnly ? "w-[5.5rem] shrink-0 flex justify-end" : "hidden"}>
                     {!c.writable && (
                       <span
                         title="Read-only — events from this calendar can't be edited"

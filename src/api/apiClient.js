@@ -53,7 +53,7 @@ import { loadFromCache, saveToCache } from "@/lib/offlineCache";
  *     disconnect: (id: string) => Promise<any>,
  *     sync: (id: string) => Promise<any>,
  *     listCalendars: (id: string) => Promise<any[]>,
- *     setCalendars: (id: string, updates: Record<string, boolean>) => Promise<any[]>,
+ *     setCalendars: (id: string, updates: Record<string, boolean>, itemKinds?: Record<string, "task" | "event">) => Promise<any[]>,
  *     setDefault: (id: string) => Promise<any>,
  *     setPrimaryCalendar: (id: string, externalCalendarId: string) => Promise<any>,
  *     setCalendarColor: (id: string, externalCalendarId: string, colorHex: string) => Promise<any>,
@@ -442,10 +442,10 @@ const liveApiClient = {
         throw error;
       }
     },
-    async setCalendars(id, updates) {
+    async setCalendars(id, updates, itemKinds) {
       const data = await apiRequest(
         `/apps/${appConfig.appId}/integrations/${encodeURIComponent(id)}/calendars`,
-        { method: "PUT", body: { updates } }
+        { method: "PUT", body: { updates, item_kinds: itemKinds || {} } }
       );
       const calendars = Array.isArray(data?.calendars) ? data.calendars : [];
       const cachedByIntegration = loadFromCache(INTEGRATION_CALENDARS_CACHE_KEY) || {};

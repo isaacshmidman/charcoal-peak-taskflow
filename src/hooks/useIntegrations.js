@@ -95,9 +95,15 @@ export function useIntegrationCalendars(integrationId, enabled = true) {
     retry: false,
   });
 
+  // One Save writes both the sync toggles and the Tasks/Events choice.
+  // The ["tasks"] invalidation below matters more than usual for item_kind:
+  // the server re-stamps already-imported rows in the same request, so the
+  // task list is stale the moment this resolves.
   const updateMutation = useMutation({
-    mutationFn: (/** @type {Record<string, boolean>} */ updates) =>
-      apiClient.integrations.setCalendars(String(integrationId), updates),
+    mutationFn: (
+      /** @type {{ updates: Record<string, boolean>, itemKinds?: Record<string, "task"|"event"> }} */ args
+    ) =>
+      apiClient.integrations.setCalendars(String(integrationId), args.updates, args.itemKinds),
     onSuccess: (data) => {
       queryClient.setQueryData(queryKey, data);
       queryClient.invalidateQueries({ queryKey: ["tasks"] });

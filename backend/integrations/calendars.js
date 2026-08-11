@@ -23,6 +23,7 @@ import {
   setCalendarColor as setAppleCalendarColor,
 } from "../providers/apple-calendar.js";
 import { getIntegrationForUser, listIntegrationCalendars } from "./queries.js";
+import { isWritableCalendar } from "./serialize.js";
 import { getFreshAccessToken } from "./google-connect.js";
 import { getAppleCredentials } from "./apple-connect.js";
 
@@ -262,6 +263,80 @@ export function setEnabledCalendars(db, integrationId, updates) {
     db.exec("ROLLBACK");
     throw err;
   }
+}
+
+/**
+ * Set whether a calendar holds tasks or events, and re-stamp the items it
+ * already imported to match.
+ *
+ * The re-stamp is the whole point. Inbound sync is INCREMENTAL — each
+ * calendar carries a sync_token and the provider only returns what changed
+ * since it. Items imported before the toggle are never revisited, so
+ * flipping the column alone would leave every existing row on the old
+ * classification, possibly forever.
+ *
+ * Safety property worth naming: these are direct SQL writes, so they never
+ * pass through routes/entities.js and never reach enqueueTaskPush. Changing
+ * a calendar's kind reclassifies rows locally and CANNOT write anything back
+ * to the user's Google or Apple calendar.
+ *
+ * Read-only calendars can't be marked as tasks — completing or re-dating a
+ * task pushes back to the provider, which we have no access to do. Callers
+ * should surface this as a 400; classify.js enforces the same rule on read.
+ *
+ * @param {DB} db
+ * @param {string} integrationId
+ * @param {string} externalCalendarId
+ * @param {"task" | "event"} kind
+ * @returns {{ ok: boolean, reason?: string }}
+ */
+export function setCalendarItemKind(db, integrationId, externalCalendarId, kind) {
+  const nextKind = kind === "task" ? "task" : "event";
+  const now = new Date().toISOString();
+
+  const integration = /** @type {any} */ (
+    db.prepare(`SELECT * FROM calendar_integrations WHERE id = ?`).get(integrationId)
+  );
+  if (!integration) return { ok: false, reason: "not_found" };
+
+  const calendar = /** @type {any} */ (
+    db
+      .prepare(
+        `SELECT * FROM integration_calendars WHERE integration_id = ? AND external_calendar_id = ?`
+      )
+      .get(integrationId, externalCalendarId)
+  );
+  if (!calendar) return { ok: false, reason: "not_found" };
+
+  if (nextKind === "task" && !isWritableCalendar(calendar)) {
+    return { ok: false, reason: "read_only" };
+  }
+
+  db.exec("BEGIN");
+  try {
+    db.prepare(
+      `UPDATE integration_calendars
+          SET item_kind = ?, updated_date = ?
+        WHERE integration_id = ? AND external_calendar_id = ?`
+    ).run(nextKind, now, integrationId, externalCalendarId);
+
+    // Re-stamp what this calendar already imported. Scoped by provider +
+    // calendar id so it can only ever touch rows this calendar produced —
+    // Zephyrly-native tasks have an empty source_provider and are excluded.
+    db.prepare(
+      `UPDATE tasks
+          SET source_kind = ?, updated_date = ?
+        WHERE app_id = ?
+          AND source_provider = ?
+          AND source_calendar_id = ?`
+    ).run(nextKind, now, integration.app_id, integration.provider, externalCalendarId);
+
+    db.exec("COMMIT");
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
+  }
+  return { ok: true };
 }
 
 /**

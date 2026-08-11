@@ -8,6 +8,7 @@ import { createDatabase } from "./db.js";
 import {
   connectApple,
   disconnectIntegration,
+  setCalendarItemKind,
   setEnabledCalendars,
   setPrimaryCalendar,
 } from "./integrations.js";
@@ -467,6 +468,148 @@ describe("setEnabledCalendars", () => {
   });
 });
 
+describe("setCalendarItemKind", () => {
+  it("re-stamps already-imported rows and leaves native tasks alone", () => {
+    const { integrationId, calendarId } = seedGoogleIntegration();
+    insertTask({
+      id: "task_meeting",
+      title: "Standup",
+      sourceProvider: "google",
+      sourceKind: "event",
+      sourceCalendarId: calendarId,
+    });
+    // Zephyrly's own task: no source_provider, so it must be untouched by
+    // either direction of the toggle.
+    insertTask({ id: "task_native", title: "Native task" });
+
+    const kindOf = (id) =>
+      db.prepare(`SELECT source_kind FROM tasks WHERE id = ?`).get(id).source_kind;
+
+    // Re-stamping matters because inbound sync is incremental — rows
+    // imported before the toggle are never returned by the provider again.
+    expect(setCalendarItemKind(db, integrationId, calendarId, "task")).toEqual({ ok: true });
+    expect(kindOf("task_meeting")).toBe("task");
+    expect(kindOf("task_native")).toBe("");
+    expect(
+      db
+        .prepare(
+          `SELECT item_kind FROM integration_calendars WHERE integration_id = ? AND external_calendar_id = ?`
+        )
+        .get(integrationId, calendarId).item_kind
+    ).toBe("task");
+
+    // And back again.
+    expect(setCalendarItemKind(db, integrationId, calendarId, "event")).toEqual({ ok: true });
+    expect(kindOf("task_meeting")).toBe("event");
+    expect(kindOf("task_native")).toBe("");
+  });
+
+  it("never touches rows belonging to a different calendar", () => {
+    const { integrationId, calendarId } = seedGoogleIntegration();
+    insertTask({
+      id: "task_other_cal",
+      title: "Elsewhere",
+      sourceProvider: "google",
+      sourceKind: "event",
+      sourceCalendarId: "other@example.com",
+    });
+
+    setCalendarItemKind(db, integrationId, calendarId, "task");
+
+    expect(
+      db.prepare(`SELECT source_kind FROM tasks WHERE id = ?`).get("task_other_cal").source_kind
+    ).toBe("event");
+  });
+
+  it("refuses to make a read-only calendar hold tasks", () => {
+    const { integrationId, calendarId } = seedGoogleIntegration();
+    db.prepare(
+      `UPDATE integration_calendars SET access_role = 'reader' WHERE integration_id = ? AND external_calendar_id = ?`
+    ).run(integrationId, calendarId);
+
+    // Tasks can be completed and re-dated, and those changes push back to
+    // the provider — impossible without write access.
+    expect(setCalendarItemKind(db, integrationId, calendarId, "task")).toEqual({
+      ok: false,
+      reason: "read_only",
+    });
+    expect(
+      db
+        .prepare(
+          `SELECT item_kind FROM integration_calendars WHERE integration_id = ? AND external_calendar_id = ?`
+        )
+        .get(integrationId, calendarId).item_kind
+    ).toBe("event");
+  });
+
+  it("reports not_found for an unknown calendar", () => {
+    const { integrationId } = seedGoogleIntegration();
+    expect(setCalendarItemKind(db, integrationId, "nope@example.com", "task")).toEqual({
+      ok: false,
+      reason: "not_found",
+    });
+  });
+});
+
+describe("imported-item classification backfill", () => {
+  it("demotes stale 'task' rows to events on boot, sparing marked calendars", () => {
+    // Reproduces the reported bug: a database written by the old rule, where
+    // every event on a writable calendar was stored as source_kind='task'
+    // and so counted as an overdue task.
+    const { integrationId, calendarId } = seedGoogleIntegration();
+    // A second calendar on the same account, marked as a task calendar.
+    const now = new Date().toISOString();
+    db.prepare(
+      `INSERT INTO integration_calendars (
+         id, app_id, integration_id, external_calendar_id, summary, time_zone,
+         color_hex, access_role, primary_flag, sync_enabled, item_kind,
+         created_date, updated_date
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      "cal_todo",
+      "test-app",
+      integrationId,
+      "todo@example.com",
+      "To-dos",
+      "America/New_York",
+      "#3174ad",
+      "owner",
+      0,
+      1,
+      "task",
+      now,
+      now
+    );
+
+    insertTask({
+      id: "task_stale_meeting",
+      title: "Old meeting",
+      sourceProvider: "google",
+      sourceKind: "task",
+      sourceCalendarId: calendarId,
+    });
+    insertTask({
+      id: "task_on_task_cal",
+      title: "Real to-do",
+      sourceProvider: "google",
+      sourceKind: "task",
+      sourceCalendarId: "todo@example.com",
+    });
+    insertTask({ id: "task_native", title: "Native task" });
+
+    // createDatabase runs the migrations against the existing file.
+    db.close();
+    db = createDatabase(config);
+
+    const kindOf = (id) =>
+      db.prepare(`SELECT source_kind FROM tasks WHERE id = ?`).get(id).source_kind;
+    expect(kindOf("task_stale_meeting")).toBe("event");
+    expect(kindOf("task_on_task_cal")).toBe("task");
+    expect(kindOf("task_native")).toBe("");
+    expect(integrationId).toBeTruthy();
+  });
+});
+
 describe("setPrimaryCalendar", () => {
   it("rejects read-only calendars as primary destinations", () => {
     const { integrationId, calendarId } = seedAppleIntegration();
@@ -633,9 +776,51 @@ describe("calendar provider task mapping", () => {
       recurrence_days: [1, 3, 5],
       recurrence_end_date: "2026-06-30",
       source_provider: "google",
-      source_kind: "task",
+      // Owning the calendar no longer makes its items tasks — a calendar is
+      // an event source until the user marks it Tasks.
+      source_kind: "event",
       source_recurrence_rule: "RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR;UNTIL=20260630T235959Z",
     });
+  });
+
+  it("imports Google events as tasks only from a calendar marked Tasks", () => {
+    const event = {
+      id: "evt_2",
+      summary: "Renew passport",
+      start: { date: "2026-05-04" },
+      end: { date: "2026-05-05" },
+    };
+    const calendar = {
+      external_calendar_id: "primary@example.com",
+      summary: "Primary",
+      time_zone: "America/New_York",
+      access_role: "owner",
+      item_kind: "event",
+    };
+
+    expect(mapGoogleEventToTaskInput(event, calendar)).toMatchObject({
+      source_kind: "event",
+    });
+    expect(
+      mapGoogleEventToTaskInput(event, { ...calendar, item_kind: "task" })
+    ).toMatchObject({ source_kind: "task" });
+
+    // A birthday stays a birthday even on a task calendar.
+    expect(
+      mapGoogleEventToTaskInput(
+        { ...event, eventType: "birthday" },
+        { ...calendar, item_kind: "task" }
+      )
+    ).toMatchObject({ source_kind: "event" });
+
+    // Read-only calendars can never yield tasks, marked or not.
+    expect(
+      mapGoogleEventToTaskInput(event, {
+        ...calendar,
+        access_role: "reader",
+        item_kind: "task",
+      })
+    ).toMatchObject({ source_kind: "event" });
   });
 
   it("imports Apple timed VEVENTs with TZID and recurrence", () => {
@@ -671,9 +856,23 @@ describe("calendar provider task mapping", () => {
       recurrence: "weekdays",
       recurrence_days: [],
       source_provider: "apple",
-      source_kind: "task",
+      // Same rule as Google — the calendar's Tasks/Events setting decides,
+      // and it defaults to events.
+      source_kind: "event",
       source_recurrence_rule: "RRULE:FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR",
     });
+
+    // Marking the calendar Tasks flips it, proving both providers share
+    // the one classifier instead of drifting apart again.
+    expect(
+      mapVEventToTaskInput(event, {
+        external_calendar_id: "https://caldav.example.com/cal/1/",
+        summary: "Work",
+        time_zone: "America/New_York",
+        access_role: "owner",
+        item_kind: "task",
+      })
+    ).toMatchObject({ source_kind: "task" });
   });
 
   it("pushes native recurrence fields and normalizes invalid timed ends", () => {

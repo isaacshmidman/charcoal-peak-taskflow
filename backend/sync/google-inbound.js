@@ -10,6 +10,7 @@ import { clearCalendarSyncToken, markCalendarSyncResult } from "../integrations.
 import { createEntityRecord, updateEntityRecord, deleteEntityRecord } from "../store.js";
 import { suppressPush } from "../push.js";
 import { parseRruleValueToTaskRecurrence } from "../recurrence-rrule.js";
+import { classifyCalendarItem } from "./classify.js";
 import { log } from "../log.js";
 import {
   findZephyrlyTaskForProviderEvent,
@@ -191,32 +192,6 @@ async function applyEventToTasks(db, config, { integration, user, calendarRow, e
 }
 
 /**
- * Decide whether a Google event represents a "task" or a "non-task" calendar
- * item (events / birthdays / holidays). Heuristics:
- *   - eventType field on the event itself (Google adds 'birthday' / 'fromGmail'
- *     / 'workingLocation' etc.).
- *   - read-only calendars (accessRole=reader/freeBusyReader) are events.
- *   - Holiday calendars summary contains "Holidays".
- * Anything else defaults to 'task' for the user's writable calendars and
- * 'event' for everything else.
- *
- * @param {any} event
- * @param {any} calendarRow
- */
-function classifySource(event, calendarRow) {
-  const writable =
-    calendarRow.access_role === "owner" || calendarRow.access_role === "writer";
-  const eventType = String(event.eventType || "default");
-  const summary = String(calendarRow.summary || "").toLowerCase();
-  const isHolidayCal = /holiday/.test(summary);
-  const isBirthdayCal = /birthday/.test(summary) || eventType === "birthday";
-  if (!writable || isHolidayCal || isBirthdayCal || eventType === "fromGmail") {
-    return "event";
-  }
-  return "task";
-}
-
-/**
  * Convert a Google Calendar RRULE recurrence array into the Zephyrly
  * recurrence shape (recurrence + recurrence_days + recurrence_end_date).
  * Unsupported RRULEs become recurrence="custom" so the provider series stays
@@ -278,7 +253,7 @@ export function mapGoogleEventToTaskInput(event, calendarRow) {
     return null;
   }
 
-  const sourceKind = calendarRow ? classifySource(event, calendarRow) : "event";
+  const sourceKind = classifyCalendarItem(calendarRow, { eventType: event.eventType });
   const writable =
     !calendarRow ||
     calendarRow.access_role === "owner" ||

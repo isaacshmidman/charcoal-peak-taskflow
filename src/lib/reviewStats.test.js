@@ -31,4 +31,38 @@ describe("computeOverdue", () => {
   it("handles the empty case", () => {
     expect(computeOverdue([], { now: NOW })).toEqual([]);
   });
+
+  it("keeps overdue items from a calendar the user marked as Tasks", () => {
+    // The per-calendar setting is the authority: an imported row whose
+    // calendar is marked Tasks arrives as source_kind "task" and belongs in
+    // the mover, even though it carries a source_provider.
+    const overdue = computeOverdue(
+      [
+        t({
+          due_date: "2026-07-10",
+          title: "from a task calendar",
+          source_provider: "google",
+          source_kind: "task",
+        }),
+        t({
+          due_date: "2026-07-10",
+          title: "a past meeting",
+          source_provider: "google",
+          source_kind: "event",
+        }),
+      ],
+      { now: NOW }
+    );
+    expect(overdue.map((x) => x.title)).toEqual(["from a task calendar"]);
+  });
+
+  it("excludes imported events however many there are", () => {
+    // The reported bug: a connected Google account produced hundreds of past
+    // events, every one of them counted as an overdue task.
+    const events = Array.from({ length: 200 }, (_, i) =>
+      t({ due_date: "2026-07-01", source_provider: "google", source_kind: "event", title: `evt ${i}` })
+    );
+    const mine = t({ due_date: "2026-07-01", title: "mine" });
+    expect(computeOverdue([...events, mine], { now: NOW }).map((x) => x.title)).toEqual(["mine"]);
+  });
 });

@@ -44,6 +44,7 @@ export function serializeIntegrationCalendar(row) {
     access_role: row.access_role,
     primary: !!row.primary_flag,
     sync_enabled: !!row.sync_enabled,
+    item_kind: row.item_kind === "task" ? "task" : "event",
     last_synced_at: row.last_synced_at,
     last_error: row.last_error,
     writable: isWritableCalendar(row),

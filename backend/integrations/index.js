@@ -24,6 +24,7 @@ export {
   setCalendarColor,
   refreshIntegrationCalendars,
   setEnabledCalendars,
+  setCalendarItemKind,
   markCalendarSyncResult,
   clearCalendarSyncToken,
   markSyncResult,

@@ -194,16 +194,21 @@ export default function Today() {
   }, [tasks, search, priorityOrderMap, todayStart, sorts, hiddenCalendars, calendarIndexByKey]);
 
   // Overdue tasks for the Overdue dialog, ordered by the same sort settings.
+  // Hidden calendars drop out here exactly as they do for the list above —
+  // these two used to disagree, so hiding a calendar cleaned up Today while
+  // the Overdue button kept counting everything it held.
   const overdueTasks = useMemo(() => {
-    return computeOverdue(tasks).sort((a, b) => {
-      for (const sortValue of sorts) {
-        const result = compareFn(a, b, sortValue);
-        if (result !== 0) return result;
-      }
-      return 0;
-    });
+    return computeOverdue(tasks)
+      .filter((t) => !hiddenCalendars.has(calendarKeyForTask(t)))
+      .sort((a, b) => {
+        for (const sortValue of sorts) {
+          const result = compareFn(a, b, sortValue);
+          if (result !== 0) return result;
+        }
+        return 0;
+      });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks, sorts, priorityOrderMap, calendarIndexByKey]);
+  }, [tasks, sorts, priorityOrderMap, calendarIndexByKey, hiddenCalendars]);
 
   return (
     <div className="space-y-5">

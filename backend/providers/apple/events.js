@@ -11,6 +11,7 @@ import {
   formatTaskTimeInTz,
 } from "./ics.js";
 import { parseRruleValueToTaskRecurrence } from "../../recurrence-rrule.js";
+import { classifyCalendarItem } from "../../sync/classify.js";
 
 /**
  * Parse a single VEVENT out of an ICS string.
@@ -132,10 +133,11 @@ export function mapVEventToTaskInput(ev, calendarRow) {
     }
   }
 
-  // Apple iCloud personal calendars are the user's own — anything writable is
-  // a "task"-equivalent. Read-only (subscribed/shared) calendars become "event".
+  // `writable` is about push access (can we write changes back?) and stays
+  // as-is. Whether the item is a TASK is a separate question, answered by
+  // the calendar's own Tasks/Events setting — see sync/classify.js.
   const writable = !calendarRow || calendarRow.access_role === "writer" || calendarRow.access_role === "owner";
-  const sourceKind = writable ? "task" : "event";
+  const sourceKind = classifyCalendarItem(calendarRow);
 
   // Recurrence — same parser shape as Google's so the UI renders the violet dot.
   const recurrenceMapped = ev.rrule

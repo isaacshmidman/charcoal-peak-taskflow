@@ -134,6 +134,10 @@ export function createDatabase(config = backendConfig) {
       access_role TEXT,                      -- 'owner' | 'writer' | 'reader' | 'freeBusyReader'
       primary_flag INTEGER NOT NULL DEFAULT 0,
       sync_enabled INTEGER NOT NULL DEFAULT 0,
+      -- 'event' | 'task' — does this calendar hold appointments or to-dos?
+      -- Defaults to 'event': a calendar is an event source unless the user
+      -- opts it in, so meetings can never masquerade as overdue tasks.
+      item_kind TEXT NOT NULL DEFAULT 'event',
       sync_token TEXT,
       last_synced_at TEXT,
       last_error TEXT,
@@ -507,6 +511,7 @@ export function createDatabase(config = backendConfig) {
     `ALTER TABLE tasks ADD COLUMN source_color_hex TEXT`,
     `ALTER TABLE tasks ADD COLUMN source_writable INTEGER NOT NULL DEFAULT 1`,
     `ALTER TABLE tasks ADD COLUMN source_recurrence_rule TEXT`,
+    `ALTER TABLE integration_calendars ADD COLUMN item_kind TEXT NOT NULL DEFAULT 'event'`,
   ]) {
     try { db.exec(stmt); } catch { /* exists — ignore */ }
   }
@@ -517,6 +522,36 @@ export function createDatabase(config = backendConfig) {
     db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_source ON tasks(source_provider, source_kind)`);
   } catch {
     // ignore — columns might still be missing on a partial migration; not fatal.
+  }
+
+  // Backfill: imported calendar items that were classified as tasks by the
+  // old rule (which called anything on a WRITABLE calendar a task) get
+  // re-stamped as events unless their calendar is now explicitly marked
+  // item_kind='task'. Without this, every meeting and appointment already
+  // in the table keeps claiming to be a task — inbound sync is incremental
+  // (syncToken), so those rows are never revisited on their own.
+  //
+  // Zephyrly's own tasks are structurally safe here: sync/shared.js strips
+  // every source_* field from a round-tripped native task, so native tasks
+  // always have an empty source_provider and can't match this WHERE clause.
+  //
+  // Runs on every boot and is idempotent — once the rows are correct it
+  // updates nothing. Toggling a calendar to Tasks re-stamps its rows via
+  // setCalendarItemKind, which is why this doesn't fight the user's choice.
+  try {
+    db.prepare(
+      `UPDATE tasks
+          SET source_kind = 'event',
+              updated_date = ?
+        WHERE COALESCE(source_provider, '') != ''
+          AND source_kind = 'task'
+          AND source_calendar_id NOT IN (
+            SELECT external_calendar_id FROM integration_calendars
+             WHERE item_kind = 'task'
+          )`
+    ).run(new Date().toISOString());
+  } catch {
+    // Partial migration (columns not present yet) — next boot picks it up.
   }
 
   // Migration: older DBs have oauth_states without kind/user_id — add them.
