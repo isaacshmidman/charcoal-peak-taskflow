@@ -38,7 +38,9 @@ export default function CompactTaskCard({ task, priorities, onToggleDone, onEdit
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: 6 }}
+      // No mount animation: rows render where they belong instead of
+      // sliding up as a list loads. `exit` still plays on delete.
+      initial={false}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.97 }}
       transition={{ duration: 0.1 }}

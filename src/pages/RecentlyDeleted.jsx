@@ -364,7 +364,8 @@ function DeletedNoteCard({ record, priorityMap, onRestore, onDelete }) {
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: 6 }}
+      // No mount animation — rows render in place. `exit` still plays.
+      initial={false}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.97 }}
       transition={{ duration: 0.1 }}
@@ -438,7 +439,8 @@ function DeletedTaskCard({ record, priorityMap, onRestore, onDelete }) {
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: 6 }}
+      // No mount animation — rows render in place. `exit` still plays.
+      initial={false}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.97 }}
       transition={{ duration: 0.1 }}

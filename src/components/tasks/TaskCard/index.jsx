@@ -200,7 +200,9 @@ export default function TaskCard({
       // unmounting). Size changes now come from CSS transitions inside
       // SubtaskList, so they're smooth without framer's involvement.
       layout="position"
-      initial={{ opacity: 0, y: 6 }}
+      // No mount animation: rows render where they belong instead of
+      // sliding up as a list loads. `exit` still plays on delete.
+      initial={false}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.97 }}
       transition={{ duration: 0.1 }}
