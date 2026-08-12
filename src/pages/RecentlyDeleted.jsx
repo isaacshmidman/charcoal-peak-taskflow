@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useMemo, useEffect } from "react";
+import { forwardRef, useState, useMemo, useEffect } from "react";
 import { apiClient } from "@/api/apiClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
@@ -354,7 +354,13 @@ export default function RecentlyDeleted({ onBack } = {}) {
 
 /** Trash row for a deleted note — DeletedTaskCard's chrome with a note
  * glyph instead of the completion square and a one-line text preview. */
-function DeletedNoteCard({ record, priorityMap, onRestore, onDelete }) {
+// Both row components forward a ref: they render inside
+// <AnimatePresence mode="popLayout">, which measures an exiting child
+// through a ref to hold its box while it animates out — see TaskCard.
+const DeletedNoteCard = forwardRef(function DeletedNoteCard(
+  { record, priorityMap, onRestore, onDelete },
+  ref
+) {
   const priority = priorityMap[record.priority_id];
   const colorKey = priority?.color || record.priority_color || "slate";
   const cardBg = colorBg[colorKey] || colorBg.slate;
@@ -364,6 +370,7 @@ function DeletedNoteCard({ record, priorityMap, onRestore, onDelete }) {
   return (
     <motion.div
       layout
+      ref={ref}
       // No mount animation — rows render in place. `exit` still plays.
       initial={false}
       animate={{ opacity: 1, y: 0 }}
@@ -425,9 +432,12 @@ function DeletedNoteCard({ record, priorityMap, onRestore, onDelete }) {
       </div>
     </motion.div>
   );
-}
+});
 
-function DeletedTaskCard({ record, priorityMap, onRestore, onDelete }) {
+const DeletedTaskCard = forwardRef(function DeletedTaskCard(
+  { record, priorityMap, onRestore, onDelete },
+  ref
+) {
   const priority = priorityMap[record.priority_id];
   const colorKey = priority?.color || record.priority_color || "slate";
   const cardBg = colorBg[colorKey] || colorBg.slate;
@@ -439,6 +449,7 @@ function DeletedTaskCard({ record, priorityMap, onRestore, onDelete }) {
   return (
     <motion.div
       layout
+      ref={ref}
       // No mount animation — rows render in place. `exit` still plays.
       initial={false}
       animate={{ opacity: 1, y: 0 }}
@@ -508,4 +519,4 @@ function DeletedTaskCard({ record, priorityMap, onRestore, onDelete }) {
       </div>
     </motion.div>
   );
-}
+});

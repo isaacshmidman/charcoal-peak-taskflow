@@ -5,7 +5,7 @@
  * sub-components: TagsRow (desktop tag chips) and SubtaskList
  * (expandable subtask checklist with its own state).
  */
-import React, { useEffect, useRef, useState } from "react";
+import React, { forwardRef, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
@@ -39,11 +39,18 @@ function buildRecurrenceShortLabel(task) {
   return labels[task.recurrence] || "Repeat";
 }
 
-export default function TaskCard({
+// forwardRef is required, not decorative: the task lists render these
+// inside <AnimatePresence mode="popLayout">, and popLayout measures an
+// exiting child through a ref so it can hold the child's box while it
+// animates out. Without a forwarded ref React warns and framer measures
+// nothing, so a removed card collapses instantly and the rest of the list
+// jumps up rather than sliding.
+/** @type {import("react").ForwardRefExoticComponent<any>} */
+const TaskCard = forwardRef(function TaskCard({
   task, priorities, subtasks = [],
   onToggleDone, onEdit, onDelete, onAddSubtask,
   onUpdate, onEditSubtask, onReorderSubtasks,
-}) {
+}, ref) {
   const [dateOpen, setDateOpen] = useState(false);
   const [optimisticDone, setOptimisticDone] = useState(false);
   const [optimisticUndone, setOptimisticUndone] = useState(false);
@@ -200,6 +207,7 @@ export default function TaskCard({
       // unmounting). Size changes now come from CSS transitions inside
       // SubtaskList, so they're smooth without framer's involvement.
       layout="position"
+      ref={ref}
       // No mount animation: rows render where they belong instead of
       // sliding up as a list loads. `exit` still plays on delete.
       initial={false}
@@ -354,7 +362,9 @@ export default function TaskCard({
       </div>
     </motion.div>
   );
-}
+});
+
+export default TaskCard;
 
 // Shows badge when there's space (xs+), dot on very small screens
 function RecurrenceBadge({ label }) {

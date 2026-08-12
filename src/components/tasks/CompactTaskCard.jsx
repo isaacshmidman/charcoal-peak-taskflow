@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { forwardRef, useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
@@ -13,15 +13,24 @@ import { fromDateStr, toDateStr } from "@/lib/dates";
 /** @typedef {import("@/types/tasks").PriorityOption} PriorityOption */
 
 /**
- * @param {{
+ * @typedef {{
  *   task: TaskRecord,
  *   priorities: PriorityOption[],
  *   onToggleDone: (task: TaskRecord) => void,
  *   onEdit: (task: TaskRecord) => void,
  *   onUpdate: (task: TaskRecord, changes: Partial<TaskRecord>) => void,
- * }} props
+ * }} CompactTaskCardProps
  */
-export default function CompactTaskCard({ task, priorities, onToggleDone, onEdit, onUpdate }) {
+
+// forwardRef so <AnimatePresence mode="popLayout"> in Groupings can measure
+// an exiting row and hold its box while it animates out — see TaskCard.
+// The props typedef moved out of a @param and onto the const: attached to a
+// forwardRef call, @param types nothing and props silently degrade to {}.
+/** @type {import("react").ForwardRefExoticComponent<CompactTaskCardProps & import("react").RefAttributes<HTMLDivElement>>} */
+const CompactTaskCard = forwardRef(function CompactTaskCard(
+  { task, priorities, onToggleDone, onEdit, onUpdate },
+  ref
+) {
   const [dateOpen, setDateOpen] = useState(false);
   const [optimisticDone, setOptimisticDone] = useState(false);
 
@@ -38,6 +47,7 @@ export default function CompactTaskCard({ task, priorities, onToggleDone, onEdit
   return (
     <motion.div
       layout
+      ref={ref}
       // No mount animation: rows render where they belong instead of
       // sliding up as a list loads. `exit` still plays on delete.
       initial={false}
@@ -115,4 +125,6 @@ export default function CompactTaskCard({ task, priorities, onToggleDone, onEdit
       </div>
     </motion.div>
   );
-}
+});
+
+export default CompactTaskCard;
