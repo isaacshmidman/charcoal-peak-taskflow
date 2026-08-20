@@ -16,8 +16,9 @@
  * picker is open). All buttons use onMouseDown+preventDefault so they
  * never blur the editable on iOS — see Toolbar.jsx.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
+import { Extension } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import { TextStyle, Color, FontFamily } from "@tiptap/extension-text-style";
 import Highlight from "@tiptap/extension-highlight";
@@ -27,6 +28,7 @@ import { OrderedListWithStyle, BulletListWithStyle } from "./richtext/orderedLis
 import { ParagraphIndent } from "./richtext/paragraphIndent";
 import { initialContentFrom, normalizeOutput, WORD_LIMIT } from "./richtext/content";
 import Toolbar from "./richtext/Toolbar";
+import { TaskLink, taskLinkStateKey, taskLinkStatePlugin } from "./richtext/taskLink";
 import { cn } from "@/lib/utils";
 
 const NON_INSERT_KEYS = new Set([
@@ -34,12 +36,29 @@ const NON_INSERT_KEYS = new Set([
   "Home", "End", "PageUp", "PageDown", "Tab", "Enter", "Escape",
 ]);
 
-export default function RichDescriptionEditor({ valueJson, plainFallback, onChange, disabled, wordLimit = WORD_LIMIT }) {
+/**
+ * @param {object} props
+ * @param {Map<string, string>} [props.taskStatusById]  taskId → status, for
+ *   note↔task highlights. Omit entirely (task descriptions) and the taskLink
+ *   machinery stays inert.
+ * @param {(text: string, range: {from: number, to: number}) => void} [props.onMakeTask]
+ * @param {(taskId: string) => void} [props.onOpenTask]
+ * @param {(editor: any) => void} [props.onEditorReady]
+ */
+export default function RichDescriptionEditor({
+  valueJson, plainFallback, onChange, disabled, wordLimit = WORD_LIMIT,
+  taskStatusById, onMakeTask, onOpenTask, onEditorReady,
+}) {
   // Hydrate once from the incoming props. We intentionally do NOT make
   // the editor a controlled mirror of valueJson on every keystroke
   // (that fights the cursor); the form re-keys the whole TaskForm on
   // open, so a fresh editor mounts per task.
   const initialRef = useRef(initialContentFrom(valueJson, plainFallback));
+  // The ProseMirror plugin is built once when the editor is created, so it
+  // closes over a ref rather than the prop — otherwise opening a task from
+  // a note would call whatever handler existed on first render.
+  const onOpenTaskRef = useRef(onOpenTask);
+  onOpenTaskRef.current = onOpenTask;
   const [focused, setFocused] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -61,6 +80,14 @@ export default function RichDescriptionEditor({ valueJson, plainFallback, onChan
       TaskItem.configure({ nested: true }),
       CharacterCount,           // word counter (.words())
       ParagraphIndent,
+      TaskLink,
+      // The plugin paints taskLink spans from live task state. Registered
+      // unconditionally so the mark round-trips everywhere, but with no
+      // task map supplied it decorates nothing.
+      Extension.create({
+        name: "taskLinkState",
+        addProseMirrorPlugins: () => [taskLinkStatePlugin({ onOpenTask: (id) => onOpenTaskRef.current?.(id) })],
+      }),
     ],
     content: initialRef.current,
     editorProps: {
@@ -107,6 +134,27 @@ export default function RichDescriptionEditor({ valueJson, plainFallback, onChan
 
   useEffect(() => () => editor?.destroy(), [editor]);
 
+  // Push live task state into the decoration plugin. This dispatches a
+  // META-ONLY transaction: docChanged stays false, so TipTap does not fire
+  // onUpdate and the note is NOT re-saved. That matters — without it every
+  // task status change anywhere in the app would rewrite every open note.
+  const statusKey = useMemo(
+    () => (taskStatusById ? [...taskStatusById.entries()].map(([k, v]) => k + ':' + v).sort().join(',') : ''),
+    [taskStatusById]
+  );
+  useEffect(() => {
+    if (!editor || !taskStatusById) return;
+    editor.view.dispatch(editor.state.tr.setMeta(taskLinkStateKey, taskStatusById));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor, statusKey]);
+
+  // Hand the editor instance up so the page can read the selection, apply
+  // the taskLink mark after a task is created, and restore the caret.
+  useEffect(() => {
+    if (editor) onEditorReady?.(editor);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor]);
+
   const showToolbar = !disabled && (focused || pickerOpen);
 
   return (
@@ -123,7 +171,12 @@ export default function RichDescriptionEditor({ valueJson, plainFallback, onChan
       <EditorContent editor={editor} />
       {showToolbar && (
         <div data-richtext-toolbar>
-          <Toolbar editor={editor} onPickerOpenChange={setPickerOpen} wordLimit={wordLimit} />
+          <Toolbar
+            editor={editor}
+            onPickerOpenChange={setPickerOpen}
+            wordLimit={wordLimit}
+            onMakeTask={onMakeTask}
+          />
         </div>
       )}
     </div>

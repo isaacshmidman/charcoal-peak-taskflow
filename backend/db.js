@@ -2,6 +2,7 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { migrateHighlightJson } from "./lib/highlight-migration.js";
 import { backendConfig } from "./config.js";
 
 /** @type {DatabaseSync | null} */
@@ -552,6 +553,36 @@ export function createDatabase(config = backendConfig) {
     ).run(new Date().toISOString());
   } catch {
     // Partial migration (columns not present yet) — next boot picks it up.
+  }
+
+  // Backfill: retire the pale-yellow highlight (#fef08a) that used to be
+  // offered in the rich-text picker. The note↔task link now paints a
+  // reserved yellow meaning "a task exists for this span", so a hand-made
+  // yellow would be indistinguishable from a real link.
+  //
+  // Only the highlight mark's colour changes — text, every other mark, and
+  // taskLink anchors are left byte-identical (see lib/highlight-migration.js,
+  // which returns null when a row needs no rewrite so we skip the write).
+  // Idempotent: once converted, later boots match nothing.
+  for (const [table, column] of [
+    ["notes", "content_json"],
+    ["deleted_notes", "content_json"],
+    ["tasks", "description_json"],
+    ["deleted_tasks", "description_json"],
+  ]) {
+    try {
+      const rows = db
+        .prepare(`SELECT id, ${column} AS body FROM ${table} WHERE ${column} LIKE '%fef08a%' COLLATE NOCASE`)
+        .all();
+      if (!rows.length) continue;
+      const update = db.prepare(`UPDATE ${table} SET ${column} = ? WHERE id = ?`);
+      for (const row of rows) {
+        const next = migrateHighlightJson(row.body);
+        if (next) update.run(next, row.id);
+      }
+    } catch {
+      // Table missing on an older DB — next boot picks it up.
+    }
   }
 
   // Migration: older DBs have oauth_states without kind/user_id — add them.

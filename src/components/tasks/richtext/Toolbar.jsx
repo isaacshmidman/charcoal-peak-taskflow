@@ -20,6 +20,7 @@ import {
   Highlighter,
   Type,
   ListChecks,
+  ListPlus,
   List as ListIcon,
   Indent,
   Outdent,
@@ -43,8 +44,12 @@ const TEXT_COLORS = [
 ];
 
 // 5 pastel highlight colors. "None" clears.
+// Yellow is deliberately ABSENT: the reserved --brand-yellow means "a task
+// exists for this span" (richtext/taskLink.js), so a hand-made yellow would
+// be indistinguishable from a real task link. Purple took its slot, and a
+// boot migration rewrote the pale yellow this used to offer.
 const HIGHLIGHTS = [
-  { label: "Yellow", hex: "#fef08a" },
+  { label: "Purple", hex: "#e9d5ff" },
   { label: "Green", hex: "#bbf7d0" },
   { label: "Blue", hex: "#bfdbfe" },
   { label: "Pink", hex: "#fbcfe8" },
@@ -78,10 +83,11 @@ const LIST_OPTIONS = [
 ];
 
 /** A toolbar icon button. Uses onMouseDown+preventDefault for iOS focus. */
-function TBtn({ active, disabled, onAction, title, children }) {
+function TBtn({ active, disabled, onAction, title, children, testid }) {
   return (
     <button
       type="button"
+      data-testid={testid}
       title={title}
       aria-label={title}
       aria-pressed={!!active}
@@ -131,7 +137,7 @@ function Picker({ icon: Icon, title, open, setOpen, onOpenChange, children }) {
   );
 }
 
-export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500 }) {
+export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, onMakeTask }) {
   const [colorOpen, setColorOpen] = useState(false);
   const [hlOpen, setHlOpen] = useState(false);
   const [fontOpen, setFontOpen] = useState(false);
@@ -173,6 +179,11 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500 })
   };
 
   const words = editor.storage.characterCount?.words?.() ?? 0;
+  // The selection IS the task title, so Make task stays disabled until
+  // there is one. Safe to read during render: the toolbar already
+  // re-renders per transaction (every editor.isActive() call below relies
+  // on that), so this tracks the caret live.
+  const hasSelection = editor.state.selection.to > editor.state.selection.from;
 
   return (
     <div className="flex items-center gap-0.5 flex-wrap px-1.5 py-1 border-t border-slate-100 dark:border-[#303030] bg-slate-50 dark:bg-[#0c0c0c]">
@@ -288,6 +299,28 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500 })
       <TBtn title="Increase indent" onAction={indent}>
         <Indent className="w-4 h-4" />
       </TBtn>
+
+      {/* Make task — only mounted by hosts that support it (notes), and
+          only usable with text selected, since the selection IS the task
+          title. Same onMouseDown+preventDefault rule as every other
+          control here, so it never blurs the editable on iOS. */}
+      {onMakeTask && (
+        <>
+          <span className="w-px h-5 bg-slate-200 dark:bg-[#303030] mx-0.5 shrink-0" />
+          <TBtn
+            title={hasSelection ? "Make task from selection" : "Select text to make a task"}
+            disabled={!hasSelection}
+            testid="richtext-make-task"
+            onAction={() => {
+              const { from, to } = editor.state.selection;
+              const text = editor.state.doc.textBetween(from, to, " ").trim();
+              if (text) onMakeTask(text, { from, to });
+            }}
+          >
+            <ListPlus className="w-4 h-4" />
+          </TBtn>
+        </>
+      )}
 
       {/* Word counter */}
       <span
