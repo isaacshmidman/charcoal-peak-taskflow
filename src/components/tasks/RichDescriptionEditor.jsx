@@ -49,6 +49,10 @@ export default function RichDescriptionEditor({
   valueJson, plainFallback, onChange, disabled, wordLimit = WORD_LIMIT,
   taskStatusById, onMakeTask, onOpenTask, onEditorReady,
   chromeless = false, minHeight = "5rem",
+  // "docked" renders the toolbar inside this component (task forms).
+  // "external" hands focus state up so the host can place the toolbar
+  // itself — Notes puts it above the title, like Apple Notes.
+  toolbar = "docked", onFocusChange,
 }) {
   // Hydrate once from the incoming props. We intentionally do NOT make
   // the editor a controlled mirror of valueJson on every keystroke
@@ -60,6 +64,9 @@ export default function RichDescriptionEditor({
   // a note would call whatever handler existed on first render.
   const onOpenTaskRef = useRef(onOpenTask);
   onOpenTaskRef.current = onOpenTask;
+  // Same reason: the editor's callbacks are bound once at creation.
+  const onFocusChangeRef = useRef(onFocusChange);
+  onFocusChangeRef.current = onFocusChange;
   const [focused, setFocused] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -133,11 +140,11 @@ export default function RichDescriptionEditor({
         text: editor.getText(),
       }));
     },
-    onFocus() { setFocused(true); },
+    onFocus() { setFocused(true); onFocusChangeRef.current?.(true); },
     onBlur() {
       // Defer so opening a picker (which momentarily blurs) doesn't flash
       // the toolbar closed; the picker sets pickerOpen synchronously.
-      setTimeout(() => setFocused(false), 0);
+      setTimeout(() => { setFocused(false); onFocusChangeRef.current?.(false); }, 0);
     },
   });
 
@@ -164,7 +171,7 @@ export default function RichDescriptionEditor({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor]);
 
-  const showToolbar = !disabled && (focused || pickerOpen);
+  const showToolbar = toolbar === "docked" && !disabled && (focused || pickerOpen);
 
   return (
     <div

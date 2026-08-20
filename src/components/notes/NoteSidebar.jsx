@@ -30,9 +30,13 @@ export default function NoteSidebar({
   onSearchChange,
   isLoading,
   className,
+  style,
 }) {
   return (
-    <aside className={cn("h-full min-h-0 w-full flex-col border-border-hairline sm:w-64 sm:shrink-0 sm:border-r", className)}>
+    <aside
+      style={style}
+      className={cn("h-full min-h-0 w-full flex-col border-border-hairline sm:shrink-0", className)}
+    >
       <div className="flex items-center gap-2 px-3 pb-2 pt-1">
         <div className="relative flex-1 min-w-0">
           <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400 dark:text-slate-500" />

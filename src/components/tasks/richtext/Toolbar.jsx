@@ -108,7 +108,7 @@ function TBtn({ active, disabled, onAction, title, children, testid }) {
 }
 
 /** A dropdown popover anchored under its trigger. Reuses useOutsideClick. */
-function Picker({ icon: Icon, title, open, setOpen, onOpenChange, children }) {
+function Picker({ icon: Icon, title, open, setOpen, onOpenChange, children, openUp = true }) {
   const ref = useRef(null);
   useOutsideClick(ref, () => { setOpen(false); onOpenChange?.(false); }, open);
   return (
@@ -129,7 +129,12 @@ function Picker({ icon: Icon, title, open, setOpen, onOpenChange, children }) {
         <ChevronDown className="w-3 h-3" />
       </button>
       {open && (
-        <div className="absolute bottom-full left-0 mb-1 z-50 rounded-lg border border-border-strong bg-surface-card shadow-lg p-1.5">
+        <div className={cn(
+          "absolute left-0 z-50 rounded-lg border border-border-strong bg-surface-card shadow-lg p-1.5",
+          // A bar docked under the editor opens upward; one pinned above
+          // the note has to open downward or it lands off-screen.
+          openUp ? "bottom-full mb-1" : "top-full mt-1"
+        )}>
           {children}
         </div>
       )}
@@ -137,7 +142,7 @@ function Picker({ icon: Icon, title, open, setOpen, onOpenChange, children }) {
   );
 }
 
-export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, onMakeTask }) {
+export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, onMakeTask, placement = "docked" }) {
   const [colorOpen, setColorOpen] = useState(false);
   const [hlOpen, setHlOpen] = useState(false);
   const [fontOpen, setFontOpen] = useState(false);
@@ -186,7 +191,17 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
   const hasSelection = editor.state.selection.to > editor.state.selection.from;
 
   return (
-    <div className="flex items-center gap-0.5 flex-wrap px-1.5 py-1 border-t border-slate-100 dark:border-[#303030] bg-slate-50 dark:bg-[#0c0c0c]">
+    <div className={cn(
+      "flex items-center gap-0.5 flex-wrap px-1.5 py-1 bg-slate-50 dark:bg-[#0c0c0c]",
+      placement === "docked"
+        // Docked under the editor: only a top rule, and the bottom corners
+        // must match the parent's INNER radius (6px box - 1px border = 5px).
+        // Leaving them square let this opaque grey paint into the parent's
+        // corner arc, which is what made the border look doubled there.
+        ? "border-t border-slate-100 dark:border-[#303030] rounded-b-[5px]"
+        // Standalone bar (Notes, above the title): its own rounded box.
+        : "rounded-lg border border-border-hairline"
+    )}>
       <TBtn title="Bold" active={editor.isActive("bold")} onAction={() => apply(() => editor.chain().focus().toggleBold().run())}>
         <Bold className="w-4 h-4" />
       </TBtn>
@@ -203,7 +218,7 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
       <span className="w-px h-5 bg-slate-200 dark:bg-[#303030] mx-0.5 shrink-0" />
 
       {/* Text color */}
-      <Picker icon={Baseline} title="Text color" open={colorOpen} setOpen={setColorOpen} onOpenChange={anyPickerOpen}>
+      <Picker icon={Baseline} title="Text color" open={colorOpen} setOpen={setColorOpen} onOpenChange={anyPickerOpen} openUp={placement === "docked"}>
         <div className="grid grid-cols-5 gap-1 w-[150px]">
           {TEXT_COLORS.map((c) => (
             <button
@@ -226,7 +241,7 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
       </Picker>
 
       {/* Highlight */}
-      <Picker icon={Highlighter} title="Highlight" open={hlOpen} setOpen={setHlOpen} onOpenChange={anyPickerOpen}>
+      <Picker icon={Highlighter} title="Highlight" open={hlOpen} setOpen={setHlOpen} onOpenChange={anyPickerOpen} openUp={placement === "docked"}>
         <div className="flex gap-1">
           {HIGHLIGHTS.map((c) => (
             <button
@@ -249,7 +264,7 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
       </Picker>
 
       {/* Font */}
-      <Picker icon={Type} title="Font" open={fontOpen} setOpen={setFontOpen} onOpenChange={anyPickerOpen}>
+      <Picker icon={Type} title="Font" open={fontOpen} setOpen={setFontOpen} onOpenChange={anyPickerOpen} openUp={placement === "docked"}>
         <div className="w-44 max-h-56 overflow-y-auto">
           {FONTS.map((f) => (
             <button
@@ -272,7 +287,7 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
       <span className="w-px h-5 bg-slate-200 dark:bg-[#303030] mx-0.5 shrink-0" />
 
       {/* Lists */}
-      <Picker icon={ListIcon} title="Lists" open={listOpen} setOpen={setListOpen} onOpenChange={anyPickerOpen}>
+      <Picker icon={ListIcon} title="Lists" open={listOpen} setOpen={setListOpen} onOpenChange={anyPickerOpen} openUp={placement === "docked"}>
         <div className="w-40">
           {LIST_OPTIONS.map((o) => (
             <button

@@ -27,6 +27,8 @@ import { useShortcutEvent } from "@/hooks/useShortcutEvent";
 import { SHORTCUT_EVENTS } from "@/lib/shortcuts";
 import { showDeleteToast } from "@/components/tasks/DeleteToast";
 import { cn } from "@/lib/utils";
+import { useSplitPane } from "@/hooks/useSplitPane";
+import SplitDivider from "@/components/ui/split-divider";
 import TaskForm from "@/components/tasks/TaskForm";
 import NoteSidebar from "@/components/notes/NoteSidebar";
 import NoteCanvas from "@/components/notes/NoteCanvas";
@@ -38,6 +40,24 @@ export default function Notes() {
   // would bury the editor under the whole note list. Show one at a time
   // instead, the way Notes behaves on a phone.
   const [mobilePane, setMobilePane] = useState("list");
+
+  // Same divider the Calendar day view uses between its timed and all-day
+  // columns — one hook, so the two behave identically rather than merely
+  // looking alike. The sidebar is on the LEFT here, so dragging right
+  // grows it (fromEnd stays false).
+  const {
+    size: sidebarWidth,
+    containerRef,
+    startResize,
+    resetSplit,
+    snapped,
+    glide,
+  } = useSplitPane({
+    storageKey: "notes_sidebar_width",
+    minSize: 180,
+    defaultSize: 256,
+    maxFraction: 0.6,
+  });
 
   // Task dialog state. `taskDraft` seeds a NEW task from a selection;
   // `editingTask` opens an existing one from its dot.
@@ -205,9 +225,16 @@ export default function Notes() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] min-h-0 flex-col sm:flex-row">
+    <div ref={containerRef} className="flex h-[calc(100vh-8rem)] min-h-0 flex-col sm:flex-row">
       <NoteSidebar
-        className={mobilePane === "editor" ? "hidden sm:flex" : "flex"}
+        // Fixed px width from the divider on desktop; full width on mobile,
+        // where the panes swap instead of sitting side by side.
+        style={{ "--notes-sb": `${sidebarWidth}px` }}
+        className={cn(
+          mobilePane === "editor" ? "hidden sm:flex" : "flex",
+          "sm:w-[var(--notes-sb)]",
+          glide && "sm:transition-[width] sm:duration-150 sm:ease-out"
+        )}
         notes={sortedNotes}
         activeId={openNoteId}
         onSelect={selectNote}
@@ -215,6 +242,13 @@ export default function Notes() {
         search={search}
         onSearchChange={setSearch}
         isLoading={isLoading}
+      />
+
+      <SplitDivider
+        onPointerDown={startResize}
+        onDoubleClick={resetSplit}
+        snapped={snapped}
+        className={cn("hidden sm:flex", mobilePane === "list" && "sm:flex")}
       />
 
       {openNote ? (

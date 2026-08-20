@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { EditorLoadBoundary } from "@/components/tasks/TaskForm/TitleAndDescription";
+import Toolbar from "@/components/tasks/richtext/Toolbar";
 import { useAutosave } from "@/hooks/useAutosave";
 
 const RichDescriptionEditor = lazy(() => import("@/components/tasks/RichDescriptionEditor"));
@@ -36,6 +37,14 @@ export default function NoteCanvas({
   className,
   onBack,
 }) {
+  // The formatting bar lives ABOVE the title here, the way Apple Notes
+  // puts it at the top of the note — so the editor hands its focus state
+  // up instead of docking its own toolbar at the bottom.
+  const [editor, setEditor] = useState(null);
+  const [focused, setFocused] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const showToolbar = !!editor && (focused || pickerOpen);
+
   const [form, setForm] = useState({
     title: note.title || "",
     content_json: note.content_json || "",
@@ -70,6 +79,29 @@ export default function NoteCanvas({
 
   return (
     <section className={cn("h-full min-h-0 flex-1 flex-col", className)}>
+      {/* Formatting bar, pinned above the title. The row is ALWAYS
+          mounted at a fixed height and only its contents fade in, so
+          focusing the note can't shove the title and body down a line. */}
+      <div className="h-9 shrink-0 px-2 pt-1">
+        {/* No overflow-hidden here: the toolbar's colour/font pickers are
+            absolutely positioned inside it and clipping would swallow them.
+            The Toolbar draws its own rounded, bordered box instead. */}
+        <div
+          data-richtext-toolbar
+          className={cn("transition-opacity", showToolbar ? "opacity-100" : "pointer-events-none opacity-0")}
+        >
+          {editor && (
+            <Toolbar
+              editor={editor}
+              placement="standalone"
+              onPickerOpenChange={setPickerOpen}
+              wordLimit={NOTE_WORD_LIMIT}
+              onMakeTask={onMakeTask}
+            />
+          )}
+        </div>
+      </div>
+
       <div className="flex items-start gap-2 px-4 pt-1">
         {/* Back to the list — only reachable below sm, where the two
             panes swap instead of sitting side by side. */}
@@ -131,10 +163,11 @@ export default function NoteCanvas({
               wordLimit={NOTE_WORD_LIMIT}
               chromeless
               minHeight="60vh"
+              toolbar="external"
+              onFocusChange={setFocused}
               taskStatusById={taskStatusById}
-              onMakeTask={onMakeTask}
               onOpenTask={onOpenTask}
-              onEditorReady={onEditorReady}
+              onEditorReady={(ed) => { setEditor(ed); onEditorReady?.(ed); }}
               onChange={({ json, text }) => setForm((f) => ({ ...f, content_json: json, content_text: text }))}
             />
           </Suspense>

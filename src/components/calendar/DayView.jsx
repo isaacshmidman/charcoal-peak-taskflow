@@ -8,6 +8,8 @@ import MiniMiniTaskCard from "./MiniMiniTaskCard";
 import { parseTaskTime, compareTaskTime } from "@/lib/sort-helpers";
 import { layoutTimedTasks } from "@/lib/calendar-layout";
 import { toDateStr } from "@/lib/dates";
+import { useSplitPane } from "@/hooks/useSplitPane";
+import SplitDivider from "@/components/ui/split-divider";
 
 const HOUR_HEIGHT = 48; // px per hour slot
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -17,17 +19,6 @@ const MIN_ALLDAY_W = 96;
 const ALLDAY_ROW_HEIGHT = 26;
 const ALLDAY_MORE_HEIGHT = 24;
 const COLLAPSED_ALLDAY_VISIBLE = 2;
-// Loose upper bound used to validate the persisted width on load. The
-// real per-drag max is container-based (80% of the flex row) — this
-// only needs to be ≥ that so a stored 70%-snap width isn't rejected.
-const getMaxAllDayW = () => {
-  if (typeof window === "undefined") return 480;
-  return Math.max(MIN_ALLDAY_W, Math.floor(window.innerWidth * 0.8));
-};
-// Detents for the splitter, as all-day-column fractions of the row
-// (timed/all-day = 70/30, 50/50, 30/70).
-const SNAP_FRACTIONS = [0.3, 0.5, 0.7];
-
 const formatHour = (h) => {
   if (h === 0) return "12 AM";
   if (h === 12) return "12 PM";
@@ -227,15 +218,21 @@ export default function DayView({
   const dateStr = toDateStr(anchorDate);
   const useSideAllDay = useMediaQuery("(min-width: 640px)");
 
-  const [allDayWidth, setAllDayWidth] = useState(() => {
-    try {
-      const raw = localStorage.getItem(ALLDAY_WIDTH_KEY);
-      const n = raw ? Number(raw) : NaN;
-      if (Number.isFinite(n) && n >= MIN_ALLDAY_W && n <= getMaxAllDayW()) return n;
-    } catch {
-      // fall through
-    }
-    return 192;
+  // The divider gesture (detents, hysteresis, glide) lives in
+  // useSplitPane so Notes uses the same one. fromEnd: the all-day column
+  // sits on the RIGHT, so dragging left grows it.
+  const {
+    size: allDayWidth,
+    containerRef,
+    startResize,
+    resetSplit,
+    snapped,
+    glide,
+  } = useSplitPane({
+    storageKey: ALLDAY_WIDTH_KEY,
+    minSize: MIN_ALLDAY_W,
+    defaultSize: 192,
+    fromEnd: true,
   });
   const [allDayCollapsed, setAllDayCollapsed] = useState(() => {
     try {
@@ -247,14 +244,6 @@ export default function DayView({
       return true;
     }
   });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(ALLDAY_WIDTH_KEY, String(allDayWidth));
-    } catch {
-      // ignore
-    }
-  }, [allDayWidth]);
 
   useEffect(() => {
     try {
@@ -298,113 +287,6 @@ export default function DayView({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateStr]);
 
-  // ── Splitter with magnetic detents (Apple split-view feel) ──────
-  // Free drag tracks the pointer 1:1. Near a detent (30/50/70% of the
-  // row) the divider latches with HYSTERESIS — the latch-out radius is
-  // larger than the latch-in radius, so the divider can't oscillate at
-  // the boundary (that oscillation is what reads as "jitter"). A short
-  // width transition ("glide") is enabled only when the rendered width
-  // jumps discontinuously — latch, unlatch, or release-settle — so the
-  // snap eases into place instead of teleporting, while free drag stays
-  // transition-free and perfectly responsive.
-  const containerRef = useRef(null);
-  const glideTimerRef = useRef(null);
-  const [glide, setGlide] = useState(false);
-  const [snapped, setSnapped] = useState(false);
-
-  const beginGlide = useCallback(() => {
-    setGlide(true);
-    if (glideTimerRef.current) clearTimeout(glideTimerRef.current);
-    glideTimerRef.current = setTimeout(() => setGlide(false), 170);
-  }, []);
-
-  useEffect(() => () => {
-    if (glideTimerRef.current) clearTimeout(glideTimerRef.current);
-  }, []);
-
-  /** Drag-time geometry: container-based bounds + detent pixel positions. */
-  const measureDragGeometry = useCallback(() => {
-    const containerW =
-      containerRef.current?.getBoundingClientRect().width ||
-      (typeof window !== "undefined" ? window.innerWidth : 1024);
-    const minW = MIN_ALLDAY_W;
-    const maxW = Math.max(minW, Math.floor(containerW * 0.8));
-    const snaps = SNAP_FRACTIONS
-      .map((f) => Math.round(containerW * f))
-      .filter((px) => px >= minW && px <= maxW);
-    // Latch-in within ~2% of the row; latch-out needs ~12px more.
-    const snapIn = Math.max(10, Math.round(containerW * 0.02));
-    const snapOut = snapIn + 12;
-    return { minW, maxW, snaps, snapIn, snapOut, containerW };
-  }, []);
-
-  const startResize = useCallback((e) => {
-    e.preventDefault();
-    const startX = e.clientX;
-    const startW = allDayWidth;
-    const { minW, maxW, snaps, snapIn, snapOut } = measureDragGeometry();
-    let latched = null;        // px of the currently-latched detent
-    let lastDesired = startW;  // free (unlatched) width at the pointer
-
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId);
-    } catch {
-      // ignore
-    }
-    const onMove = (ev) => {
-      // All-day sits on the right: dragging LEFT increases its width.
-      const dx = startX - ev.clientX;
-      const desired = Math.max(minW, Math.min(maxW, startW + dx));
-      lastDesired = desired;
-
-      if (latched != null && Math.abs(desired - latched) > snapOut) {
-        latched = null;
-        setSnapped(false);
-        beginGlide(); // ease OUT of the detent
-      }
-      if (latched == null) {
-        for (const px of snaps) {
-          if (Math.abs(desired - px) <= snapIn) {
-            latched = px;
-            setSnapped(true);
-            beginGlide(); // ease INTO the detent
-            break;
-          }
-        }
-      }
-      setAllDayWidth(latched != null ? latched : desired);
-    };
-    const onUp = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onUp);
-      setSnapped(false);
-      if (latched == null) {
-        // Released near (but not inside) a detent → settle onto it.
-        let best = null;
-        for (const px of snaps) {
-          const d = Math.abs(lastDesired - px);
-          if (d <= snapIn && (best == null || d < Math.abs(lastDesired - best))) {
-            best = px;
-          }
-        }
-        if (best != null) {
-          beginGlide();
-          setAllDayWidth(best);
-        }
-      }
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onUp);
-  }, [allDayWidth, beginGlide, measureDragGeometry]);
-
-  // Double-click the splitter → jump straight to 50/50.
-  const resetSplit = useCallback(() => {
-    const { minW, maxW, containerW } = measureDragGeometry();
-    beginGlide();
-    setAllDayWidth(Math.max(minW, Math.min(maxW, Math.round(containerW * 0.5))));
-  }, [beginGlide, measureDragGeometry]);
 
   return (
     <div ref={containerRef} className="flex items-stretch gap-0">
@@ -490,23 +372,7 @@ export default function DayView({
           resets to 50/50. The handle pill grows + darkens while latched
           so the detent reads as a tactile "click". */}
       {useSideAllDay && (
-        <div
-          role="separator"
-          aria-orientation="vertical"
-          onPointerDown={startResize}
-          onDoubleClick={resetSplit}
-          title="Drag to resize — snaps at 30 / 50 / 70%. Double-click for 50/50."
-          className="flex w-2 cursor-col-resize items-center justify-center group shrink-0"
-        >
-          <div
-            className={cn(
-              "w-0.5 rounded-full transition-all duration-150",
-              snapped
-                ? "h-12 bg-slate-500 dark:bg-slate-300"
-                : "h-8 bg-slate-200 dark:bg-[#222222] group-hover:bg-slate-400"
-            )}
-          />
-        </div>
+        <SplitDivider onPointerDown={startResize} onDoubleClick={resetSplit} snapped={snapped} />
       )}
 
       {/* All-day column — fixed width when there is room; mobile uses
