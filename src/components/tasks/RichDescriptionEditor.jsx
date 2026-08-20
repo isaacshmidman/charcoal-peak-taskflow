@@ -48,6 +48,7 @@ const NON_INSERT_KEYS = new Set([
 export default function RichDescriptionEditor({
   valueJson, plainFallback, onChange, disabled, wordLimit = WORD_LIMIT,
   taskStatusById, onMakeTask, onOpenTask, onEditorReady,
+  chromeless = false, minHeight = "5rem",
 }) {
   // Hydrate once from the incoming props. We intentionally do NOT make
   // the editor a controlled mirror of valueJson on every keystroke
@@ -64,6 +65,11 @@ export default function RichDescriptionEditor({
 
   const editor = useEditor({
     editable: !disabled,
+    // TipTap v3 stopped re-rendering per transaction by default, which
+    // silently froze everything in the toolbar that reads editor state:
+    // the Bold/Italic/list active states never updated, and Make task
+    // could never see a selection. Opt back in.
+    shouldRerenderOnTransaction: true,
     extensions: [
       StarterKit.configure({
         link: false,            // XSS hygiene — no links in descriptions
@@ -92,7 +98,10 @@ export default function RichDescriptionEditor({
     content: initialRef.current,
     editorProps: {
       attributes: {
-        class: "tiptap-prose focus:outline-none px-3 py-2 min-h-[5rem]",
+        // minHeight is baked in at creation — it never changes for a
+        // given host (dialog vs full-page note), so this needs no reactivity.
+        class: `tiptap-prose focus:outline-none px-3 py-2`,
+        style: `min-height: ${minHeight}`,
       },
       // Hard word cap: block character insertion + paste past the limit,
       // while always allowing navigation/deletion so the user can edit
@@ -160,8 +169,14 @@ export default function RichDescriptionEditor({
   return (
     <div
       className={cn(
-        "rounded-md border bg-white dark:bg-[#0c0c0c] transition-colors",
-        showToolbar ? "border-slate-300 dark:border-[#454545]" : "border-slate-200 dark:border-[#343434]"
+        "transition-colors",
+        // Chromeless: the note IS the page, so no card around the words.
+        chromeless
+          ? "h-full"
+          : cn(
+              "rounded-md border bg-white dark:bg-[#0c0c0c]",
+              showToolbar ? "border-slate-300 dark:border-[#454545]" : "border-slate-200 dark:border-[#343434]"
+            )
       )}
       // Keep the editor focused when interacting with the toolbar chrome.
       onMouseDown={(e) => {
@@ -170,7 +185,12 @@ export default function RichDescriptionEditor({
     >
       <EditorContent editor={editor} />
       {showToolbar && (
-        <div data-richtext-toolbar>
+        <div
+          data-richtext-toolbar
+          // In a full-page note the body scrolls, so the toolbar sticks to
+          // the bottom instead of drifting off with the text.
+          className={cn(chromeless && "sticky bottom-0 z-10 rounded-md border border-slate-200 bg-white dark:border-[#343434] dark:bg-[#0c0c0c]")}
+        >
           <Toolbar
             editor={editor}
             onPickerOpenChange={setPickerOpen}
