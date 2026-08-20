@@ -18,17 +18,14 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
-import { Extension } from "@tiptap/core";
-import StarterKit from "@tiptap/starter-kit";
-import { TextStyle, Color, FontFamily } from "@tiptap/extension-text-style";
-import Highlight from "@tiptap/extension-highlight";
-import { TaskList, TaskItem } from "@tiptap/extension-list";
-import CharacterCount from "@tiptap/extension-character-count";
-import { OrderedListWithStyle, BulletListWithStyle } from "./richtext/orderedListStyle";
-import { ParagraphIndent } from "./richtext/paragraphIndent";
 import { initialContentFrom, normalizeOutput, WORD_LIMIT } from "./richtext/content";
 import Toolbar from "./richtext/Toolbar";
-import { TaskLink, taskLinkStateKey, taskLinkStatePlugin } from "./richtext/taskLink";
+import { buildEditorExtensions } from "./richtext/extensions";
+import { taskLinkStateKey } from "./richtext/taskLink";
+import { looksLikeMarkdown } from "./richtext/pasteMarkdown";
+// Static, but this whole module is lazy-loaded at both call sites, so
+// marked rides the editor chunk and never enters the initial PWA bundle.
+import { marked } from "marked";
 import { cn } from "@/lib/utils";
 
 const NON_INSERT_KEYS = new Set([
@@ -77,31 +74,7 @@ export default function RichDescriptionEditor({
     // the Bold/Italic/list active states never updated, and Make task
     // could never see a selection. Opt back in.
     shouldRerenderOnTransaction: true,
-    extensions: [
-      StarterKit.configure({
-        link: false,            // XSS hygiene — no links in descriptions
-        bulletList: false,      // replaced by BulletListWithStyle
-        orderedList: false,     // replaced by OrderedListWithStyle
-      }),
-      BulletListWithStyle,
-      OrderedListWithStyle,
-      TextStyle,
-      Color,
-      FontFamily.configure({ types: ["textStyle"] }),
-      Highlight.configure({ multicolor: true }),
-      TaskList,
-      TaskItem.configure({ nested: true }),
-      CharacterCount,           // word counter (.words())
-      ParagraphIndent,
-      TaskLink,
-      // The plugin paints taskLink spans from live task state. Registered
-      // unconditionally so the mark round-trips everywhere, but with no
-      // task map supplied it decorates nothing.
-      Extension.create({
-        name: "taskLinkState",
-        addProseMirrorPlugins: () => [taskLinkStatePlugin({ onOpenTask: (id) => onOpenTaskRef.current?.(id) })],
-      }),
-    ],
+    extensions: buildEditorExtensions({ onOpenTask: (id) => onOpenTaskRef.current?.(id) }),
     content: initialRef.current,
     editorProps: {
       attributes: {
@@ -127,10 +100,30 @@ export default function RichDescriptionEditor({
         }
         return false;
       },
-      handlePaste(view) {
+      handlePaste(view, event) {
         const words = editor?.storage.characterCount?.words?.() ?? 0;
         if (words >= wordLimit) return true; // swallow the paste
-        return false;
+
+        // Real HTML on the clipboard already round-trips through TipTap's
+        // own parser, which does a better job than re-reading it as text.
+        const clipboard = event?.clipboardData;
+        if (!clipboard || clipboard.getData("text/html")) return false;
+
+        const text = clipboard.getData("text/plain");
+        if (!looksLikeMarkdown(text)) return false;
+
+        try {
+          const html = marked.parse(text, { async: false, gfm: true, breaks: true });
+          if (typeof html !== "string" || !html.trim()) return false;
+          // insertContent parses through the editor's SCHEMA, so anything
+          // the schema doesn't define — script tags, images, raw HTML
+          // passthrough — is dropped rather than trusted.
+          editor?.commands.insertContent(html);
+          return true;
+        } catch {
+          // Never lose a paste to a parser error; fall back to plain text.
+          return false;
+        }
       },
     },
     onUpdate({ editor }) {

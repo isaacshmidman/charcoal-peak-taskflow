@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAutosave } from "@/hooks/useAutosave";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,12 @@ import { Calendar as CalendarIcon, Trash2 } from "lucide-react";
 import { format } from "date-fns/format";
 import { useOutsideClick } from "@/hooks/useOutsideClick";
 import { fromDateStr, toDateStr } from "@/lib/dates";
+import { EditorLoadBoundary } from "@/components/tasks/TaskForm/TitleAndDescription";
+
+// Same lazy rich editor the task description and notes use, so every
+// multi-line box in the app behaves identically — markdown shortcuts as
+// you type, markdown on paste, the same toolbar.
+const RichDescriptionEditor = lazy(() => import("@/components/tasks/RichDescriptionEditor"));
 
 /**
  * @typedef {import("@/types/tasks").TaskCreateInput} TaskCreateInput
@@ -31,7 +37,7 @@ import { fromDateStr, toDateStr } from "@/lib/dates";
  */
 export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubmit, onDelete }) {
   /** @type {[TaskCreateInput, import("react").Dispatch<import("react").SetStateAction<TaskCreateInput>>]} */
-  const [form, setForm] = useState({ title: "", description: "", due_date: "", task_time: "" });
+  const [form, setForm] = useState({ title: "", description: "", description_json: "", due_date: "", task_time: "" });
   // Frozen at open — keeps the button label from flipping during close.
   const [isEditMode, setIsEditMode] = useState(!!task);
   const idRef = useRef(task?.id || null);
@@ -41,12 +47,13 @@ export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubm
       setForm({
         title: task.title || "",
         description: task.description || "",
+        description_json: task.description_json || "",
         due_date: task.due_date || "",
         task_time: task.task_time || "",
       });
     } else {
       const todayStr = format(new Date(), "yyyy-MM-dd");
-      setForm({ title: "", description: "", due_date: todayStr, task_time: "" });
+      setForm({ title: "", description: "", description_json: "", due_date: todayStr, task_time: "" });
     }
   }, [task, open]);
 
@@ -72,8 +79,8 @@ export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubm
     idRef.current = task?.id || null;
     setIsEditMode(!!task);
     const initial = task
-      ? { title: task.title || "", description: task.description || "", due_date: task.due_date || "", task_time: task.task_time || "" }
-      : { title: "", description: "", due_date: format(new Date(), "yyyy-MM-dd"), task_time: "" };
+      ? { title: task.title || "", description: task.description || "", description_json: task.description_json || "", due_date: task.due_date || "", task_time: task.task_time || "" }
+      : { title: "", description: "", description_json: "", due_date: format(new Date(), "yyyy-MM-dd"), task_time: "" };
     reset({ ...initial, ...(parentId ? { parent_id: parentId } : {}) });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, task?.id]);
@@ -116,12 +123,31 @@ export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubm
             onEnter={() => { if (isValid) commitAndClose(); }}
           />
 
-          <Textarea
-            placeholder="Add details (optional)"
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-            className="h-20 resize-none"
-          />
+          <EditorLoadBoundary
+            fallback={
+              <Textarea
+                placeholder="Add details (optional)"
+                defaultValue={form.description || ""}
+                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value, description_json: "" }))}
+                className="h-20 resize-none"
+              />
+            }
+          >
+            <Suspense
+              fallback={
+                <div className="min-h-[5rem] rounded-md border border-slate-200 dark:border-[#343434] bg-white dark:bg-[#0c0c0c] px-3 py-2 text-sm text-slate-400 dark:text-slate-500">
+                  Loading editor…
+                </div>
+              }
+            >
+              <RichDescriptionEditor
+                key={task?.id || "new-subtask"}
+                valueJson={task?.description_json}
+                plainFallback={task?.description}
+                onChange={({ json, text }) => setForm((f) => ({ ...f, description_json: json, description: text }))}
+              />
+            </Suspense>
+          </EditorLoadBoundary>
 
           {/* Date + Time */}
           <div className="space-y-2">

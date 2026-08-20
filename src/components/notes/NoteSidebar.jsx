@@ -7,10 +7,7 @@
  * group by and no sort to choose: most-recently-edited first is the whole
  * ordering.
  */
-import { Plus, Search } from "lucide-react";
 import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 /** First non-empty line of the body, for the preview row. */
@@ -25,9 +22,7 @@ export default function NoteSidebar({
   notes = [],
   activeId,
   onSelect,
-  onNew,
   search,
-  onSearchChange,
   isLoading,
   className,
   style,
@@ -37,30 +32,9 @@ export default function NoteSidebar({
       style={style}
       className={cn("h-full min-h-0 w-full flex-col border-border-hairline sm:shrink-0", className)}
     >
-      <div className="flex items-center gap-2 px-3 pb-2 pt-1">
-        <div className="relative flex-1 min-w-0">
-          <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
-          <Input
-            value={search}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Search"
-            data-testid="note-search"
-            className="h-8 pl-7 text-xs"
-          />
-        </div>
-        <Button
-          onClick={onNew}
-          size="icon"
-          aria-label="New note"
-          title="New note"
-          data-testid="new-note-button"
-          className="h-8 w-8 shrink-0 bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
-        >
-          <Plus className="h-4 w-4" />
-        </Button>
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+      {/* Search and New note live in the page header, like every other
+          nav — this pane is only the list. */}
+      <div className="min-h-0 flex-1 overflow-y-auto p-2">
         {isLoading ? (
           <div className="space-y-1.5 px-1 pt-1">
             {[1, 2, 3].map((i) => (

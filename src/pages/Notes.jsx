@@ -19,7 +19,9 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { NotebookPen } from "lucide-react";
+import { NotebookPen, Plus, Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { AnimatedSearchInput } from "@/components/ui/animated-search-input";
 import { apiClient } from "@/api/apiClient";
 import { useOfflineEntityMutation } from "@/hooks/useOfflineEntityMutation";
 import { useOfflineMutation } from "@/hooks/useOfflineMutation";
@@ -35,6 +37,7 @@ import NoteCanvas from "@/components/notes/NoteCanvas";
 
 export default function Notes() {
   const [search, setSearch] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
   const [openNoteId, setOpenNoteId] = useState(null);
   // Below sm the two panes can't sit side by side, and stacking them
   // would bury the editor under the whole note list. Show one at a time
@@ -158,6 +161,7 @@ export default function Notes() {
   };
 
   useShortcutEvent(SHORTCUT_EVENTS.newTask, newNote);
+  useShortcutEvent(SHORTCUT_EVENTS.search, () => setShowSearch(true));
 
   // ── Selection ⇄ task ───────────────────────────────────────────────
   // Remember exactly where the writer was before the dialog takes over.
@@ -225,7 +229,50 @@ export default function Notes() {
   };
 
   return (
-    <div ref={containerRef} className="flex h-[calc(100vh-8rem)] min-h-0 flex-col sm:flex-row">
+    <div className="space-y-5">
+      {/* Same header shape as Today / All Tasks / Groupings / Completed:
+          title + count on the left, search and the primary action on the
+          right. Search and New note live here rather than inside the
+          sidebar so the page reads like the rest of the app. */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-base font-semibold text-slate-900 dark:text-slate-100">Notes</h1>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+            {notes.length} note{notes.length !== 1 ? "s" : ""}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <AnimatedSearchInput
+            open={showSearch}
+            value={search}
+            onChange={setSearch}
+            onClose={() => setShowSearch(false)}
+          />
+          <Button
+            variant="ghost"
+            size="icon"
+            data-search-toggle
+            className="h-9 w-9 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
+            onMouseDown={(event) => { if (showSearch) event.preventDefault(); }}
+            onClick={() => { if (showSearch) setSearch(""); setShowSearch((v) => !v); }}
+          >
+            <Search className="w-4 h-4" />
+          </Button>
+          <Button
+            onClick={newNote}
+            data-testid="new-note-button"
+            className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200 h-9 gap-1.5"
+          >
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">New note</span>
+          </Button>
+        </div>
+      </div>
+
+      <div
+        ref={containerRef}
+        className="flex min-h-0 flex-col rounded-xl border border-border-hairline bg-surface-card h-[calc(100vh-17rem)] sm:h-[calc(100vh-12rem)] sm:flex-row"
+      >
       <NoteSidebar
         // Fixed px width from the divider on desktop; full width on mobile,
         // where the panes swap instead of sitting side by side.
@@ -238,9 +285,7 @@ export default function Notes() {
         notes={sortedNotes}
         activeId={openNoteId}
         onSelect={selectNote}
-        onNew={newNote}
         search={search}
-        onSearchChange={setSearch}
         isLoading={isLoading}
       />
 
@@ -278,6 +323,8 @@ export default function Notes() {
           </div>
         </section>
       )}
+
+      </div>
 
       <TaskForm
         open={taskFormOpen}
