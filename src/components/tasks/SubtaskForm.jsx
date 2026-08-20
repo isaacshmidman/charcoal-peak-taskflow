@@ -60,7 +60,9 @@ export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubm
     return res;
   }, [onSubmit]);
 
-  const { flush, reset } = useAutosave({ payload, valid: isValid, onSave: saveSubtask });
+  // Autosave is for EDITS only — creating writes nothing until the button,
+  // so Cancel can promise no subtask was created. Mirrors TaskForm.
+  const { flush, reset } = useAutosave({ payload, valid: isValid && isEditMode, onSave: saveSubtask });
 
   const initedRef = useRef(false);
   useEffect(() => {
@@ -76,10 +78,26 @@ export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubm
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, task?.id]);
 
-  const commitAndClose = () => { if (isValid) flush(); onOpenChange(false); };
+  const commitAndClose = async () => {
+    if (isEditMode) {
+      if (isValid) await flush();
+    } else {
+      if (!isValid) return;
+      await onSubmit(payload, null);
+    }
+    onOpenChange(false);
+  };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) { commitAndClose(); } else { onOpenChange(true); } }}>
+    <Dialog
+      open={open}
+      // Escape / X / outside-click discard while creating (nothing was
+      // written) and commit while editing (autosave already wrote).
+      onOpenChange={(o) => {
+        if (o) { onOpenChange(true); return; }
+        if (isEditMode) commitAndClose(); else onOpenChange(false);
+      }}
+    >
       <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto" onOpenAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle className="text-sm font-semibold text-slate-900 dark:text-slate-100">
@@ -165,10 +183,18 @@ export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubm
                 </Button>
               )}
             </div>
-            {/* Autosaves; button greys until there's a title, then closes. */}
-            <Button type="button" disabled={!isValid} onClick={commitAndClose} className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200">
-              {isEditMode ? "Save Changes" : "Create Subtask"}
-            </Button>
+            {/* Editing autosaves; creating writes only on the button, which
+                is why Cancel appears in create mode only. */}
+            <div className="flex items-center gap-2">
+              {!isEditMode && (
+                <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} data-testid="subtask-form-cancel">
+                  Cancel
+                </Button>
+              )}
+              <Button type="button" disabled={!isValid} onClick={commitAndClose} className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200">
+                {isEditMode ? "Save Changes" : "Create Subtask"}
+              </Button>
+            </div>
           </div>
         </form>
       </DialogContent>

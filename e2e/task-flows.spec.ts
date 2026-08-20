@@ -490,3 +490,58 @@ test("google sign-in starts with the local auth callback target", async ({ page 
   expect(meta.lastLoginProvider).toBe("google");
   expect(meta.lastLoginFromUrl).toBe("http://127.0.0.1:4173/auth/callback?next=http%3A%2F%2F127.0.0.1%3A4173%2FToday");
 });
+
+test("cancelling the new-task form creates nothing, and the create button is the only writer", async ({ page }) => {
+  // The form used to autosave: a title plus the default date was enough to
+  // create the task while you were still typing, and there was no way back
+  // out. Creation is now deferred to the button so Cancel means "no task",
+  // not "a task that was made and then removed".
+  const api = await installMockBackend(page, { tasks: [], priorities: [defaultPriority] });
+
+  await page.goto("/Today");
+  await page.getByRole("button", { name: /new task/i }).click();
+  await page.getByTestId("task-form-title").fill("cancelled task");
+
+  // Give the old autosave debounce (400ms) more than enough time to fire.
+  await page.waitForTimeout(900);
+  expect((await api.getState()).tasks.length).toBe(0);
+
+  await page.getByTestId("task-form-cancel").click();
+  await expect(page.getByTestId("task-form-dialog")).toBeHidden();
+  expect((await api.getState()).tasks.length).toBe(0);
+  await expect(taskCardByTitle(page, "cancelled task")).toHaveCount(0);
+
+  // Escape is the same contract as Cancel while creating.
+  await page.getByRole("button", { name: /new task/i }).click();
+  await page.getByTestId("task-form-title").fill("escaped task");
+  await page.waitForTimeout(900);
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("task-form-dialog")).toBeHidden();
+  expect((await api.getState()).tasks.length).toBe(0);
+
+  // The button is what writes.
+  await page.getByRole("button", { name: /new task/i }).click();
+  await page.getByTestId("task-form-title").fill("kept task");
+  await page.getByTestId("task-form-submit").click();
+  await expect(taskCardByTitle(page, "kept task")).toHaveCount(1);
+  expect((await api.getState()).tasks.map((t) => t.title)).toEqual(["kept task"]);
+});
+
+test("editing an existing task still autosaves without pressing anything", async ({ page }) => {
+  // Deferred create must not have turned edits into explicit saves — an
+  // open task still persists as you type, and closing commits it.
+  const api = await installMockBackend(page, {
+    tasks: [recurringTask({ id: "edit-me", title: "before", task_type: "one_time", recurrence: "none" })],
+    priorities: [defaultPriority],
+  });
+
+  await page.goto("/Today");
+  await taskCardByTitle(page, "before").click();
+  await page.getByTestId("task-form-title").fill("after");
+  await page.waitForTimeout(900);
+
+  // No button pressed, yet the edit is already persisted.
+  expect((await api.getState()).tasks.find((t) => t.id === "edit-me")?.title).toBe("after");
+  // Edit mode offers no Cancel — the change is already saved, so it would lie.
+  await expect(page.getByTestId("task-form-cancel")).toHaveCount(0);
+});

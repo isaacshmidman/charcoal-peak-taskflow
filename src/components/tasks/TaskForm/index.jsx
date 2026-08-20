@@ -189,15 +189,26 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onSubmit]);
 
-  const { flush, reset } = useAutosave({ payload, valid: canSubmit, onSave: onSaveTask });
+  // Autosave is for EDITS only. While creating, nothing is persisted until
+  // the Create button runs commitAndClose — that's what makes Cancel able to
+  // promise 'no task was created' rather than 'a task was created and removed'.
+  const { flush, reset } = useAutosave({ payload, valid: canSubmit && isEditMode, onSave: onSaveTask });
 
-  // Flush the latest fields, commit any pending subtask titles + files, close.
+  // Editing: autosave already wrote the fields, so this just flushes any
+  // pending debounce and commits subtasks. Creating: this is the ONLY write —
+  // one submit, on the button.
   const commitAndClose = async () => {
-    if (canSubmit) await flush();
     const { data, subtaskTitles } = buildData(form);
     const filesToFlush = pendingFiles;
-    if (savedIdRef.current && (subtaskTitles.length || (filesToFlush.length && !task))) {
-      const res = await onSubmit(data, subtaskTitles, savedIdRef.current);
+    if (isEditMode) {
+      if (canSubmit) await flush();
+      if (savedIdRef.current && subtaskTitles.length) {
+        const res = await onSubmit(data, subtaskTitles, savedIdRef.current);
+        if (res?.id) savedIdRef.current = res.id;
+      }
+    } else {
+      if (!canSubmit) return;
+      const res = await onSubmit(data, subtaskTitles, null);
       if (res?.id) savedIdRef.current = res.id;
     }
     onOpenChange(false);
@@ -213,7 +224,16 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) { commitAndClose(); } else { onOpenChange(true); } }}>
+    <Dialog
+      open={open}
+      // Escape / X / outside-click DISCARD while creating — nothing was
+      // written, so backing out is just closing. While editing they commit,
+      // because autosave has already persisted the edits.
+      onOpenChange={(o) => {
+        if (o) { onOpenChange(true); return; }
+        if (isEditMode) commitAndClose(); else onOpenChange(false);
+      }}
+    >
       <DialogContent
         className="sm:max-w-md max-h-[90vh] overflow-y-auto"
         onOpenAutoFocus={(e) => e.preventDefault()}
@@ -335,11 +355,23 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
               )}
             </div>
             <div className="flex items-center gap-2">
-              {/* The task autosaves; the button just greys until it's valid
-                  (title + date), then flushes + closes. No "Saved" flash. */}
+              {/* Editing autosaves, so its button just flushes + closes.
+                  Creating writes nothing until pressed, which is why create
+                  mode — and only create mode — offers a real Cancel. */}
               {isReadOnly ? (
                 <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Close</Button>
               ) : (
+                <>
+                {!isEditMode && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => onOpenChange(false)}
+                    data-testid="task-form-cancel"
+                  >
+                    Cancel
+                  </Button>
+                )}
                 <Button
                   type="button"
                   disabled={!canSubmit}
@@ -349,6 +381,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                 >
                   {isEditMode ? "Save Changes" : "Create Task"}
                 </Button>
+                </>
               )}
             </div>
           </div>
