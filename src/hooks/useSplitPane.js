@@ -17,13 +17,18 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 
+/** Settle duration. Short enough to read as a click rather than a drift. */
+export const GLIDE_MS = 110;
+
 /**
  * @param {object} opts
  * @param {string} opts.storageKey            localStorage key for the persisted size
  * @param {number} opts.minSize               px floor for the resizable pane
  * @param {number} [opts.defaultSize]         px used when nothing is stored
  * @param {number} [opts.maxFraction]         cap as a fraction of the container
- * @param {number[]} [opts.snapFractions]     detents as container fractions
+ * @param {number[]} [opts.snapFractions]     detents as container fractions;
+ *   pass [] for a divider that drags freely with no sticky spots
+ * @param {number} [opts.resetFraction]        where double-click jumps to
  * @param {boolean} [opts.fromEnd]            true when the resizable pane is on the
  *   RIGHT, so dragging left grows it (the calendar's all-day column). Notes'
  *   sidebar is on the left, so it leaves this false.
@@ -34,6 +39,7 @@ export function useSplitPane({
   defaultSize = 192,
   maxFraction = 0.8,
   snapFractions = [0.3, 0.5, 0.7],
+  resetFraction = 0.5,
   fromEnd = false,
 }) {
   const containerRef = useRef(null);
@@ -68,7 +74,7 @@ export function useSplitPane({
   const beginGlide = useCallback(() => {
     setGlide(true);
     if (glideTimerRef.current) clearTimeout(glideTimerRef.current);
-    glideTimerRef.current = setTimeout(() => setGlide(false), 170);
+    glideTimerRef.current = setTimeout(() => setGlide(false), GLIDE_MS);
   }, []);
 
   useEffect(() => () => {
@@ -85,9 +91,13 @@ export function useSplitPane({
     const snaps = snapFractions
       .map((f) => Math.round(containerW * f))
       .filter((px) => px >= minW && px <= maxW);
-    // Latch-in within ~2% of the row; latch-out needs ~12px more.
-    const snapIn = Math.max(10, Math.round(containerW * 0.02));
-    const snapOut = snapIn + 12;
+    // Catch radius, tuned for a decisive detent. The original ~2% was
+    // too narrow to reliably grab, so the divider slid past the detent
+    // as often as it caught — which is what read as "weird". A wider
+    // catch with proportionally more latch-out keeps it snappy while
+    // still making oscillation at the boundary impossible.
+    const snapIn = Math.max(14, Math.round(containerW * 0.035));
+    const snapOut = snapIn + 14;
     return { minW, maxW, snaps, snapIn, snapOut, containerW };
   }, [maxFraction, minSize, snapFractions]);
 
@@ -154,12 +164,12 @@ export function useSplitPane({
     window.addEventListener("pointercancel", onUp);
   }, [beginGlide, fromEnd, measureDragGeometry, size]);
 
-  /** Double-click the divider → jump straight to 50/50. */
+  /** Double-click the divider → jump straight to the reset split. */
   const resetSplit = useCallback(() => {
     const { minW, maxW, containerW } = measureDragGeometry();
     beginGlide();
-    setSize(Math.max(minW, Math.min(maxW, Math.round(containerW * 0.5))));
-  }, [beginGlide, measureDragGeometry]);
+    setSize(Math.max(minW, Math.min(maxW, Math.round(containerW * resetFraction))));
+  }, [beginGlide, measureDragGeometry, resetFraction]);
 
   return { size, setSize, containerRef, startResize, resetSplit, snapped, glide };
 }

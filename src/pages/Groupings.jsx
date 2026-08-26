@@ -82,9 +82,9 @@ function GroupColumn({ title, subtitle, tasks, priorities, priorityOrderMap, onT
         <p className="text-[10px] text-slate-400 dark:text-slate-500">{tasks.length} task{tasks.length !== 1 ? "s" : ""}</p>
       </div>
       <div className="flex-1 overflow-y-auto p-2 space-y-1.5 max-h-[70vh]">
-        {sorted.length === 0 ? (
-          <p className="text-[10px] text-slate-300 dark:text-slate-600 text-center py-6">Clear skies.</p>
-        ) : (
+        {/* An empty group says nothing — the heading's "0 tasks" already
+            covers it, and a message per empty column was just noise. */}
+        {sorted.length === 0 ? null : (
           <AnimatePresence mode="popLayout">
             {sorted.map(task => (
               <CompactTaskCard

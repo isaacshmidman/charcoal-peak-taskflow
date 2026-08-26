@@ -51,10 +51,12 @@ export default function SubtasksField({
         </Button>
       </div>
 
-      {/* Existing subtasks (when editing) */}
-      {task && existingSubtasks.length > 0 && (
+      {/* Saved subtasks and not-yet-created ones share ONE wrap
+          container — two separate flex rows is what pushed a freshly
+          added chip onto its own line below the others. */}
+      {((task && existingSubtasks.length > 0) || (form.subtask_titles || []).length > 0) && (
         <div className="mt-2 flex flex-wrap gap-1.5">
-          {existingSubtasks.map((sub) => (
+          {task && existingSubtasks.map((sub) => (
             <div key={sub.id} className="inline-flex items-center gap-1.5 bg-secondary text-secondary-foreground rounded-full px-2.5 py-0.5 text-xs font-semibold group">
               <button
                 type="button"
@@ -81,11 +83,6 @@ export default function SubtasksField({
               </button>
             </div>
           ))}
-        </div>
-      )}
-
-      {(form.subtask_titles || []).length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
           {(form.subtask_titles || []).map((title, idx) => (
             <div key={idx} className="inline-flex items-center gap-1.5 bg-secondary text-secondary-foreground rounded-full px-2.5 py-0.5 text-xs font-semibold group">
               <div className="shrink-0 w-3.5 h-3.5 rounded border-2 border-slate-400" />

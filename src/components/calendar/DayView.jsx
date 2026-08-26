@@ -132,18 +132,22 @@ function MobileAllDayOverlay({
     <div className="sticky top-0 z-30 bg-white dark:bg-[#0c0c0c] border-b border-slate-100 dark:border-[#303030]">
       <div className="flex" style={{ height }}>
         <div className="w-12 shrink-0 border-r border-slate-100 dark:border-[#303030] bg-white dark:bg-[#0c0c0c] flex items-start justify-center pt-1">
-          <button
-            type="button"
-            onClick={onToggleCollapsed}
-            className="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
-            aria-label={collapsed ? "Expand all-day" : "Collapse all-day"}
-          >
-            {collapsed ? (
-              <ChevronRight className="w-4 h-4" />
-            ) : (
-              <ChevronDown className="w-4 h-4" />
-            )}
-          </button>
+          {/* Only offer the toggle when collapsing actually hides
+              something — an arrow that expands nothing is a dead control. */}
+          {allDayTasks.length > COLLAPSED_ALLDAY_VISIBLE && (
+            <button
+              type="button"
+              onClick={onToggleCollapsed}
+              className="inline-flex h-6 w-6 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-[#222222] dark:hover:text-slate-200"
+              aria-label={collapsed ? "Expand all-day" : "Collapse all-day"}
+            >
+              {collapsed ? (
+                <ChevronRight className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              )}
+            </button>
+          )}
         </div>
         <AllDayOverlayCell
           dateStr={dateStr}
@@ -173,9 +177,7 @@ function AllDayColumn({ dateStr, allDayTasks, priorities, onTaskClick, onToggleD
       )}
     >
       <h3 className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-2">All day</h3>
-      {allDayTasks.length === 0 ? (
-        <p className="text-[11px] text-slate-400 dark:text-slate-500">No all-day tasks</p>
-      ) : (
+      {allDayTasks.length === 0 ? null : (
         <div
           className={cn(
             "space-y-1 overflow-y-auto",
@@ -372,7 +374,12 @@ export default function DayView({
           resets to 50/50. The handle pill grows + darkens while latched
           so the detent reads as a tactile "click". */}
       {useSideAllDay && (
-        <SplitDivider onPointerDown={startResize} onDoubleClick={resetSplit} snapped={snapped} />
+        <SplitDivider
+          onPointerDown={startResize}
+          onDoubleClick={resetSplit}
+          snapped={snapped}
+          title="Drag to resize — snaps at 30 / 50 / 70%. Double-click for 50/50."
+        />
       )}
 
       {/* All-day column — fixed width when there is room; mobile uses
@@ -383,7 +390,7 @@ export default function DayView({
         <div
           className={cn(
             "shrink-0 w-[var(--ad-w)]",
-            glide && "transition-[width] duration-150 ease-out"
+            glide && "transition-[width] duration-100 ease-out"
           )}
           style={{ "--ad-w": `${allDayWidth}px` }}
         >

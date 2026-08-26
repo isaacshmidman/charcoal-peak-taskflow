@@ -203,11 +203,17 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
     if (isEditMode) {
       if (canSubmit) await flush();
       if (savedIdRef.current && subtaskTitles.length) {
+        // Drop the pending titles BEFORE awaiting the create. The moment
+        // the subtasks exist they arrive back through existingSubtasks,
+        // and if the pending chips were still in form state the same
+        // subtask would be drawn twice for the width of that await.
+        setForm((f) => ({ ...f, subtask_titles: [] }));
         const res = await onSubmit(data, subtaskTitles, savedIdRef.current);
         if (res?.id) savedIdRef.current = res.id;
       }
     } else {
       if (!canSubmit) return;
+      if (subtaskTitles.length) setForm((f) => ({ ...f, subtask_titles: [] }));
       const res = await onSubmit(data, subtaskTitles, null);
       if (res?.id) savedIdRef.current = res.id;
     }

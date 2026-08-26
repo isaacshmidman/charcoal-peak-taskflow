@@ -233,7 +233,7 @@ export default function Completed() {
         </div>
       ) : completedItems.length === 0 ? (
         <div className="text-center py-14">
-          <p className="text-xs text-slate-400 dark:text-slate-500">Nothing finished yet. Done tasks settle here.</p>
+          <p className="text-xs text-slate-400 dark:text-slate-500">Nothing finished yet. Completed tasks settle here.</p>
         </div>
       ) : (
         <div className="space-y-2">

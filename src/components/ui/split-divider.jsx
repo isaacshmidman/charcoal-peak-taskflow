@@ -10,22 +10,30 @@
  */
 import { cn } from "@/lib/utils";
 
-export default function SplitDivider({ onPointerDown, onDoubleClick, snapped, className }) {
+export default function SplitDivider({
+  onPointerDown,
+  onDoubleClick,
+  snapped,
+  className,
+  title = "Drag to resize. Double-click to reset.",
+}) {
   return (
     <div
       role="separator"
       aria-orientation="vertical"
       onPointerDown={onPointerDown}
       onDoubleClick={onDoubleClick}
-      title="Drag to resize — snaps at 30 / 50 / 70%. Double-click for 50/50."
+      title={title}
       className={cn("flex w-2 cursor-col-resize items-center justify-center group shrink-0", className)}
     >
       <div
         className={cn(
           "w-0.5 rounded-full transition-all duration-150",
+          // Visible at rest: the old slate-200 / #222 vanished into the
+          // surface behind it, so the divider read as empty space.
           snapped
             ? "h-12 bg-slate-500 dark:bg-slate-300"
-            : "h-8 bg-slate-200 dark:bg-[#222222] group-hover:bg-slate-400"
+            : "h-8 bg-slate-300 dark:bg-[#3a3a3a] group-hover:bg-slate-400 dark:group-hover:bg-slate-500"
         )}
       />
     </div>

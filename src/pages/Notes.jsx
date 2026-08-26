@@ -59,7 +59,11 @@ export default function Notes() {
     storageKey: "notes_sidebar_width",
     minSize: 180,
     defaultSize: 256,
-    maxFraction: 0.6,
+    // The list never takes more than half the page, and it drags freely —
+    // no detents, unlike the calendar's. Double-click parks it at 25/75.
+    maxFraction: 0.5,
+    snapFractions: [],
+    resetFraction: 0.25,
   });
 
   // Task dialog state. `taskDraft` seeds a NEW task from a selection;
@@ -280,7 +284,7 @@ export default function Notes() {
         className={cn(
           mobilePane === "editor" ? "hidden sm:flex" : "flex",
           "sm:w-[var(--notes-sb)]",
-          glide && "sm:transition-[width] sm:duration-150 sm:ease-out"
+          glide && "sm:transition-[width] sm:duration-100 sm:ease-out"
         )}
         notes={sortedNotes}
         activeId={openNoteId}
@@ -293,6 +297,7 @@ export default function Notes() {
         onPointerDown={startResize}
         onDoubleClick={resetSplit}
         snapped={snapped}
+        title="Drag to resize. Double-click for a 25/75 split."
         className={cn("hidden sm:flex", mobilePane === "list" && "sm:flex")}
       />
 
