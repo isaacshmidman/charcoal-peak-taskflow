@@ -71,6 +71,10 @@ export default function Layout() {
                 <Link
                   key={item.path}
                   to={item.path}
+                  // Tapping the nav icon for the page you're already on
+                  // returns to that page's top level — the same gesture
+                  // Settings uses to get back to its menu.
+                  onClick={() => window.dispatchEvent(new Event(`navClicked:${item.path}`))}
                   title={item.label}
                   aria-label={item.label}
                   className={cn(
@@ -146,6 +150,9 @@ export default function Layout() {
                 to={item.path}
                 title={item.label}
                 aria-label={item.label}
+                // Same gesture as the desktop nav: tapping the icon for the
+                // page you're on returns to that page's top level.
+                onClick={() => window.dispatchEvent(new Event(`navClicked:${item.path}`))}
                 className={cn(
                   "flex items-center justify-center py-2 rounded-lg transition-all touch-manipulation flex-1",
                   isActive ? "text-slate-900 dark:text-slate-100 bg-slate-100/80 dark:bg-[#161616]" : "text-slate-400 dark:text-slate-500"

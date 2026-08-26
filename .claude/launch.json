@@ -5,7 +5,6 @@
       "name": "Full Dev (Vite + Backend)",
       "runtimeExecutable": "/Users/isaacshmidman/Documents/New project/tools/node-v22.14.0-darwin-arm64/bin/node",
       "runtimeArgs": ["node_modules/.bin/vite", "--host", "127.0.0.1"],
-      "env": { "TASKFLOW_ALLOW_ANY_PASSWORD": "true" },
       "port": 5173
     },
     {

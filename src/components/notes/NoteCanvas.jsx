@@ -13,13 +13,14 @@
  * forms, where nothing is written until the button.
  */
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { EditorLoadBoundary } from "@/components/tasks/TaskForm/TitleAndDescription";
 import Toolbar from "@/components/tasks/richtext/Toolbar";
 import { useAutosave } from "@/hooks/useAutosave";
+import { useKeyboardInset } from "@/hooks/useKeyboardInset";
 
 const RichDescriptionEditor = lazy(() => import("@/components/tasks/RichDescriptionEditor"));
 
@@ -28,7 +29,6 @@ const NOTE_WORD_LIMIT = 5000;
 export default function NoteCanvas({
   note,
   onSave,
-  onDelete,
   taskStatusById,
   onMakeTask,
   onOpenTask,
@@ -44,6 +44,10 @@ export default function NoteCanvas({
   const [focused, setFocused] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const showToolbar = !!editor && (focused || pickerOpen);
+  // On a phone the keyboard covers the bottom of the pane, taking the
+  // toolbar with it. Shrink the section by the covered strip (plus a
+  // little breathing room) so the bar sits just above the keys.
+  const keyboardInset = useKeyboardInset();
 
   const [form, setForm] = useState({
     title: note.title || "",
@@ -78,30 +82,10 @@ export default function NoteCanvas({
   useEffect(() => () => { flushRef.current?.(); }, []);
 
   return (
-    <section className={cn("h-full min-h-0 flex-1 flex-col", className)}>
-      {/* Formatting bar, pinned above the title. The row is ALWAYS
-          mounted at a fixed height and only its contents fade in, so
-          focusing the note can't shove the title and body down a line. */}
-      <div className="h-9 shrink-0 px-2 pt-1">
-        {/* No overflow-hidden here: the toolbar's colour/font pickers are
-            absolutely positioned inside it and clipping would swallow them.
-            The Toolbar draws its own rounded, bordered box instead. */}
-        <div
-          data-richtext-toolbar
-          className={cn("transition-opacity", showToolbar ? "opacity-100" : "pointer-events-none opacity-0")}
-        >
-          {editor && (
-            <Toolbar
-              editor={editor}
-              placement="standalone"
-              onPickerOpenChange={setPickerOpen}
-              wordLimit={NOTE_WORD_LIMIT}
-              onMakeTask={onMakeTask}
-            />
-          )}
-        </div>
-      </div>
-
+    <section
+      className={cn("h-full min-h-0 flex-1 flex-col", className)}
+      style={keyboardInset ? { paddingBottom: keyboardInset + 12 } : undefined}
+    >
       <div className="flex items-start gap-2 px-4 pt-1">
         {/* Back to the list — only reachable below sm, where the two
             panes swap instead of sitting side by side. */}
@@ -123,25 +107,22 @@ export default function NoteCanvas({
           onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
           placeholder="Title"
           data-testid="note-title-input"
+          // Enter drops into the body, so the title reads as the note's
+          // first line and the next line is ordinary paragraph text.
+          // Focus the contenteditable directly rather than going through
+          // editor.chain().focus() — the command is a no-op from here,
+          // while the DOM call reliably moves the caret.
+          onKeyDown={(e) => {
+            if (e.key !== "Enter") return;
+            e.preventDefault();
+            scrollRef.current?.querySelector(".tiptap-prose")?.focus();
+            editor?.commands.setTextSelection(0);
+          }}
           className="min-w-0 flex-1 bg-transparent text-lg font-semibold text-slate-900 outline-none placeholder:text-slate-300 dark:text-slate-100 dark:placeholder:text-slate-600"
         />
-        {onDelete && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label="Delete note"
-            title="Delete note"
-            data-testid="note-delete"
-            className="h-8 w-8 shrink-0 text-slate-300 hover:bg-red-50 hover:text-red-500 dark:text-slate-600 dark:hover:bg-[#2a1116] dark:hover:text-red-300"
-            onClick={() => onDelete(note)}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        )}
       </div>
 
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-1 pb-4" data-testid="note-scroll">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-1" data-testid="note-scroll">
         <EditorLoadBoundary
           fallback={
             <Textarea
@@ -172,6 +153,29 @@ export default function NoteCanvas({
             />
           </Suspense>
         </EditorLoadBoundary>
+      </div>
+
+      {/* Formatting bar docked at the bottom, spanning the pane's full
+          width and flush with its bottom edge — the same way it comes
+          straight out of the bottom of a description box. Always
+          mounted so showing it can't shift the body; only the contents
+          fade. */}
+      <div
+        data-richtext-toolbar
+        className={cn(
+          "shrink-0 border-t border-border-hairline bg-slate-50 transition-opacity dark:bg-[#0c0c0c]",
+          showToolbar ? "opacity-100" : "pointer-events-none opacity-0"
+        )}
+      >
+        {editor && (
+          <Toolbar
+            editor={editor}
+            placement="flush"
+            onPickerOpenChange={setPickerOpen}
+            wordLimit={NOTE_WORD_LIMIT}
+            onMakeTask={onMakeTask}
+          />
+        )}
       </div>
     </section>
   );

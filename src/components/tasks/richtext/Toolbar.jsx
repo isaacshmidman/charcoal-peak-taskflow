@@ -199,8 +199,12 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
         // Leaving them square let this opaque grey paint into the parent's
         // corner arc, which is what made the border look doubled there.
         ? "border-t border-slate-100 dark:border-[#303030] rounded-b-[5px]"
-        // Standalone bar (Notes, above the title): its own rounded box.
-        : "rounded-lg border border-border-hairline"
+        : placement === "flush"
+          // Docked to a pane edge: the wrapper draws the rule, so this
+          // adds no border or radius that could double up on it.
+          ? ""
+          // Standalone bar: its own rounded box.
+          : "rounded-lg border border-border-hairline"
     )}>
       <TBtn title="Bold" active={editor.isActive("bold")} onAction={() => apply(() => editor.chain().focus().toggleBold().run())}>
         <Bold className="w-4 h-4" />
@@ -218,7 +222,7 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
       <span className="w-px h-5 bg-slate-200 dark:bg-[#303030] mx-0.5 shrink-0" />
 
       {/* Text color */}
-      <Picker icon={Baseline} title="Text color" open={colorOpen} setOpen={setColorOpen} onOpenChange={anyPickerOpen} openUp={placement === "docked"}>
+      <Picker icon={Baseline} title="Text color" open={colorOpen} setOpen={setColorOpen} onOpenChange={anyPickerOpen} openUp={placement !== "standalone"}>
         <div className="grid grid-cols-5 gap-1 w-[150px]">
           {TEXT_COLORS.map((c) => (
             <button
@@ -241,7 +245,7 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
       </Picker>
 
       {/* Highlight */}
-      <Picker icon={Highlighter} title="Highlight" open={hlOpen} setOpen={setHlOpen} onOpenChange={anyPickerOpen} openUp={placement === "docked"}>
+      <Picker icon={Highlighter} title="Highlight" open={hlOpen} setOpen={setHlOpen} onOpenChange={anyPickerOpen} openUp={placement !== "standalone"}>
         <div className="flex gap-1">
           {HIGHLIGHTS.map((c) => (
             <button
@@ -264,7 +268,7 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
       </Picker>
 
       {/* Font */}
-      <Picker icon={Type} title="Font" open={fontOpen} setOpen={setFontOpen} onOpenChange={anyPickerOpen} openUp={placement === "docked"}>
+      <Picker icon={Type} title="Font" open={fontOpen} setOpen={setFontOpen} onOpenChange={anyPickerOpen} openUp={placement !== "standalone"}>
         <div className="w-44 max-h-56 overflow-y-auto">
           {FONTS.map((f) => (
             <button
@@ -287,7 +291,7 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
       <span className="w-px h-5 bg-slate-200 dark:bg-[#303030] mx-0.5 shrink-0" />
 
       {/* Lists */}
-      <Picker icon={ListIcon} title="Lists" open={listOpen} setOpen={setListOpen} onOpenChange={anyPickerOpen} openUp={placement === "docked"}>
+      <Picker icon={ListIcon} title="Lists" open={listOpen} setOpen={setListOpen} onOpenChange={anyPickerOpen} openUp={placement !== "standalone"}>
         <div className="w-40">
           {LIST_OPTIONS.map((o) => (
             <button

@@ -6,6 +6,7 @@
  * (expandable subtask checklist with its own state).
  */
 import React, { forwardRef, useEffect, useRef, useState } from "react";
+import { useSwipeToDelete } from "@/hooks/useSwipeToDelete";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
@@ -54,20 +55,16 @@ const TaskCard = forwardRef(function TaskCard({
   const [dateOpen, setDateOpen] = useState(false);
   const [optimisticDone, setOptimisticDone] = useState(false);
   const [optimisticUndone, setOptimisticUndone] = useState(false);
-  const [swipeX, setSwipeX] = useState(0);
-  const [swiping, setSwiping] = useState(false);
-  const swipeStartX = useRef(null);
-  const swipeStartY = useRef(null);
-  const swipeLocked = useRef(false);
-  const didSwipe = useRef(false);
-  const cardRef = useRef(null);
-  const swipeXRef = useRef(0);
-
-  // Returns the delete threshold: 2/5 of the card's width
-  const getThreshold = () => {
-    const w = cardRef.current?.offsetWidth;
-    return w ? w * 2 / 5 : 120;
-  };
+  // Swipe-to-delete lives in useSwipeToDelete so the note rows use the
+  // very same gesture — direction lock, thresholds and all — rather than
+  // a second copy of it.
+  const {
+    ref: cardRef,
+    swipeX,
+    swiping,
+    willDelete,
+    didSwipeRef: didSwipe,
+  } = useSwipeToDelete({ onDelete: () => onDelete(task) });
 
   // Reset optimistic state whenever the server/cache status changes
   useEffect(() => {
@@ -83,101 +80,6 @@ const TaskCard = forwardRef(function TaskCard({
     else setOptimisticUndone(true);
     onToggleDone(task);
   };
-
-  // Unified pointer-based swipe (works for both touch and mouse drag)
-  useEffect(() => {
-    const el = cardRef.current;
-    if (!el) return;
-
-    const onStart = (e) => {
-      if (e.type === 'mousedown' && e.button !== 0) return;
-      swipeStartX.current = e.type === 'mousedown' ? e.clientX : e.touches[0].clientX;
-      swipeStartY.current = e.type === 'mousedown' ? e.clientY : e.touches[0].clientY;
-      swipeLocked.current = false;
-      didSwipe.current = false;
-      swipeXRef.current = 0;
-      setSwiping(false);
-      setSwipeX(0);
-    };
-
-    const onMove = (e) => {
-    if (swipeStartX.current === null) return;
-    const isTouch = e.type === 'touchmove';
-    const clientX = isTouch ? e.touches[0].clientX : e.clientX;
-    const clientY = isTouch ? e.touches[0].clientY : e.clientY;
-    if (!isTouch && e.buttons !== 1) {
-      swipeStartX.current = null;
-      return;
-    }
-    const dx = clientX - swipeStartX.current;
-    const dy = clientY - swipeStartY.current;
-
-    if (!swipeLocked.current) {
-      const adx = Math.abs(dx);
-      const ady = Math.abs(dy);
-
-      // Determine zone: middle 3/5 vs outer 1/5 on each side
-      const cardW = cardRef.current?.offsetWidth || 300;
-      const relX = swipeStartX.current - (cardRef.current?.getBoundingClientRect().left || 0);
-      const oneFifth = cardW / 5;
-      const inMiddleZone = relX > oneFifth && relX < cardW - oneFifth;
-
-      // Middle zone: ratio 4:1 (very strict), outer zones: ratio 3:1 (stricter than old 2:1)
-      const ratio = inMiddleZone ? 4 : 3;
-
-      if (adx > 10 && adx > ady * ratio) {
-        swipeLocked.current = true;
-      } else if (ady > 6) {
-        // User is scrolling vertically — abort
-        swipeStartX.current = null;
-        return;
-      } else {
-        return;
-      }
-    }
-
-      if (e.cancelable) e.preventDefault();
-      swipeXRef.current = dx;
-      didSwipe.current = Math.abs(dx) > 10;
-      setSwiping(true);
-      setSwipeX(dx);
-    };
-
-    const onEnd = () => {
-      if (swipeStartX.current === null) { setSwiping(false); setSwipeX(0); return; }
-      if (Math.abs(swipeXRef.current) >= getThreshold()) {
-        onDelete(task);
-      }
-      setSwiping(false);
-      setSwipeX(0);
-      swipeXRef.current = 0;
-      swipeStartX.current = null;
-      // didSwipe.current stays true briefly so click handlers can check it
-      setTimeout(() => { didSwipe.current = false; }, 50);
-    };
-
-    // Touch
-    el.addEventListener('touchstart', onStart, { passive: true });
-    el.addEventListener('touchmove', onMove, { passive: false });
-    el.addEventListener('touchend', onEnd, { passive: true });
-    // Mouse
-    el.addEventListener('mousedown', onStart);
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onEnd);
-    window.addEventListener('blur', onEnd);
-    document.addEventListener('mouseleave', onEnd);
-
-    return () => {
-      el.removeEventListener('touchstart', onStart);
-      el.removeEventListener('touchmove', onMove);
-      el.removeEventListener('touchend', onEnd);
-      el.removeEventListener('mousedown', onStart);
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onEnd);
-      window.removeEventListener('blur', onEnd);
-      document.removeEventListener('mouseleave', onEnd);
-    };
-  }, [task, onDelete]);
 
   const recurrenceLabel = buildRecurrenceShortLabel(task);
 
@@ -220,7 +122,6 @@ const TaskCard = forwardRef(function TaskCard({
     >
       {/* Swipe delete background */}
       {swiping && Math.abs(swipeX) > 20 && (() => {
-        const willDelete = Math.abs(swipeX) >= getThreshold();
         return (
           <div className={cn(
             "absolute inset-0 rounded-xl flex items-center px-5 pointer-events-none z-0 transition-colors duration-100",

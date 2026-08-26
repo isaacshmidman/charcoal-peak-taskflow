@@ -167,6 +167,14 @@ export default function Notes() {
   useShortcutEvent(SHORTCUT_EVENTS.newTask, newNote);
   useShortcutEvent(SHORTCUT_EVENTS.search, () => setShowSearch(true));
 
+  // Tapping the Notes nav icon while a note is open returns to the list,
+  // mirroring how the Settings icon returns to the settings menu.
+  useEffect(() => {
+    const handler = () => setMobilePane("list");
+    window.addEventListener("navClicked:/Notes", handler);
+    return () => window.removeEventListener("navClicked:/Notes", handler);
+  }, []);
+
   // ── Selection ⇄ task ───────────────────────────────────────────────
   // Remember exactly where the writer was before the dialog takes over.
   const capturePlace = (range) => {
@@ -289,6 +297,7 @@ export default function Notes() {
         notes={sortedNotes}
         activeId={openNoteId}
         onSelect={selectNote}
+        onDelete={deleteNote}
         search={search}
         isLoading={isLoading}
       />
@@ -311,7 +320,6 @@ export default function Notes() {
           onBack={() => setMobilePane("list")}
           note={openNote}
           onSave={saveNote}
-          onDelete={deleteNote}
           taskStatusById={taskStatusById}
           onMakeTask={handleMakeTask}
           onOpenTask={handleOpenTask}

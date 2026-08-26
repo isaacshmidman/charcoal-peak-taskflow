@@ -145,9 +145,19 @@
 
 /* ── Rich description editor (TipTap / ProseMirror) ──────────────── */
 .tiptap-prose {
-  font-size: 0.875rem;
+  /* 16px on phones. iOS zooms the page whenever you focus a field whose
+     font-size is under 16px, which is why tapping into a description
+     jumped the layout. ui/input.jsx and ui/textarea.jsx already use
+     text-base for exactly this reason — this was the last field that
+     didn't. Desktop keeps 14px below. */
+  font-size: 1rem;
   line-height: 1.5;
   color: theme("colors.slate.900");
+}
+@media (min-width: 640px) {
+  .tiptap-prose {
+    font-size: 0.875rem;
+  }
 }
 .dark .tiptap-prose {
   color: theme("colors.slate.100");
