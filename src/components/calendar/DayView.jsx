@@ -18,7 +18,7 @@ const ALLDAY_COLLAPSE_KEY = "calendar_day_allday_collapsed";
 const MIN_ALLDAY_W = 96;
 const ALLDAY_ROW_HEIGHT = 26;
 const ALLDAY_MORE_HEIGHT = 24;
-const COLLAPSED_ALLDAY_VISIBLE = 2;
+import { COLLAPSED_ALLDAY_VISIBLE, canCollapseAllDay } from "@/lib/allday-collapse";
 const formatHour = (h) => {
   if (h === 0) return "12 AM";
   if (h === 12) return "12 PM";
@@ -69,7 +69,9 @@ function AllDayOverlayCell({ dateStr, allDayTasks, priorities, onTaskClick, onTo
     id: `allday-${dateStr}`,
     data: { kind: "allday", dateStr },
   });
-  const visibleLimit = collapsed ? COLLAPSED_ALLDAY_VISIBLE : allDayTasks.length;
+  // Hiding a single row costs nearly what it saves, so a strip that
+  // small shows everything — see lib/allday-collapse.
+  const visibleLimit = collapsed && canCollapseAllDay(allDayTasks.length) ? COLLAPSED_ALLDAY_VISIBLE : allDayTasks.length;
   const visible = allDayTasks.slice(0, visibleLimit);
   const hiddenCount = Math.max(0, allDayTasks.length - visible.length);
 
@@ -119,10 +121,11 @@ function MobileAllDayOverlay({
   onToggleCollapsed,
   onExpand,
 }) {
-  const visibleCount = collapsed
+  const collapsible = canCollapseAllDay(allDayTasks.length);
+  const visibleCount = collapsed && collapsible
     ? Math.min(COLLAPSED_ALLDAY_VISIBLE, allDayTasks.length)
     : allDayTasks.length;
-  const hasMore = collapsed && allDayTasks.length > COLLAPSED_ALLDAY_VISIBLE;
+  const hasMore = collapsed && collapsible;
   const height =
     Math.max(1, visibleCount) * ALLDAY_ROW_HEIGHT +
     (hasMore ? ALLDAY_MORE_HEIGHT : 0) +
@@ -134,7 +137,7 @@ function MobileAllDayOverlay({
         <div className="w-12 shrink-0 border-r border-slate-100 dark:border-[#303030] bg-white dark:bg-[#0c0c0c] flex items-start justify-center pt-1">
           {/* Only offer the toggle when collapsing actually hides
               something — an arrow that expands nothing is a dead control. */}
-          {allDayTasks.length > COLLAPSED_ALLDAY_VISIBLE && (
+          {collapsible && (
             <button
               type="button"
               onClick={onToggleCollapsed}

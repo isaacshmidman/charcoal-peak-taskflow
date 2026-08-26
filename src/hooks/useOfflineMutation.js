@@ -43,7 +43,12 @@ export function useOfflineMutation() {
    */
   const createTask = async (data) => {
     const optimisticId = createOptimisticId('offline');
-    const optimistic = { ...data, id: optimisticId, created_date: new Date().toISOString(), updated_date: new Date().toISOString() };
+    // _key is the row's STABLE React identity. The id below is temporary
+    // and gets swapped for the server's once it lands; without a key that
+    // survives that swap, lists keyed on id treat it as a different row
+    // and animate one out while animating another in. Client-only — it is
+    // never part of the payload sent to the server.
+    const optimistic = { ...data, id: optimisticId, _key: optimisticId, created_date: new Date().toISOString(), updated_date: new Date().toISOString() };
     applyToCache((current) => [optimistic, ...current]);
     if (isOnline()) {
       try {

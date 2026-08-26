@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { forwardRef, useState, useMemo, useEffect } from "react";
+import { rowKey } from "@/lib/row-key";
 import { apiClient } from "@/api/apiClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
@@ -320,7 +321,7 @@ export default function RecentlyDeleted({ onBack } = {}) {
               <AnimatePresence mode="popLayout">
                 {displayedTasks.map(record => (
                   <DeletedTaskCard
-                    key={record.id}
+                    key={rowKey(record)}
                     record={record}
                     priorityMap={priorityMap}
                     onRestore={() => handleRestore(record)}
@@ -337,7 +338,7 @@ export default function RecentlyDeleted({ onBack } = {}) {
               <AnimatePresence mode="popLayout">
                 {displayedNotes.map(record => (
                   <DeletedNoteCard
-                    key={record.id}
+                    key={rowKey(record)}
                     record={record}
                     priorityMap={priorityMap}
                     onRestore={() => handleRestoreNote(record)}

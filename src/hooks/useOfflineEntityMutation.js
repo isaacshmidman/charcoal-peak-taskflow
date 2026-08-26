@@ -39,7 +39,8 @@ export function useOfflineEntityMutation(entityName) {
   const create = async (data) => {
     const optimisticId = createOptimisticId();
     const now = new Date().toISOString();
-    const optimistic = { ...data, id: optimisticId, created_date: now, updated_date: now };
+    // _key: stable React identity across the id swap below — see lib/row-key.js.
+    const optimistic = { ...data, id: optimisticId, _key: optimisticId, created_date: now, updated_date: now };
     applyToCache((current) => [optimistic, ...current]);
     if (isOnline()) {
       try {

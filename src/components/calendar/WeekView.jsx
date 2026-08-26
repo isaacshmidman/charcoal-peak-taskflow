@@ -16,7 +16,7 @@ const HOUR_HEIGHT = 44;
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const DAY_HEADER_HEIGHT = 40; // day-of-week label + date number + py-1 padding
 const COLLAPSE_KEY = "calendar_week_allday_collapsed";
-const COLLAPSED_ALLDAY_VISIBLE = 2;
+import { COLLAPSED_ALLDAY_VISIBLE, canCollapseAllDay } from "@/lib/allday-collapse";
 
 const formatHour = (h) => {
   if (h === 0) return "12 AM";
@@ -30,7 +30,9 @@ function AllDayCell({ dateStr, tasks, priorities, onTaskClick, onToggleDone, col
     id: `allday-${dateStr}`,
     data: { kind: "allday", dateStr },
   });
-  const visibleLimit = collapsed ? COLLAPSED_ALLDAY_VISIBLE : tasks.length;
+  // Collapsing one row costs almost as much as it saves, so a cell that
+  // small just shows everything — see lib/allday-collapse.
+  const visibleLimit = collapsed && canCollapseAllDay(tasks.length) ? COLLAPSED_ALLDAY_VISIBLE : tasks.length;
   const visible = tasks.slice(0, visibleLimit);
   const hiddenCount = Math.max(0, tasks.length - visible.length);
   return (
@@ -253,7 +255,10 @@ export default function WeekView({
         {/* Sticky day-header row (on top) */}
         <div className="sticky top-0 z-40 bg-white dark:bg-[#0c0c0c] border-b border-slate-100 dark:border-[#303030]">
           <div className="flex" style={{ height: DAY_HEADER_HEIGHT }}>
-            <div className="w-12 shrink-0 border-r border-slate-100 dark:border-[#303030] bg-white dark:bg-[#0c0c0c]" />
+            {/* No border-r: the day column beside it already draws a
+                border-l, and the two together made this rule 2px thick —
+                visibly heavier than the day view's. */}
+            <div className="w-12 shrink-0 bg-white dark:bg-[#0c0c0c]" />
             {days.map((d) => (
               <DayHeader key={toDateStr(d)} date={d} onClick={onDayClick} />
             ))}
@@ -266,19 +271,23 @@ export default function WeekView({
           style={{ top: DAY_HEADER_HEIGHT }}
         >
           <div className="flex min-h-7">
-            <div className="w-12 shrink-0 border-r border-slate-100 dark:border-[#303030] bg-white dark:bg-[#0c0c0c] flex items-start justify-center pt-1">
-              <button
-                type="button"
-                onClick={() => setAllDayCollapsed((v) => !v)}
-                className="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
-                aria-label={allDayCollapsed ? "Expand all-day" : "Collapse all-day"}
-              >
-                {allDayCollapsed ? (
-                  <ChevronRight className="w-4 h-4" />
-                ) : (
-                  <ChevronDown className="w-4 h-4" />
-                )}
-              </button>
+            <div className="w-12 shrink-0 bg-white dark:bg-[#0c0c0c] flex items-start justify-center pt-1">
+              {/* Only offer the toggle when some day actually has enough
+                  all-day tasks for collapsing to hide anything. */}
+              {days.some((d) => canCollapseAllDay((byDay.get(toDateStr(d))?.allDay || []).length)) && (
+                <button
+                  type="button"
+                  onClick={() => setAllDayCollapsed((v) => !v)}
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-[#222222] dark:hover:text-slate-200"
+                  aria-label={allDayCollapsed ? "Expand all-day" : "Collapse all-day"}
+                >
+                  {allDayCollapsed ? (
+                    <ChevronRight className="w-4 h-4" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4" />
+                  )}
+                </button>
+              )}
             </div>
             {days.map((d) => {
               const ds = toDateStr(d);
@@ -301,7 +310,7 @@ export default function WeekView({
 
         {/* Timed grid */}
         <div className="flex">
-          <div className="w-12 shrink-0 border-r border-slate-100 dark:border-[#303030] bg-white dark:bg-[#0c0c0c] relative" style={{ height: HOURS.length * HOUR_HEIGHT }}>
+          <div className="w-12 shrink-0 bg-white dark:bg-[#0c0c0c] relative" style={{ height: HOURS.length * HOUR_HEIGHT }}>
             {/* Centred on the hour line rather than sitting under it, and
                 right-aligned so the gap to the grid is identical for
                 "1 AM" and "12 PM". Matches DayView. */}

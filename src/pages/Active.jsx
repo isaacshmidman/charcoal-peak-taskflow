@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { useEffect, useState, useMemo } from "react";
+import { rowKey } from "@/lib/row-key";
 import { apiClient } from "@/api/apiClient";
 import { useQuery } from "@tanstack/react-query";
 import { useOfflineMutation } from "@/hooks/useOfflineMutation";
@@ -255,7 +256,7 @@ export default function Active() {
           <AnimatePresence mode="popLayout">
             {activeTasks.map(task => (
               <TaskCard
-                key={task.id}
+                key={rowKey(task)}
                 task={task}
                 priorities={priorities}
                 subtasks={subtaskMap[task.id] || []}

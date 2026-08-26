@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { useState, useMemo, useEffect, useRef } from "react";
+import { rowKey } from "@/lib/row-key";
 import { apiClient } from "@/api/apiClient";
 import { useQuery } from "@tanstack/react-query";
 import { useOfflineMutation } from "@/hooks/useOfflineMutation";
@@ -88,7 +89,7 @@ function GroupColumn({ title, subtitle, tasks, priorities, priorityOrderMap, onT
           <AnimatePresence mode="popLayout">
             {sorted.map(task => (
               <CompactTaskCard
-                key={task.id}
+                key={rowKey(task)}
                 task={task}
                 priorities={priorities}
                 onToggleDone={onToggleDone}

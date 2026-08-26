@@ -14,6 +14,7 @@
  * on the parent card.
  */
 // React default import is required: vitest's esbuild transform compiles
+import { rowKey } from "@/lib/row-key";
 // JSX in this file to classic React.createElement calls (the app build
 // uses the automatic runtime and doesn't need it).
 import React, { useEffect, useRef, useState } from "react";
@@ -52,7 +53,14 @@ export default function SubtaskList({
   }, [subtasks.length]);
 
   const hasSubtasks = subtasks.length > 0;
-  const showRows = subtasksExpanded && hasSubtasks;
+  // Deliberately NOT `&& hasSubtasks`. Removing the last subtask used to
+  // flip this false, which collapsed the container to grid-rows-[0fr] and
+  // marked it inert WHILE the row was still animating out — so the row's
+  // exit stalled inside a hidden subtree and never unmounted. It was then
+  // still sitting there when undo added the restored row, which is what
+  // made the reappearance judder. The row's own exit drives the removal
+  // now; this only reflects the user's expand/collapse.
+  const showRows = subtasksExpanded;
   const doneSubtasks = subtasks.filter((s) => s.status === "done").length;
   const wasSwipe = () => !!didSwipeRef?.current;
 
@@ -132,16 +140,22 @@ export default function SubtaskList({
                 };
                 return (
                   <motion.div
-                    key={sub.id}
+                    key={rowKey(sub)}
                     // No `layout` — the row's height collapse on exit is
                     // the single source of motion; siblings + the card
-                    // follow via flow. `pb-1.5` carries this row's
-                    // spacing so it collapses together with the row.
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
+                    // follow via flow.
+                    //
+                    // paddingBottom is ANIMATED rather than left to a
+                    // `pb-1.5` class. A class-based padding isn't part of
+                    // the exit, so a removed row collapsed its height to 0
+                    // but kept 6px of padding — leaving a permanent ghost
+                    // gap, and a second visible jump when the row came
+                    // back. Animating it means the row really does reach 0.
+                    initial={{ opacity: 0, height: 0, paddingBottom: 0 }}
+                    animate={{ opacity: 1, height: "auto", paddingBottom: 6 }}
+                    exit={{ opacity: 0, height: 0, paddingBottom: 0 }}
                     transition={{ duration: 0.15, ease: "easeOut" }}
-                    className="flex items-center gap-2 pb-1.5 group/sub cursor-pointer overflow-hidden"
+                    className="flex items-center gap-2 group/sub cursor-pointer overflow-hidden"
                     onClick={() => { if (wasSwipe()) return; onEditSubtask ? onEditSubtask(sub) : onEdit(sub); }}
                   >
                     {onReorderSubtasks && (
