@@ -333,6 +333,7 @@ export default function RecentlyDeleted({ onBack } = {}) {
           {displayedNotes.length > 0 && (
             <div className="space-y-2">
               <h2 className="text-xs font-semibold text-slate-900 dark:text-slate-100">Notes</h2>
+              <div className="grid gap-2 sm:grid-cols-2">
               <AnimatePresence mode="popLayout">
                 {displayedNotes.map(record => (
                   <DeletedNoteCard
@@ -344,6 +345,7 @@ export default function RecentlyDeleted({ onBack } = {}) {
                   />
                 ))}
               </AnimatePresence>
+              </div>
             </div>
           )}
         </>
@@ -380,9 +382,7 @@ const DeletedNoteCard = forwardRef(function DeletedNoteCard(
       <div className={cn("rounded-xl border flex overflow-hidden", cardBg)}>
         <div className="flex-1 min-w-0 px-3 py-2.5">
           <div className="flex items-start gap-2">
-            <div className="shrink-0 w-7 h-7 rounded-md border-2 border-slate-300 dark:border-slate-600 bg-white/80 dark:bg-[#0c0c0c] flex items-center justify-center">
-              <NotebookPen className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
-            </div>
+            <NotebookPen className="shrink-0 w-6 h-6 text-slate-400 dark:text-slate-500" />
 
             <div className="flex-1 min-w-0">
               <p className={cn(

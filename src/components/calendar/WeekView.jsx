@@ -302,10 +302,13 @@ export default function WeekView({
         {/* Timed grid */}
         <div className="flex">
           <div className="w-12 shrink-0 border-r border-slate-100 dark:border-[#303030] bg-white dark:bg-[#0c0c0c] relative" style={{ height: HOURS.length * HOUR_HEIGHT }}>
+            {/* Centred on the hour line rather than sitting under it, and
+                right-aligned so the gap to the grid is identical for
+                "1 AM" and "12 PM". Matches DayView. */}
             {HOURS.map((h) => (
               <div
                 key={h}
-                className="absolute left-0 right-0 text-[10px] text-slate-400 dark:text-slate-500 pl-1"
+                className="absolute left-0 right-0 -translate-y-1/2 pr-2 text-right text-[10px] text-slate-400 dark:text-slate-500"
                 style={{ top: h * HOUR_HEIGHT }}
               >
                 {formatHour(h)}

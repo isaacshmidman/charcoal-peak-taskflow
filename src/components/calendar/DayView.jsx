@@ -310,16 +310,25 @@ export default function DayView({
           />
         )}
         <TimedDropZone dateStr={dateStr}>
+          {/* The vertical rule sits at the gutter's edge, lining up with
+              the one MobileAllDayOverlay already draws beside its expand
+              arrow, so the grid reads as one column either way. */}
+          <div className="absolute left-12 top-0 bottom-0 w-px bg-slate-100 dark:bg-[#303030] pointer-events-none" />
+
           {HOURS.map((h) => (
-            <div
-              key={h}
-              className="absolute left-0 right-0 border-t border-slate-100 dark:border-[#303030] flex"
-              style={{ top: h * HOUR_HEIGHT, height: HOUR_HEIGHT }}
-            >
-              <div className="w-12 shrink-0 text-[10px] text-slate-400 dark:text-slate-500 pt-0.5 pl-1 select-none">
+            <div key={h}>
+              {/* Label centred on the line, right-aligned so the gap to
+                  the grid is the same for "1 AM" and "12 PM". */}
+              <div
+                className="absolute left-0 w-12 -translate-y-1/2 pr-2 text-right text-[10px] text-slate-400 dark:text-slate-500 select-none"
+                style={{ top: h * HOUR_HEIGHT }}
+              >
                 {formatHour(h)}
               </div>
-              <div className="flex-1" />
+              <div
+                className="absolute left-12 right-0 border-t border-slate-100 dark:border-[#303030]"
+                style={{ top: h * HOUR_HEIGHT }}
+              />
             </div>
           ))}
 
@@ -329,6 +338,7 @@ export default function DayView({
               className="absolute left-12 right-1 border-t-2 border-red-500 pointer-events-none z-10"
               style={{ top: (nowMinutes / 60) * HOUR_HEIGHT }}
             >
+              {/* -left-1.5 puts the 12px bulb's centre on the rule at left-12. */}
               <span className="absolute -top-1.5 -left-1.5 w-3 h-3 rounded-full bg-red-500" />
             </div>
           )}
