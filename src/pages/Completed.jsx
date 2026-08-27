@@ -1,6 +1,5 @@
 // @ts-nocheck
 import { useEffect, useMemo, useRef, useState } from "react";
-import { rowKey } from "@/lib/row-key";
 import { AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { Search, Trash2 } from "lucide-react";
@@ -242,7 +241,7 @@ export default function Completed() {
             {completedItems.map((item) => {
               return (
                 <TaskCard
-                  key={rowKey(item)}
+                  key={item.id}
                   task={item.task}
                   priorities={priorities}
                   subtasks={subtaskMap[item.task.id] || []}

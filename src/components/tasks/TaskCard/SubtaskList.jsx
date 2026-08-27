@@ -14,7 +14,6 @@
  * on the parent card.
  */
 // React default import is required: vitest's esbuild transform compiles
-import { rowKey } from "@/lib/row-key";
 // JSX in this file to classic React.createElement calls (the app build
 // uses the automatic runtime and doesn't need it).
 import React, { useEffect, useRef, useState } from "react";
@@ -53,6 +52,17 @@ export default function SubtaskList({
   }, [subtasks.length]);
 
   const hasSubtasks = subtasks.length > 0;
+  // Whether any row is still MOUNTED, which outlasts `hasSubtasks` for as
+  // long as a removed row is animating out. The section collapses on
+  // hasSubtasks (that visual contraction is deliberate), but it must not
+  // go inert/aria-hidden until the exit has finished — hiding the subtree
+  // out from under a row mid-exit is what stranded it there, still
+  // present when undo added the restored row.
+  const [rowsMounted, setRowsMounted] = useState(subtasks.length > 0);
+  useEffect(() => {
+    if (subtasks.length > 0) setRowsMounted(true);
+  }, [subtasks.length]);
+  const rowsPresent = hasSubtasks || rowsMounted;
   // Deliberately NOT `&& hasSubtasks`. Removing the last subtask used to
   // flip this false, which collapsed the container to grid-rows-[0fr] and
   // marked it inert WHILE the row was still animating out — so the row's
@@ -79,8 +89,8 @@ export default function SubtaskList({
         "grid transition-[grid-template-rows] duration-200 ease-out",
         hasSubtasks ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
       )}
-      inert={hasSubtasks ? undefined : ""}
-      aria-hidden={!hasSubtasks}
+      inert={rowsPresent ? undefined : ""}
+      aria-hidden={!rowsPresent}
     >
       <div className="overflow-hidden min-h-0">
         <div className="px-3 pb-2">
@@ -127,7 +137,10 @@ export default function SubtaskList({
                 rows, which would add a SECOND, slightly-out-of-step force
                 on the same sibling. One animation drives everything, so
                 the sibling's rise and the card's contraction stay locked. */}
-            <AnimatePresence initial={false}>
+            <AnimatePresence
+              initial={false}
+              onExitComplete={() => { if (subtasks.length === 0) setRowsMounted(false); }}
+            >
               {subtasks.map((sub, subIdx) => {
                 const subOverdue = sub.due_date && new Date(sub.due_date + "T00:00:00") < new Date(new Date().setHours(0,0,0,0)) && sub.status !== "done";
                 const moveSubtask = (dir) => {
@@ -140,7 +153,7 @@ export default function SubtaskList({
                 };
                 return (
                   <motion.div
-                    key={rowKey(sub)}
+                    key={sub.id}
                     // No `layout` — the row's height collapse on exit is
                     // the single source of motion; siblings + the card
                     // follow via flow.

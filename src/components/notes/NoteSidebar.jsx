@@ -9,7 +9,6 @@
  * nav's, so this pane is only the list.
  */
 import { Trash2 } from "lucide-react";
-import { rowKey } from "@/lib/row-key";
 import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
 import { useSwipeToDelete } from "@/hooks/useSwipeToDelete";
 import { cn } from "@/lib/utils";
@@ -132,7 +131,7 @@ export default function NoteSidebar({
           <ul className="space-y-1.5">
             {notes.map((note) => (
               <NoteRow
-                key={rowKey(note)}
+                key={note.id}
                 note={note}
                 active={note.id === activeId}
                 onSelect={onSelect}
