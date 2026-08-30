@@ -542,6 +542,12 @@ test("editing an existing task still autosaves without pressing anything", async
 
   // No button pressed, yet the edit is already persisted.
   expect((await api.getState()).tasks.find((t) => t.id === "edit-me")?.title).toBe("after");
-  // Edit mode offers no Cancel — the change is already saved, so it would lie.
-  await expect(page.getByTestId("task-form-cancel")).toHaveCount(0);
+
+  // Edit mode has a Cancel too, but it CLOSES rather than reverts — the
+  // fields were already autosaved above, and this pins that difference so
+  // nobody later mistakes it for a discard.
+  await expect(page.getByTestId("task-form-cancel")).toHaveCount(1);
+  await page.getByTestId("task-form-cancel").click();
+  await expect(page.getByTestId("task-form-dialog")).toBeHidden();
+  expect((await api.getState()).tasks.find((t) => t.id === "edit-me")?.title).toBe("after");
 });

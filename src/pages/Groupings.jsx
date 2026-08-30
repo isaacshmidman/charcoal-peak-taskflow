@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { AnimatedSearchInput } from "@/components/ui/animated-search-input";
 import { Plus, Search } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
 import { addDays } from "date-fns/addDays";
 import { format } from "date-fns/format";
 import { isBefore } from "date-fns/isBefore";
@@ -81,9 +82,17 @@ function GroupColumn({ title, subtitle, tasks, priorities, priorityOrderMap, onT
         {subtitle && <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{subtitle}</p>}
         <p className="text-[10px] text-slate-400 dark:text-slate-500">{tasks.length} task{tasks.length !== 1 ? "s" : ""}</p>
       </div>
-      <div className="flex-1 overflow-y-auto p-2 space-y-1.5 max-h-[70vh]">
-        {/* An empty group says nothing — the heading's "0 tasks" already
-            covers it, and a message per empty column was just noise. */}
+      {/* An empty group keeps the height of a two-task one. Without a
+          floor it collapsed to a sliver once the "Clear skies" line was
+          removed, so a board of empty groups looked ragged. */}
+      <div
+        className={cn(
+          "flex-1 overflow-y-auto p-2 space-y-1.5 max-h-[70vh]",
+          // 90px = two 34px cards + the 6px gap between them + the
+          // container's 16px padding, measured against a real column.
+          sorted.length === 0 && "min-h-[5.625rem]"
+        )}
+      >
         {sorted.length === 0 ? null : (
           <AnimatePresence mode="popLayout">
             {sorted.map(task => (

@@ -44,19 +44,33 @@ export function useOfflineMutation() {
   const createTask = async (data) => {
     const optimisticId = createOptimisticId('offline');
     const optimistic = { ...data, id: optimisticId, created_date: new Date().toISOString(), updated_date: new Date().toISOString() };
-    applyToCache((current) => [optimistic, ...current]);
+
+    // Subtask rows live in an <AnimatePresence> keyed by id, so inserting
+    // one under a temporary offline id and then swapping in the real id
+    // RE-KEYS the row: React unmounts it and mounts a different one, and
+    // AnimatePresence plays an exit and a second enter on what is really
+    // one row. That is the double-take when a subtask is added or an undo
+    // restores one. Online, skip the placeholder and insert once, already
+    // carrying its real id — a round-trip is imperceptible next to a
+    // second animation. Offline still needs the optimistic row, and the
+    // placeholder is inserted late if the request turns out to fail.
+    const deferInsert = !!data.parent_id && isOnline();
+    if (!deferInsert) applyToCache((current) => [optimistic, ...current]);
+
     if (isOnline()) {
       try {
         const result = await apiClient.entities.Task.create(data);
-        applyToCache((current) => current.map(t => t.id === optimisticId ? { ...t, id: result.id } : t));
+        if (deferInsert) applyToCache((current) => [result, ...current]);
+        else applyToCache((current) => current.map(t => t.id === optimisticId ? { ...t, id: result.id } : t));
         return result;
       } catch (error) {
         if (isRecoverableConnectionError(error)) {
+          if (deferInsert) applyToCache((current) => [optimistic, ...current]);
           TaskOffline.queueMutation({ type: 'create', data: { ...data, _offlineId: optimisticId } });
           return optimistic;
         }
 
-        applyToCache((current) => current.filter(t => t.id !== optimisticId));
+        if (!deferInsert) applyToCache((current) => current.filter(t => t.id !== optimisticId));
         return optimistic;
       }
     } else {

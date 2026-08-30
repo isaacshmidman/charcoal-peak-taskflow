@@ -61,7 +61,7 @@ function AllDayCell({ dateStr, tasks, priorities, onTaskClick, onToggleDone, col
             e.stopPropagation();
             onExpand?.();
           }}
-          className="h-5 w-full rounded border border-slate-200 dark:border-[#343434] bg-slate-50 dark:bg-[#161616] px-1.5 text-left text-[10px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222222] transition-colors"
+          className="h-5 w-full rounded border border-slate-200 dark:border-[#343434] bg-slate-50 dark:bg-[#161616] truncate px-1.5 text-left text-[10px] font-semibold leading-5 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222222] transition-colors"
           title={`Show ${hiddenCount} more all-day task${hiddenCount === 1 ? "" : "s"}`}
         >
           {hiddenCount} more

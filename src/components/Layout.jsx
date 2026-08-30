@@ -140,8 +140,11 @@ export default function Layout() {
       </header>
 
       {/* Mobile nav — raised from bottom edge for comfortable thumb reach */}
-      <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/90 dark:bg-black backdrop-blur-xl dark:backdrop-blur-none border-t border-slate-100 dark:border-[#303030] px-1 pt-2 pb-5">
-        <div className="flex justify-around">
+      {/* px-5 keeps the row off the screen edges; the items are square
+          tap targets rather than flex-1 cells, so six of them read as a
+          tidy row instead of six wide bars butted together. */}
+      <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/90 dark:bg-black backdrop-blur-xl dark:backdrop-blur-none border-t border-slate-100 dark:border-[#303030] px-5 pt-2 pb-5">
+        <div className="flex items-center justify-between">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path;
             return (
@@ -154,7 +157,10 @@ export default function Layout() {
                 // page you're on returns to that page's top level.
                 onClick={() => window.dispatchEvent(new Event(`navClicked:${item.path}`))}
                 className={cn(
-                  "flex items-center justify-center py-2 rounded-lg transition-all touch-manipulation flex-1",
+                  // h-11/w-11 = a 44px tap target, the accessible minimum,
+                  // and it keeps the active pill square around the icon
+                  // instead of stretching the full width of a cell.
+                  "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-all touch-manipulation",
                   isActive ? "text-slate-900 dark:text-slate-100 bg-slate-100/80 dark:bg-[#161616]" : "text-slate-400 dark:text-slate-500"
                 )}
               >

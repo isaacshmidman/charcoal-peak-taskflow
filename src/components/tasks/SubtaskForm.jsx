@@ -209,14 +209,13 @@ export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubm
                 </Button>
               )}
             </div>
-            {/* Editing autosaves; creating writes only on the button, which
-                is why Cancel appears in create mode only. */}
+            {/* Cancel in both modes, matching TaskForm. Creating, nothing
+                has been written yet so it discards; editing, autosave has
+                already persisted the fields, so it just closes. */}
             <div className="flex items-center gap-2">
-              {!isEditMode && (
-                <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} data-testid="subtask-form-cancel">
-                  Cancel
-                </Button>
-              )}
+              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} data-testid="subtask-form-cancel">
+                Cancel
+              </Button>
               <Button type="button" disabled={!isValid} onClick={commitAndClose} className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200">
                 {isEditMode ? "Save Changes" : "Create Subtask"}
               </Button>

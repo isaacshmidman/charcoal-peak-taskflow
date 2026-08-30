@@ -200,24 +200,26 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
   const commitAndClose = async () => {
     const { data, subtaskTitles } = buildData(form);
     const filesToFlush = pendingFiles;
+    if (!isEditMode && !canSubmit) return;
+
+    // Close FIRST. Everything below is a write that doesn't need the
+    // dialog open, and awaiting it here is exactly what kept the form
+    // sitting there after Save Changes while the pending chips cleared
+    // and each created subtask appeared behind it, one at a time.
+    // Pending titles aren't cleared either — the form is gone, and the
+    // reset effect empties them on the next open.
+    onOpenChange(false);
+
     if (isEditMode) {
       if (canSubmit) await flush();
       if (savedIdRef.current && subtaskTitles.length) {
-        // Drop the pending titles BEFORE awaiting the create. The moment
-        // the subtasks exist they arrive back through existingSubtasks,
-        // and if the pending chips were still in form state the same
-        // subtask would be drawn twice for the width of that await.
-        setForm((f) => ({ ...f, subtask_titles: [] }));
         const res = await onSubmit(data, subtaskTitles, savedIdRef.current);
         if (res?.id) savedIdRef.current = res.id;
       }
     } else {
-      if (!canSubmit) return;
-      if (subtaskTitles.length) setForm((f) => ({ ...f, subtask_titles: [] }));
       const res = await onSubmit(data, subtaskTitles, null);
       if (res?.id) savedIdRef.current = res.id;
     }
-    onOpenChange(false);
     if (!task && filesToFlush.length && savedIdRef.current) {
       try {
         await flushPendingUploads(savedIdRef.current, filesToFlush);
@@ -361,23 +363,23 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
               )}
             </div>
             <div className="flex items-center gap-2">
-              {/* Editing autosaves, so its button just flushes + closes.
-                  Creating writes nothing until pressed, which is why create
-                  mode — and only create mode — offers a real Cancel. */}
+              {/* Cancel sits left of the confirm in both modes. Note it
+                  means different things: creating, nothing has been written
+                  yet so it truly discards; editing, autosave has already
+                  persisted the fields, so it just closes without committing
+                  pending subtask titles. */}
               {isReadOnly ? (
                 <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Close</Button>
               ) : (
                 <>
-                {!isEditMode && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => onOpenChange(false)}
-                    data-testid="task-form-cancel"
-                  >
-                    Cancel
-                  </Button>
-                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => onOpenChange(false)}
+                  data-testid="task-form-cancel"
+                >
+                  Cancel
+                </Button>
                 <Button
                   type="button"
                   disabled={!canSubmit}

@@ -101,7 +101,7 @@ function AllDayOverlayCell({ dateStr, allDayTasks, priorities, onTaskClick, onTo
             e.stopPropagation();
             onExpand?.();
           }}
-          className="h-5 w-full rounded border border-slate-200 dark:border-[#343434] bg-slate-50 dark:bg-[#161616] px-1.5 text-left text-[10px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222222] transition-colors"
+          className="h-5 w-full rounded border border-slate-200 dark:border-[#343434] bg-slate-50 dark:bg-[#161616] truncate px-1.5 text-left text-[10px] font-semibold leading-5 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222222] transition-colors"
           title={`Show ${hiddenCount} more all-day task${hiddenCount === 1 ? "" : "s"}`}
         >
           {hiddenCount} more
@@ -134,7 +134,10 @@ function MobileAllDayOverlay({
   return (
     <div className="sticky top-0 z-30 bg-white dark:bg-[#0c0c0c] border-b border-slate-100 dark:border-[#303030]">
       <div className="flex" style={{ height }}>
-        <div className="w-12 shrink-0 border-r border-slate-100 dark:border-[#303030] bg-white dark:bg-[#0c0c0c] flex items-start justify-center pt-1">
+        {/* No border-r: the cell beside it already draws a border-l, and
+            the two together rendered this rule 2px thick — a pixel heavier
+            than the week tab's. */}
+        <div className="w-12 shrink-0 bg-white dark:bg-[#0c0c0c] flex items-start justify-center pt-1">
           {/* Only offer the toggle when collapsing actually hides
               something — an arrow that expands nothing is a dead control. */}
           {collapsible && (
