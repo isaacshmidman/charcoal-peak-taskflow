@@ -225,3 +225,109 @@ describe("highlights are never the reserved yellow", () => {
     expect(html).toContain('data-color="#bbf7d0"');
   });
 });
+
+describe("links", () => {
+  /** Every link mark in the doc as { text, href }. */
+  const links = () => {
+    const found = [];
+    editor.state.doc.descendants((node) => {
+      const mark = node.marks?.find((m) => m.type.name === "link");
+      if (node.isText && mark) found.push({ text: node.text, href: mark.attrs.href });
+    });
+    return found;
+  };
+
+  it("turns a typed address into a link when you finish it", () => {
+    typeAll("join https://zoom.us/j/123 ");
+    expect(links()).toEqual([{ text: "https://zoom.us/j/123", href: "https://zoom.us/j/123" }]);
+  });
+
+  it("links a bare domain with a path as https", () => {
+    typeAll("see zoom.us/j/9 ");
+    expect(links()[0]?.href).toBe("https://zoom.us/j/9");
+  });
+
+  it("leaves file names alone, even when the extension is a real domain", () => {
+    typeAll("edit notes.md and setup.sh then play clip.mov ");
+    expect(links()).toEqual([]);
+  });
+
+  it("keeps links in pasted or imported HTML, and drops every unsafe one", () => {
+    editor.commands.setContent(
+      '<p><a href="https://meet.google.com/abc">Join</a> ' +
+        '<a href="javascript:alert(1)">bad</a> ' +
+        '<a href="data:text/html,x">data</a> ' +
+        '<a href="/Today">relative</a></p>'
+    );
+    expect(links()).toEqual([{ text: "Join", href: "https://meet.google.com/abc" }]);
+    // The unsafe ones stay as plain words, not lost.
+    expect(editor.getText()).toBe("Join bad data relative");
+  });
+
+  it("renders every link to open safely in a new tab, ignoring pasted target/rel/class", () => {
+    editor.commands.setContent(
+      '<p><a href="https://example.com" target="_self" rel="opener" class="task-link-open">x</a></p>'
+    );
+    const html = editor.getHTML();
+    expect(html).toContain('href="https://example.com/"');
+    expect(html).toContain('target="_blank"');
+    expect(html).toContain('rel="noopener noreferrer nofollow"');
+    // class="task-link-open" would fake the reserved task-link yellow.
+    expect(html).not.toContain("task-link-open");
+    expect(html).not.toContain("_self");
+  });
+
+  it("never draws an unsafe href from a stored document", () => {
+    // A hand-crafted document, as if saved straight to the API.
+    editor.commands.setContent({
+      type: "doc",
+      content: [{
+        type: "paragraph",
+        content: [{ type: "text", text: "click", marks: [{ type: "link", attrs: { href: "javascript:alert(1)" } }] }],
+      }],
+    });
+    expect(editor.getHTML()).not.toContain("javascript");
+    expect(editor.view.dom.querySelector("a")?.hasAttribute("href")).toBe(false);
+  });
+
+  it("links plain addresses already in the text when the editor opens — but not look-alike words", async () => {
+    const { linkifyExistingUrls, LINKIFY_ON_LOAD } = await import("./extensions");
+    // Content given at creation, the way hosts hydrate — no transaction,
+    // so autolink-as-you-type never sees it; only the load pass can.
+    editor.destroy();
+    const element = document.createElement("div");
+    document.body.appendChild(element);
+    editor = new Editor({
+      element,
+      extensions: buildEditorExtensions(),
+      content:
+        "<p>Call: https://zoom.us/j/5 or www.example.com, mail me@example.com. See notes.md</p>" +
+        "<pre><code>curl https://api.example.com</code></pre>",
+    });
+    let meta = null;
+    editor.on("transaction", ({ transaction }) => { meta = meta ?? transaction.getMeta(LINKIFY_ON_LOAD); });
+    // (A trailing code block makes TipTap append an undoable empty
+    // paragraph at load; linkify must add nothing on top of that.)
+    const undoBefore = editor.can().undo();
+    linkifyExistingUrls(editor);
+
+    expect(links().map((l) => l.href)).toEqual([
+      "https://zoom.us/j/5",
+      "https://www.example.com/",
+      "mailto:me@example.com",
+    ]);
+    // Tagged so hosts don't autosave it, and kept out of undo.
+    expect(meta).toBe(true);
+    expect(editor.can().undo()).toBe(undoBefore);
+    editor.commands.undo();
+    expect(links()).toHaveLength(3);
+  });
+
+  it("opens the link editor from ⌘K", () => {
+    editor.commands.setContent("<p>text</p>");
+    editor.commands.selectAll();
+    expect(editor.storage.link.editorOpen).toBe(false);
+    editor.commands.openLinkEditor();
+    expect(editor.storage.link.editorOpen).toBe(true);
+  });
+});

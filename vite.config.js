@@ -76,6 +76,10 @@ export default defineConfig(({ mode }) => {
             dnd: ["@dnd-kit/core"],
             "date-picker": ["react-day-picker", "date-fns"],
             icons: ["lucide-react"],
+            // URL detection for editor links. Only the lazy editor imports
+            // it, so it loads with the editor — split out just to keep that
+            // chunk under the 500 kB warning.
+            linkify: ["linkifyjs"],
           },
         },
       },

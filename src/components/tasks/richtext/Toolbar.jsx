@@ -29,9 +29,11 @@ import {
   Redo2,
   Heading,
   RemoveFormatting,
+  Link2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useOutsideClick } from "@/hooks/useOutsideClick";
+import { isMacLike } from "@/lib/shortcuts";
 
 // 10 readable text colors (Tailwind ~500). "Default" clears the mark.
 const TEXT_COLORS = [
@@ -322,6 +324,15 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
       </TBtn>
       <TBtn title="Strikethrough" active={editor.isActive("strike")} onAction={() => apply(() => editor.chain().focus().toggleStrike().run())}>
         <Strikethrough className="w-4 h-4" />
+      </TBtn>
+      {/* Opens the link bar's editor at the selection (LinkBubble.jsx). */}
+      <TBtn
+        title={`Link (${isMacLike() ? "⌘" : "Ctrl"}K)`}
+        testid="richtext-link"
+        active={editor.isActive("link")}
+        onAction={() => editor.commands.openLinkEditor()}
+      >
+        <Link2 className="w-4 h-4" />
       </TBtn>
 
       <span className="w-px h-5 bg-slate-200 dark:bg-[#303030] mx-0.5 shrink-0" />

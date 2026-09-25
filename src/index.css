@@ -307,7 +307,20 @@
 .dark .tiptap-prose hr {
   border-top-color: #303030;
 }
-.tiptap-prose a { color: inherit; text-decoration: underline; }
+/* Links look like links. Editing, a click only moves the caret (the link
+   bar under it has Open); read-only, a click follows it, so show a hand. */
+.tiptap-prose a {
+  color: theme("colors.blue.600");
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: text;
+}
+.dark .tiptap-prose a {
+  color: theme("colors.blue.400");
+}
+.tiptap-prose[contenteditable="false"] a[href] {
+  cursor: pointer;
+}
 
 /* ── Note ↔ task links ────────────────────────────────────────────
    The mark itself paints NOTHING. Everything visible here comes from

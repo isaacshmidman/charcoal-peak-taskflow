@@ -20,7 +20,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { initialContentFrom, normalizeOutput, WORD_LIMIT } from "./richtext/content";
 import Toolbar from "./richtext/Toolbar";
-import { buildEditorExtensions } from "./richtext/extensions";
+import { buildEditorExtensions, LINKIFY_ON_LOAD, linkifyExistingUrls } from "./richtext/extensions";
+import LinkBubble from "./richtext/LinkBubble";
 import { taskLinkStateKey } from "./richtext/taskLink";
 import { looksLikeMarkdown } from "./richtext/pasteMarkdown";
 // Static, but this whole module is lazy-loaded at both call sites, so
@@ -77,6 +78,9 @@ export default function RichDescriptionEditor({
   onFocusChangeRef.current = onFocusChange;
   const [focused, setFocused] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  // Typing a link address moves focus into the link bar's input; that
+  // isn't leaving the editor, so the toolbar must not drop away.
+  const linkEditingRef = useRef(false);
 
   const editor = useEditor({
     editable: !disabled,
@@ -137,7 +141,13 @@ export default function RichDescriptionEditor({
         }
       },
     },
-    onUpdate({ editor }) {
+    // Plain URLs already in the text become links as it opens. That's
+    // not an edit, so it's kept out of onChange (no autosave on open).
+    onCreate({ editor }) {
+      linkifyExistingUrls(editor);
+    },
+    onUpdate({ editor, transaction }) {
+      if (transaction?.getMeta(LINKIFY_ON_LOAD)) return;
       onChange?.(normalizeOutput({
         isEmpty: editor.isEmpty,
         json: editor.getJSON(),
@@ -148,7 +158,11 @@ export default function RichDescriptionEditor({
     onBlur() {
       // Defer so opening a picker (which momentarily blurs) doesn't flash
       // the toolbar closed; the picker sets pickerOpen synchronously.
-      setTimeout(() => { setFocused(false); onFocusChangeRef.current?.(false); }, 0);
+      setTimeout(() => {
+        if (linkEditingRef.current) return;
+        setFocused(false);
+        onFocusChangeRef.current?.(false);
+      }, 0);
     },
   });
 
@@ -202,6 +216,18 @@ export default function RichDescriptionEditor({
       }}
     >
       <EditorContent editor={editor} />
+      {editor && (
+        <LinkBubble
+          editor={editor}
+          onEditingChange={(editing) => {
+            linkEditingRef.current = editing;
+            if (editing) {
+              setFocused(true);
+              onFocusChangeRef.current?.(true);
+            }
+          }}
+        />
+      )}
       {showToolbar && (
         <div
           data-richtext-toolbar

@@ -92,6 +92,7 @@ export default function ShortcutsHelp({ open, onOpenChange }) {
             <Row keys={[`${mod} ⇧ S`]} label="Strikethrough" />
             <Row keys={[`${mod} ⇧ H`]} label="Highlight" />
             <Row keys={[`${mod} E`]} label="Inline code" />
+            <Row keys={[`${mod} K`]} label="Add or edit a link" />
             <Row keys={[`${mod} ${alt} 1`]} label="Heading (2 and 3 for smaller)" />
             <Row keys={[`${mod} ⇧ B`]} label="Quote" />
             <Row keys={[`${mod} ${alt} C`]} label="Code block" />
