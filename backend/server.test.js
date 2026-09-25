@@ -4,12 +4,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { closeDatabase, createDatabase } from "./db.js";
+import { readZip } from "./test-support/readZip.js";
 import { createRequestHandler } from "./server.js";
 
 let tempDir = "";
 let db;
 let handler;
+/** @type {any} */
+let config;
 
 function createMockRequest({ method = "GET", url = "/", headers = {}, body }) {
   const payload = body == null ? [] : [Buffer.from(typeof body === "string" ? body : JSON.stringify(body))];
@@ -30,6 +34,8 @@ function createMockResponse() {
   let statusCode = 200;
   let body = "";
   let ended = false;
+  /** @type {Buffer[]} */
+  const chunks = [];
 
   let resolveDone;
   const done = new Promise((resolve) => {
@@ -44,11 +50,31 @@ function createMockResponse() {
       statusCode = code;
       Object.assign(headers, head);
     },
+    // Streaming responses (the export ZIP) write chunks before end().
+    write(chunk) {
+      chunks.push(Buffer.from(chunk));
+      return true;
+    },
+    on() {},
+    once() {},
+    destroyed: false,
+    get writableEnded() {
+      return ended;
+    },
+    destroy(error) {
+      ended = true;
+      this.destroyed = true;
+      resolveDone(error);
+    },
     end(chunk = "") {
       if (ended) return;
       ended = true;
       body += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8");
       resolveDone();
+    },
+    async asBuffer() {
+      await done;
+      return { statusCode, headers, body: Buffer.concat(chunks) };
     },
     async asJson() {
       await done;
@@ -59,6 +85,13 @@ function createMockResponse() {
       };
     },
   };
+}
+
+async function invokeRaw(path, init = {}) {
+  const request = createMockRequest({ method: init.method || "GET", url: path, headers: init.headers || {}, body: undefined });
+  const response = createMockResponse();
+  await handler(request, response);
+  return response.asBuffer();
 }
 
 async function invoke(path, init = {}) {
@@ -92,7 +125,7 @@ async function login(email) {
 
 beforeAll(() => {
   tempDir = mkdtempSync(join(tmpdir(), "taskflow-backend-"));
-  const config = {
+  config = {
     host: "127.0.0.1",
     port: 0,
     appId: "test-app",
@@ -554,3 +587,107 @@ describe("CORS", () => {
     expect(other.headers.Vary).toBe("Origin");
   });
 });
+
+describe("data export", () => {
+  it("downloads everything a user has as a valid ZIP — and nothing of anyone else's, and no secrets", async () => {
+    const owner = await login("exporter@example.com");
+    const other = await login("someone-else@example.com");
+    const headers = { Authorization: `Bearer ${owner}`, "Content-Type": "application/json" };
+    const me = (await invoke("/api/apps/test-app/entities/User/me", { headers })).body;
+
+    const post = async (entity, body, token = owner) =>
+      (await invoke(`/api/apps/test-app/entities/${entity}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body,
+      })).body;
+
+    const trip = await post("Task", {
+      title: 'Trip, "big" one',
+      description: '=HYPERLINK("http://evil.example","click")',
+      due_date: "2026-10-01",
+      tags: ["travel", "family"],
+    });
+    await post("Task", { title: "Pack bags", parent_id: trip.id, due_date: "2026-09-30" });
+    await post("Note", { title: "Plans/2026", content_text: "Line one\nLine two" });
+    await post("DeletedNote", { note_id: "note_old", title: "Old idea", content_text: "gone" });
+    await post("Task", { title: "Not yours", due_date: "2026-10-01" }, other);
+
+    // A connected calendar, with credentials that must never leave the server.
+    const now = new Date().toISOString();
+    db.prepare(
+      `INSERT INTO calendar_integrations (id, app_id, user_id, provider, external_account_id, external_account_email,
+         access_token_enc, refresh_token_enc, scopes, status, is_default, created_date, updated_date)
+       VALUES ('int_1', 'test-app', ?, 'google', 'sub-1', 'exporter@gmail.com', 'SECRET-ACCESS', 'SECRET-REFRESH', '', 'active', 1, ?, ?)`
+    ).run(me.id, now, now);
+    db.prepare(
+      `INSERT INTO integration_calendars (id, app_id, integration_id, external_calendar_id, summary, item_kind, sync_enabled, created_date, updated_date)
+       VALUES ('cal_1', 'test-app', 'int_1', 'primary', 'Work', 'task', 1, ?, ?)`
+    ).run(now, now);
+
+    // One attachment on disk, one whose file has gone missing.
+    const rel = `test-app/${me.id}/${trip.id}/att_1_boarding.pdf`;
+    const pdf = Buffer.from("%PDF-1.4 boarding pass");
+    mkdirSync(join(tempDir, "attachments", "test-app", me.id, trip.id), { recursive: true });
+    writeFileSync(join(tempDir, "attachments", rel), pdf);
+    const insertAttachment = db.prepare(
+      `INSERT INTO task_attachments (id, app_id, user_id, task_id, filename, mime_type, size_bytes, storage_path, is_image, created_date)
+       VALUES (?, 'test-app', ?, ?, ?, 'application/pdf', ?, ?, 0, ?)`
+    );
+    insertAttachment.run("att_1", me.id, trip.id, "Boarding.PDF", pdf.length, rel, now);
+    insertAttachment.run("att_2", me.id, trip.id, "lost.pdf", 10, `test-app/${me.id}/${trip.id}/att_2_lost.pdf`, now);
+
+    const result = await invokeRaw("/api/apps/test-app/export", { headers: { Authorization: `Bearer ${owner}` } });
+    expect(result.statusCode).toBe(200);
+    expect(result.headers["Content-Type"]).toBe("application/zip");
+    expect(Number(result.headers["Content-Length"])).toBe(result.body.length);
+    const fileName = /filename="(zephyrly-export-\d{4}-\d{2}-\d{2})\.zip"/.exec(String(result.headers["Content-Disposition"]))?.[1];
+    expect(fileName).toBeTruthy();
+
+    const files = readZip(result.body);
+    const at = (path) => files.get(`${fileName}/${path}`);
+    expect(at("README.txt")?.toString()).toContain("Never included: passwords");
+
+    const data = JSON.parse(at("data.json").toString());
+    expect(data.format).toBe("zephyrly-export");
+    expect(data.account.email).toBe("exporter@example.com");
+    expect(data.tasks.map((t) => t.title).sort()).toEqual(["Pack bags", 'Trip, "big" one']);
+    expect(data.notes.map((n) => n.title)).toEqual(["Plans/2026"]);
+    expect(data.recently_deleted.notes.map((n) => n.title)).toEqual(["Old idea"]);
+    expect(data.priorities.length).toBeGreaterThan(0);
+    expect(data.calendar_connections).toEqual([
+      expect.objectContaining({
+        provider: "google",
+        account_email: "exporter@gmail.com",
+        calendars: [expect.objectContaining({ name: "Work", holds: "tasks", synced: true })],
+      }),
+    ]);
+    expect(data.attachments.find((a) => a.id === "att_2").file).toBeNull();
+
+    // Nothing of the other account, and no credential anywhere in the archive.
+    const everything = [...files.values()].map((b) => b.toString()).join("\n");
+    expect(everything).not.toContain("Not yours");
+    expect(everything).not.toContain("SECRET-ACCESS");
+    expect(everything).not.toContain("SECRET-REFRESH");
+
+    // The real file, under a folder named after its task (quotes stripped).
+    expect(at("attachments/Trip, big one/Boarding.pdf")?.equals(pdf)).toBe(true);
+
+    // Notes as Markdown, with a filename that can't escape its folder.
+    expect(at("notes/Plans 2026.md")?.toString()).toBe("# Plans/2026\n\nLine one\nLine two\n");
+
+    // CSV: quoted properly, with the planted formula defused.
+    const csv = at("tasks.csv").toString();
+    expect(csv.startsWith("\ufeffTitle,Description")).toBe(true);
+    expect(csv).toContain('"Trip, ""big"" one"');
+    expect(csv).toContain(`"'=HYPERLINK(""http://evil.example"",""click"")"`);
+    expect(csv).toContain("travel; family");
+    expect(csv).toContain('Pack bags,,todo,2026-09-30');
+  });
+
+  it("requires sign-in", async () => {
+    const result = await invokeRaw("/api/apps/test-app/export");
+    expect(result.statusCode).toBe(401);
+  });
+});
+

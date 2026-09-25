@@ -22,6 +22,7 @@
  *   - "advancedNotifications" → AdvancedNotificationSettings; back
  *                                arrow returns to "notifications" (not
  *                                main) so the back-stack feels natural
+ *   - "export"                → ExportSection (download a ZIP of it all)
  *   - "recentlyDeleted"       → RecentlyDeleted (renders its own
  *                                chrome; we just route to it)
  *
@@ -36,6 +37,7 @@ import {
   CheckSquare,
   ChevronLeft,
   ChevronRight,
+  Download,
   FolderOpen,
   LogOut,
   Palette,
@@ -60,6 +62,7 @@ import NotificationsPanel from "@/components/settings/NotificationsPanel";
 import AdvancedNotificationSettings from "@/components/settings/AdvancedNotificationSettings";
 import StorageSection from "@/components/settings/StorageSection";
 import FilesSection from "@/components/settings/FilesSection";
+import ExportSection from "@/components/settings/ExportSection";
 import AppearanceSection from "@/components/settings/AppearanceSection";
 import DefaultsSection from "@/components/settings/DefaultsSection";
 import PrioritiesSection from "@/components/settings/PrioritiesSection";
@@ -128,7 +131,7 @@ function SettingsCard({ icon: Icon, label, subtitle, onClick, iconClassName }) {
 // ── Page ────────────────────────────────────────────────────────
 
 export default function Settings() {
-  /** @type {[null | "appearance" | "tasks" | "calendars" | "notifications" | "advancedNotifications" | "files" | "recentlyDeleted", any]} */
+  /** @type {[null | "appearance" | "tasks" | "calendars" | "notifications" | "advancedNotifications" | "files" | "export" | "recentlyDeleted", any]} */
   const [activeSection, setActiveSection] = useState(null);
   const scrollPosRef = useRef(0);
   const pendingScrollRestoreRef = useRef(null);
@@ -242,6 +245,14 @@ export default function Settings() {
     );
   }
 
+  if (activeSection === "export") {
+    return (
+      <SubPage title="Export your data" onBack={returnToMain}>
+        <ExportSection />
+      </SubPage>
+    );
+  }
+
   if (activeSection === "recentlyDeleted") {
     return (
       <RecentlyDeleted onBack={returnToMain} />
@@ -318,6 +329,12 @@ export default function Settings() {
           label="Files"
           subtitle="Search attachments and check storage"
           onClick={() => openSection("files")}
+        />
+        <SettingsCard
+          icon={Download}
+          label="Export your data"
+          subtitle="Download everything as a .zip"
+          onClick={() => openSection("export")}
         />
         <SettingsCard
           icon={Trash2}

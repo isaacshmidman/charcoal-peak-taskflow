@@ -7,9 +7,17 @@ declare const process: {
 
 declare class Buffer extends Uint8Array {
   static from(value: string | ArrayBuffer | ArrayBufferView, encoding?: string): Buffer;
+  static alloc(size: number): Buffer;
   static concat(chunks: Uint8Array[]): Buffer;
   static isBuffer(value: unknown): value is Buffer;
   toString(encoding?: string): string;
+  writeUInt16LE(value: number, offset: number): number;
+  writeUInt32LE(value: number, offset: number): number;
+  readUInt16LE(offset: number): number;
+  readUInt32LE(offset: number): number;
+  copy(target: Uint8Array, targetStart?: number): number;
+  equals(other: Uint8Array): boolean;
+  subarray(start?: number, end?: number): Buffer;
 }
 
 declare namespace NodeJS {
@@ -50,6 +58,12 @@ declare module "node:fs" {
   export function statSync(...args: any[]): any;
 }
 
+declare module "node:zlib" {
+  export function crc32(data: string | Uint8Array, value?: number): number;
+  export function deflateRawSync(data: Uint8Array, options?: any): Buffer;
+  export function inflateRawSync(data: Uint8Array, options?: any): Buffer;
+}
+
 declare module "node:http" {
   export interface IncomingMessage {
     method?: string;
@@ -63,7 +77,13 @@ declare module "node:http" {
     statusCode: number;
     setHeader(name: string, value: string | number | readonly string[]): void;
     writeHead(statusCode: number, headers?: Record<string, string>): void;
+    write(chunk: any): boolean;
     end(chunk?: any): void;
+    on(event: string, listener: (...args: any[]) => void): void;
+    once(event: string, listener: (...args: any[]) => void): void;
+    destroy(error?: Error): void;
+    readonly destroyed: boolean;
+    readonly writableEnded: boolean;
   }
   const http: any;
   export default http;

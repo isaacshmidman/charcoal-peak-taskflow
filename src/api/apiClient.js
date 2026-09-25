@@ -659,4 +659,16 @@ const liveApiClient = {
 };
 
 /** @type {ApiClient} */
+/**
+ * Same-origin URL of the "Export your data" ZIP. Used as a plain link
+ * href, like attachment downloads: the browser sends the session cookie
+ * and saves the file itself, streaming it rather than holding up to a
+ * gigabyte in page memory.
+ *
+ * @returns {string}
+ */
+export function exportDownloadUrl() {
+  return buildApiUrl(`/apps/${appConfig.appId}/export`);
+}
+
 export const apiClient = createE2EApiClient() || liveApiClient;

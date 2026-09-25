@@ -163,7 +163,7 @@ async function maybeGenerateThumbnail(buffer, mimeType) {
  * Both live on the same mounted volume in production.
  * @param {{ dbFile: string }} config
  */
-function attachmentsRoot(config) {
+export function attachmentsRoot(config) {
   return resolve(dirname(config.dbFile), "attachments");
 }
 
