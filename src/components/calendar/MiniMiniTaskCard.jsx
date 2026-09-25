@@ -4,6 +4,7 @@ import { CheckSquare, CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { colorBg, isDarkColor, mixHexColor } from "@/lib/colors";
 import { useTheme } from "@/lib/ThemeProvider";
+import { isReadOnlyTask } from "@/lib/task-filters";
 
 /** @typedef {import("@/types/tasks").TaskRecord & { source_kind?: string | null, source_color_hex?: string | null }} TaskRecord */
 /** @typedef {import("@/types/tasks").PriorityOption} PriorityOption */
@@ -39,9 +40,13 @@ export default function MiniMiniTaskCard({ task, priorities, onClick, onToggleDo
   useEffect(() => { setOptimisticDone(false); }, [task.id, task.status]);
   const isDone = task.status === "done" || optimisticDone;
 
+  // Read-only calendar items can be opened (view-only) but not dragged:
+  // a drop would move Zephyrly's copy while the real event stays put.
+  const readOnly = isReadOnlyTask(task);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `task-${task.id}`,
     data: { taskId: task.id, task },
+    disabled: readOnly,
   });
 
   const dark = sourceHex ? false : isDarkColor(colorKey);

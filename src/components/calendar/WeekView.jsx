@@ -76,7 +76,7 @@ function AllDayCell({ dateStr, tasks, priorities, onTaskClick, onToggleDone, col
   );
 }
 
-function TimedColumn({ date, timedTasks, priorities, onTaskClick, onToggleDone, onCreate }) {
+function TimedColumn({ date, timedTasks, priorities, onTaskClick, onToggleDone, onCreate, dropPreview }) {
   const dateStr = toDateStr(date);
   const slot = useEmptySlotClick({ onCreate, hourHeight: HOUR_HEIGHT });
   const { setNodeRef, isOver } = useDroppable({
@@ -110,6 +110,9 @@ function TimedColumn({ date, timedTasks, priorities, onTaskClick, onToggleDone, 
       ))}
 
       <SlotGhost minutes={slot.hoverMinutes} hourHeight={HOUR_HEIGHT} />
+      {dropPreview?.dateStr === dateStr && (
+        <SlotGhost variant="drop" minutes={dropPreview.start} endMinutes={dropPreview.end} hourHeight={HOUR_HEIGHT} />
+      )}
 
       {nowMinutes != null && (
         <div
@@ -190,6 +193,8 @@ export default function WeekView({
   onDayClick,
   // (dateStr, minutesAfterMidnight | null) — see DayView.
   onCreateAt,
+  // { dateStr, start, end } while a task is dragged over a timed column.
+  dropPreview,
 }) {
   const scrollRef = useRef(null);
   const weekStart = useMemo(
@@ -348,6 +353,7 @@ export default function WeekView({
                 onTaskClick={onTaskClick}
                 onToggleDone={onToggleDone}
                 onCreate={onCreateAt ? (minutes) => onCreateAt(toDateStr(d), minutes) : undefined}
+                dropPreview={dropPreview}
               />
             );
           })}

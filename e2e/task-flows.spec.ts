@@ -581,3 +581,47 @@ test("clicking empty calendar time opens a new task there; the all-day strip mak
   const allDay = (await api.getState()).tasks.find((t) => t.title === "Pay rent");
   expect(allDay).toMatchObject({ due_date: today, task_time: "" });
 });
+
+test("dragging a task in week view reschedules it, showing the time it will land at; read-only events don't move", async ({ page }) => {
+  const today = formatDateOffset(0);
+  // A neighbouring day in the same Sunday-start week.
+  const neighbour = formatDateOffset(new Date().getDay() === 0 ? 1 : -1);
+  const api = await installMockBackend(page, {
+    tasks: [
+      recurringTask({ id: "drag-me", title: "Drag me", task_type: "one_time", recurrence: "none", due_date: today, task_time: "9:00AM", task_end_time: "10:30AM" }),
+      recurringTask({ id: "holiday", title: "Holiday", task_type: "one_time", recurrence: "none", due_date: today, task_time: "",
+        source_provider: "google", source_kind: "event", source_writable: false, source_calendar_name: "Holidays" }),
+    ],
+    priorities: [defaultPriority],
+  });
+  await page.addInitScript(() => window.localStorage.setItem("defaultCalendarView", "week"));
+  await page.goto("/Calendar");
+
+  const column = page.getByTestId(`calendar-timed-${today}`);
+  await expect(column).toBeVisible();
+  await column.evaluate((el) => { el.closest(".overflow-auto")!.scrollTop = 8 * 44; });
+
+  const card = page.locator('[title="Drag me"]');
+  const cardBox = (await card.boundingBox())!;
+  const colBox = (await column.boundingBox())!;
+  // Grab near the card's top and move that point to just past 2 PM.
+  await page.mouse.move(cardBox.x + cardBox.width / 2, cardBox.y + 6);
+  await page.mouse.down();
+  await page.mouse.move(colBox.x + colBox.width / 2, colBox.y + 14 * 44 + 6 + 4, { steps: 12 });
+  await expect(page.getByTestId("calendar-drop-time")).toHaveText("2 PM – 3:30 PM");
+  await page.mouse.up();
+
+  await expect.poll(async () => (await api.getState()).tasks.find((t) => t.id === "drag-me"))
+    .toMatchObject({ due_date: today, task_time: "2:00PM", task_end_time: "3:30PM" });
+
+  // The read-only holiday can't be picked up and moved to another day.
+  const holiday = page.locator('[title="Holiday"]');
+  const holidayBox = (await holiday.boundingBox())!;
+  const neighbourBox = (await page.getByTestId(`calendar-allday-${neighbour}`).boundingBox())!;
+  await page.mouse.move(holidayBox.x + holidayBox.width / 2, holidayBox.y + holidayBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(neighbourBox.x + neighbourBox.width / 2, neighbourBox.y + 8, { steps: 10 });
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  expect((await api.getState()).tasks.find((t) => t.id === "holiday")?.due_date).toBe(today);
+});

@@ -62,6 +62,15 @@ export function slotLabel(minutes) {
   return `${hour}${m ? `:${String(m).padStart(2, "0")}` : ""} ${h24 < 12 ? "AM" : "PM"}`;
 }
 
+/**
+ * A time range for people, e.g. "2 PM – 3:30 PM".
+ * @param {number} start
+ * @param {number} end
+ */
+export function timeRangeLabel(start, end) {
+  return `${slotLabel(start)} – ${slotLabel(end)}`;
+}
+
 /** @param {EventTarget | null} target */
 const startsOnSomethingClickable = (target) =>
   target instanceof Element && Boolean(target.closest(INTERACTIVE));

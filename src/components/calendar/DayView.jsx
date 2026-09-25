@@ -234,6 +234,8 @@ export default function DayView({
   // (dateStr, minutesAfterMidnight | null) — clicking empty time or the
   // all-day area opens a new task there (useEmptySlotClick).
   onCreateAt,
+  // { dateStr, start, end } while a task is dragged over a timed column.
+  dropPreview,
 }) {
   const timedScrollRef = useRef(null);
   const dateStr = toDateStr(anchorDate);
@@ -374,6 +376,9 @@ export default function DayView({
             {...timedSlot.handlers}
           >
             <SlotGhost minutes={timedSlot.hoverMinutes} hourHeight={HOUR_HEIGHT} />
+            {dropPreview?.dateStr === dateStr && (
+              <SlotGhost variant="drop" minutes={dropPreview.start} endMinutes={dropPreview.end} hourHeight={HOUR_HEIGHT} />
+            )}
             {laidOutTimed.map(({ task, startMin, endMin, col, cols, colSpan }) => {
               const top = (startMin / 60) * HOUR_HEIGHT;
               const height = Math.max(

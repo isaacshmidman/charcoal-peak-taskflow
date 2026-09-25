@@ -52,3 +52,21 @@ export function taskMatchesSearch(task, query) {
   if (!description) return false;
   return description.replace(/<[^>]*>/g, " ").toLowerCase().includes(q);
 }
+
+/**
+ * True for items from a read-only calendar (Holidays, Birthdays, calendars
+ * shared view-only). Zephyrly can't change the real event, and inbound sync
+ * only fetches changes — so an edit here would leave the local copy wrong
+ * for good. The task form, calendar dragging and drops all use this.
+ *
+ * `source_writable` defaults to true on legacy rows, so only an explicit
+ * false (false / 0 / "0") counts.
+ *
+ * @param {any} task  any task-shaped record (reads source_provider, source_writable)
+ * @returns {boolean}
+ */
+export function isReadOnlyTask(task) {
+  if (!task || !task.source_provider) return false;
+  const writable = task.source_writable;
+  return writable === false || writable === 0 || writable === "0";
+}

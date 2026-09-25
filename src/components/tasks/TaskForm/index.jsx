@@ -30,6 +30,7 @@ import TagsField from "./TagsField.jsx";
 import SubtasksField from "./SubtasksField.jsx";
 import AttachmentsField, { flushPendingUploads } from "../AttachmentsField.jsx";
 import { useAutosave } from "@/hooks/useAutosave";
+import { isReadOnlyTask } from "@/lib/task-filters";
 
 const defaultTask = {
   title: "",
@@ -145,11 +146,8 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
   const sourceProvider = form.source_provider || task?.source_provider || null;
   const isExternal = !!sourceProvider;
   const isExternalEvent = isExternal && form.source_kind === "event";
-  // source_writable defaults to true for legacy rows; only treat as read-only
-  // when the field is explicitly false (0 / false / "0" all coerced).
-  const writableRaw = form.source_writable;
-  const isReadOnly =
-    isExternal && (writableRaw === false || writableRaw === 0 || writableRaw === "0");
+  // One rule for read-only, shared with calendar dragging (task-filters).
+  const isReadOnly = isReadOnlyTask({ source_provider: sourceProvider, source_writable: form.source_writable });
   const sourceCalendarName = form.source_calendar_name || "Calendar";
   const sourceColorHex = form.source_color_hex || null;
 

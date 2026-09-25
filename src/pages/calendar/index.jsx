@@ -10,6 +10,7 @@
  *   - TaskForm + RecurringDeleteDialog modals
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/api/apiClient";
@@ -37,7 +38,7 @@ import { subMonths } from "date-fns/subMonths";
 import { subWeeks } from "date-fns/subWeeks";
 import { subYears } from "date-fns/subYears";
 import TaskForm from "@/components/tasks/TaskForm";
-import { formatSlotTime } from "@/components/calendar/useEmptySlotClick";
+import { formatSlotTime, timeRangeLabel } from "@/components/calendar/useEmptySlotClick";
 import MonthCalendar from "@/components/calendar/MonthCalendar";
 import DayView from "@/components/calendar/DayView";
 import WeekView from "@/components/calendar/WeekView";
@@ -196,8 +197,10 @@ export default function Calendar() {
     sensors,
     activeTask,
     overlayWidth,
+    dropPreview,
     handleDragStart,
     handleDragOver,
+    handleDragMove,
     handleDragEnd,
     handleDragCancel,
   } = useCalendarDnd({ updateTask, onTaskReschedule: handleTaskReschedule });
@@ -349,12 +352,15 @@ export default function Calendar() {
         onNewTask={openNewTask}
       />
 
-      {/* View body — DnD wraps Month/Week (Day/Year use click nav) */}
+      {/* View body — DnD wraps Day, Week and Month. Dropping on an hour
+          column sets the day and time; on an all-day strip, makes it
+          all-day; on a month cell, moves the date. */}
       <DndContext
         sensors={sensors}
         collisionDetection={pointerWithin}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
+        onDragMove={handleDragMove}
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
@@ -366,6 +372,7 @@ export default function Calendar() {
             onTaskClick={handleTaskClick}
             onToggleDone={handleToggleDone}
             onCreateAt={openNewTaskAt}
+            dropPreview={dropPreview}
           />
         )}
         {view === "week" && (
@@ -377,6 +384,7 @@ export default function Calendar() {
             onToggleDone={handleToggleDone}
             onDayClick={handleDayEmptyClick}
             onCreateAt={openNewTaskAt}
+            dropPreview={dropPreview}
           />
         )}
         {view === "month" && (
@@ -396,12 +404,29 @@ export default function Calendar() {
           />
         )}
 
+        {/* Portalled to <body>. Rendered in place, the overlay's fixed-position
+            wrapper was a child of this page's space-y-4 container and picked
+            up its margin-top: 16px — so every dragged card floated 16px
+            below the pointer, and a Day/Week drop landed ~20 minutes later
+            than where it was picked up relative to. */}
+        {createPortal(
         <DragOverlay>
           {activeTask ? (
             <div
-              className="ring-2 ring-slate-900 shadow-lg rounded transition-[width] duration-150 ease-out origin-center"
+              className="relative ring-2 ring-slate-900 shadow-lg rounded transition-[width] duration-150 ease-out origin-center"
               style={overlayWidth ? { width: overlayWidth } : undefined}
             >
+              {/* Over an hour column: the time it will land at, riding on
+                  the card so it's never hidden (the grid outline shows the
+                  slot and duration). */}
+              {dropPreview && (
+                <div
+                  data-testid="calendar-drop-time"
+                  className="pointer-events-none absolute bottom-full left-0 mb-1 whitespace-nowrap rounded bg-slate-900 px-1.5 py-0.5 text-[10px] font-semibold text-white shadow dark:bg-slate-100 dark:text-slate-900"
+                >
+                  {timeRangeLabel(dropPreview.start, dropPreview.end)}
+                </div>
+              )}
               <MiniMiniTaskCard
                 task={activeTask}
                 priorities={priorities}
@@ -409,7 +434,9 @@ export default function Calendar() {
               />
             </div>
           ) : null}
-        </DragOverlay>
+        </DragOverlay>,
+        document.body
+        )}
       </DndContext>
 
       {timezone && (
