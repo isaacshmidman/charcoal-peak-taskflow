@@ -11,7 +11,7 @@ import TitleTokenInput from "./TitleTokenInput";
  */
 
 const SAVED_TAGS = [{ id: "t1", name: "family" }];
-const GRAMMAR = { dates: false, times: false, recurrence: false, tags: true, priority: false };
+const GRAMMAR = { tags: true, priority: false };
 
 function Harness({ onEnter, initial = "" }) {
   const [form, setForm] = useState({ title: initial, tags: [] });

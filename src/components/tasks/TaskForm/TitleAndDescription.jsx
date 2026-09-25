@@ -64,13 +64,14 @@ export default function TitleAndDescription({ form, setForm, task, priorities = 
   const editorKey = task?.id || "new";
   return (
     <>
-      {/* Title understands in-title tokens: !priority / #tag (dropdown),
-          and natural-language dates/times/"every…" recurrence, applied to
-          the real fields on completion. */}
+      {/* Title understands !priority / #tag tokens (with a dropdown),
+          applied to the real fields on completion. It never reads dates,
+          times or recurrence out of the words — those have their own
+          controls below. */}
       <TitleTokenInput
         form={form}
         setForm={setForm}
-        grammar={{ dates: true, times: true, recurrence: true, tags: true, priority: true }}
+        grammar={{ tags: true, priority: true }}
         priorities={priorities}
         savedTags={savedTags}
         placeholder="What needs to be done?"

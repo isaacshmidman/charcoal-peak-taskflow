@@ -1,52 +1,17 @@
 // @ts-check
 /**
- * @file In-title token parsing for form title inputs. Typing
- * `!high #family tomorrow` into a task title applies to the real form
- * fields when a token completes (accepted from the #/! dropdown, or
- * terminated by a space) and strips the token from the visible title —
- * so the dedicated priority/tag/date controls light up while the title
- * stays clean. Quotes still escape (`"tomorrow"` stays literal).
+ * @file In-title tokens for form title inputs: `#tag` and `!priority`.
+ * A completed token — accepted from the #/! dropdown, or terminated by a
+ * space — is applied to the real form field and stripped from the visible
+ * title, so the tag/priority controls light up while the title stays clean.
  *
- * `grammar` subsets what each form honors:
- *   { dates, times, recurrence, tags, priority }
- * TaskForm = all; SubtaskForm = dates+times; NoteEditor = tags+priority.
+ * `grammar` subsets what each form honors: { tags, priority }.
  *
- * This is the strip-and-apply cousin of the old useTokenCompletion
- * (which inserted token text for the standalone quick-add). Fields come
- * from parseQuickAdd's per-token values; the #/! dropdown reuses
- * TokenAutocomplete.
+ * Titles are NOT read for dates, times or recurrence. That used to happen
+ * and was removed deliberately — see titleTokens.js.
  */
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
-import { parseQuickAdd } from "@/lib/quickAddParser";
-
-const grammarAllows = (type, g) =>
-  (type === "date" && g.dates) ||
-  (type === "time" && g.times) ||
-  (type === "recurrence" && g.recurrence) ||
-  (type === "tag" && g.tags) ||
-  (type === "priority" && g.priority);
-
-/** Map a single completed token to the form fields it sets. */
-function tokenFields(tok, parsed) {
-  switch (tok.type) {
-    case "date":
-      return { due_date: tok.value };
-    case "time":
-      return tok.value; // { task_time, task_end_time? }
-    case "tag":
-      return { tags: [tok.value] };
-    case "priority":
-      return { priority_id: tok.value.id };
-    case "recurrence": {
-      const f = { task_type: "recurring", recurrence: parsed.fields.recurrence };
-      if (parsed.fields.recurrence_days) f.recurrence_days = parsed.fields.recurrence_days;
-      if (parsed.fields.due_date) f.due_date = parsed.fields.due_date; // first occurrence
-      return f;
-    }
-    default:
-      return {};
-  }
-}
+import { completedTokenAt } from "./titleTokens";
 
 export function useTitleTokens({ value, setValue, inputRef, priorities = [], savedTags = [], grammar, onApply }) {
   const [caret, setCaret] = useState(0);
@@ -133,11 +98,8 @@ export function useTitleTokens({ value, setValue, inputRef, priorities = [], sav
     const grew = nextVal.length === value.length + 1;
     const typedTerminator = grew && /\s/.test(nextVal[nextCaret - 1] || "");
     if (typedTerminator) {
-      const parsed = parseQuickAdd(nextVal, { priorities, now: new Date() });
-      // The token whose end sits just before the terminator we just typed.
-      const tok = parsed.tokens.find(
-        (t) => t.end === nextCaret - 1 && grammarAllows(t.type, grammar)
-      );
+      // The #/! token whose end sits just before the space we just typed.
+      const tok = completedTokenAt(nextVal, nextCaret - 1, grammar, priorities);
       if (tok) {
         const before = nextVal.slice(0, tok.start);
         const after = nextVal.slice(nextCaret); // past the terminator space
@@ -145,7 +107,7 @@ export function useTitleTokens({ value, setValue, inputRef, priorities = [], sav
         pendingCaretRef.current = before.length;
         setValue(stripped);
         setCaret(before.length);
-        onApply(tokenFields(tok, parsed));
+        onApply(tok.fields);
         return;
       }
     }

@@ -1,9 +1,9 @@
 // @ts-nocheck
 /**
- * @file A form title <Input> that understands in-title tokens. Wraps the
- * useTitleTokens hook + the #/! TokenAutocomplete dropdown and merges
- * parsed fields back into the form. Shared by TaskForm, SubtaskForm, and
- * NoteEditor — each passes a `grammar` subset.
+ * @file A form title <Input> that understands #tag / !priority tokens.
+ * Wraps the useTitleTokens hook + the #/! TokenAutocomplete dropdown and
+ * merges the chosen field back into the form. Shared by TaskForm and
+ * SubtaskForm — each passes a `grammar` subset ({ tags, priority }).
  */
 import { useRef } from "react";
 import { Input } from "@/components/ui/input";

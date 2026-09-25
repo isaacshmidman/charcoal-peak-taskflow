@@ -112,12 +112,13 @@ export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubm
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
-          {/* Title parses natural-language dates/times only (subtasks
-              have no tags/priority/recurrence). */}
+          {/* Plain title — subtasks have no tags or priority, and titles
+              are never read for dates or times. TitleTokenInput is kept for
+              its Enter-to-finish behaviour. */}
           <TitleTokenInput
             form={form}
             setForm={setForm}
-            grammar={{ dates: true, times: true, recurrence: false, tags: false, priority: false }}
+            grammar={{ tags: false, priority: false }}
             placeholder="What needs to be done?"
             // Enter in the title finishes the subtask (already autosaved).
             onEnter={() => { if (isValid) commitAndClose(); }}
