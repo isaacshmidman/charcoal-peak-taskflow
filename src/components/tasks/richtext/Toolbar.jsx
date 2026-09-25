@@ -25,6 +25,10 @@ import {
   Indent,
   Outdent,
   ChevronDown,
+  Undo2,
+  Redo2,
+  Heading,
+  RemoveFormatting,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useOutsideClick } from "@/hooks/useOutsideClick";
@@ -71,6 +75,23 @@ const FONTS = [
   { label: "Monospace", stack: "ui-monospace, SFMono-Regular, monospace" },
 ];
 
+// Block styles. These were reachable only by typing markdown ("# ",
+// "> ", "```"), which nobody discovers by accident. Each preview is drawn
+// in roughly the style it applies.
+const TEXT_STYLES = [
+  { key: "paragraph", label: "Normal text", className: "text-xs" },
+  { key: "h1", label: "Heading 1", level: 1, className: "text-base font-semibold" },
+  { key: "h2", label: "Heading 2", level: 2, className: "text-sm font-semibold" },
+  { key: "h3", label: "Heading 3", level: 3, className: "text-xs font-semibold" },
+  { key: "quote", label: "Quote", className: "text-xs italic text-slate-500 dark:text-slate-400" },
+  { key: "code", label: "Code block", className: "text-xs font-mono" },
+];
+
+// Marks "Clear formatting" removes. Deliberately a list, not
+// unsetAllMarks(): that would also strip taskLink and silently cut a note
+// span loose from the task made out of it.
+const CLEARABLE_MARKS = ["bold", "italic", "underline", "strike", "code", "textStyle", "highlight"];
+
 // List marker options. Each applies the right list + style attr.
 const LIST_OPTIONS = [
   { key: "task", label: "Checklist", glyph: "☑" },
@@ -108,7 +129,7 @@ function TBtn({ active, disabled, onAction, title, children, testid }) {
 }
 
 /** A dropdown popover anchored under its trigger. Reuses useOutsideClick. */
-function Picker({ icon: Icon, title, open, setOpen, onOpenChange, children, openUp = true }) {
+function Picker({ icon: Icon, title, open, setOpen, onOpenChange, children, openUp = true, testid }) {
   const ref = useRef(null);
   useOutsideClick(ref, () => { setOpen(false); onOpenChange?.(false); }, open);
   return (
@@ -117,6 +138,8 @@ function Picker({ icon: Icon, title, open, setOpen, onOpenChange, children, open
         type="button"
         title={title}
         aria-label={title}
+        aria-expanded={open}
+        data-testid={testid}
         onMouseDown={(e) => {
           e.preventDefault();
           const next = !open;
@@ -147,6 +170,7 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
   const [hlOpen, setHlOpen] = useState(false);
   const [fontOpen, setFontOpen] = useState(false);
   const [listOpen, setListOpen] = useState(false);
+  const [styleOpen, setStyleOpen] = useState(false);
 
   if (!editor) return null;
 
@@ -154,6 +178,45 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
 
   // Whichever picker is open keeps the toolbar alive (parent reads this).
   const anyPickerOpen = (next) => onPickerOpenChange?.(next);
+  // A choice closes its picker, the way every other menu in the app
+  // behaves. The editor keeps focus (mousedown never blurred it), so the
+  // toolbar stays up.
+  const pick = (setOpen, fn) => { fn(); setOpen(false); anyPickerOpen(false); };
+
+  const setTextStyle = (key) => {
+    const chain = editor.chain().focus();
+    const inQuote = editor.isActive("blockquote");
+    if (key === "paragraph") {
+      chain.setParagraph();
+      if (inQuote) chain.lift("blockquote");
+    } else if (key === "quote") {
+      chain.setParagraph();
+      if (!inQuote) chain.setBlockquote();
+    } else if (key === "code") {
+      chain.setCodeBlock();
+    } else {
+      const level = TEXT_STYLES.find((t) => t.key === key)?.level;
+      chain.setHeading({ level });
+    }
+    chain.run();
+  };
+
+  const clearFormatting = () => {
+    const chain = editor.chain().focus();
+    for (const mark of CLEARABLE_MARKS) chain.unsetMark(mark);
+    // Headings and code blocks back to body text, out of any quote. Lists
+    // stay: they're structure, not formatting.
+    chain.setParagraph();
+    if (editor.isActive("blockquote")) chain.lift("blockquote");
+    chain.run();
+  };
+
+  const headingLevel = [1, 2, 3].find((level) => editor.isActive("heading", { level }));
+  const activeStyle =
+    editor.isActive("codeBlock") ? "code"
+      : editor.isActive("blockquote") ? "quote"
+        : headingLevel ? `h${headingLevel}`
+          : "paragraph";
 
   const setListType = (key) => {
     const chain = editor.chain().focus();
@@ -206,6 +269,48 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
           // Standalone bar: its own rounded box.
           : "rounded-lg border border-border-hairline"
     )}>
+      {/* Undo/redo. Cmd+Z covers a keyboard; a phone has nothing else. */}
+      <TBtn title="Undo" testid="richtext-undo" disabled={!editor.can().undo()} onAction={() => editor.chain().focus().undo().run()}>
+        <Undo2 className="w-4 h-4" />
+      </TBtn>
+      <TBtn title="Redo" testid="richtext-redo" disabled={!editor.can().redo()} onAction={() => editor.chain().focus().redo().run()}>
+        <Redo2 className="w-4 h-4" />
+      </TBtn>
+
+      <span className="w-px h-5 bg-slate-200 dark:bg-[#303030] mx-0.5 shrink-0" />
+
+      {/* Text style */}
+      <Picker icon={Heading} title="Text style" testid="richtext-style" open={styleOpen} setOpen={setStyleOpen} onOpenChange={anyPickerOpen} openUp={placement !== "standalone"}>
+        <div className="w-40">
+          {TEXT_STYLES.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              data-testid={`richtext-style-${t.key}`}
+              onMouseDown={(e) => { e.preventDefault(); pick(setStyleOpen, () => setTextStyle(t.key)); }}
+              className={cn(
+                "w-full text-left px-2 py-1.5 rounded text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222222]",
+                activeStyle === t.key && "bg-slate-100 dark:bg-[#222222]"
+              )}
+            >
+              <span className={t.className}>{t.label}</span>
+            </button>
+          ))}
+          <div className="my-1 h-px bg-slate-100 dark:bg-[#303030]" />
+          <button
+            type="button"
+            data-testid="richtext-clear-formatting"
+            onMouseDown={(e) => { e.preventDefault(); pick(setStyleOpen, clearFormatting); }}
+            className="w-full flex items-center gap-2 text-left text-xs px-2 py-1.5 rounded text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222222]"
+          >
+            <RemoveFormatting className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+            Clear formatting
+          </button>
+        </div>
+      </Picker>
+
+      <span className="w-px h-5 bg-slate-200 dark:bg-[#303030] mx-0.5 shrink-0" />
+
       <TBtn title="Bold" active={editor.isActive("bold")} onAction={() => apply(() => editor.chain().focus().toggleBold().run())}>
         <Bold className="w-4 h-4" />
       </TBtn>
@@ -229,7 +334,7 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
               key={c.hex}
               type="button"
               title={c.label}
-              onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().setColor(c.hex).run(); }}
+              onMouseDown={(e) => { e.preventDefault(); pick(setColorOpen, () => editor.chain().focus().setColor(c.hex).run()); }}
               className="w-6 h-6 rounded-full border border-slate-200 dark:border-[#343434]"
               style={{ backgroundColor: c.hex }}
             />
@@ -237,7 +342,7 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
         </div>
         <button
           type="button"
-          onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().unsetColor().run(); }}
+          onMouseDown={(e) => { e.preventDefault(); pick(setColorOpen, () => editor.chain().focus().unsetColor().run()); }}
           className="mt-1.5 w-full text-[11px] text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 py-1 rounded hover:bg-slate-100 dark:hover:bg-[#222222]"
         >
           Default color
@@ -252,7 +357,7 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
               key={c.hex}
               type="button"
               title={c.label}
-              onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleHighlight({ color: c.hex }).run(); }}
+              onMouseDown={(e) => { e.preventDefault(); pick(setHlOpen, () => editor.chain().focus().toggleHighlight({ color: c.hex }).run()); }}
               className="w-6 h-6 rounded border border-slate-200 dark:border-[#343434]"
               style={{ backgroundColor: c.hex }}
             />
@@ -260,7 +365,7 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
         </div>
         <button
           type="button"
-          onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().unsetHighlight().run(); }}
+          onMouseDown={(e) => { e.preventDefault(); pick(setHlOpen, () => editor.chain().focus().unsetHighlight().run()); }}
           className="mt-1.5 w-full text-[11px] text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 py-1 rounded hover:bg-slate-100 dark:hover:bg-[#222222]"
         >
           No highlight
@@ -276,8 +381,10 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
               type="button"
               onMouseDown={(e) => {
                 e.preventDefault();
-                if (f.stack) editor.chain().focus().setFontFamily(f.stack).run();
-                else editor.chain().focus().unsetFontFamily().run();
+                pick(setFontOpen, () => {
+                  if (f.stack) editor.chain().focus().setFontFamily(f.stack).run();
+                  else editor.chain().focus().unsetFontFamily().run();
+                });
               }}
               className="w-full text-left text-xs px-2 py-1.5 rounded text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222222]"
               style={{ fontFamily: f.stack || undefined }}
@@ -297,7 +404,7 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
             <button
               key={o.key}
               type="button"
-              onMouseDown={(e) => { e.preventDefault(); setListType(o.key); }}
+              onMouseDown={(e) => { e.preventDefault(); pick(setListOpen, () => setListType(o.key)); }}
               className="w-full flex items-center gap-2 text-left text-xs px-2 py-1.5 rounded text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222222]"
             >
               <span className="w-5 text-center text-slate-500 dark:text-slate-400">{o.glyph}</span>

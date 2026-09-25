@@ -35,6 +35,16 @@ const NON_INSERT_KEYS = new Set([
 
 /**
  * @param {object} props
+ * @param {string | null} [props.valueJson]  stored ProseMirror JSON
+ * @param {string | null} [props.plainFallback]  plaintext mirror, used when there's no JSON
+ * @param {(out: { json: string, text: string }) => void} [props.onChange]
+ * @param {boolean} [props.disabled]  read-only: not editable, no toolbar
+ * @param {number} [props.wordLimit]
+ * @param {boolean} [props.chromeless]  no box around the text (notes)
+ * @param {string} [props.minHeight]
+ * @param {"docked" | "external"} [props.toolbar]
+ * @param {(focused: boolean) => void} [props.onFocusChange]
+ * @param {string} [props.placeholder]  hint shown while the box is empty
  * @param {Map<string, string>} [props.taskStatusById]  taskId → status, for
  *   note↔task highlights. Omit entirely (task descriptions) and the taskLink
  *   machinery stays inert.
@@ -50,6 +60,7 @@ export default function RichDescriptionEditor({
   // "external" hands focus state up so the host can place the toolbar
   // itself — Notes puts it above the title, like Apple Notes.
   toolbar = "docked", onFocusChange,
+  placeholder = "Add details (optional)",
 }) {
   // Hydrate once from the incoming props. We intentionally do NOT make
   // the editor a controlled mirror of valueJson on every keystroke
@@ -74,7 +85,7 @@ export default function RichDescriptionEditor({
     // the Bold/Italic/list active states never updated, and Make task
     // could never see a selection. Opt back in.
     shouldRerenderOnTransaction: true,
-    extensions: buildEditorExtensions({ onOpenTask: (id) => onOpenTaskRef.current?.(id) }),
+    extensions: buildEditorExtensions({ onOpenTask: (id) => onOpenTaskRef.current?.(id), placeholder }),
     content: initialRef.current,
     editorProps: {
       attributes: {
@@ -142,6 +153,13 @@ export default function RichDescriptionEditor({
   });
 
   useEffect(() => () => editor?.destroy(), [editor]);
+
+  // `editable` above is only read when the editor is created; keep it in
+  // step if the host flips `disabled` later. No update event: toggling
+  // editability isn't an edit and mustn't trigger an autosave.
+  useEffect(() => {
+    if (editor && editor.isEditable === !!disabled) editor.setEditable(!disabled, false);
+  }, [editor, disabled]);
 
   // Push live task state into the decoration plugin. This dispatches a
   // META-ONLY transaction: docChanged stays false, so TipTap does not fire

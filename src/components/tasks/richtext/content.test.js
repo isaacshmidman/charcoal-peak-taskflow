@@ -13,19 +13,42 @@ describe("richtext content helpers", () => {
       expect(initialContentFrom(JSON.stringify(doc), "")).toEqual(doc);
     });
 
-    it("falls back to the plaintext mirror when JSON is empty", () => {
-      expect(initialContentFrom("", "hello world")).toBe("hello world");
-      expect(initialContentFrom(null, "legacy note")).toBe("legacy note");
-      expect(initialContentFrom(undefined, "legacy note")).toBe("legacy note");
+    const para = (text) => ({ type: "paragraph", content: [{ type: "text", text }] });
+
+    it("falls back to the plaintext mirror when JSON is empty — as a doc, not a raw string", () => {
+      // A raw string would be parsed as HTML by the editor; see below.
+      expect(initialContentFrom("", "hello world")).toEqual({ type: "doc", content: [para("hello world")] });
+      expect(initialContentFrom(null, "legacy note")).toEqual({ type: "doc", content: [para("legacy note")] });
+      expect(initialContentFrom(undefined, "legacy note")).toEqual({ type: "doc", content: [para("legacy note")] });
     });
 
     it("falls back to plaintext when JSON is malformed", () => {
-      expect(initialContentFrom("{not json", "plain")).toBe("plain");
+      expect(initialContentFrom("{not json", "plain")).toEqual({ type: "doc", content: [para("plain")] });
+    });
+
+    it("keeps line breaks and blank lines from plain text", () => {
+      expect(initialContentFrom("", "first\n\nthird\r\nfourth")).toEqual({
+        type: "doc",
+        content: [para("first"), { type: "paragraph" }, para("third"), para("fourth")],
+      });
+    });
+
+    it("never treats plain-text angle brackets as markup", () => {
+      expect(initialContentFrom("", "x < y and a <-> b")).toEqual({
+        type: "doc",
+        content: [para("x < y and a <-> b")],
+      });
+    });
+
+    it("passes HTML descriptions (calendar imports) through as HTML", () => {
+      const html = "Join: <b>bring notes</b><br>Room 4";
+      expect(initialContentFrom("", html)).toBe(html);
     });
 
     it("returns empty string when both are empty", () => {
       expect(initialContentFrom("", "")).toBe("");
       expect(initialContentFrom(null, null)).toBe("");
+      expect(initialContentFrom(null, "   \n ")).toBe("");
     });
 
     it("prefers JSON over plaintext when both present", () => {

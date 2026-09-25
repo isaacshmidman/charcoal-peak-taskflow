@@ -190,7 +190,7 @@ export default function CommandPalette({ open, onOpenChange }) {
           value={query}
           data-testid="command-palette-input"
           placeholder="Type a command or search tasks…"
-          className="w-full h-12 px-4 bg-transparent text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none border-b border-slate-100 dark:border-[#303030]"
+          className="w-full h-12 px-4 bg-transparent text-base md:text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none border-b border-slate-100 dark:border-[#303030]"
           onChange={(e) => {
             setQuery(e.target.value);
             setActiveIndex(0);

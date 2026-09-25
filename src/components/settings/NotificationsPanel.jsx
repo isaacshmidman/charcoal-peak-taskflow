@@ -351,7 +351,7 @@ export default function NotificationsPanel({ onOpenAdvanced }) {
                     value={customParts.amount}
                     disabled={offline}
                     onChange={(e) => updateCustomOffset({ amount: e.target.value })}
-                    className="h-9 text-sm"
+                    className="h-9 text-base md:text-sm"
                   />
                   <Select
                     value={customParts.unit}

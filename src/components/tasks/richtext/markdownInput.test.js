@@ -95,6 +95,37 @@ describe("markdown typing shortcuts", () => {
   });
 });
 
+describe("hydrating stored descriptions", () => {
+  /**
+   * Through a real editor, because the bug only shows there: TipTap
+   * parses any string as HTML, which is what collapsed plain-text line
+   * breaks into one paragraph.
+   */
+  const hydrate = async (plain) => {
+    const { initialContentFrom } = await import("./content");
+    editor.commands.setContent(initialContentFrom("", plain));
+  };
+
+  it("keeps each line of a plain-text description as its own paragraph", async () => {
+    await hydrate("Bring:\nlaptop\ncharger");
+    expect(editor.getJSON().content).toHaveLength(3);
+    expect(editor.getText({ blockSeparator: "\n" })).toBe("Bring:\nlaptop\ncharger");
+  });
+
+  it("keeps a literal < in plain text as text", async () => {
+    await hydrate("budget < 50, deadline <- friday");
+    expect(editor.getText()).toBe("budget < 50, deadline <- friday");
+  });
+
+  it("renders an HTML calendar description with its formatting, minus anything unsafe", async () => {
+    await hydrate('Agenda <b>first</b><br><script>alert(1)</script><img src=x onerror=alert(1)>');
+    const html = editor.getHTML();
+    expect(html).toContain("<strong>first</strong>");
+    expect(html).not.toContain("<script");
+    expect(html).not.toContain("onerror");
+  });
+});
+
 describe("pasted markdown", () => {
   /**
    * The paste path in RichDescriptionEditor is: looksLikeMarkdown gates
@@ -142,5 +173,55 @@ describe("pasted markdown", () => {
     const converted = await pasteMarkdown("just a sentence I copied from an email");
     expect(converted).toBe(false);
     expect(editor.getHTML()).not.toContain("<strong>");
+  });
+});
+
+describe("placeholder", () => {
+  /**
+   * index.css draws the hint from data-placeholder on the empty
+   * paragraph. Before the Placeholder extension was registered nothing set
+   * it, so the CSS rule never matched and an empty box gave no hint.
+   */
+  it("labels an empty editor with the host's hint, and drops it once typed in", () => {
+    editor.destroy();
+    const element = document.createElement("div");
+    document.body.appendChild(element);
+    editor = new Editor({ element, extensions: buildEditorExtensions({ placeholder: "Write anything" }), content: "" });
+
+    const para = () => element.querySelector("p");
+    expect(para()?.getAttribute("data-placeholder")).toBe("Write anything");
+    expect(para()?.classList.contains("is-editor-empty")).toBe(true);
+
+    typeAll("hi");
+    expect(para()?.classList.contains("is-editor-empty")).toBe(false);
+  });
+});
+
+describe("highlights are never the reserved yellow", () => {
+  /**
+   * Yellow means "a task exists for this span". A highlight with no colour
+   * renders as the browser's default yellow <mark>, so every way of making
+   * one must land on a palette colour.
+   */
+  const PURPLE = 'data-color="#e9d5ff"';
+
+  it("⌘⇧H (toggleHighlight with no colour) uses the palette default", () => {
+    editor.commands.setContent("<p>flag this</p>");
+    editor.commands.selectAll();
+    editor.commands.toggleHighlight();
+    expect(editor.getHTML()).toContain(PURPLE);
+  });
+
+  it("typing ==text== uses the palette default", () => {
+    typeAll("==loud== ");
+    expect(editor.getHTML()).toContain("<mark");
+    expect(editor.getHTML()).toContain(PURPLE);
+  });
+
+  it("a pasted bare <mark> uses the palette default, while a coloured one keeps its colour", () => {
+    editor.commands.setContent('<p><mark>bare</mark> <mark data-color="#bbf7d0">green</mark></p>');
+    const html = editor.getHTML();
+    expect(html).toContain(`<mark ${PURPLE}`);
+    expect(html).toContain('data-color="#bbf7d0"');
   });
 });

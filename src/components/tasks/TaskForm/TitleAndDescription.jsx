@@ -53,7 +53,7 @@ function PlainDescriptionFallback({ form, setForm }) {
   );
 }
 
-export default function TitleAndDescription({ form, setForm, task, priorities = [], savedTags = [], onTitleEnter }) {
+export default function TitleAndDescription({ form, setForm, task, priorities = [], savedTags = [], onTitleEnter, readOnly = false }) {
   // The editor hydrates ONCE at mount. Read its initial content straight
   // from the `task` prop (available on first render) rather than from
   // `form.description_json` — the form's hydration effect runs after the
@@ -93,6 +93,10 @@ export default function TitleAndDescription({ form, setForm, task, priorities = 
             key={editorKey}
             valueJson={task?.description_json}
             plainFallback={task?.description}
+            // The form's <fieldset disabled> reaches inputs but not a
+            // contenteditable, so a read-only event's description stayed
+            // typeable — and every edit was silently thrown away.
+            disabled={readOnly}
             onChange={({ json, text }) => setForm((f) => ({ ...f, description_json: json, description: text }))}
           />
         </Suspense>

@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar, Paperclip, Trash2 } from "lucide-react";
+import { AlignLeft, Calendar, Paperclip, Trash2 } from "lucide-react";
 import { format } from "date-fns/format";
 import { cn } from "@/lib/utils";
 import { colorBg, isDarkColor } from "@/lib/colors";
@@ -21,6 +21,13 @@ import TagsRow from "./TagsRow.jsx";
 import SubtaskList from "./SubtaskList.jsx";
 
 const parseDateLocal = (str) => new Date(str + "T00:00:00");
+
+/** The description as one short line for a hover preview. Calendar
+ *  imports can carry HTML, so tags are flattened to spaces first. */
+function descriptionPreview(description) {
+  const flat = String(description || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  return flat.length > 140 ? flat.slice(0, 139) + "…" : flat;
+}
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 function buildRecurrenceShortLabel(task) {
@@ -74,6 +81,7 @@ const TaskCard = forwardRef(function TaskCard({
 
   const isDone = (task.status === "done" || optimisticDone) && !optimisticUndone;
   const priority = priorities.find((p) => p.id === task.priority_id);
+  const preview = descriptionPreview(task.description);
 
   const handleToggle = () => {
     if (task.status !== "done") setOptimisticDone(true);
@@ -184,6 +192,20 @@ const TaskCard = forwardRef(function TaskCard({
               {/* Recurrence badge/dot */}
               {recurrenceLabel && (
                 <RecurrenceBadge label={recurrenceLabel} />
+              )}
+
+              {/* Description indicator. A description is otherwise
+                  invisible until the task is opened; hovering shows the
+                  start of it. */}
+              {preview && (
+                <span
+                  className="inline-flex items-center text-slate-400 dark:text-slate-500 px-1 py-0.5"
+                  title={preview}
+                  aria-label="Has a description"
+                  data-testid={`task-has-description-${task.id}`}
+                >
+                  <AlignLeft className="w-3 h-3" />
+                </span>
               )}
 
               {/* Attachment indicator — visible when the task has any

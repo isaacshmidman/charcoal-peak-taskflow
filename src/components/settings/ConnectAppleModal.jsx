@@ -104,7 +104,7 @@ export default function ConnectAppleModal({ open, onOpenChange }) {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@icloud.com"
-              className="w-full rounded-md border border-slate-200 dark:border-[#343434] bg-white dark:bg-[#0c0c0c] px-2.5 py-1.5 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-slate-400 dark:focus:border-slate-500 focus:outline-none"
+              className="w-full rounded-md border border-slate-200 dark:border-[#343434] bg-white dark:bg-[#0c0c0c] px-2.5 py-1.5 text-base md:text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-slate-400 dark:focus:border-slate-500 focus:outline-none"
             />
           </div>
 
@@ -117,7 +117,7 @@ export default function ConnectAppleModal({ open, onOpenChange }) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="xxxx-xxxx-xxxx-xxxx"
-              className="w-full rounded-md border border-slate-200 dark:border-[#343434] bg-white dark:bg-[#0c0c0c] px-2.5 py-1.5 text-sm font-mono text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-slate-400 dark:focus:border-slate-500 focus:outline-none"
+              className="w-full rounded-md border border-slate-200 dark:border-[#343434] bg-white dark:bg-[#0c0c0c] px-2.5 py-1.5 text-base md:text-sm font-mono text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-slate-400 dark:focus:border-slate-500 focus:outline-none"
             />
             <p className="text-[11px] text-slate-400 dark:text-slate-500">
               Your password is encrypted at rest and only used for CalDAV calls to iCloud.

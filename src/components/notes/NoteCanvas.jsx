@@ -144,6 +144,7 @@ export default function NoteCanvas({
               wordLimit={NOTE_WORD_LIMIT}
               chromeless
               minHeight="60vh"
+              placeholder="Write anything"
               toolbar="external"
               onFocusChange={setFocused}
               taskStatusById={taskStatusById}

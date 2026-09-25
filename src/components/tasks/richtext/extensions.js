@@ -17,14 +17,39 @@ import { TextStyle, Color, FontFamily } from "@tiptap/extension-text-style";
 import Highlight from "@tiptap/extension-highlight";
 import { TaskList, TaskItem } from "@tiptap/extension-list";
 import CharacterCount from "@tiptap/extension-character-count";
+import { Placeholder } from "@tiptap/extensions";
 import { OrderedListWithStyle, BulletListWithStyle } from "./orderedListStyle";
 import { ParagraphIndent } from "./paragraphIndent";
 import { TaskLink, taskLinkStatePlugin } from "./taskLink";
 
+/** Purple, the first swatch in the toolbar's highlight picker. */
+export const DEFAULT_HIGHLIGHT = "#e9d5ff";
+
 /**
- * @param {{ onOpenTask?: (taskId: string) => void }} [opts]
+ * Highlight that is never colourless. Yellow is reserved for note↔task
+ * links (see Toolbar.jsx), but ⌘⇧H, typing ==text== and pasted <mark>s all
+ * made a highlight with no colour — which the browser paints yellow. They
+ * now get the picker's first colour instead.
  */
-export function buildEditorExtensions({ onOpenTask } = {}) {
+const PaletteHighlight = Highlight.extend({
+  addAttributes() {
+    const parent = this.parent?.() ?? {};
+    return {
+      ...parent,
+      color: {
+        ...parent.color,
+        default: DEFAULT_HIGHLIGHT,
+        parseHTML: (element) =>
+          element.getAttribute("data-color") || element.style.backgroundColor || DEFAULT_HIGHLIGHT,
+      },
+    };
+  },
+});
+
+/**
+ * @param {{ onOpenTask?: (taskId: string) => void, placeholder?: string }} [opts]
+ */
+export function buildEditorExtensions({ onOpenTask, placeholder = "" } = {}) {
   return [
     StarterKit.configure({
       link: false,            // XSS hygiene — no links in descriptions
@@ -36,10 +61,13 @@ export function buildEditorExtensions({ onOpenTask } = {}) {
     TextStyle,
     Color,
     FontFamily.configure({ types: ["textStyle"] }),
-    Highlight.configure({ multicolor: true }),
+    PaletteHighlight.configure({ multicolor: true }),
     TaskList,
     TaskItem.configure({ nested: true }),
     CharacterCount,           // word counter (.words())
+    // Hint text for an empty box. It lives in a data attribute on the
+    // empty paragraph (see .tiptap-prose in index.css), never in the doc.
+    Placeholder.configure({ placeholder }),
     ParagraphIndent,
     TaskLink,
     // Paints taskLink spans from live task state. Registered

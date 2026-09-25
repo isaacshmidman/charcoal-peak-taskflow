@@ -44,6 +44,7 @@ function Section({ title, children }) {
 
 export default function ShortcutsHelp({ open, onOpenChange }) {
   const mod = isMacLike() ? "⌘" : "Ctrl";
+  const alt = isMacLike() ? "⌥" : "Alt";
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
@@ -76,15 +77,36 @@ export default function ShortcutsHelp({ open, onOpenChange }) {
           </Section>
 
           <Section title="Task form">
+            <Row keys={["↵"]} label="Finish (in the title)" />
             <Row keys={[`${mod} ↵`]} label="Save the task" />
-            <Row keys={[`${mod} B`]} label="Bold (description)" />
-            <Row keys={[`${mod} I`]} label="Italic (description)" />
-            <Row keys={[`${mod} U`]} label="Underline (description)" />
-            <Row keys={[`${mod} ⇧ X`]} label="Strikethrough (description)" />
-            <Row keys={[`${mod} ⇧ 8`]} label="Bullet list (description)" />
-            <Row keys={[`${mod} ⇧ 7`]} label="Numbered list (description)" />
-            <Row keys={[`${mod} ⇧ 9`]} label="Checklist (description)" />
-            <Row keys={["Tab"]} label="Indent list item / paragraph (description)" />
+          </Section>
+
+          {/* Every binding here is live in the shared editor (richtext/
+              extensions.js), so it holds for descriptions and notes alike. */}
+          <Section title="Writing — descriptions and notes">
+            <Row keys={[`${mod} Z`]} label="Undo" />
+            <Row keys={[`${mod} ⇧ Z`]} label="Redo" />
+            <Row keys={[`${mod} B`]} label="Bold" />
+            <Row keys={[`${mod} I`]} label="Italic" />
+            <Row keys={[`${mod} U`]} label="Underline" />
+            <Row keys={[`${mod} ⇧ S`]} label="Strikethrough" />
+            <Row keys={[`${mod} ⇧ H`]} label="Highlight" />
+            <Row keys={[`${mod} E`]} label="Inline code" />
+            <Row keys={[`${mod} ${alt} 1`]} label="Heading (2 and 3 for smaller)" />
+            <Row keys={[`${mod} ⇧ B`]} label="Quote" />
+            <Row keys={[`${mod} ${alt} C`]} label="Code block" />
+            <Row keys={[`${mod} ⇧ 8`]} label="Bullet list" />
+            <Row keys={[`${mod} ⇧ 7`]} label="Numbered list" />
+            <Row keys={[`${mod} ⇧ 9`]} label="Checklist" />
+            <Row keys={["Tab"]} label="Indent (⇧ Tab to outdent)" />
+            <Row keys={["⇧ ↵"]} label="Line break in the same paragraph" />
+            <p className="pt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
+              Markdown works as you type or paste:{" "}
+              <code className="font-mono">#</code> heading, <code className="font-mono">-</code> bullets,{" "}
+              <code className="font-mono">1.</code> numbers, <code className="font-mono">&gt;</code> quote,{" "}
+              <code className="font-mono">```</code> code, <code className="font-mono">**bold**</code>,{" "}
+              <code className="font-mono">*italic*</code>, <code className="font-mono">==highlight==</code>.
+            </p>
           </Section>
 
           <Section title="Calendar">

@@ -72,4 +72,22 @@ describe("TaskCard", () => {
       .className.split(/\s+/);
     expect(toggleClassTokens).not.toContain("bg-slate-900");
   });
+
+  it("marks a task that has a description, previewing it on hover", () => {
+    const noop = vi.fn();
+    const props = {
+      priorities, subtasks: [], onToggleDone: noop, onEdit: noop, onDelete: noop,
+      onAddSubtask: noop, onUpdate: noop, onEditSubtask: noop, onReorderSubtasks: noop,
+    };
+    const { rerender } = render(<TaskCard task={recurringTask} {...props} />);
+    expect(screen.queryByTestId("task-has-description-series-1")).toBeNull();
+
+    // Calendar imports store HTML; the preview must read as plain text.
+    rerender(<TaskCard task={{ ...recurringTask, description: "Join <b>Zoom</b><br>room 4" }} {...props} />);
+    expect(screen.getByTestId("task-has-description-series-1").getAttribute("title")).toBe("Join Zoom room 4");
+
+    // Whitespace alone is not a description.
+    rerender(<TaskCard task={{ ...recurringTask, description: "  \n " }} {...props} />);
+    expect(screen.queryByTestId("task-has-description-series-1")).toBeNull();
+  });
 });

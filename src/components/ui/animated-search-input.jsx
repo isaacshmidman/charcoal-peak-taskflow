@@ -67,7 +67,7 @@ export function AnimatedSearchInput({ open, value, onChange, onClose, placeholde
         onChange={(e) => onChange(e.target.value)}
         tabIndex={open ? 0 : -1}
         className={cn(
-          "h-9 w-full text-sm bg-white dark:bg-[#0c0c0c] border-slate-100 dark:border-[#303030] whitespace-nowrap",
+          "h-9 w-full text-base md:text-sm bg-white dark:bg-[#0c0c0c] border-slate-100 dark:border-[#303030] whitespace-nowrap",
           open ? "px-3" : "p-0 border-0",
           className
         )}

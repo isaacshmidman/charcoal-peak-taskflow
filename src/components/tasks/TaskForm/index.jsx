@@ -296,6 +296,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
             priorities={priorities}
             savedTags={savedTags}
             onTitleEnter={() => { if (!isReadOnly && canSubmit) commitAndClose(); }}
+            readOnly={isReadOnly}
           />
 
           <PriorityAndType

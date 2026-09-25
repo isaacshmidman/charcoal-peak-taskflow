@@ -40,7 +40,7 @@ export default function PriorityRow({ p, idx, total, isEditing, onStartEdit, onS
           value={editName}
           onChange={(e) => setEditName(e.target.value)}
           onKeyDown={(e) => {if (e.key === "Enter") save();if (e.key === "Escape") onStopEdit();}}
-          className="h-7 text-sm flex-1 border-0 border-b rounded-none px-0 focus-visible:ring-0"
+          className="h-7 text-base md:text-sm flex-1 border-0 border-b rounded-none px-0 focus-visible:ring-0"
           autoFocus />
 
         <Select value={editColor} onValueChange={setEditColor}>
