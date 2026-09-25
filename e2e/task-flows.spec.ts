@@ -551,3 +551,33 @@ test("editing an existing task still autosaves without pressing anything", async
   await expect(page.getByTestId("task-form-dialog")).toBeHidden();
   expect((await api.getState()).tasks.find((t) => t.id === "edit-me")?.title).toBe("after");
 });
+
+test("clicking empty calendar time opens a new task there; the all-day strip makes an all-day one", async ({ page }) => {
+  const api = await installMockBackend(page, { tasks: [], priorities: [defaultPriority] });
+  await page.addInitScript(() => window.localStorage.setItem("defaultCalendarView", "week"));
+  await page.goto("/Calendar");
+
+  const today = formatDateOffset(0);
+  const column = page.getByTestId(`calendar-timed-${today}`);
+  await expect(column).toBeVisible();
+  // Bring 2 PM into view, then click just below the 2 PM line (week hours are 44px).
+  await column.evaluate((el) => { el.closest(".overflow-auto")!.scrollTop = 14 * 44 - 120; });
+  const box = (await column.boundingBox())!;
+  await page.mouse.click(box.x + box.width / 2, box.y + 14 * 44 + 6);
+
+  await expect(page.getByTestId("task-form-dialog")).toBeVisible();
+  await page.getByTestId("task-form-title").fill("Dentist");
+  await page.getByTestId("task-form-submit").click();
+  await expect(page.getByTestId("task-form-dialog")).toBeHidden();
+
+  const created = (await api.getState()).tasks.find((t) => t.title === "Dentist");
+  expect(created).toMatchObject({ due_date: today, task_time: "2:00PM", task_end_time: "3:00PM" });
+
+  // The all-day strip above the grid: same day, no time.
+  await page.getByTestId(`calendar-allday-${today}`).click({ position: { x: 5, y: 5 } });
+  await page.getByTestId("task-form-title").fill("Pay rent");
+  await page.getByTestId("task-form-submit").click();
+  await expect(page.getByTestId("task-form-dialog")).toBeHidden();
+  const allDay = (await api.getState()).tasks.find((t) => t.title === "Pay rent");
+  expect(allDay).toMatchObject({ due_date: today, task_time: "" });
+});

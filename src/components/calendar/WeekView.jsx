@@ -11,6 +11,8 @@ import MiniMiniTaskCard from "./MiniMiniTaskCard";
 import { parseTaskTime, compareTaskTime } from "@/lib/sort-helpers";
 import { layoutTimedTasks } from "@/lib/calendar-layout";
 import { toDateStr } from "@/lib/dates";
+import { useEmptySlotClick } from "./useEmptySlotClick";
+import SlotGhost from "./SlotGhost";
 
 const HOUR_HEIGHT = 44;
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -25,11 +27,12 @@ const formatHour = (h) => {
   return `${h - 12} PM`;
 };
 
-function AllDayCell({ dateStr, tasks, priorities, onTaskClick, onToggleDone, collapsed, onExpand }) {
+function AllDayCell({ dateStr, tasks, priorities, onTaskClick, onToggleDone, collapsed, onExpand, onCreate }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `allday-${dateStr}`,
     data: { kind: "allday", dateStr },
   });
+  const { handlers: createHandlers } = useEmptySlotClick({ onCreate });
   // Collapsing one row costs almost as much as it saves, so a cell that
   // small just shows everything — see lib/allday-collapse.
   const visibleLimit = collapsed && canCollapseAllDay(tasks.length) ? COLLAPSED_ALLDAY_VISIBLE : tasks.length;
@@ -38,6 +41,8 @@ function AllDayCell({ dateStr, tasks, priorities, onTaskClick, onToggleDone, col
   return (
     <div
       ref={setNodeRef}
+      {...createHandlers}
+      data-testid={`calendar-allday-${dateStr}`}
       className={cn(
         "flex-1 min-w-0 border-l border-slate-100 dark:border-[#303030] p-1 space-y-0.5",
         collapsed && "overflow-hidden",
@@ -71,8 +76,9 @@ function AllDayCell({ dateStr, tasks, priorities, onTaskClick, onToggleDone, col
   );
 }
 
-function TimedColumn({ date, timedTasks, priorities, onTaskClick, onToggleDone }) {
+function TimedColumn({ date, timedTasks, priorities, onTaskClick, onToggleDone, onCreate }) {
   const dateStr = toDateStr(date);
+  const slot = useEmptySlotClick({ onCreate, hourHeight: HOUR_HEIGHT });
   const { setNodeRef, isOver } = useDroppable({
     id: `timed-${dateStr}`,
     data: { kind: "timed", dateStr, hourHeight: HOUR_HEIGHT },
@@ -87,6 +93,8 @@ function TimedColumn({ date, timedTasks, priorities, onTaskClick, onToggleDone }
   return (
     <div
       ref={setNodeRef}
+      {...slot.handlers}
+      data-testid={`calendar-timed-${dateStr}`}
       className={cn(
         "flex-1 min-w-0 border-l border-slate-100 dark:border-[#303030] relative",
         isOver && "bg-blue-50 dark:bg-[#101f34]"
@@ -100,6 +108,8 @@ function TimedColumn({ date, timedTasks, priorities, onTaskClick, onToggleDone }
           style={{ top: h * HOUR_HEIGHT, height: HOUR_HEIGHT }}
         />
       ))}
+
+      <SlotGhost minutes={slot.hoverMinutes} hourHeight={HOUR_HEIGHT} />
 
       {nowMinutes != null && (
         <div
@@ -178,6 +188,8 @@ export default function WeekView({
   onTaskClick,
   onToggleDone,
   onDayClick,
+  // (dateStr, minutesAfterMidnight | null) — see DayView.
+  onCreateAt,
 }) {
   const scrollRef = useRef(null);
   const weekStart = useMemo(
@@ -302,6 +314,7 @@ export default function WeekView({
                   onToggleDone={onToggleDone}
                   collapsed={allDayCollapsed}
                   onExpand={() => setAllDayCollapsed(false)}
+                  onCreate={onCreateAt ? () => onCreateAt(ds, null) : undefined}
                 />
               );
             })}
@@ -334,6 +347,7 @@ export default function WeekView({
                 priorities={priorities}
                 onTaskClick={onTaskClick}
                 onToggleDone={onToggleDone}
+                onCreate={onCreateAt ? (minutes) => onCreateAt(toDateStr(d), minutes) : undefined}
               />
             );
           })}

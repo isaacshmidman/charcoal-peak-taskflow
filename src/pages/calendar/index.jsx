@@ -37,6 +37,7 @@ import { subMonths } from "date-fns/subMonths";
 import { subWeeks } from "date-fns/subWeeks";
 import { subYears } from "date-fns/subYears";
 import TaskForm from "@/components/tasks/TaskForm";
+import { formatSlotTime } from "@/components/calendar/useEmptySlotClick";
 import MonthCalendar from "@/components/calendar/MonthCalendar";
 import DayView from "@/components/calendar/DayView";
 import WeekView from "@/components/calendar/WeekView";
@@ -272,6 +273,15 @@ export default function Calendar() {
     handleViewChange("day");
   };
 
+  // Clicking empty time (or an all-day area) in Day/Week: a new task on
+  // that day, at that time — or all-day when minutes is null.
+  const openNewTaskAt = (dateStr, minutes) => {
+    setEditingTask(null);
+    setFormDefaultDueDate(dateStr);
+    setFormDefaultTimeStart(minutes == null ? null : formatSlotTime(minutes));
+    setShowForm(true);
+  };
+
   const openNewTask = () => {
     const today = startOfDay(new Date());
     let defaultDate;
@@ -355,6 +365,7 @@ export default function Calendar() {
             priorities={priorities}
             onTaskClick={handleTaskClick}
             onToggleDone={handleToggleDone}
+            onCreateAt={openNewTaskAt}
           />
         )}
         {view === "week" && (
@@ -365,6 +376,7 @@ export default function Calendar() {
             onTaskClick={handleTaskClick}
             onToggleDone={handleToggleDone}
             onDayClick={handleDayEmptyClick}
+            onCreateAt={openNewTaskAt}
           />
         )}
         {view === "month" && (

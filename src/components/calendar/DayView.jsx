@@ -10,6 +10,8 @@ import { layoutTimedTasks } from "@/lib/calendar-layout";
 import { toDateStr } from "@/lib/dates";
 import { useSplitPane } from "@/hooks/useSplitPane";
 import SplitDivider from "@/components/ui/split-divider";
+import { useEmptySlotClick } from "./useEmptySlotClick";
+import SlotGhost from "./SlotGhost";
 
 const HOUR_HEIGHT = 48; // px per hour slot
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -64,11 +66,12 @@ function TimedDropZone({ dateStr, children }) {
   );
 }
 
-function AllDayOverlayCell({ dateStr, allDayTasks, priorities, onTaskClick, onToggleDone, collapsed, onExpand }) {
+function AllDayOverlayCell({ dateStr, allDayTasks, priorities, onTaskClick, onToggleDone, collapsed, onExpand, onCreate }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `allday-${dateStr}`,
     data: { kind: "allday", dateStr },
   });
+  const { handlers: createHandlers } = useEmptySlotClick({ onCreate });
   // Hiding a single row costs nearly what it saves, so a strip that
   // small shows everything — see lib/allday-collapse.
   const visibleLimit = collapsed && canCollapseAllDay(allDayTasks.length) ? COLLAPSED_ALLDAY_VISIBLE : allDayTasks.length;
@@ -78,6 +81,8 @@ function AllDayOverlayCell({ dateStr, allDayTasks, priorities, onTaskClick, onTo
   return (
     <div
       ref={setNodeRef}
+      {...createHandlers}
+      data-testid={`calendar-allday-${dateStr}`}
       className={cn(
         "flex-1 min-w-0 border-l border-slate-100 dark:border-[#303030] p-1 space-y-0.5",
         collapsed && "overflow-hidden",
@@ -120,6 +125,7 @@ function MobileAllDayOverlay({
   collapsed,
   onToggleCollapsed,
   onExpand,
+  onCreate,
 }) {
   const collapsible = canCollapseAllDay(allDayTasks.length);
   const visibleCount = collapsed && collapsible
@@ -163,20 +169,24 @@ function MobileAllDayOverlay({
           onToggleDone={onToggleDone}
           collapsed={collapsed}
           onExpand={onExpand}
+          onCreate={onCreate}
         />
       </div>
     </div>
   );
 }
 
-function AllDayColumn({ dateStr, allDayTasks, priorities, onTaskClick, onToggleDone }) {
+function AllDayColumn({ dateStr, allDayTasks, priorities, onTaskClick, onToggleDone, onCreate }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `allday-${dateStr}`,
     data: { kind: "allday", dateStr },
   });
+  const { handlers: createHandlers } = useEmptySlotClick({ onCreate });
   return (
     <div
       ref={setNodeRef}
+      {...createHandlers}
+      data-testid={`calendar-allday-${dateStr}`}
       className={cn(
         "border border-slate-100 dark:border-[#303030] rounded-lg bg-white dark:bg-[#0c0c0c] p-2 h-full",
         isOver && "bg-blue-50 dark:bg-[#101f34]"
@@ -221,9 +231,15 @@ export default function DayView({
   priorities,
   onTaskClick,
   onToggleDone,
+  // (dateStr, minutesAfterMidnight | null) — clicking empty time or the
+  // all-day area opens a new task there (useEmptySlotClick).
+  onCreateAt,
 }) {
   const timedScrollRef = useRef(null);
   const dateStr = toDateStr(anchorDate);
+  const createTimed = onCreateAt ? (minutes) => onCreateAt(dateStr, minutes) : undefined;
+  const createAllDay = onCreateAt ? () => onCreateAt(dateStr, null) : undefined;
+  const timedSlot = useEmptySlotClick({ onCreate: createTimed, hourHeight: HOUR_HEIGHT });
   const useSideAllDay = useMediaQuery("(min-width: 640px)");
 
   // The divider gesture (detents, hysteresis, glide) lives in
@@ -313,6 +329,7 @@ export default function DayView({
             collapsed={allDayCollapsed}
             onToggleCollapsed={() => setAllDayCollapsed((v) => !v)}
             onExpand={() => setAllDayCollapsed(false)}
+            onCreate={createAllDay}
           />
         )}
         <TimedDropZone dateStr={dateStr}>
@@ -349,8 +366,14 @@ export default function DayView({
             </div>
           )}
 
-          {/* Timed tasks */}
-          <div className="absolute top-0 left-12 right-1 bottom-0">
+          {/* Timed tasks. Empty space in this layer is the click-to-create
+              target; the ghost shows where a click would land. */}
+          <div
+            className="absolute top-0 left-12 right-1 bottom-0"
+            data-testid={`calendar-timed-${dateStr}`}
+            {...timedSlot.handlers}
+          >
+            <SlotGhost minutes={timedSlot.hoverMinutes} hourHeight={HOUR_HEIGHT} />
             {laidOutTimed.map(({ task, startMin, endMin, col, cols, colSpan }) => {
               const top = (startMin / 60) * HOUR_HEIGHT;
               const height = Math.max(
@@ -416,6 +439,7 @@ export default function DayView({
             priorities={priorities}
             onTaskClick={onTaskClick}
             onToggleDone={onToggleDone}
+            onCreate={createAllDay}
           />
         </div>
       )}
