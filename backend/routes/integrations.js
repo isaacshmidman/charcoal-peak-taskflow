@@ -8,7 +8,7 @@
  * itself still requires a session match (enforced inside
  * completeGoogleConnect against the oauth_states row's user_id).
  */
-import { HttpError, readJsonBody, redirect, sendJson } from "../http.js";
+import { HttpError, readJsonBody, redirect, sameOriginUrl, sendJson } from "../http.js";
 import { requireAuthenticatedUser } from "../auth.js";
 import {
   completeGoogleConnect,
@@ -63,7 +63,7 @@ export async function handleIntegrationsRoute(request, response, { config, db, u
       throw new HttpError(400, "Missing state or code.", "invalid_callback");
     }
     const { redirectTo } = await completeGoogleConnect(db, config, { user, state, code });
-    const redirectUrl = new URL(redirectTo || "/Settings", config.publicAppUrl);
+    const redirectUrl = new URL(sameOriginUrl(redirectTo, config.publicAppUrl, "/Settings"));
     if (!redirectUrl.hash) redirectUrl.hash = "calendar-integrations";
     redirect(response, redirectUrl.toString());
     return true;
@@ -86,7 +86,7 @@ export async function handleIntegrationsRoute(request, response, { config, db, u
     segments[4] === "google" &&
     segments[5] === "connect"
   ) {
-    const fromUrl = url.searchParams.get("from_url") || "/Settings";
+    const fromUrl = sameOriginUrl(url.searchParams.get("from_url"), config.publicAppUrl, "/Settings");
     const { authUrl } = startGoogleConnect(db, config, { user, appId, fromUrl });
     const wantsJson = (request.headers.accept || "").includes("application/json");
     if (wantsJson) {

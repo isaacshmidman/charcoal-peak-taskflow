@@ -34,6 +34,15 @@ const CONTENT_TYPES = {
   ".woff2": "font/woff2",
 };
 
+/** The origin of config.publicAppUrl, or "" when it isn't a valid URL. */
+function publicOrigin(config) {
+  try {
+    return new URL(config.publicAppUrl).origin;
+  } catch {
+    return "";
+  }
+}
+
 function parsePath(pathname) {
   return pathname.split("/").filter(Boolean);
 }
@@ -141,12 +150,21 @@ export function createTaskflowServer(config = backendConfig) {
 
 export function createRequestHandler(config = backendConfig, db = getDatabase(config)) {
   return async (request, response) => {
+    // CORS for the app's own origin only. This used to echo back ANY
+    // Origin with credentials allowed, i.e. "every website may call this
+    // API as the signed-in user". The SameSite=Lax session cookie kept
+    // that from being usable, but the header shouldn't have offered it.
+    // The app itself is same-origin (the server serves the SPA), so this
+    // matters only for a dev setup that points VITE_API_BASE_URL across
+    // ports — which is exactly what publicAppUrl names.
     const requestOrigin = request.headers.origin || "";
-    const allowedOrigin = requestOrigin || config.publicAppUrl || "*";
-    response.setHeader("Access-Control-Allow-Origin", allowedOrigin);
-    response.setHeader("Access-Control-Allow-Credentials", "true");
-    response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-App-Id, X-Origin-URL");
-    response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    response.setHeader("Vary", "Origin");
+    if (requestOrigin && requestOrigin === publicOrigin(config)) {
+      response.setHeader("Access-Control-Allow-Origin", requestOrigin);
+      response.setHeader("Access-Control-Allow-Credentials", "true");
+      response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-App-Id, X-Origin-URL");
+      response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    }
 
     if (request.method === "OPTIONS") {
       response.writeHead(204);

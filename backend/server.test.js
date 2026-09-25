@@ -431,3 +431,126 @@ describe("registry entities: DeletedNote", () => {
     expect(removed.statusCode).toBe(200);
   });
 });
+
+describe("server safety", () => {
+  const json = (token) => ({ Authorization: `Bearer ${token}`, "Content-Type": "application/json" });
+
+  it("never lets a client create a record inside someone else's account", async () => {
+    const victim = await login("victim@example.com");
+    const attacker = await login("attacker@example.com");
+
+    const planted = await invoke("/api/apps/test-app/entities/Task", {
+      method: "POST",
+      headers: json(attacker),
+      body: {
+        title: "Planted",
+        due_date: "2026-09-25",
+        // Naming the victim used to be enough to land in their account.
+        created_by: "victim@example.com",
+        created_by_id: "anything",
+      },
+    });
+    expect(planted.statusCode).toBe(201);
+    expect(planted.body.created_by).toBe("attacker@example.com");
+
+    const victimTasks = await invoke("/api/apps/test-app/entities/Task", { headers: json(victim) });
+    expect(victimTasks.body.some((t) => t.title === "Planted")).toBe(false);
+  });
+
+  it("404s entity names that only exist on Object.prototype", async () => {
+    const token = await login("proto@example.com");
+    for (const name of ["constructor", "toString", "__proto__", "hasOwnProperty"]) {
+      const result = await invoke(`/api/apps/test-app/entities/${name}`, { headers: json(token) });
+      expect(result.statusCode).toBe(404);
+      expect(result.body.code).toBe("unknown_entity");
+    }
+  });
+
+  it("rejects wrong shapes with a 400 instead of a driver error", async () => {
+    const token = await login("shapes@example.com");
+    const post = (body) =>
+      invoke("/api/apps/test-app/entities/Task", { method: "POST", headers: json(token), body });
+
+    expect((await post({ title: "ok", description: { nested: true } })).statusCode).toBe(400);
+    expect((await post({ title: "ok", tags: { not: "a list" } })).statusCode).toBe(400);
+    expect((await post({ title: "ok", tags: [{ tag: 1 }] })).statusCode).toBe(400);
+    expect((await post(["an", "array"])).statusCode).toBe(400);
+  });
+
+  it("caps field sizes well above anything the app writes", async () => {
+    const token = await login("sizes@example.com");
+    const post = (body) =>
+      invoke("/api/apps/test-app/entities/Task", { method: "POST", headers: json(token), body });
+
+    // A realistic long description — far past the editor's 500 words — is fine.
+    const long = await post({ title: "Long", description: "word ".repeat(20_000) });
+    expect(long.statusCode).toBe(201);
+
+    const tooLong = await post({ title: "x".repeat(2_001) });
+    expect(tooLong.statusCode).toBe(400);
+    expect(tooLong.body.code).toBe("field_too_long");
+
+    const tooManyTags = await post({ title: "Tags", tags: Array.from({ length: 101 }, (_, i) => `t${i}`) });
+    expect(tooManyTags.statusCode).toBe(400);
+
+    // Updates are held to the same rules.
+    const update = await invoke(`/api/apps/test-app/entities/Task/${long.body.id}`, {
+      method: "PUT",
+      headers: json(token),
+      body: { title: "y".repeat(5_000) },
+    });
+    expect(update.statusCode).toBe(400);
+  });
+
+  it("refuses oversized bodies — including on login, before anyone is signed in", async () => {
+    const hugeLogin = await invoke("/api/apps/test-app/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: { email: "a@example.com", password: "p".repeat(100 * 1024) },
+    });
+    expect(hugeLogin.statusCode).toBe(413);
+    expect(hugeLogin.headers.Connection).toBe("close");
+
+    const token = await login("body@example.com");
+    const hugeTask = await invoke("/api/apps/test-app/entities/Task", {
+      method: "POST",
+      headers: json(token),
+      body: { title: "Huge", description_json: "x".repeat(5 * 1024 * 1024) },
+    });
+    expect(hugeTask.statusCode).toBe(413);
+  });
+
+  it("keeps sign-in and sign-out redirects on this app's own origin", async () => {
+    const offsite = await invoke(
+      `/api/apps/auth/logout?from_url=${encodeURIComponent("https://evil.example/fake-login")}`
+    );
+    expect(offsite.statusCode).toBe(302);
+    expect(offsite.headers.Location).toBe("http://127.0.0.1:4173/login");
+
+    const onsite = await invoke(`/api/apps/auth/logout?from_url=${encodeURIComponent("/login?bye=1")}`);
+    expect(onsite.headers.Location).toBe("http://127.0.0.1:4173/login?bye=1");
+
+    // Google isn't configured here, so sign-in bounces to /login carrying
+    // only a same-origin path — never the off-site address.
+    const signIn = await invoke(
+      `/api/apps/auth/login?app_id=test-app&from_url=${encodeURIComponent("https://evil.example/")}`
+    );
+    expect(signIn.statusCode).toBe(302);
+    expect(String(signIn.headers.Location).startsWith("http://127.0.0.1:4173/login")).toBe(true);
+    expect(signIn.headers.Location).not.toContain("evil.example");
+  });
+});
+
+describe("CORS", () => {
+  it("allows credentialed calls from the app's own origin only", async () => {
+    const own = await invoke("/api/health", { headers: { Origin: "http://127.0.0.1:4173" } });
+    expect(own.headers["Access-Control-Allow-Origin"]).toBe("http://127.0.0.1:4173");
+    expect(own.headers["Access-Control-Allow-Credentials"]).toBe("true");
+
+    // Any other site used to be echoed straight back with credentials allowed.
+    const other = await invoke("/api/health", { headers: { Origin: "https://evil.example" } });
+    expect(other.headers["Access-Control-Allow-Origin"]).toBeUndefined();
+    expect(other.headers["Access-Control-Allow-Credentials"]).toBeUndefined();
+    expect(other.headers.Vary).toBe("Origin");
+  });
+});

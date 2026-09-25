@@ -12,8 +12,10 @@ import {
   getEntityRecord,
   listEntityRecords,
   updateEntityRecord,
+  validateClientInput,
 } from "../store.js";
 import { enqueueTaskPush } from "../push.js";
+import { MAX_ENTITY_BODY_BYTES } from "../limits.js";
 
 /**
  * @param {import("node:http").IncomingMessage} request
@@ -60,7 +62,8 @@ export async function handleEntitiesRoute(request, response, { config, db, url, 
   }
 
   if (request.method === "POST" && entityName && !entityId) {
-    const body = (await readJsonBody(request)) || {};
+    const body = (await readJsonBody(request, { maxBytes: MAX_ENTITY_BODY_BYTES })) || {};
+    validateClientInput(entityName, body);
     const created = createEntityRecord(db, {
       entityName,
       appId,
@@ -76,7 +79,8 @@ export async function handleEntitiesRoute(request, response, { config, db, url, 
   }
 
   if (request.method === "PUT" && entityName && entityId) {
-    const body = (await readJsonBody(request)) || {};
+    const body = (await readJsonBody(request, { maxBytes: MAX_ENTITY_BODY_BYTES })) || {};
+    validateClientInput(entityName, body);
     const updated = updateEntityRecord(db, { entityName, appId, user, id: entityId, input: body });
     if (entityName === "Task") {
       enqueueTaskPush(db, config, { op: "upsert", appId, taskSnapshot: updated });

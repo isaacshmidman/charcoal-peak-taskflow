@@ -9,7 +9,7 @@
  *   - GET  /api/apps/auth/google/callback
  *   - GET  /api/apps/:appId/auth/logout
  */
-import { HttpError, readJsonBody, redirect, sendJson } from "../http.js";
+import { HttpError, readJsonBody, redirect, sameOriginUrl, sendJson } from "../http.js";
 import {
   clearSessionCookie,
   completeGoogleLogin,
@@ -59,7 +59,9 @@ export async function handleAuthRoute(request, response, { config, db, url, segm
   ) {
     const appId = url.searchParams.get("app_id") || config.appId;
     ensureAppId(appId, config);
-    const fromUrl = url.searchParams.get("from_url") || `${config.publicAppUrl}/Today`;
+    // Stored with the OAuth state and followed after Google sign-in, so it
+    // must stay on this app's origin (see sameOriginUrl).
+    const fromUrl = sameOriginUrl(url.searchParams.get("from_url"), config.publicAppUrl, "/Today");
     const wantsJson = (request.headers.accept || "").includes("application/json");
     try {
       const authUrl = getGoogleAuthUrl(db, config, { appId, fromUrl });
@@ -100,8 +102,11 @@ export async function handleAuthRoute(request, response, { config, db, url, segm
       throw new HttpError(400, "Google sign-in callback is missing state or code.", "invalid_google_callback");
     }
     const result = await completeGoogleLogin(db, config, request, { state, code });
-    const redirectUrl = new URL(result.redirectTo, config.publicAppUrl);
-    redirect(response, redirectUrl.toString(), { "Set-Cookie": result.sessionCookie });
+    // Checked again here: states written before the check above existed
+    // may still hold an off-site address.
+    redirect(response, sameOriginUrl(result.redirectTo, config.publicAppUrl, "/Today"), {
+      "Set-Cookie": result.sessionCookie,
+    });
     return true;
   }
 
@@ -114,7 +119,9 @@ export async function handleAuthRoute(request, response, { config, db, url, segm
     destroySession(db, config, request, config.appId);
     const fromUrl = url.searchParams.get("from_url");
     if (fromUrl) {
-      redirect(response, fromUrl, { "Set-Cookie": clearSessionCookie(config) });
+      redirect(response, sameOriginUrl(fromUrl, config.publicAppUrl, "/login"), {
+        "Set-Cookie": clearSessionCookie(config),
+      });
       return true;
     }
     sendJson(response, 200, { success: true }, { "Set-Cookie": clearSessionCookie(config) });

@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { HttpError } from "./http.js";
 import { backendConfig, getDeletedTaskRetentionMs } from "./config.js";
 import { deleteAttachmentsForTask } from "./attachments.js";
+import { ARRAY_LIMITS, DEFAULT_FIELD_MAX_CHARS, FIELD_MAX_CHARS } from "./limits.js";
 
 const ENTITY_DEFINITIONS = {
   Task: {
@@ -189,6 +190,18 @@ const DEFAULT_PRIORITIES = [
   { name: "Low", color: "green", order: 3 },
 ];
 
+/**
+ * The definition for an entity name taken from a URL. An own-property
+ * check, not a bare lookup: `ENTITY_DEFINITIONS["constructor"]` is
+ * inherited from Object and truthy, which turned /entities/constructor
+ * into a SQL error and a 500 instead of a 404.
+ *
+ * @param {string} entityName
+ */
+function definitionFor(entityName) {
+  return Object.hasOwn(ENTITY_DEFINITIONS, entityName) ? ENTITY_DEFINITIONS[entityName] : undefined;
+}
+
 function toIsoString(value, fallback = "") {
   if (!value) return fallback;
   const parsed = new Date(String(value));
@@ -220,13 +233,13 @@ function normalizedFieldList(fields) {
 }
 
 function mapFieldName(entityName, fieldName) {
-  const definition = ENTITY_DEFINITIONS[entityName];
+  const definition = definitionFor(entityName);
   if (!definition) return fieldName;
   return definition.fieldMap[fieldName] || fieldName;
 }
 
 function mapFieldNameFromDb(entityName, fieldName) {
-  const definition = ENTITY_DEFINITIONS[entityName];
+  const definition = definitionFor(entityName);
   if (!definition) return fieldName;
   const inverse = Object.entries(definition.fieldMap).find(([, dbField]) => dbField === fieldName);
   return inverse ? inverse[0] : fieldName;
@@ -238,7 +251,7 @@ function mapFieldNameFromDb(entityName, fieldName) {
  */
 export function hydrateRecord(entityName, row) {
   if (!row) return null;
-  const definition = ENTITY_DEFINITIONS[entityName];
+  const definition = definitionFor(entityName);
   if (!definition) return { ...row };
 
   /** @type {Record<string, unknown>} */
@@ -269,7 +282,7 @@ function stableUserScope(user) {
 }
 
 function authWhereClause(entityName) {
-  const definition = ENTITY_DEFINITIONS[entityName];
+  const definition = definitionFor(entityName);
   if (!definition) {
     return {
       clause: "",
@@ -441,8 +454,87 @@ function validateEntityInput(entityName, input, { mode = "create" } = {}) {
   // "Untitled"); content may be empty while a draft is being typed.
 }
 
+/**
+ * @param {string} field
+ * @param {string} problem
+ */
+function fieldError(field, problem) {
+  return new HttpError(400, `${field} ${problem}.`, "validation_error", { field });
+}
+
+/**
+ * @param {string} field
+ * @param {unknown} value
+ */
+function checkListField(field, value) {
+  let list = value;
+  if (typeof value === "string") {
+    try {
+      list = JSON.parse(value);
+    } catch {
+      // Unparseable text is stored as the field's default; nothing to check.
+      return;
+    }
+  }
+  if (!Array.isArray(list)) throw fieldError(field, "must be a list");
+  const limits = ARRAY_LIMITS[field];
+  if (limits?.maxItems && list.length > limits.maxItems) {
+    throw new HttpError(400, `${field} has more than ${limits.maxItems} items.`, "field_too_long", { field });
+  }
+  if (limits?.maxItemChars) {
+    for (const item of list) {
+      if (typeof item !== "string") throw fieldError(field, "must be a list of text");
+      if (item.length > limits.maxItemChars) {
+        throw new HttpError(400, `Each ${field} item must be at most ${limits.maxItemChars} characters.`, "field_too_long", { field });
+      }
+    }
+  }
+}
+
+/**
+ * Shape and size checks for a record sent by the browser, run before a
+ * create or update. Values used to go to SQLite as-is: an object where
+ * text belonged failed inside the driver as a 500, and nothing bounded how
+ * much text a single field could hold. Limits live in limits.js.
+ *
+ * Calendar sync and the Base44 import call the store directly and skip
+ * this — they are trusted, and a long imported event must not stall sync.
+ *
+ * @param {string} entityName
+ * @param {unknown} input
+ */
+export function validateClientInput(entityName, input) {
+  const definition = definitionFor(entityName);
+  if (!definition) throw new HttpError(404, `Unknown entity: ${entityName}`, "unknown_entity");
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new HttpError(400, "Request body must be a JSON object.", "validation_error");
+  }
+  const record = /** @type {Record<string, unknown>} */ (input);
+  const fields = new Set([...Object.keys(definition.defaults), ...definition.mutableFields]);
+
+  for (const field of fields) {
+    if (!Object.hasOwn(record, field)) continue;
+    const value = record[field];
+    if (value == null) continue;
+
+    if (definition.jsonColumns.includes(field)) {
+      checkListField(field, value);
+      continue;
+    }
+    if (typeof value === "object") {
+      throw fieldError(field, definition.booleanColumns.includes(field) ? "must be true or false" : "must be text or a number");
+    }
+    if (typeof value === "string") {
+      const max = FIELD_MAX_CHARS[field] ?? DEFAULT_FIELD_MAX_CHARS;
+      if (value.length > max) {
+        throw new HttpError(400, `${field} is longer than ${max} characters.`, "field_too_long", { field });
+      }
+    }
+  }
+}
+
 function buildInsertRow(entityName, input, { appId, user, config, allowSystemFields = false }) {
-  const definition = ENTITY_DEFINITIONS[entityName];
+  const definition = definitionFor(entityName);
   if (!definition) throw new HttpError(404, `Unknown entity: ${entityName}`, "unknown_entity");
   const now = new Date().toISOString();
   const row = {
@@ -450,8 +542,12 @@ function buildInsertRow(entityName, input, { appId, user, config, allowSystemFie
     app_id: appId,
     created_date: allowSystemFields && input.created_date ? String(input.created_date) : now,
     updated_date: allowSystemFields && input.updated_date ? String(input.updated_date) : now,
-    created_by_id: String(input.created_by_id || user?.id || ""),
-    created_by: String(input.created_by || user?.email || ""),
+    // Ownership comes from the signed-in user, never from the request.
+    // Taking it from the body let anyone create tasks and notes inside
+    // another account just by naming its email. Only the Base44 import
+    // (allowSystemFields) carries owners over from an export.
+    created_by_id: String((allowSystemFields && input.created_by_id) || user?.id || ""),
+    created_by: String((allowSystemFields && input.created_by) || user?.email || ""),
     is_sample: toBoolean(input.is_sample) ? 1 : 0,
   };
 
@@ -497,7 +593,7 @@ function buildInsertRow(entityName, input, { appId, user, config, allowSystemFie
 }
 
 function buildUpdateRow(entityName, input) {
-  const definition = ENTITY_DEFINITIONS[entityName];
+  const definition = definitionFor(entityName);
   if (!definition) throw new HttpError(404, `Unknown entity: ${entityName}`, "unknown_entity");
 
   /** @type {Record<string, unknown>} */
@@ -553,7 +649,7 @@ export function purgeExpiredDeletedNotes(db, appId) {
 }
 
 function listRowsForEntity(db, entityName, appId, user) {
-  const definition = ENTITY_DEFINITIONS[entityName];
+  const definition = definitionFor(entityName);
   if (!definition) throw new HttpError(404, `Unknown entity: ${entityName}`, "unknown_entity");
   const scope = authWhereClause(entityName);
   return db
@@ -593,7 +689,7 @@ export function getEntityRecord(db, { entityName, appId, user, id }) {
     purgeExpiredDeletedNotes(db, appId);
   }
 
-  const definition = ENTITY_DEFINITIONS[entityName];
+  const definition = definitionFor(entityName);
   if (!definition) throw new HttpError(404, `Unknown entity: ${entityName}`, "unknown_entity");
   const scope = authWhereClause(entityName);
   const row = db
@@ -608,7 +704,7 @@ export function getEntityRecord(db, { entityName, appId, user, id }) {
 }
 
 export function createEntityRecord(db, { entityName, appId, user, input, config, allowSystemFields = false }) {
-  const definition = ENTITY_DEFINITIONS[entityName];
+  const definition = definitionFor(entityName);
   if (!definition) throw new HttpError(404, `Unknown entity: ${entityName}`, "unknown_entity");
   validateEntityInput(entityName, input, { mode: "create" });
 
@@ -618,7 +714,7 @@ export function createEntityRecord(db, { entityName, appId, user, input, config,
 }
 
 export function importEntityRecord(db, { entityName, appId, user, input, config }) {
-  const definition = ENTITY_DEFINITIONS[entityName];
+  const definition = definitionFor(entityName);
   if (!definition) throw new HttpError(404, `Unknown entity: ${entityName}`, "unknown_entity");
 
   if (input.id) {
@@ -636,7 +732,7 @@ export function importEntityRecord(db, { entityName, appId, user, input, config 
 }
 
 export function updateEntityRecord(db, { entityName, appId, user, id, input }) {
-  const definition = ENTITY_DEFINITIONS[entityName];
+  const definition = definitionFor(entityName);
   if (!definition) throw new HttpError(404, `Unknown entity: ${entityName}`, "unknown_entity");
   validateEntityInput(entityName, input, { mode: "update" });
   getEntityRecord(db, { entityName, appId, user, id });
@@ -648,7 +744,7 @@ export function updateEntityRecord(db, { entityName, appId, user, id, input }) {
 }
 
 export function deleteEntityRecord(db, { entityName, appId, user, id }) {
-  const definition = ENTITY_DEFINITIONS[entityName];
+  const definition = definitionFor(entityName);
   if (!definition) throw new HttpError(404, `Unknown entity: ${entityName}`, "unknown_entity");
   getEntityRecord(db, { entityName, appId, user, id });
   const scope = authWhereClause(entityName);
