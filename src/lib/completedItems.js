@@ -40,6 +40,7 @@ export function buildCompletedTaskItem(task) {
 
 import { compareTaskTime } from "@/lib/sort-helpers";
 import { calendarKeyForTask, compareByCalendarOrder } from "@/lib/calendar-order";
+import { taskMatchesSearch } from "@/lib/task-filters";
 
 /**
  * @param {CompletedItem} item
@@ -153,11 +154,7 @@ export function buildCompletedItems({
     .filter((task) => !hiddenCalendars || !hiddenCalendars.has(calendarKeyForTask(task)))
     .map((task) => buildCompletedTaskItem(/** @type {TaskRecord & { id: string }} */ (task)));
 
-  const filtered = completedTasks.filter((item) => {
-    if (!normalizedSearch) return true;
-
-    return item.title.toLowerCase().includes(normalizedSearch) || item.tags.some((tag) => tag.toLowerCase().includes(normalizedSearch));
-  });
+  const filtered = completedTasks.filter((item) => taskMatchesSearch(item.task, normalizedSearch));
 
   return sortCompletedItems(filtered, sorts, priorityOrderMap, calendarIndexByKey);
 }

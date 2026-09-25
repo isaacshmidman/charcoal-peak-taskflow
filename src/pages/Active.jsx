@@ -16,7 +16,7 @@ import SubtaskForm from "@/components/tasks/SubtaskForm";
 import MultiSortPanel from "@/components/tasks/MultiSortPanel";
 import RecurringDeleteDialog from "@/components/tasks/RecurringDeleteDialog";
 import { compareDueDateTime } from "@/lib/sort-helpers";
-import { excludeExternalEvents } from "@/lib/task-filters";
+import { excludeExternalEvents, taskMatchesSearch } from "@/lib/task-filters";
 import { useCalendarOrderState } from "@/hooks/useCalendarOrder";
 import { calendarKeyForTask, compareByCalendarOrder } from "@/lib/calendar-order";
 import { useShortcutEvent } from "@/hooks/useShortcutEvent";
@@ -186,14 +186,12 @@ export default function Active() {
   };
 
   const activeTasks = useMemo(() => {
-    const q = search.toLowerCase();
     const filtered = topLevelTasks.filter(t => {
       if (t.status === "done") return false;
       // Drop tasks belonging to a calendar the user has hidden in
       // Settings → Calendar Order.
       if (hiddenCalendars.has(calendarKeyForTask(t))) return false;
-      if (!search) return true;
-      return t.title?.toLowerCase().includes(q) || t.tags?.some(tag => tag.toLowerCase().includes(q));
+      return taskMatchesSearch(t, search);
     });
     return filtered.sort((a, b) => {
       for (const sortValue of sorts) {

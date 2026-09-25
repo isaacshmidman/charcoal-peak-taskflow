@@ -21,6 +21,7 @@ import { startOfWeek } from "date-fns/startOfWeek";
 import { startOfYear } from "date-fns/startOfYear";
 import { deriveCalendars } from "@/components/calendar/CalendarVisibilityDropdown";
 import { calendarKeyForTask } from "@/lib/calendar-order";
+import { taskMatchesSearch } from "@/lib/task-filters";
 import {
   compareDueDateTime,
   compareTaskTime,
@@ -112,11 +113,7 @@ export function useCalendarFilters({ tasks, view, anchorDate, search, sorts, pri
       if (hiddenCalendars.size > 0 && hiddenCalendars.has(calendarKeyForTask(t))) {
         return false;
       }
-      if (!q) return true;
-      return (
-        t.title?.toLowerCase().includes(q) ||
-        t.tags?.some((tag) => tag.toLowerCase().includes(q))
-      );
+      return taskMatchesSearch(t, q);
     });
     const sorted = [...filtered].sort((a, b) => {
       for (const sv of sorts) {

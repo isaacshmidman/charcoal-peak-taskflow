@@ -22,7 +22,7 @@ import SubtaskForm from "@/components/tasks/SubtaskForm";
 import MultiSortPanel from "@/components/tasks/MultiSortPanel";
 import RecurringDeleteDialog from "@/components/tasks/RecurringDeleteDialog";
 import { compareDueDateTime } from "@/lib/sort-helpers";
-import { excludeExternalEvents } from "@/lib/task-filters";
+import { excludeExternalEvents, taskMatchesSearch } from "@/lib/task-filters";
 import { useCalendarOrderState } from "@/hooks/useCalendarOrder";
 import { calendarKeyForTask, compareByCalendarOrder } from "@/lib/calendar-order";
 import { useShortcutEvent } from "@/hooks/useShortcutEvent";
@@ -182,7 +182,7 @@ export default function Today() {
         const d = startOfDay(new Date(t.due_date + "T00:00:00"));
         return isToday(d) || isBefore(d, todayStart);
       })
-      .filter(t => !search || t.title?.toLowerCase().includes(search.toLowerCase()) || t.tags?.some(tag => tag.toLowerCase().includes(search.toLowerCase())));
+      .filter(t => taskMatchesSearch(t, search));
 
     return base.sort((a, b) => {
       for (const sortValue of sorts) {

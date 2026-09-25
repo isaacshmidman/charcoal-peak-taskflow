@@ -17,7 +17,7 @@ import { useOfflineMutation } from "@/hooks/useOfflineMutation";
 import { useOfflineEntityMutation } from "@/hooks/useOfflineEntityMutation";
 import { showDeleteToast } from "@/components/tasks/DeleteToast";
 import NotePreview from "@/components/notes/NotePreview";
-import { excludeExternalEvents } from "@/lib/task-filters";
+import { excludeExternalEvents, taskMatchesSearch } from "@/lib/task-filters";
 import { formatDeleteLabel } from "@/hooks/useDeleteWithUndo";
 import {
   Dialog,
@@ -123,11 +123,7 @@ export default function RecentlyDeleted({ onBack } = {}) {
   );
 
   const displayedTasks = useMemo(() => {
-    const q = search.toLowerCase();
-    const filtered = userDeletedTasks.filter(t => {
-      if (!q) return true;
-      return t.title?.toLowerCase().includes(q) || t.tags?.some(tag => tag.toLowerCase().includes(q));
-    });
+    const filtered = userDeletedTasks.filter(t => taskMatchesSearch(t, search));
     return sortTrash(filtered, sorts, compareDeletedTask, priorityRank);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userDeletedTasks, search, sorts, priorityMap]);

@@ -410,6 +410,34 @@ function zonedDateTimeToDate(ymd, minutes, timeZone) {
   return Number.isNaN(zoned.getTime()) ? null : zoned;
 }
 
+/** Tags that mark a stored description as HTML (Google Calendar imports). */
+const HTML_TAG_RE = /<\/?(p|br|div|span|b|strong|i|em|u|s|a|ul|ol|li|h[1-6]|blockquote|code|pre)\b[^>]*>/i;
+
+/**
+ * A task description as notification text. A push body is plain text, but
+ * Google Calendar stores descriptions as HTML — shown raw, a reminder read
+ * "Join <b>Zoom</b><br>…". HTML is flattened to one line with the common
+ * entities decoded; plain text is left as written, so a literal "<" in it
+ * is never mistaken for markup.
+ *
+ * @param {unknown} description
+ * @returns {string}
+ */
+export function notificationDescriptionText(description) {
+  const raw = String(description || "").trim();
+  if (!HTML_TAG_RE.test(raw)) return raw;
+  return raw
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /**
  * Build a notification payload modeled after Google Calendar's reminders
  * on Apple devices.
@@ -459,7 +487,7 @@ function buildTaskNotificationPayload(task, scheduledFor, settings = sanitizeNot
   if (recurLabel) bodyLines.push(recurLabel);
 
   if (settings.showDescription && task.description) {
-    const desc = String(task.description).trim();
+    const desc = notificationDescriptionText(task.description);
     if (desc) bodyLines.push(desc.length > 200 ? `${desc.slice(0, 197)}…` : desc);
   }
 

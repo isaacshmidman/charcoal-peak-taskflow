@@ -21,7 +21,7 @@ import TaskForm from "@/components/tasks/TaskForm";
 import MultiSortPanel from "@/components/tasks/MultiSortPanel";
 import RecurringDeleteDialog from "@/components/tasks/RecurringDeleteDialog";
 import { compareDueDateTime } from "@/lib/sort-helpers";
-import { excludeExternalEvents } from "@/lib/task-filters";
+import { excludeExternalEvents, taskMatchesSearch } from "@/lib/task-filters";
 import { useCalendarOrderState } from "@/hooks/useCalendarOrder";
 import { calendarKeyForTask, compareByCalendarOrder } from "@/lib/calendar-order";
 import { useShortcutEvent } from "@/hooks/useShortcutEvent";
@@ -199,13 +199,11 @@ export default function Groupings() {
   const nextSevenDaysEnd = startOfDay(addDays(today, 8));
 
   const topLevel = useMemo(() => {
-    const q = search.toLowerCase();
     return tasks.filter(t => {
       if (t.parent_id || t.status === "done") return false;
       // Hide tasks belonging to user-hidden calendars (Settings → Calendar Order).
       if (hiddenCalendars.has(calendarKeyForTask(t))) return false;
-      if (!search) return true;
-      return t.title?.toLowerCase().includes(q) || t.tags?.some(tag => tag.toLowerCase().includes(q));
+      return taskMatchesSearch(t, search);
     });
   }, [tasks, search, hiddenCalendars]);
   const getDate = (t) => t.due_date ? new Date(t.due_date + "T00:00:00") : null;

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createDatabase } from "./db.js";
 import {
   getUserNotificationSettings,
+  notificationDescriptionText,
   runNotificationSweep,
   sendTestNotification,
   unsubscribeNotificationSubscription,
@@ -271,3 +272,21 @@ describe("notification scheduler", () => {
     expect(result).toEqual({ sent: 1, failed: 0 });
   });
 });
+
+describe("notificationDescriptionText", () => {
+  it("flattens an HTML calendar description to readable text", () => {
+    expect(notificationDescriptionText("Join <b>Zoom</b><br><a href=\"https://x\">link</a> &amp; bring notes&nbsp;"))
+      .toBe("Join Zoom link & bring notes");
+  });
+
+  it("leaves plain text alone, including a literal < and its line breaks", () => {
+    expect(notificationDescriptionText("budget < 50\nsee > below")).toBe("budget < 50\nsee > below");
+  });
+
+  it("returns empty for nothing", () => {
+    expect(notificationDescriptionText("")).toBe("");
+    expect(notificationDescriptionText(undefined)).toBe("");
+    expect(notificationDescriptionText("   ")).toBe("");
+  });
+});
+
