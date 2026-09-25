@@ -150,6 +150,35 @@ function readConfigValue({
   return readStoredValue(storageKey, legacyStorageKeys);
 }
 
+/**
+ * Remove query parameters from the address bar without reloading.
+ * @param {string[]} names
+ * @returns {void}
+ */
+function stripUrlParams(names) {
+  if (isServer) return;
+  const searchParams = new URLSearchParams(window.location.search);
+  const present = names.filter((name) => searchParams.has(name));
+  if (!present.length) return;
+  present.forEach((name) => searchParams.delete(name));
+  const query = searchParams.toString();
+  window.history.replaceState({}, document.title, `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`);
+}
+
+/**
+ * Link parameters that used to reconfigure the app (inherited from Base44)
+ * and are now stripped and ignored. Nothing in Zephyrly generates them, and
+ * each let a crafted link take over a browser:
+ *   - api_base_url / app_base_url pointed every request — and so every task
+ *     and note typed afterwards — at whatever server the link named, and
+ *     saved that choice so it outlived the visit;
+ *   - access_token quietly signed the visitor into the link-maker's
+ *     account, so whatever they typed next went to that account;
+ *   - app_id could leave the app failing every request until site data
+ *     was cleared.
+ */
+export const IGNORED_URL_PARAMS = ["api_base_url", "app_base_url", "access_token", "app_id"];
+
 /** @returns {void} */
 function clearStoredToken() {
   removeStorageValue(APP_STORAGE_KEYS.accessToken);
@@ -182,28 +211,27 @@ function getAppConfig() {
     removeStorageValue(CLEAR_TOKEN_STORAGE_KEY);
   }
 
+  stripUrlParams(IGNORED_URL_PARAMS);
+  // An API address saved by an earlier ?api_base_url link must not keep
+  // redirecting requests now that the parameter is ignored.
+  removeStorageValue(APP_STORAGE_KEYS.apiBaseUrl);
+
   return {
     appId: readConfigValue({
-      paramNames: ["app_id"],
       storageKey: APP_STORAGE_KEYS.appId,
       defaultValues: [import.meta.env.VITE_APP_ID],
     }),
     token: readConfigValue({
-      paramNames: ["access_token"],
       storageKey: APP_STORAGE_KEYS.accessToken,
       legacyStorageKeys: TOKEN_FALLBACK_STORAGE_KEYS,
-      removeFromUrl: true,
     }),
     fromUrl: readConfigValue({
       paramNames: ["from_url"],
       storageKey: APP_STORAGE_KEYS.fromUrl,
       defaultValues: [getWindowUrl()],
     }),
-    apiBaseUrl: readConfigValue({
-      paramNames: ["api_base_url", "app_base_url"],
-      storageKey: APP_STORAGE_KEYS.apiBaseUrl,
-      defaultValues: [import.meta.env.VITE_API_BASE_URL],
-    }),
+    // Build-time only: never from a link, never from storage.
+    apiBaseUrl: import.meta.env.VITE_API_BASE_URL || null,
   };
 }
 
