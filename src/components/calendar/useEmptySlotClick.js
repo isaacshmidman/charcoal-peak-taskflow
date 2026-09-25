@@ -23,8 +23,9 @@ import { useRef, useState } from "react";
 export const SLOT_MINUTES = 15;
 /** How far a press may travel and still count as a click. */
 const MAX_CLICK_TRAVEL_PX = 6;
-/** Things that have their own click behaviour (cards are role="button"). */
-const INTERACTIVE = 'button, a, input, textarea, select, [role="button"]';
+/** Things that have their own click behaviour (cards are role="button";
+ *  the resize strip marks itself data-no-create). */
+const INTERACTIVE = 'button, a, input, textarea, select, [role="button"], [data-no-create]';
 
 /**
  * Minutes after midnight at a vertical offset into a 24-hour grid, snapped

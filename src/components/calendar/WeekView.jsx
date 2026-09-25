@@ -13,6 +13,7 @@ import { layoutTimedTasks } from "@/lib/calendar-layout";
 import { toDateStr } from "@/lib/dates";
 import { useEmptySlotClick } from "./useEmptySlotClick";
 import SlotGhost from "./SlotGhost";
+import TimedEventBlock from "./TimedEventBlock";
 
 const HOUR_HEIGHT = 44;
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -76,7 +77,7 @@ function AllDayCell({ dateStr, tasks, priorities, onTaskClick, onToggleDone, col
   );
 }
 
-function TimedColumn({ date, timedTasks, priorities, onTaskClick, onToggleDone, onCreate, dropPreview }) {
+function TimedColumn({ date, timedTasks, priorities, onTaskClick, onToggleDone, onCreate, dropPreview, onResizeEnd }) {
   const dateStr = toDateStr(date);
   const slot = useEmptySlotClick({ onCreate, hourHeight: HOUR_HEIGHT });
   const { setNodeRef, isOver } = useDroppable({
@@ -123,34 +124,18 @@ function TimedColumn({ date, timedTasks, priorities, onTaskClick, onToggleDone, 
         </div>
       )}
 
-      {laidOut.map(({ task, startMin, endMin, col, cols, colSpan }) => {
-        const top = (startMin / 60) * HOUR_HEIGHT;
-        const height = Math.max(22, ((endMin - startMin) / 60) * HOUR_HEIGHT);
-        // Width = colSpan / cols (not 1 / cols) so events expand into
-        // empty adjacent columns. See layoutTimedTasks.
-        const widthPct = ((colSpan || 1) / cols) * 100;
-        const leftPct = (col / cols) * 100;
-        return (
-          <div
-            key={task.id}
-            className="absolute px-0.5"
-            style={{
-              top,
-              height,
-              left: `${leftPct}%`,
-              width: `${widthPct}%`,
-            }}
-          >
-            <MiniMiniTaskCard
-              task={task}
-              priorities={priorities}
-              onClick={onTaskClick}
-              onToggleDone={onToggleDone}
-              fillHeight
-            />
-          </div>
-        );
-      })}
+      {laidOut.map((layout) => (
+        <TimedEventBlock
+          key={layout.task.id}
+          layout={layout}
+          hourHeight={HOUR_HEIGHT}
+          minHeight={22}
+          priorities={priorities}
+          onTaskClick={onTaskClick}
+          onToggleDone={onToggleDone}
+          onResize={onResizeEnd}
+        />
+      ))}
     </div>
   );
 }
@@ -195,6 +180,8 @@ export default function WeekView({
   onCreateAt,
   // { dateStr, start, end } while a task is dragged over a timed column.
   dropPreview,
+  // (task, endMinutes) — see DayView.
+  onResizeEnd,
 }) {
   const scrollRef = useRef(null);
   const weekStart = useMemo(
@@ -354,6 +341,7 @@ export default function WeekView({
                 onToggleDone={onToggleDone}
                 onCreate={onCreateAt ? (minutes) => onCreateAt(toDateStr(d), minutes) : undefined}
                 dropPreview={dropPreview}
+                onResizeEnd={onResizeEnd}
               />
             );
           })}

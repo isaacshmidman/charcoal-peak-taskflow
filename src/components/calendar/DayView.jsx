@@ -12,6 +12,7 @@ import { useSplitPane } from "@/hooks/useSplitPane";
 import SplitDivider from "@/components/ui/split-divider";
 import { useEmptySlotClick } from "./useEmptySlotClick";
 import SlotGhost from "./SlotGhost";
+import TimedEventBlock from "./TimedEventBlock";
 
 const HOUR_HEIGHT = 48; // px per hour slot
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -236,6 +237,8 @@ export default function DayView({
   onCreateAt,
   // { dateStr, start, end } while a task is dragged over a timed column.
   dropPreview,
+  // (task, endMinutes) — dragging an event's bottom edge.
+  onResizeEnd,
 }) {
   const timedScrollRef = useRef(null);
   const dateStr = toDateStr(anchorDate);
@@ -379,37 +382,18 @@ export default function DayView({
             {dropPreview?.dateStr === dateStr && (
               <SlotGhost variant="drop" minutes={dropPreview.start} endMinutes={dropPreview.end} hourHeight={HOUR_HEIGHT} />
             )}
-            {laidOutTimed.map(({ task, startMin, endMin, col, cols, colSpan }) => {
-              const top = (startMin / 60) * HOUR_HEIGHT;
-              const height = Math.max(
-                24,
-                ((endMin - startMin) / 60) * HOUR_HEIGHT
-              );
-              // Width = colSpan / cols (not 1 / cols) so events expand
-              // into empty adjacent columns. See layoutTimedTasks.
-              const widthPct = ((colSpan || 1) / cols) * 100;
-              const leftPct = (col / cols) * 100;
-              return (
-                <div
-                  key={task.id}
-                  className="absolute px-0.5"
-                  style={{
-                    top,
-                    height,
-                    left: `${leftPct}%`,
-                    width: `${widthPct}%`,
-                  }}
-                >
-                  <MiniMiniTaskCard
-                    task={task}
-                    priorities={priorities}
-                    onClick={onTaskClick}
-                    onToggleDone={onToggleDone}
-                    fillHeight
-                  />
-                </div>
-              );
-            })}
+            {laidOutTimed.map((layout) => (
+              <TimedEventBlock
+                key={layout.task.id}
+                layout={layout}
+                hourHeight={HOUR_HEIGHT}
+                minHeight={24}
+                priorities={priorities}
+                onTaskClick={onTaskClick}
+                onToggleDone={onToggleDone}
+                onResize={onResizeEnd}
+              />
+            ))}
           </div>
         </TimedDropZone>
       </div>

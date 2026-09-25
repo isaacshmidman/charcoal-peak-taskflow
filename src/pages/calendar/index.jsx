@@ -44,7 +44,7 @@ import DayView from "@/components/calendar/DayView";
 import WeekView from "@/components/calendar/WeekView";
 import YearView from "@/components/calendar/YearView";
 import MiniMiniTaskCard from "@/components/calendar/MiniMiniTaskCard";
-import { nextQuarterHour } from "@/lib/sort-helpers";
+import { minutesToTaskTime, nextQuarterHour } from "@/lib/sort-helpers";
 import { toDateStr } from "@/lib/dates";
 import { useIntegrationsConnected, useIntegrations } from "@/hooks/useIntegrations";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
@@ -285,6 +285,11 @@ export default function Calendar() {
     setShowForm(true);
   };
 
+  // Dragging an event's bottom edge in Day/Week: a new end time.
+  const handleResizeEnd = (task, endMinutes) => {
+    updateTask(task.id, { task_end_time: minutesToTaskTime(endMinutes) });
+  };
+
   const openNewTask = () => {
     const today = startOfDay(new Date());
     let defaultDate;
@@ -373,6 +378,7 @@ export default function Calendar() {
             onToggleDone={handleToggleDone}
             onCreateAt={openNewTaskAt}
             dropPreview={dropPreview}
+            onResizeEnd={handleResizeEnd}
           />
         )}
         {view === "week" && (
@@ -385,6 +391,7 @@ export default function Calendar() {
             onDayClick={handleDayEmptyClick}
             onCreateAt={openNewTaskAt}
             dropPreview={dropPreview}
+            onResizeEnd={handleResizeEnd}
           />
         )}
         {view === "month" && (

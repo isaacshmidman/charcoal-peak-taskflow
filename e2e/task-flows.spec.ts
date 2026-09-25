@@ -625,3 +625,35 @@ test("dragging a task in week view reschedules it, showing the time it will land
   await page.waitForTimeout(300);
   expect((await api.getState()).tasks.find((t) => t.id === "holiday")?.due_date).toBe(today);
 });
+
+test("dragging an event's bottom edge changes when it ends, and nothing else", async ({ page }) => {
+  const today = formatDateOffset(0);
+  const api = await installMockBackend(page, {
+    tasks: [recurringTask({ id: "stretch", title: "Stretch me", task_type: "one_time", recurrence: "none", due_date: today, task_time: "9:00AM", task_end_time: "10:30AM" })],
+    priorities: [defaultPriority],
+  });
+  await page.addInitScript(() => window.localStorage.setItem("defaultCalendarView", "week"));
+  await page.goto("/Calendar");
+
+  const column = page.getByTestId(`calendar-timed-${today}`);
+  await expect(column).toBeVisible();
+  await column.evaluate((el) => { el.closest(".overflow-auto")!.scrollTop = 8 * 44; });
+
+  const event = page.getByTestId("calendar-event-stretch");
+  await event.hover();
+  const handle = page.getByTestId("calendar-resize-stretch");
+  const box = (await handle.boundingBox())!;
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x, y + 44, { steps: 8 }); // one hour later (44px/hour)
+  await expect(page.getByTestId("calendar-resize-time")).toHaveText("9 AM – 11:30 AM");
+  await page.mouse.up();
+
+  await expect.poll(async () => (await api.getState()).tasks.find((t) => t.id === "stretch"))
+    .toMatchObject({ due_date: today, task_time: "9:00AM", task_end_time: "11:30AM" });
+  // Letting go neither opened the task nor started a new one.
+  await expect(page.getByTestId("task-form-dialog")).toHaveCount(0);
+  expect((await api.getState()).tasks).toHaveLength(1);
+});
