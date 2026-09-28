@@ -293,7 +293,7 @@ export default function Groupings() {
             onClose={() => setShowSearch(false)}
             placeholder="Search title or tag..."
           />
-          <Button
+          <Button aria-label={showSearch ? "Close search" : "Search"}
             variant="ghost"
             size="icon"
             data-search-toggle

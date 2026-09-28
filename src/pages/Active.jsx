@@ -217,7 +217,7 @@ export default function Active() {
             onChange={setSearch}
             onClose={() => setShowSearch(false)}
           />
-          <Button
+          <Button aria-label={showSearch ? "Close search" : "Search"}
             variant="ghost"
             size="icon"
             data-search-toggle

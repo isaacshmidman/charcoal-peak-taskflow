@@ -120,16 +120,14 @@ function ConnectCard({ provider, onConnect, connecting, disabled }) {
       <div>
         <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{provider.label}</p>
         <p className="text-xs text-slate-400 dark:text-slate-500">
-          {provider.comingSoon ? "Coming soon" : "Not connected"}
+          Not connected
         </p>
       </div>
       <Button
         variant="outline"
         size="sm"
-        disabled={disabled || connecting || provider.comingSoon}
+        disabled={disabled || connecting}
         onClick={() => onConnect(provider.id)}
-        title={provider.comingSoon ? "Coming soon" : undefined}
-        className={provider.comingSoon ? "cursor-not-allowed opacity-60" : undefined}
       >
         {connecting ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
         Connect

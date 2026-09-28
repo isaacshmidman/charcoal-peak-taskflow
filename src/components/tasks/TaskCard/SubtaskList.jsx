@@ -173,10 +173,10 @@ export default function SubtaskList({
                   >
                     {onReorderSubtasks && (
                       <div className="flex flex-col gap-0.5 opacity-0 group-hover/sub:opacity-100 transition-opacity">
-                        <button type="button" onClick={(e) => { e.stopPropagation(); moveSubtask(-1); }} disabled={subIdx === 0} className="disabled:opacity-20 text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400 transition-colors">
+                        <button aria-label={`Move ${sub.title} up`} type="button" onClick={(e) => { e.stopPropagation(); moveSubtask(-1); }} disabled={subIdx === 0} className="disabled:opacity-20 text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400 transition-colors">
                           <ArrowUp className="w-3 h-3" />
                         </button>
-                        <button type="button" onClick={(e) => { e.stopPropagation(); moveSubtask(1); }} disabled={subIdx === subtasks.length - 1} className="disabled:opacity-20 text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400 transition-colors">
+                        <button aria-label={`Move ${sub.title} down`} type="button" onClick={(e) => { e.stopPropagation(); moveSubtask(1); }} disabled={subIdx === subtasks.length - 1} className="disabled:opacity-20 text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400 transition-colors">
                           <ArrowDown className="w-3 h-3" />
                         </button>
                       </div>
@@ -195,7 +195,7 @@ export default function SubtaskList({
                         {format(new Date(sub.due_date + "T00:00:00"), "MMM d")}{sub.task_time ? `, ${sub.task_time}` : ""}
                       </span>
                     )}
-                    <button
+                    <button aria-label={`Delete subtask ${sub.title}`}
                       className="opacity-0 group-hover/sub:opacity-100 text-slate-400 dark:text-slate-500 hover:text-red-400 dark:hover:text-red-300 transition-colors"
                       onClick={(e) => { e.stopPropagation(); if (wasSwipe()) return; onDelete(sub); }}
                     >

@@ -59,7 +59,7 @@ export default function TagsField({ form, setForm, savedTags }) {
             </div>
           )}
         </div>
-        <Button type="button" size="sm" onClick={() => addTag()} className="h-9 px-3 bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200">
+        <Button aria-label="Add tag" type="button" size="sm" onClick={() => addTag()} className="h-9 px-3 bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200">
           <Plus className="w-4 h-4" />
         </Button>
       </div>
@@ -68,7 +68,7 @@ export default function TagsField({ form, setForm, savedTags }) {
           {form.tags.map(tag => (
             <Badge key={tag} variant="secondary" className="text-xs gap-1 pr-1 max-w-full break-words whitespace-normal">
               <span className="break-words whitespace-normal">{tag}</span>
-              <button type="button" onClick={() => removeTag(tag)} className="text-slate-400 dark:text-slate-500 hover:text-red-400 dark:hover:text-red-300 transition-colors"><X className="w-3 h-3" /></button>
+              <button aria-label={`Remove tag ${tag}`} type="button" onClick={() => removeTag(tag)} className="text-slate-400 dark:text-slate-500 hover:text-red-400 dark:hover:text-red-300 transition-colors"><X className="w-3 h-3" /></button>
             </Badge>
           ))}
         </div>

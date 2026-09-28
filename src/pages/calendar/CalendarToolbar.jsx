@@ -90,7 +90,7 @@ export default function CalendarToolbar({
             onChange={setSearch}
             onClose={() => setShowSearch(false)}
           />
-          <Button
+          <Button aria-label={showSearch ? "Close search" : "Search"}
             variant="ghost"
             size="icon"
             data-search-toggle
@@ -182,7 +182,7 @@ export default function CalendarToolbar({
             ))}
           </div>
           <div className="inline-flex items-center gap-0.5">
-            <Button
+            <Button aria-label="Previous"
               variant="ghost"
               size="icon"
               className="h-8 w-8 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
@@ -199,7 +199,7 @@ export default function CalendarToolbar({
             >
               Today
             </button>
-            <Button
+            <Button aria-label="Next"
               variant="ghost"
               size="icon"
               className="h-8 w-8 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"

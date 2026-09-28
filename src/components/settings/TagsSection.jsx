@@ -101,7 +101,7 @@ export default function TagsSection() {
               <span className="text-sm font-medium text-slate-900 dark:text-slate-100 flex items-center gap-2 min-w-0 break-words whitespace-normal">
                 <Tag className="w-3 h-3 text-slate-900 dark:text-slate-100 shrink-0" /><span className="break-words whitespace-normal">{tag.name}</span>
               </span>
-              <button onClick={() => deleteTagMutation.mutate(tag.id)} className="text-slate-300 dark:text-slate-600 hover:text-red-400 dark:hover:text-red-300 transition-colors">
+              <button aria-label={`Delete tag ${tag.name}`} onClick={() => deleteTagMutation.mutate(tag.id)} className="text-slate-300 dark:text-slate-600 hover:text-red-400 dark:hover:text-red-300 transition-colors">
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -123,7 +123,7 @@ export default function TagsSection() {
           }}
           className="" />
 
-        <Button
+        <Button aria-label="Add tag"
           onClick={() => {
             const t = newTagName.trim();
             if (t && !savedTags.find((s) => s.name === t)) createTagMutation.mutate(t);

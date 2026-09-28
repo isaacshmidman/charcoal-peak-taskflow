@@ -331,3 +331,50 @@ describe("links", () => {
     expect(editor.storage.link.editorOpen).toBe(true);
   });
 });
+
+describe("word limit", () => {
+  const limited = (limit, content = "") => {
+    editor.destroy();
+    const element = document.createElement("div");
+    document.body.appendChild(element);
+    const rejected = [];
+    editor = new Editor({
+      element,
+      extensions: buildEditorExtensions({ wordLimit: limit, onWordLimit: (info) => rejected.push(info) }),
+      content,
+    });
+    return rejected;
+  };
+  const words = (n) => Array.from({ length: n }, (_, i) => `w${i}`).join(" ");
+
+  it("refuses a paste that would go over, whole, and says by how much", () => {
+    const rejected = limited(5, `<p>${words(3)}</p>`);
+    editor.commands.insertContentAt(editor.state.doc.content.size - 1, ` ${words(4)}`);
+    expect(editor.getText()).toBe(words(3)); // nothing was cut in
+    expect(rejected).toEqual([{ over: 2, limit: 5 }]);
+  });
+
+  it("lets a paste that fits through", () => {
+    const rejected = limited(5, `<p>${words(3)}</p>`);
+    editor.commands.insertContentAt(editor.state.doc.content.size - 1, " a b");
+    expect(editor.getText().split(" ")).toHaveLength(5);
+    expect(rejected).toEqual([]);
+  });
+
+  it("blocks typing a new word at the limit, but still allows finishing the current one", () => {
+    const rejected = limited(3, "<p>one two thr</p>");
+    editor.commands.setTextSelection(editor.state.doc.content.size - 1); // caret at the end
+    typeAll("ee");
+    expect(editor.getText()).toBe("one two three");
+    typeAll(" four");
+    expect(editor.getText().trim()).toBe("one two three");
+    expect(rejected.length).toBeGreaterThan(0);
+  });
+
+  it("always lets an over-limit document be trimmed", () => {
+    // A description saved before the limit existed.
+    limited(3, `<p>${words(6)}</p>`);
+    editor.commands.deleteRange({ from: 1, to: 4 });
+    expect(editor.getText().split(" ").filter(Boolean).length).toBeLessThan(6);
+  });
+});

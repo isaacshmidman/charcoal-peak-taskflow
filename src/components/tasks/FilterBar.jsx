@@ -40,7 +40,7 @@ export default function FilterBar({ filters, onFiltersChange, priorities = [] })
             className="pl-9 h-10 bg-white dark:bg-[#0c0c0c] border-slate-100 dark:border-[#303030]"
           />
         </div>
-        <Button
+        <Button aria-label={showAdvanced ? "Hide filters" : "More filters"}
           variant="outline"
           size="icon"
           className={cn("h-10 w-10 shrink-0", showAdvanced && "bg-slate-100 dark:bg-[#161616]")}

@@ -260,7 +260,7 @@ export default function Notes() {
             onChange={setSearch}
             onClose={() => setShowSearch(false)}
           />
-          <Button
+          <Button aria-label={showSearch ? "Close search" : "Search notes"}
             variant="ghost"
             size="icon"
             data-search-toggle

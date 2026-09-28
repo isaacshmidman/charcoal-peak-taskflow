@@ -29,10 +29,8 @@ import { looksLikeMarkdown } from "./richtext/pasteMarkdown";
 import { marked } from "marked";
 import { cn } from "@/lib/utils";
 
-const NON_INSERT_KEYS = new Set([
-  "Backspace", "Delete", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
-  "Home", "End", "PageUp", "PageDown", "Tab", "Enter", "Escape",
-]);
+/** How long the "over the word limit" note stays up. */
+const LIMIT_NOTICE_MS = 4000;
 
 /**
  * @param {object} props
@@ -81,6 +79,14 @@ export default function RichDescriptionEditor({
   // Typing a link address moves focus into the link bar's input; that
   // isn't leaving the editor, so the toolbar must not drop away.
   const linkEditingRef = useRef(false);
+  // Set when WordLimit refuses a change: { over, limit }. Cleared after a
+  // few seconds; each refusal restarts the clock with the latest numbers.
+  const [limitNotice, setLimitNotice] = useState(null);
+  useEffect(() => {
+    if (!limitNotice) return undefined;
+    const timer = setTimeout(() => setLimitNotice(null), LIMIT_NOTICE_MS);
+    return () => clearTimeout(timer);
+  }, [limitNotice]);
 
   const editor = useEditor({
     editable: !disabled,
@@ -89,7 +95,14 @@ export default function RichDescriptionEditor({
     // the Bold/Italic/list active states never updated, and Make task
     // could never see a selection. Opt back in.
     shouldRerenderOnTransaction: true,
-    extensions: buildEditorExtensions({ onOpenTask: (id) => onOpenTaskRef.current?.(id), placeholder }),
+    extensions: buildEditorExtensions({
+      onOpenTask: (id) => onOpenTaskRef.current?.(id),
+      placeholder,
+      // The limit itself lives in WordLimit (extensions.js): every change
+      // that would pass it — typed, pasted or dropped — is refused whole.
+      wordLimit,
+      onWordLimit: (info) => setLimitNotice({ ...info, at: Date.now() }),
+    }),
     content: initialRef.current,
     editorProps: {
       attributes: {
@@ -98,27 +111,7 @@ export default function RichDescriptionEditor({
         class: `tiptap-prose focus:outline-none px-3 py-2`,
         style: `min-height: ${minHeight}`,
       },
-      // Hard word cap: block character insertion + paste past the limit,
-      // while always allowing navigation/deletion so the user can edit
-      // back down. Enter (a new block, not a word) stays allowed.
-      handleKeyDown(view, event) {
-        if (event.metaKey || event.ctrlKey || event.altKey) return false;
-        if (NON_INSERT_KEYS.has(event.key)) return false;
-        if (event.key.length !== 1) return false;
-        const words = editor?.storage.characterCount?.words?.() ?? 0;
-        const { empty } = view.state.selection;
-        // Only block when typing into an empty selection at/over the cap
-        // (replacing a selection can't grow the word count).
-        if (words >= wordLimit && empty) {
-          event.preventDefault();
-          return true;
-        }
-        return false;
-      },
       handlePaste(view, event) {
-        const words = editor?.storage.characterCount?.words?.() ?? 0;
-        if (words >= wordLimit) return true; // swallow the paste
-
         // Real HTML on the clipboard already round-trips through TipTap's
         // own parser, which does a better job than re-reading it as text.
         const clipboard = event?.clipboardData;
@@ -216,6 +209,20 @@ export default function RichDescriptionEditor({
       }}
     >
       <EditorContent editor={editor} />
+      {limitNotice && (
+        <p
+          role="status"
+          data-testid="richtext-limit-notice"
+          className={cn(
+            "px-3 pb-1.5 text-[11px] font-medium text-red-600 dark:text-red-400",
+            chromeless && "sticky bottom-0 bg-white/90 py-1 dark:bg-black/80"
+          )}
+        >
+          {limitNotice.over === 1
+            ? `That's 1 word over the ${limitNotice.limit.toLocaleString()}-word limit.`
+            : `That's ${limitNotice.over.toLocaleString()} words over the ${limitNotice.limit.toLocaleString()}-word limit.`}
+        </p>
+      )}
       {editor && (
         <LinkBubble
           editor={editor}

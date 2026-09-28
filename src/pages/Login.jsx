@@ -203,9 +203,6 @@ export default function Login() {
                   ? "Google sign-in is currently disabled on this backend. Email and password login still works."
                   : "Google sign-in is currently disabled on this backend. Contact the administrator for access."}
           </p>
-          <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500 break-all">
-            Return target: {nextUrl}
-          </p>
         </div>
       </div>
     </div>

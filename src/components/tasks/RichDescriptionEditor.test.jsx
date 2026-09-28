@@ -53,3 +53,20 @@ describe("TitleAndDescription readOnly", () => {
     expect(container.querySelector(".tiptap-prose").getAttribute("contenteditable")).toBe("false");
   });
 });
+
+describe("RichDescriptionEditor word limit", () => {
+  it("explains a refused paste instead of silently doing nothing", async () => {
+    /** @type {any} */
+    let editor = null;
+    const onChange = vi.fn();
+    const { findByTestId } = render(
+      <RichDescriptionEditor plainFallback="one two" wordLimit={3} onChange={onChange} onEditorReady={(ed) => { editor = ed; }} />
+    );
+    await waitFor(() => expect(editor).not.toBeNull());
+    act(() => { editor.commands.insertContentAt(editor.state.doc.content.size - 1, " three four five"); });
+
+    expect((await findByTestId("richtext-limit-notice")).textContent).toBe("That's 2 words over the 3-word limit.");
+    expect(editor.getText()).toBe("one two");
+    expect(onChange).not.toHaveBeenCalled();
+  });
+});

@@ -46,7 +46,7 @@ export default function SubtasksField({
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSubtask(); } }}
           className=""
         />
-        <Button type="button" size="sm" onClick={addSubtask} className="h-9 px-3 bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200">
+        <Button aria-label="Add subtask" type="button" size="sm" onClick={addSubtask} className="h-9 px-3 bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200">
           <Plus className="w-4 h-4" />
         </Button>
       </div>
@@ -58,7 +58,7 @@ export default function SubtasksField({
         <div className="mt-2 flex flex-wrap gap-1.5">
           {task && existingSubtasks.map((sub) => (
             <div key={sub.id} className="inline-flex items-center gap-1.5 bg-secondary text-secondary-foreground rounded-full px-2.5 py-0.5 text-xs font-semibold group">
-              <button
+              <button aria-label={sub.status === "done" ? `Mark ${sub.title} not done` : `Mark ${sub.title} done`}
                 type="button"
                 onClick={() => onToggleSubtask && onToggleSubtask(sub)}
                 className={cn(
@@ -74,7 +74,7 @@ export default function SubtasksField({
               >
                 {sub.title}
               </span>
-              <button
+              <button aria-label={`Delete subtask ${sub.title}`}
                 type="button"
                 onPointerDown={(e) => { e.preventDefault(); onDeleteSubtask && onDeleteSubtask(sub); }}
                 className="text-slate-400 dark:text-slate-500 hover:text-red-400 dark:hover:text-red-300 transition-colors"
@@ -87,7 +87,7 @@ export default function SubtasksField({
             <div key={idx} className="inline-flex items-center gap-1.5 bg-secondary text-secondary-foreground rounded-full px-2.5 py-0.5 text-xs font-semibold group">
               <div className="shrink-0 w-3.5 h-3.5 rounded border-2 border-slate-400" />
               <span className="break-words whitespace-normal max-w-full">{title}</span>
-              <button type="button" onPointerDown={(e) => { e.preventDefault(); removeSubtask(idx); }} className="text-slate-400 dark:text-slate-500 hover:text-red-400 dark:hover:text-red-300 transition-colors">
+              <button aria-label={`Remove subtask ${title}`} type="button" onPointerDown={(e) => { e.preventDefault(); removeSubtask(idx); }} className="text-slate-400 dark:text-slate-500 hover:text-red-400 dark:hover:text-red-300 transition-colors">
                 <X className="w-3 h-3" />
               </button>
             </div>

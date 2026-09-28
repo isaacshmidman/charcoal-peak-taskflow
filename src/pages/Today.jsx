@@ -219,7 +219,7 @@ export default function Today() {
         </div>
         <div className="flex items-center gap-2">
           {overdueTasks.length > 0 && (
-            <Button
+            <Button aria-label="Overdue tasks"
               variant="ghost"
               size="icon"
               className="h-9 w-9 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
@@ -236,7 +236,7 @@ export default function Today() {
             onChange={setSearch}
             onClose={() => setShowSearch(false)}
           />
-          <Button
+          <Button aria-label={showSearch ? "Close search" : "Search"}
             variant="ghost"
             size="icon"
             data-search-toggle

@@ -75,10 +75,10 @@ export default function DefaultsSection({ navOptions }) {
           {navOrder.map((path, idx) =>
             <div key={path} className="flex items-center gap-3 bg-surface-card border border-border-hairline rounded-xl px-3 py-2.5 hover:border-slate-200 dark:hover:border-[#454545] transition-colors">
               <div className="flex flex-col gap-0.5">
-                <button onClick={() => moveNav(idx, -1)} disabled={idx === 0} className="disabled:opacity-20 text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400 transition-colors">
+                <button aria-label={`Move ${navOptions.find((o) => o.value === path)?.label || path} up`} onClick={() => moveNav(idx, -1)} disabled={idx === 0} className="disabled:opacity-20 text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400 transition-colors">
                   <ArrowUp className="w-3 h-3" />
                 </button>
-                <button onClick={() => moveNav(idx, 1)} disabled={idx === navOrder.length - 1} className="disabled:opacity-20 text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400 transition-colors">
+                <button aria-label={`Move ${navOptions.find((o) => o.value === path)?.label || path} down`} onClick={() => moveNav(idx, 1)} disabled={idx === navOrder.length - 1} className="disabled:opacity-20 text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400 transition-colors">
                   <ArrowDown className="w-3 h-3" />
                 </button>
               </div>

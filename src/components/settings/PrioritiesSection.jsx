@@ -179,7 +179,7 @@ export default function PrioritiesSection() {
             )}
           </SelectContent>
         </Select>
-        <Button onClick={addPriority} className="h-9 px-3 bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200">
+        <Button aria-label="Add priority" onClick={addPriority} className="h-9 px-3 bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200">
           <Plus className="w-4 h-4" />
         </Button>
       </div>

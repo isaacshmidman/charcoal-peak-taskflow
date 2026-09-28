@@ -38,6 +38,21 @@ export function addMinutes(t, mins) {
 }
 
 /**
+ * The end a new or re-timed task gets by default: an hour after `start`,
+ * but never past 11:59 PM. addMinutes wraps around midnight, so a task
+ * starting at 11:30 PM used to get a 12:30 AM end — earlier than its start
+ * on the same day. Calendar drags already stop at 11:59 PM; this matches.
+ *
+ * @param {string} start
+ * @returns {string}
+ */
+export function defaultEndTime(start) {
+  const parsed = parseTaskTime(start);
+  if (parsed == null) return addMinutes(start, 60);
+  return parsed + 60 >= 24 * 60 ? "11:59PM" : addMinutes(start, 60);
+}
+
+/**
  * @param {{
  *   value: string,
  *   onChange: (value: string) => void,

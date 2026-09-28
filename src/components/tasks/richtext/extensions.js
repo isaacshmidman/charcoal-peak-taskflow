@@ -125,6 +125,52 @@ const SafeLink = Link.extend({
 });
 
 /**
+ * Words in a document, counted exactly as CharacterCount's words() does
+ * (the toolbar's counter), so the limit and the counter never disagree.
+ *
+ * @param {import("@tiptap/pm/model").Node} doc
+ */
+export function countDocWords(doc) {
+  return doc.textBetween(0, doc.content.size, " ", " ").split(" ").filter((word) => word !== "").length;
+}
+
+/**
+ * A hard word limit, enforced on every change rather than on keystrokes:
+ * typing, paste, drop, markdown paste and programmatic inserts all go
+ * through here. A change that would take the count past the limit is
+ * refused whole — nothing is silently cut — and `onRejected` says by how
+ * much, so the host can explain. Changes that don't grow the count always
+ * pass, so a document already over the limit can still be trimmed.
+ */
+export const WordLimit = Extension.create({
+  name: "wordLimit",
+  addOptions() {
+    return {
+      limit: 0,
+      /** @type {((info: { over: number, limit: number }) => void) | undefined} */
+      onRejected: undefined,
+    };
+  },
+  addProseMirrorPlugins() {
+    const { limit, onRejected } = this.options;
+    if (!limit) return [];
+    return [
+      new Plugin({
+        key: new PluginKey("wordLimit"),
+        filterTransaction(tr, state) {
+          if (!tr.docChanged) return true;
+          const after = countDocWords(tr.doc);
+          if (after <= limit) return true;
+          if (after <= countDocWords(state.doc)) return true;
+          onRejected?.({ over: after - limit, limit });
+          return false;
+        },
+      }),
+    ];
+  },
+});
+
+/**
  * Turn plain URLs already in the document into links — text written
  * before links existed, and plain-text calendar descriptions. Runs once
  * when an editor opens, outside undo history and tagged LINKIFY_ON_LOAD
@@ -168,9 +214,14 @@ const PaletteHighlight = Highlight.extend({
 });
 
 /**
- * @param {{ onOpenTask?: (taskId: string) => void, placeholder?: string }} [opts]
+ * @param {{
+ *   onOpenTask?: (taskId: string) => void,
+ *   placeholder?: string,
+ *   wordLimit?: number,
+ *   onWordLimit?: (info: { over: number, limit: number }) => void,
+ * }} [opts]
  */
-export function buildEditorExtensions({ onOpenTask, placeholder = "" } = {}) {
+export function buildEditorExtensions({ onOpenTask, placeholder = "", wordLimit = 0, onWordLimit } = {}) {
   return [
     StarterKit.configure({
       link: false,            // replaced by SafeLink (http/https/mailto only)
@@ -187,6 +238,7 @@ export function buildEditorExtensions({ onOpenTask, placeholder = "" } = {}) {
     TaskItem.configure({ nested: true }),
     SafeLink,
     CharacterCount,           // word counter (.words())
+    WordLimit.configure({ limit: wordLimit, onRejected: onWordLimit }),
     // Hint text for an empty box. It lives in a data attribute on the
     // empty paragraph (see .tiptap-prose in index.css), never in the doc.
     Placeholder.configure({ placeholder }),

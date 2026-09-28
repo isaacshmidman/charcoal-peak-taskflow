@@ -234,7 +234,7 @@ const TaskCard = forwardRef(function TaskCard({
                       {dateDisplay}
                     </button>
                   ) : (
-                    <button
+                    <button aria-label="Set a date"
                       onClick={(e) => e.stopPropagation()}
                       className="text-[11px] text-slate-300 dark:text-slate-600 hover:text-slate-400 dark:hover:text-slate-300 hover:bg-white dark:hover:bg-[#222222] px-1.5 py-0.5 rounded transition-colors"
                     >

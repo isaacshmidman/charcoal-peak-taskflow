@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Lock, Trash2 } from "lucide-react";
 import { format } from "date-fns/format";
-import { addMinutes } from "./TimeInput.jsx";
+import { defaultEndTime } from "./TimeInput.jsx";
 
 import TitleAndDescription from "./TitleAndDescription.jsx";
 import PriorityAndType from "./PriorityAndType.jsx";
@@ -111,7 +111,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
       const defaultPriority = priorities[mid] || priorities[0] || null;
       const dueDate = defaultDueDate ?? format(new Date(), "yyyy-MM-dd");
       const timeStart = defaultTaskTime || "";
-      const timeEnd = timeStart ? addMinutes(timeStart, 60) : "";
+      const timeEnd = timeStart ? defaultEndTime(timeStart) : "";
       // initialDraft: caller-provided seed values for a NEW task (e.g. the
       // Notes "Make task" bridge prefilling the title from a selection).
       setForm({ ...defaultTask, priority_id: defaultPriority?.id || "", parent_id: parentId || "", due_date: dueDate, task_time: timeStart, task_end_time: timeEnd, ...(initialDraft || {}) });
@@ -135,7 +135,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
     setIsEditMode(!!task);
     reset(buildData(task
       ? { ...defaultTask, ...task, tags: task.tags || [], recurrence_days: task.recurrence_days || [], recurrence_end_date: task.recurrence_end_date || "", task_time: task.task_time || "", task_end_time: task.task_end_time || "", subtask_titles: [] }
-      : { ...defaultTask, priority_id: (priorities[Math.floor(priorities.length / 2)] || priorities[0] || {}).id || "", parent_id: parentId || "", due_date: defaultDueDate ?? format(new Date(), "yyyy-MM-dd"), task_time: defaultTaskTime || "", task_end_time: defaultTaskTime ? addMinutes(defaultTaskTime, 60) : "", ...(initialDraft || {}) }
+      : { ...defaultTask, priority_id: (priorities[Math.floor(priorities.length / 2)] || priorities[0] || {}).id || "", parent_id: parentId || "", due_date: defaultDueDate ?? format(new Date(), "yyyy-MM-dd"), task_time: defaultTaskTime || "", task_end_time: defaultTaskTime ? defaultEndTime(defaultTaskTime) : "", ...(initialDraft || {}) }
     ).data);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, task?.id]);
@@ -349,7 +349,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
           <div className="flex items-center justify-between pt-2">
             <div>
               {task && onDelete && !isReadOnly && (
-                <Button
+                <Button aria-label="Delete task"
                   type="button"
                   variant="ghost"
                   size="icon"

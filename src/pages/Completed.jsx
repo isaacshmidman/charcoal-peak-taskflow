@@ -179,7 +179,7 @@ export default function Completed() {
             onChange={setSearch}
             onClose={() => setShowSearch(false)}
           />
-          <Button
+          <Button aria-label={showSearch ? "Close search" : "Search"}
             variant="ghost"
             size="icon"
             data-search-toggle
@@ -192,7 +192,7 @@ export default function Completed() {
           <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} page="completed" />
           {completedItems.length > 0 && (
             <Dialog open={showDeleteAllDialog} onOpenChange={setShowDeleteAllDialog}>
-              <Button
+              <Button aria-label="Delete all completed"
                 variant="ghost"
                 size="icon"
                 className="h-9 w-9 text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-[#2a1116]"

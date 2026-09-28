@@ -109,7 +109,7 @@ export default function MultiSortPanel({ sorts, onSortsChange, page = "default" 
       }}
     >
       <DropdownMenuTrigger asChild>
-        <Button
+        <Button aria-label="Multi-level sorting"
           variant="ghost"
           size="icon"
           className="h-9 w-9 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
@@ -151,7 +151,7 @@ export default function MultiSortPanel({ sorts, onSortsChange, page = "default" 
                     )}
                   </button>
                   {sorts.length > 1 && (
-                    <button
+                    <button aria-label="Remove sort"
                       type="button"
                       onClick={() => removeSortAt(index)}
                       className="p-1 text-slate-300 dark:text-slate-600 hover:text-red-400 dark:hover:text-red-300 transition-colors"

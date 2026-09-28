@@ -217,7 +217,7 @@ export default function RecentlyDeleted({ onBack } = {}) {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <button
+          <button aria-label="Back"
             onClick={() => {
               if (onBack) {
                 onBack();
@@ -247,13 +247,13 @@ export default function RecentlyDeleted({ onBack } = {}) {
             onChange={setSearch}
             onClose={() => setSearchOpen(false)}
           />
-          <Button variant="ghost" size="icon" data-search-toggle className="h-9 w-9 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200" onMouseDown={(e) => e.preventDefault()} onClick={() => setSearchOpen(!searchOpen)}>
+          <Button aria-label={searchOpen ? "Close search" : "Search"} variant="ghost" size="icon" data-search-toggle className="h-9 w-9 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200" onMouseDown={(e) => e.preventDefault()} onClick={() => setSearchOpen(!searchOpen)}>
             <Search className="w-4 h-4" />
           </Button>
           <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} page="deleted" />
           {(userDeletedTasks.length > 0 || rawDeletedNotes.length > 0) && (
             <Dialog open={showEmptyDialog} onOpenChange={setShowEmptyDialog}>
-              <Button
+              <Button aria-label="Empty recently deleted"
                 variant="ghost"
                 size="icon"
                 className="h-9 w-9 text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-[#2a1116]"
@@ -407,7 +407,7 @@ const DeletedNoteCard = forwardRef(function DeletedNoteCard(
             </div>
 
             <div className="flex items-center gap-1 shrink-0">
-              <button
+              <button aria-label="Restore"
                 onClick={onRestore}
                 className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-[#10261b] transition-colors"
                 title="Restore"
@@ -415,7 +415,7 @@ const DeletedNoteCard = forwardRef(function DeletedNoteCard(
               >
                 <RotateCcw className="w-3.5 h-3.5" />
               </button>
-              <button
+              <button aria-label="Delete permanently"
                 onClick={onDelete}
                 className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-[#2a1116] transition-colors"
                 title="Delete permanently"
@@ -495,14 +495,14 @@ const DeletedTaskCard = forwardRef(function DeletedTaskCard(
 
             {/* Actions */}
             <div className="flex items-center gap-1 shrink-0">
-              <button
+              <button aria-label="Restore"
                 onClick={onRestore}
                 className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-[#10261b] transition-colors"
                 title="Restore"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
               </button>
-              <button
+              <button aria-label="Delete permanently"
                 onClick={onDelete}
                 className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-[#2a1116] transition-colors"
                 title="Delete permanently"

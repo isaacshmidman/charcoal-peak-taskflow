@@ -11,7 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as CalendarIcon } from "lucide-react";
 import { format } from "date-fns/format";
 import { fromDateStr, toDateStr } from "@/lib/dates";
-import TimeInput, { addMinutes } from "./TimeInput.jsx";
+import TimeInput, { defaultEndTime } from "./TimeInput.jsx";
 
 export default function TimeFields({ form, setForm, endTouchedRef }) {
   return (
@@ -74,13 +74,13 @@ export default function TimeFields({ form, setForm, endTouchedRef }) {
               setForm((f) => ({
                 ...f,
                 task_time: v,
-                task_end_time: endTouchedRef.current ? f.task_end_time : addMinutes(v, 60),
+                task_end_time: endTouchedRef.current ? f.task_end_time : defaultEndTime(v),
               }));
             }}
           />
           <span className="text-xs font-medium text-slate-500 dark:text-slate-400">to</span>
           <TimeInput
-            value={form.task_end_time || addMinutes(form.task_time, 60)}
+            value={form.task_end_time || defaultEndTime(form.task_time)}
             onChange={(v) => {
               endTouchedRef.current = true;
               setForm((f) => ({ ...f, task_end_time: v }));

@@ -203,7 +203,7 @@ export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubm
           <div className="flex items-center justify-between pt-2">
             <div>
               {task && onDelete && (
-                <Button type="button" variant="ghost" size="icon"
+                <Button aria-label="Delete subtask" type="button" variant="ghost" size="icon"
                   className="text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-[#2a1116]"
                   onClick={() => { onDelete(task); onOpenChange(false); }}>
                   <Trash2 className="w-4 h-4" />
