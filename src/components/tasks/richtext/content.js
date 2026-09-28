@@ -5,29 +5,14 @@
  * DOM/editor instance.
  */
 
+import { countWords, plainTextToDoc } from "../../../../backend/lib/plain-text-doc.js";
+
+export { countWords, plainTextToDoc };
+
 export const WORD_LIMIT = 500;
 
 /** Tags that mark a stored description as HTML rather than plain text. */
 const HTML_TAG_RE = /<\/?(p|br|div|span|b|strong|i|em|u|s|a|ul|ol|li|h[1-6]|blockquote|code|pre)\b[^>]*>/i;
-
-/**
- * Plain text → a ProseMirror doc, one paragraph per line (blank lines kept
- * as empty paragraphs). Built as JSON, so nothing in the text is ever
- * interpreted as markup.
- *
- * @param {string} text
- * @returns {{ type: "doc", content: Array<Record<string, any>> }}
- */
-export function plainTextToDoc(text) {
-  const lines = String(text).replace(/\r\n?/g, "\n").split("\n");
-  return {
-    type: "doc",
-    content: lines.map((line) =>
-      // ProseMirror forbids empty text nodes; a blank line is a bare paragraph.
-      line ? { type: "paragraph", content: [{ type: "text", text: line }] } : { type: "paragraph" }
-    ),
-  };
-}
 
 /**
  * Decide the initial TipTap `content` for the editor:
@@ -80,15 +65,4 @@ export function normalizeOutput({ isEmpty, json, text }) {
     return { json: "", text: "" };
   }
   return { json: JSON.stringify(json), text: trimmed };
-}
-
-/**
- * Count words in a plaintext string (whitespace-delimited).
- * @param {string} text
- * @returns {number}
- */
-export function countWords(text) {
-  const t = (text || "").trim();
-  if (!t) return 0;
-  return t.split(/\s+/).length;
 }

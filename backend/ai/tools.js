@@ -12,6 +12,7 @@
 import { HttpError } from "../http.js";
 import { ToolError, validateArgs } from "./args.js";
 import { READ_TOOLS } from "./reads.js";
+import { WRITE_TOOLS } from "./writes.js";
 
 /**
  * @typedef {import("./context.js").Tool} Tool
@@ -20,8 +21,6 @@ import { READ_TOOLS } from "./reads.js";
  */
 
 /** @type {Tool[]} */
-export const WRITE_TOOLS = [];
-
 const ALL_TOOLS = [...READ_TOOLS, ...WRITE_TOOLS];
 
 /**
