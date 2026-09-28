@@ -66,7 +66,12 @@ function targetFor(event) {
   return target ? { dateStr: data.dateStr, ...target } : null;
 }
 
-export function useCalendarDnd({ updateTask, onTaskReschedule }) {
+/**
+ * @param {{ onMove: (task: any, patch: Record<string, string>) => void }} options
+ *   Every drop lands here as the fields to change; the page applies them
+ *   and offers Undo.
+ */
+export function useCalendarDnd({ onMove }) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } })
@@ -127,14 +132,14 @@ export function useCalendarDnd({ updateTask, onTaskReschedule }) {
     if (kind === "allday") {
       const patch = { task_time: "", task_end_time: "" };
       if (overData.dateStr !== task.due_date) patch.due_date = overData.dateStr;
-      updateTask(task.id, patch);
+      onMove(task, patch);
       return;
     }
 
     if (kind === "timed") {
       const target = targetFor(event);
       if (!target) return;
-      updateTask(task.id, {
+      onMove(task, {
         due_date: target.dateStr,
         task_time: minutesToTaskTime(target.start),
         task_end_time: minutesToTaskTime(target.end),
@@ -144,7 +149,7 @@ export function useCalendarDnd({ updateTask, onTaskReschedule }) {
 
     if (kind === "day") {
       if (overData.dateStr !== task.due_date) {
-        onTaskReschedule(task, overData.dateStr);
+        onMove(task, { due_date: overData.dateStr });
       }
     }
   };

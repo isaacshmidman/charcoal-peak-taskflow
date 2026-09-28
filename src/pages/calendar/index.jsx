@@ -17,6 +17,7 @@ import { apiClient } from "@/api/apiClient";
 import { useOfflineMutation } from "@/hooks/useOfflineMutation";
 import { useDeleteWithUndo, formatDeleteLabel } from "@/hooks/useDeleteWithUndo";
 import { showDeleteToast } from "@/components/tasks/DeleteToast";
+import { describeMove, moveChanges } from "@/lib/calendar-move";
 import RecurringDeleteDialog from "@/components/tasks/RecurringDeleteDialog";
 import { DndContext, DragOverlay, pointerWithin } from "@dnd-kit/core";
 import { addDays } from "date-fns/addDays";
@@ -180,8 +181,17 @@ export default function Calendar() {
     setShowForm(true);
   };
 
-  const handleTaskReschedule = (task, newDateStr) => {
-    updateTask(task.id, { due_date: newDateStr });
+  // Every drag, drop and resize lands here. Only fields that actually
+  // change are written, and the toast's Undo (or `z`) puts exactly those
+  // back — a move is one click from reversed, like a delete.
+  const moveTask = (task, patch) => {
+    const { before, after } = moveChanges(task, patch);
+    if (!Object.keys(after).length) return;
+    updateTask(task.id, after);
+    showDeleteToast({
+      label: describeMove(task, after),
+      onUndo: () => updateTask(task.id, before),
+    });
   };
 
   const {
@@ -203,7 +213,7 @@ export default function Calendar() {
     handleDragMove,
     handleDragEnd,
     handleDragCancel,
-  } = useCalendarDnd({ updateTask, onTaskReschedule: handleTaskReschedule });
+  } = useCalendarDnd({ onMove: moveTask });
 
   const timezone = useMemo(() => {
     try {
@@ -287,7 +297,7 @@ export default function Calendar() {
 
   // Dragging an event's bottom edge in Day/Week: a new end time.
   const handleResizeEnd = (task, endMinutes) => {
-    updateTask(task.id, { task_end_time: minutesToTaskTime(endMinutes) });
+    moveTask(task, { task_end_time: minutesToTaskTime(endMinutes) });
   };
 
   const openNewTask = () => {

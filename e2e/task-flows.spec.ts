@@ -626,6 +626,12 @@ test("dragging a task in week view reschedules it, showing the time it will land
   await expect.poll(async () => (await api.getState()).tasks.find((t) => t.id === "drag-me"))
     .toMatchObject({ due_date: today, task_time: "2:00PM", task_end_time: "3:30PM" });
 
+  // The move can be undone from the toast, back to exactly where it was.
+  await expect(page.getByTestId("delete-toast")).toContainText("Moved “Drag me” to");
+  await page.getByTestId("delete-toast-undo").click();
+  await expect.poll(async () => (await api.getState()).tasks.find((t) => t.id === "drag-me"))
+    .toMatchObject({ due_date: today, task_time: "9:00AM", task_end_time: "10:30AM" });
+
   // The read-only holiday can't be picked up and moved to another day.
   const holiday = page.locator('[title="Holiday"]');
   const holidayBox = (await holiday.boundingBox())!;
@@ -665,6 +671,7 @@ test("dragging an event's bottom edge changes when it ends, and nothing else", a
 
   await expect.poll(async () => (await api.getState()).tasks.find((t) => t.id === "stretch"))
     .toMatchObject({ due_date: today, task_time: "9:00AM", task_end_time: "11:30AM" });
+  await expect(page.getByTestId("delete-toast")).toContainText("“Stretch me” now ends 11:30 AM");
   // Letting go neither opened the task nor started a new one.
   await expect(page.getByTestId("task-form-dialog")).toHaveCount(0);
   expect((await api.getState()).tasks).toHaveLength(1);

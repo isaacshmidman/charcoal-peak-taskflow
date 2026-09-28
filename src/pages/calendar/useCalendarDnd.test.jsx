@@ -55,10 +55,9 @@ describe("isReadOnlyTask", () => {
 
 describe("useCalendarDnd drops", () => {
   const setup = () => {
-    const updateTask = vi.fn();
-    const onTaskReschedule = vi.fn();
-    const { result } = renderHook(() => useCalendarDnd({ updateTask, onTaskReschedule }));
-    return { result, updateTask, onTaskReschedule };
+    const onMove = vi.fn();
+    const { result } = renderHook(() => useCalendarDnd({ onMove }));
+    return { result, onMove };
   };
   const dropEvent = (t, over, translatedTop) => ({
     active: { data: { current: { task: t } }, rect: { current: { translated: translatedTop == null ? null : { top: translatedTop } } } },
@@ -67,39 +66,38 @@ describe("useCalendarDnd drops", () => {
   const timedOver = (dateStr, top = 0) => ({ rect: { top }, data: { current: { kind: "timed", dateStr, hourHeight: 44 } } });
 
   it("moves a task to the day and time it was dropped on, and previews that exact slot first", () => {
-    const { result, updateTask } = setup();
+    const { result, onMove } = setup();
     const event = dropEvent(task(), timedOver("2026-09-24"), 14 * 44 + 3);
 
     act(() => result.current.handleDragMove(event));
     expect(result.current.dropPreview).toEqual({ dateStr: "2026-09-24", start: 14 * 60, end: 15 * 60 + 30 });
 
     act(() => result.current.handleDragEnd(event));
-    expect(updateTask).toHaveBeenCalledWith("t1", { due_date: "2026-09-24", task_time: "2:00PM", task_end_time: "3:30PM" });
+    expect(onMove).toHaveBeenCalledWith(expect.objectContaining({ id: "t1" }), { due_date: "2026-09-24", task_time: "2:00PM", task_end_time: "3:30PM" });
     expect(result.current.dropPreview).toBeNull();
   });
 
   it("makes a task all-day when dropped on an all-day strip", () => {
-    const { result, updateTask } = setup();
+    const { result, onMove } = setup();
     act(() => result.current.handleDragEnd(dropEvent(task(), { data: { current: { kind: "allday", dateStr: "2026-09-25" } } }, 0)));
-    expect(updateTask).toHaveBeenCalledWith("t1", { task_time: "", task_end_time: "", due_date: "2026-09-25" });
+    expect(onMove).toHaveBeenCalledWith(expect.objectContaining({ id: "t1" }), { task_time: "", task_end_time: "", due_date: "2026-09-25" });
   });
 
   it("never moves a read-only calendar item, in any view", () => {
-    const { result, updateTask, onTaskReschedule } = setup();
+    const { result, onMove } = setup();
     const holiday = task({ source_provider: "google", source_kind: "event", source_writable: false });
     act(() => {
       result.current.handleDragEnd(dropEvent(holiday, timedOver("2026-09-24"), 300));
       result.current.handleDragEnd(dropEvent(holiday, { data: { current: { kind: "allday", dateStr: "2026-09-25" } } }, 0));
       result.current.handleDragEnd(dropEvent(holiday, { data: { current: { kind: "day", dateStr: "2026-09-26" } } }, 0));
     });
-    expect(updateTask).not.toHaveBeenCalled();
-    expect(onTaskReschedule).not.toHaveBeenCalled();
+    expect(onMove).not.toHaveBeenCalled();
   });
 
   it("leaves the time alone when the drop can't be measured", () => {
-    const { result, updateTask } = setup();
+    const { result, onMove } = setup();
     act(() => result.current.handleDragEnd(dropEvent(task(), timedOver("2026-09-24"), null)));
-    expect(updateTask).not.toHaveBeenCalled();
+    expect(onMove).not.toHaveBeenCalled();
   });
 
   it("clears the preview when the card leaves the hour grid", () => {
