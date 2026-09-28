@@ -3,7 +3,7 @@ import { apiClient } from '@/api/apiClient';
 import { useQuery } from '@tanstack/react-query';
 
 
-export default function PageNotFound({}) {
+export default function PageNotFound() {
     const location = useLocation();
     const pageName = location.pathname.substring(1);
 

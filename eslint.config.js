@@ -1,5 +1,6 @@
 import globals from "globals";
 import pluginJs from "@eslint/js";
+import pluginReact from "eslint-plugin-react";
 
 const noopRule = {
   create: () => ({}),
@@ -17,13 +18,10 @@ export default [
     ],
   },
   {
-    files: [
-      "src/components/**/*.{js,mjs,cjs,jsx}",
-      "src/pages/**/*.{js,mjs,cjs,jsx}",
-      "src/Layout.jsx",
-    ],
+    // All app code. This used to list only components/ and pages/ (and
+    // ignore lib/), so hooks, api, lib and the whole backend weren't linted.
+    files: ["src/**/*.{js,mjs,cjs,jsx}"],
     ignores: [
-      "src/lib/**/*",
       "src/components/ui/accordion.jsx",
       "src/components/ui/aspect-ratio.jsx",
       "src/components/ui/avatar.jsx",
@@ -62,7 +60,6 @@ export default [
       "src/components/ui/tooltip.jsx",
       "src/components/ui/use-toast.jsx",
     ],
-    ...pluginJs.configs.recommended,
     languageOptions: {
       globals: globals.browser,
       parserOptions: {
@@ -74,6 +71,7 @@ export default [
       },
     },
     plugins: {
+      react: pluginReact,
       "react-hooks": {
         rules: {
           "exhaustive-deps": noopRule,
@@ -81,16 +79,58 @@ export default [
         },
       },
     },
-    rules: {
-      "no-unused-vars": [
-        "warn",
-        {
-          vars: "all",
-          varsIgnorePattern: "^_",
-          args: "after-used",
-          argsIgnorePattern: "^_",
-        },
-      ],
+    settings: { react: { version: "18" } },
+    rules: sharedRules({
+      // A component used in JSX but never imported crashes the page at
+      // render; core no-undef doesn't look inside JSX, this does.
+      "react/jsx-no-undef": "error",
+      // Counts JSX usage, so components aren't reported as unused.
+      "react/jsx-uses-vars": "error",
+    }),
+  },
+  {
+    files: ["backend/**/*.js"],
+    languageOptions: {
+      globals: globals.node,
+      parserOptions: { ecmaVersion: 2022, sourceType: "module" },
+    },
+    rules: sharedRules(),
+  },
+  {
+    // Vitest runs with `globals: true` (vitest.config.js), so tests may
+    // use describe/it/expect/vi without importing them.
+    files: ["src/**/*.test.{js,jsx}", "backend/**/*.test.js", "src/test/**/*.{js,jsx}"],
+    languageOptions: {
+      globals: { ...globals.browser, ...globals.node, ...globals.vitest },
     },
   },
 ];
+
+/**
+ * The recommended rules plus our own. They used to be REPLACED rather than
+ * extended: the block spread pluginJs.configs.recommended and then set its
+ * own `rules`, which overwrote them — so no-undef never ran, and a missing
+ * import (`cn`) and a shadowed one (`rangeLabel`) both shipped as crashes.
+ *
+ * @param {Record<string, unknown>} [extra]
+ */
+function sharedRules(extra = {}) {
+  return {
+    ...pluginJs.configs.recommended.rules,
+    // A local that hides an import or outer variable — the rangeLabel crash.
+    "no-shadow": ["error", { hoist: "functions" }],
+    // `catch {}` is how this codebase says "ignore, it's optional".
+    "no-empty": ["error", { allowEmptyCatch: true }],
+    "no-unused-vars": [
+      "warn",
+      {
+        vars: "all",
+        varsIgnorePattern: "^_",
+        args: "after-used",
+        argsIgnorePattern: "^_",
+        caughtErrors: "none",
+      },
+    ],
+    ...extra,
+  };
+}

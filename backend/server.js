@@ -121,17 +121,17 @@ export function createTaskflowServer(config = backendConfig) {
     db,
     requestHandler,
     start() {
-      return new Promise((resolve) => {
+      return new Promise((resolveStart) => {
         server.listen(config.port, config.host, () => {
           log.info(`backend listening on http://${config.host}:${config.port}`);
           syncHandle = startSyncLoop(db, config);
           notificationHandle = startNotificationLoop(db, config);
-          resolve(server);
+          resolveStart(server);
         });
       });
     },
     stop() {
-      return new Promise((resolve, reject) => {
+      return new Promise((resolveStop, reject) => {
         syncHandle?.stop();
         syncHandle = null;
         notificationHandle?.stop();
@@ -142,7 +142,7 @@ export function createTaskflowServer(config = backendConfig) {
             return;
           }
           closeDatabase();
-          resolve(undefined);
+          resolveStop(undefined);
         });
       });
     },

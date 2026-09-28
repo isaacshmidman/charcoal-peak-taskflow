@@ -38,9 +38,9 @@ function makeConfig(dbFile) {
   };
 }
 
-function seedTask(db, { id = TASK_ID, title = "Test task" } = {}) {
+function seedTask(database, { id = TASK_ID, title = "Test task" } = {}) {
   const now = new Date().toISOString();
-  db.prepare(
+  database.prepare(
     `INSERT INTO tasks (
       id, app_id, title, status, task_type, recurrence, recurrence_days_json,
       tags_json, created_date, updated_date, created_by_id, created_by, is_sample

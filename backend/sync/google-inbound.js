@@ -25,16 +25,11 @@ import {
 export async function syncOneCalendar(db, config, { integration, accessToken, user, calendarRow }) {
   const externalCalendarId = calendarRow.external_calendar_id;
 
-  let result;
-  try {
-    result = await listEventsIncremental(
-      accessToken,
-      externalCalendarId,
-      calendarRow.sync_token
-    );
-  } catch (err) {
-    throw err;
-  }
+  const result = await listEventsIncremental(
+    accessToken,
+    externalCalendarId,
+    calendarRow.sync_token
+  );
 
   if (result.fullResync) {
     // Google invalidated our sync token (typically >7 days idle). Drop it

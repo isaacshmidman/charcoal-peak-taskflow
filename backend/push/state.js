@@ -77,7 +77,6 @@ export function getPushQueueState() {
 
 export async function waitForPushIdle({ timeoutMs = 300_000, pollMs = 50 } = {}) {
   const startedAt = Date.now();
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     const state = getPushQueueState();
     if (state.debounced === 0 && state.queued === 0 && !state.running) {

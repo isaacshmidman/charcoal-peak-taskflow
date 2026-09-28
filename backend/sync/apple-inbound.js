@@ -88,12 +88,7 @@ export async function syncAppleIntegration(db, config, integrationRow) {
 
 async function syncOneAppleCalendar(db, config, { integration, creds, user, calendarRow }) {
   const externalCalendarId = calendarRow.external_calendar_id; // absolute calendar URL
-  let result;
-  try {
-    result = await listAppleEventsIncremental(creds, externalCalendarId, calendarRow.sync_token);
-  } catch (err) {
-    throw err;
-  }
+  const result = await listAppleEventsIncremental(creds, externalCalendarId, calendarRow.sync_token);
 
   if (result.fullResync) {
     clearCalendarSyncToken(db, integration.id, externalCalendarId);

@@ -143,15 +143,15 @@ export default function RichDescriptionEditor({
     },
     // Plain URLs already in the text become links as it opens. That's
     // not an edit, so it's kept out of onChange (no autosave on open).
-    onCreate({ editor }) {
-      linkifyExistingUrls(editor);
+    onCreate({ editor: created }) {
+      linkifyExistingUrls(created);
     },
-    onUpdate({ editor, transaction }) {
+    onUpdate({ editor: updated, transaction }) {
       if (transaction?.getMeta(LINKIFY_ON_LOAD)) return;
       onChange?.(normalizeOutput({
-        isEmpty: editor.isEmpty,
-        json: editor.getJSON(),
-        text: editor.getText(),
+        isEmpty: updated.isEmpty,
+        json: updated.getJSON(),
+        text: updated.getText(),
       }));
     },
     onFocus() { setFocused(true); onFocusChangeRef.current?.(true); },
