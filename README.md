@@ -208,6 +208,15 @@ Zephyrly can sync Google Calendar and iCloud Calendar with your task list. Provi
 - Integration routes require an active session; missing integrations return 404 (never 403) to avoid existence leaks.
 - Encryption key is loaded once at boot; if missing, integration routes return 503 rather than silently falling back to plaintext storage.
 
+## AI Apps
+
+Claude, ChatGPT, Gemini and local model apps can read tasks and notes over
+MCP at `/api/mcp`, and change them only when the person allows it
+(Settings → Connected apps). Apps like claude.ai sign in with Zephyrly
+(OAuth); others take a personal token. Calendar items are never changed,
+nothing is deleted for good, and every change can be undone. Setup, the
+rules and the server side are in [docs/ai-access.md](docs/ai-access.md).
+
 ## Offline Mode
 
 Zephyrly is designed to stay useful when the network drops. Everything the user touches regularly keeps working offline; only things that require a round-trip to a remote server are disabled.
