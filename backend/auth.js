@@ -4,11 +4,11 @@ import { HttpError } from "./http.js";
 import { ensureDefaultPrioritiesForUser, findUserByEmail } from "./store.js";
 import { getGoogleRedirectUrl } from "./config.js";
 
-function sha256(value) {
+export function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
 }
 
-function createOpaqueToken(bytes = 32) {
+export function createOpaqueToken(bytes = 32) {
   return randomBytes(bytes).toString("base64url");
 }
 
@@ -53,7 +53,7 @@ function serializeCookie(name, value, { maxAge = 0, httpOnly = true, secure = fa
   return attributes.join("; ");
 }
 
-function buildUserPayload(row) {
+export function buildUserPayload(row) {
   if (!row) return null;
   return {
     id: row.id,

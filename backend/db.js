@@ -348,6 +348,50 @@ export function createDatabase(config = backendConfig) {
       local_id TEXT NOT NULL,
       PRIMARY KEY (app_id, user_id, entity, source_id)
     );
+
+    -- AI apps (backend/ai/). A grant is one connected app for one user —
+    -- a personal token, or later an OAuth sign-in. can_write is read on
+    -- every request, so changing it in Settings takes effect at once.
+    -- Revoked grants are kept so the activity log can still name them.
+    CREATE TABLE IF NOT EXISTS ai_grants (
+      id TEXT PRIMARY KEY,
+      app_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      kind TEXT NOT NULL,                -- 'token' | 'oauth'
+      label TEXT NOT NULL,               -- the token's name, or the app's
+      client_id TEXT,                    -- oauth only
+      can_write INTEGER NOT NULL DEFAULT 0,
+      time_zone TEXT NOT NULL DEFAULT 'UTC',
+      created_date TEXT NOT NULL,
+      last_used_at TEXT,
+      revoked_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_ai_grants_user ON ai_grants(app_id, user_id);
+
+    -- Secrets are never stored, only their sha256.
+    CREATE TABLE IF NOT EXISTS ai_tokens (
+      token_hash TEXT PRIMARY KEY,
+      grant_id TEXT NOT NULL,
+      kind TEXT NOT NULL,                -- 'personal' | 'access' | 'refresh'
+      expires_at TEXT,                   -- NULL: until revoked
+      created_date TEXT NOT NULL,
+      used_at TEXT                       -- refresh: when it was exchanged
+    );
+    CREATE INDEX IF NOT EXISTS idx_ai_tokens_grant ON ai_tokens(grant_id);
+
+    -- Every change an AI app makes, with what Undo needs to reverse it.
+    CREATE TABLE IF NOT EXISTS ai_activity (
+      id TEXT PRIMARY KEY,
+      app_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      grant_id TEXT NOT NULL,
+      tool TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      undo_json TEXT,                    -- NULL: not undoable from the log
+      created_date TEXT NOT NULL,
+      undone_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_ai_activity_user ON ai_activity(app_id, user_id, created_date);
   `);
 
   // Migration: add task_end_time to existing databases.

@@ -682,7 +682,7 @@ function parsePreferences(raw) {
   }
 }
 
-function sanitizeTimeZone(value) {
+export function sanitizeTimeZone(value) {
   const tz = String(value || DEFAULT_SETTINGS.timeZone).trim() || DEFAULT_SETTINGS.timeZone;
   try {
     Intl.DateTimeFormat("en-US", { timeZone: tz }).format(new Date());

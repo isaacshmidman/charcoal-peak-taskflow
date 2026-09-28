@@ -8,6 +8,7 @@ import { closeDatabase, getDatabase } from "./db.js";
 import { HttpError, getRequestUrl, sendError, sendJson } from "./http.js";
 import { log } from "./log.js";
 import { purgeExpiredAuthRecords } from "./auth.js";
+import { purgeExpiredAiRecords } from "./ai/grants.js";
 import { startSyncLoop } from "./sync.js";
 import { startNotificationLoop } from "./notifications.js";
 import { handleAuthRoute } from "./routes/auth.js";
@@ -190,6 +191,7 @@ export function createRequestHandler(config = backendConfig, db = getDatabase(co
       // Healthcheck (used by Docker + uptime probes).
       if (requestUrl.pathname === "/health" || requestUrl.pathname === "/api/health") {
         purgeExpiredAuthRecords(db);
+        purgeExpiredAiRecords(db);
         sendJson(response, 200, { ok: true, app_id: config.appId });
         return;
       }
