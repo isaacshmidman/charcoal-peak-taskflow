@@ -1,6 +1,6 @@
 import React from "react";
 import { afterEach, describe, expect, it } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Editor } from "@tiptap/core";
 import { buildEditorExtensions } from "./extensions";
 import Toolbar from "./Toolbar";
@@ -139,5 +139,19 @@ describe("pickers", () => {
     fireEvent.mouseDown(screen.getByTitle("Blue"));
     expect(ed.getHTML()).toContain("color: #3b82f6");
     expect(screen.queryByTitle("Blue")).toBeNull();
+  });
+});
+
+describe("a toolbar outside the editor (Notes)", () => {
+  it("keeps up with the selection on its own — no host re-render needed", () => {
+    const element = document.createElement("div");
+    document.body.appendChild(element);
+    editor = new Editor({ element, extensions: buildEditorExtensions(), content: "<p>Call the plumber</p>" });
+    // Rendered once, and never re-rendered by a parent — like the Notes bar.
+    render(<Toolbar editor={editor} onPickerOpenChange={undefined} onMakeTask={() => {}} />);
+    expect(screen.getByTestId("richtext-make-task")).toHaveProperty("disabled", true);
+
+    act(() => { editor.commands.setTextSelection({ from: 1, to: 5 }); });
+    expect(screen.getByTestId("richtext-make-task")).toHaveProperty("disabled", false);
   });
 });

@@ -67,6 +67,9 @@ export function createE2EApiClient() {
   if (!backend) return null;
 
   const nextId = createIdFactory();
+  // Notes arrived after this mock; state saved by an older run won't have them.
+  backend.state.notes ||= [];
+  backend.state.deletedNotes ||= [];
   const createEntityStore = (key, createCounter, updateCounter, deleteCounter) => ({
     async list(sort) {
       return clone(sortRecords(backend.state[key], sort));
@@ -119,6 +122,8 @@ export function createE2EApiClient() {
       Priority: createEntityStore("priorities", null, null, null),
       DeletedTask: createEntityStore("deletedTasks", "deletedTaskCreates", "deletedTaskUpdates", "deletedTaskDeletes"),
       SavedTag: createEntityStore("savedTags", "savedTagCreates", null, null),
+      Note: createEntityStore("notes", null, null, null),
+      DeletedNote: createEntityStore("deletedNotes", null, null, null),
     },
     auth: {
       async me() {

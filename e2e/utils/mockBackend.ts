@@ -8,6 +8,8 @@ export interface MockState {
   priorities?: EntityRecord[];
   deletedTasks?: EntityRecord[];
   savedTags?: EntityRecord[];
+  notes?: EntityRecord[];
+  deletedNotes?: EntityRecord[];
   currentUser?: EntityRecord | null;
 }
 
@@ -17,6 +19,8 @@ export interface MockController {
     priorities: EntityRecord[];
     deletedTasks: EntityRecord[];
     savedTags: EntityRecord[];
+    notes: EntityRecord[];
+    deletedNotes: EntityRecord[];
     currentUser: EntityRecord | null;
   }>;
   getMeta: () => Promise<{
@@ -68,6 +72,8 @@ export async function installMockBackend(page: Page, initialState: MockState = {
             priorities: state.priorities ?? [],
             deletedTasks: state.deletedTasks ?? [],
             savedTags: state.savedTags ?? [],
+            notes: state.notes ?? [],
+            deletedNotes: state.deletedNotes ?? [],
             currentUser: state.currentUser === undefined ? defaultUser : state.currentUser,
           },
           counters: {

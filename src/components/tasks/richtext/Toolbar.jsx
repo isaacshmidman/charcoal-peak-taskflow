@@ -10,7 +10,7 @@
  * (color/highlight/font/list) DO take focus when opened — the parent
  * keeps the toolbar visible while `onPickerOpenChange(true)` is active.
  */
-import { useRef, useState } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import {
   Bold,
   Italic,
@@ -168,6 +168,19 @@ function Picker({ icon: Icon, title, open, setOpen, onOpenChange, children, open
 }
 
 export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, onMakeTask, placement = "docked" }) {
+  // Everything below reads live editor state (active marks, the selection
+  // for Make task, undo availability), so the bar re-renders on every
+  // editor transaction itself. It used to rely on its host re-rendering —
+  // true for the docked bar inside RichDescriptionEditor, but not for the
+  // Notes bar, which sits outside it: selecting text there left Make task
+  // disabled and the Bold/Italic states stale.
+  const [, rerender] = useReducer((n) => n + 1, 0);
+  useEffect(() => {
+    if (!editor) return undefined;
+    editor.on("transaction", rerender);
+    return () => editor.off("transaction", rerender);
+  }, [editor]);
+
   const [colorOpen, setColorOpen] = useState(false);
   const [hlOpen, setHlOpen] = useState(false);
   const [fontOpen, setFontOpen] = useState(false);

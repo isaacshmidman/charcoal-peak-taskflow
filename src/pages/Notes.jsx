@@ -75,7 +75,12 @@ export default function Notes() {
   const editorRef = useRef(null);
   const scrollRef = useRef(null);
   // The span a pending new task should mark, captured before the dialog
-  // opens. Cleared on cancel so nothing is ever marked without a task.
+  // opens. It is NOT cleared when the dialog closes: the task form closes
+  // first and submits after (see TaskForm commitAndClose), so clearing on
+  // close threw the span away before the task existed and nothing was ever
+  // linked. It's consumed once the task is created, replaced by the next
+  // Make task, and cleared when an existing task is opened. Cancelling
+  // can't mark anything: marking only happens after a task is created.
   const pendingRangeRef = useRef(null);
   // Where to put the reader back afterwards: caret + scroll.
   const restoreRef = useRef(null);
@@ -236,7 +241,6 @@ export default function Notes() {
     setTaskFormOpen(false);
     setTaskDraft(null);
     setEditingTask(null);
-    pendingRangeRef.current = null;
     restorePlace();
   };
 

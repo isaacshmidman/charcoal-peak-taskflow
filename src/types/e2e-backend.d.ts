@@ -9,6 +9,8 @@ declare global {
         priorities: Record<string, any>[];
         deletedTasks: Record<string, any>[];
         savedTags: Record<string, any>[];
+        notes: Record<string, any>[];
+        deletedNotes: Record<string, any>[];
         currentUser: Record<string, any> | null;
       };
       counters: {
