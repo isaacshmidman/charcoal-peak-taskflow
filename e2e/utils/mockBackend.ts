@@ -12,6 +12,7 @@ export interface MockState {
   deletedNotes?: EntityRecord[];
   aiGrants?: EntityRecord[];
   aiActivity?: EntityRecord[];
+  aiConnectRequests?: Record<string, EntityRecord>;
   currentUser?: EntityRecord | null;
 }
 
@@ -78,6 +79,7 @@ export async function installMockBackend(page: Page, initialState: MockState = {
             deletedNotes: state.deletedNotes ?? [],
             aiGrants: state.aiGrants ?? [],
             aiActivity: state.aiActivity ?? [],
+            aiConnectRequests: state.aiConnectRequests ?? {},
             currentUser: state.currentUser === undefined ? defaultUser : state.currentUser,
           },
           counters: {

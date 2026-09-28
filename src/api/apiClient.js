@@ -73,6 +73,8 @@ import { loadFromCache, saveToCache } from "@/lib/offlineCache";
  *     revoke: (id: string) => Promise<any>,
  *     activity: () => Promise<any[]>,
  *     undo: (id: string) => Promise<any>,
+ *     connectRequest: (id: string) => Promise<{ client_name: string, redirect_host: string, wants_changes: boolean }>,
+ *     decide: (id: string, input: { approve: boolean, can_write?: boolean, time_zone?: string }) => Promise<{ redirect_to: string }>,
  *   },
  *   cleanup: () => void,
  * }} ApiClient
@@ -631,6 +633,21 @@ const liveApiClient = {
     /** @param {string} id */
     async undo(id) {
       return apiRequest(`/apps/${appConfig.appId}/ai/activity/${encodeURIComponent(id)}/undo`, { method: "POST" });
+    },
+    /**
+     * An AI app's sign-in waiting on the consent page.
+     * @param {string} id
+     */
+    async connectRequest(id) {
+      return apiRequest(`/apps/${appConfig.appId}/ai/connect/${encodeURIComponent(id)}`);
+    },
+    /**
+     * @param {string} id
+     * @param {{ approve: boolean, can_write?: boolean, time_zone?: string }} input
+     * @returns {Promise<{ redirect_to: string }>}
+     */
+    async decide(id, input) {
+      return apiRequest(`/apps/${appConfig.appId}/ai/connect/${encodeURIComponent(id)}`, { method: "POST", body: input });
     },
   },
   async getPublicSettings() {

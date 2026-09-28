@@ -86,3 +86,77 @@ test("recent changes can be undone, and a delete points to Recently Deleted", as
   await deletion.getByRole("link", { name: "In Recently Deleted" }).click();
   await expect(page).toHaveURL(/\/RecentlyDeleted$/);
 });
+
+const CALLBACK = "https://claude.ai/api/mcp/auth_callback";
+
+/** Catch the trip back to the AI app, which isn't reachable from the test. */
+async function catchReturn(page) {
+  const returned: string[] = [];
+  await page.route("https://claude.ai/**", async (route) => {
+    returned.push(route.request().url());
+    await route.fulfill({ status: 200, contentType: "text/html", body: "<p>Back in the app</p>" });
+  });
+  return returned;
+}
+
+test("an AI app signing in: the page names it and where it returns, and changes are off unless ticked", async ({ page }) => {
+  await installMockBackend(page, {
+    tasks: [],
+    priorities: [defaultPriority],
+    aiConnectRequests: { "req-1": { client_name: "Claude", redirect_uri: CALLBACK, wants_changes: true, state: "abc" } },
+  });
+  const returned = await catchReturn(page);
+  await page.goto("/connect/req-1");
+  await expect(page.getByRole("heading", { name: "Connect “Claude” to your Zephyrly account?" })).toBeVisible();
+  await expect(page.getByTestId("connect-host")).toHaveText("claude.ai");
+  const allowChanges = page.getByTestId("connect-allow-changes");
+  await expect(allowChanges).toHaveAttribute("aria-checked", "false");
+
+  await page.getByTestId("connect-allow").click();
+  await expect(page.getByText("Back in the app")).toBeVisible();
+  expect(new URL(returned[0]).searchParams.get("code")).toBe("e2e-code-read");
+  expect(new URL(returned[0]).searchParams.get("state")).toBe("abc");
+});
+
+test("ticking changes grants them; refusing sends the app access_denied", async ({ page }) => {
+  await installMockBackend(page, {
+    tasks: [],
+    priorities: [defaultPriority],
+    aiConnectRequests: {
+      "req-w": { client_name: "ChatGPT", redirect_uri: CALLBACK, wants_changes: true, state: "w" },
+      "req-n": { client_name: "ChatGPT", redirect_uri: CALLBACK, wants_changes: false, state: "n" },
+    },
+  });
+  const returned = await catchReturn(page);
+  await page.goto("/connect/req-w");
+  await page.getByTestId("connect-allow-changes").click();
+  await page.getByTestId("connect-allow").click();
+  await expect(page.getByText("Back in the app")).toBeVisible();
+  expect(new URL(returned[0]).searchParams.get("code")).toBe("e2e-code-changes");
+
+  await page.goto("/connect/req-n");
+  await page.getByTestId("connect-deny").click();
+  await expect(page.getByText("Back in the app")).toBeVisible();
+  const refused = new URL(returned[1]);
+  expect(refused.searchParams.get("error")).toBe("access_denied");
+  expect(refused.searchParams.get("code")).toBeNull();
+});
+
+test("an expired or used sign-in says so", async ({ page }) => {
+  await installMockBackend(page, { tasks: [], priorities: [defaultPriority] });
+  await page.goto("/connect/nope");
+  await expect(page.getByTestId("connect-gone")).toContainText("expired or was already used");
+  await expect(page.getByTestId("connect-allow")).toHaveCount(0);
+});
+
+test("someone not signed in signs in first and comes back to the same request", async ({ page }) => {
+  await installMockBackend(page, {
+    tasks: [],
+    priorities: [defaultPriority],
+    currentUser: null,
+    aiConnectRequests: { "req-1": { client_name: "Claude", redirect_uri: CALLBACK, state: "abc" } },
+  });
+  await page.goto("/connect/req-1");
+  await expect(page).toHaveURL(/\/login\?next=.*%2Fconnect%2Freq-1/);
+});
+

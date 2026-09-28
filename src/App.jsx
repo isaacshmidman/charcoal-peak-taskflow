@@ -18,6 +18,7 @@ import Login from "@/pages/Login.jsx";
 import Settings from "@/pages/Settings.jsx";
 import RecentlyDeleted from "@/pages/RecentlyDeleted.jsx";
 import Notes from "@/pages/Notes.jsx";
+import Connect from "@/pages/Connect.jsx";
 
 function DefaultRedirect() {
   const defaultNav = sanitizeNavRoute(localStorage.getItem("defaultNav"));
@@ -76,6 +77,8 @@ const AuthenticatedApp = () => {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
+      {/* An AI app asking to connect ("Sign in with Zephyrly"); needs sign-in, outside the app's chrome. */}
+      <Route path="/connect/:requestId" element={<Connect />} />
       <Route element={<Layout />}>
         <Route path="/" element={<DefaultRedirect />} />
         <Route path="/Active" element={<Active />} />

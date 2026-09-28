@@ -322,6 +322,30 @@ export function createE2EApiClient() {
         persistBackend(backend);
         return clone(entry);
       },
+      // Consent for an AI app signing in: state.aiConnectRequests[id] =
+      // { client_name, redirect_uri, wants_changes, state }.
+      async connectRequest(id) {
+        const request = (/** @type {any} */ (backend.state).aiConnectRequests || {})[id];
+        if (!request) {
+          const error = new Error("This sign-in has expired or was already used. Start again from the app.");
+          /** @type {any} */ (error).status = 404;
+          throw error;
+        }
+        return { client_name: request.client_name, redirect_host: new URL(request.redirect_uri).host, wants_changes: Boolean(request.wants_changes) };
+      },
+      async decide(id, input) {
+        const state = /** @type {any} */ (backend.state);
+        const request = (state.aiConnectRequests || {})[id];
+        const back = new URL(request.redirect_uri);
+        // The mock's code says what was granted, so a test can read it off the URL.
+        if (input?.approve) back.searchParams.set("code", input.can_write ? "e2e-code-changes" : "e2e-code-read");
+        else back.searchParams.set("error", "access_denied");
+        back.searchParams.set("state", request.state || "");
+        state.lastAiDecision = { id, ...input };
+        delete state.aiConnectRequests[id];
+        persistBackend(backend);
+        return { redirect_to: back.toString() };
+      },
     },
     cleanup() {},
     setToken(token) {
