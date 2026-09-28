@@ -113,6 +113,13 @@ describe("get_agenda", () => {
     expect(later.text).toContain("- Water plants — repeats every week");
   });
 
+  it("says the agenda as sentences for Siri: no ids, times as spoken, overdue last", async () => {
+    const { data } = await runTool(ctxFor(), "get_agenda", {});
+    expect(data.spoken).toBe("Today you have 5 things: Yam soup, Kiwi tart, Zebra report at 9 AM, Dentist at 11 AM and Apple pie at 2 PM. Also 1 overdue: Old essay.");
+    const two = await runTool(ctxFor(), "get_agenda", { start_date: addDaysYmd(today, 1), days: 2 });
+    expect(two.data.spoken).toMatch(/^Tomorrow you have 2 things: Tomorrow thing and Water plants\. On \w+day \d{1,2} \w+ there's nothing due\.$/);
+  });
+
   it("says plainly when a day is empty", async () => {
     const { text } = await runTool(ctxFor(), "get_agenda", { start_date: addDaysYmd(today, 30) });
     expect(text).toContain("- Nothing due.");

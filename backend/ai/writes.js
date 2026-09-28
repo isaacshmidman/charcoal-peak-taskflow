@@ -27,7 +27,7 @@ import { ToolError } from "./args.js";
 import { logActivity } from "./activity.js";
 import { DATE, findPriority, getOwnTask, loadPriorities, loadTasks, lower } from "./context.js";
 import { WRITES_PER_HOUR, takeSlot } from "./rate-limit.js";
-import { dayLabel, defaultEndTime, describeReminder, formatTime, fromCalendar, isFromCalendar, normalizeTime, timeMinutes } from "./view.js";
+import { dayLabel, defaultEndTime, describeReminder, formatTime, fromCalendar, isFromCalendar, normalizeTime, speakDay, speakTime, timeMinutes, todayIn } from "./view.js";
 
 /** The task editor's limit (richtext/content.js WORD_LIMIT). */
 const TASK_DESCRIPTION_WORDS = 500;
@@ -301,9 +301,20 @@ const createTask = {
       task_id: created.id,
       updated_date: created.updated_date,
     });
+    const spokenWhen = created.due_date
+      ? ` for ${speakDay(created.due_date, todayIn(ctx.timeZone))}${created.task_time ? ` at ${speakTime(created.task_time)}` : ""}`
+      : "";
     return {
       text: `Added ${quote(created.title)}${where}${when(created)} (id ${created.id}).`,
-      data: { id: created.id, title: created.title, due_date: created.due_date || null, time: created.task_time || null, end_time: created.task_end_time || null, parent_task_id: parent?.id || null },
+      data: {
+        id: created.id,
+        title: created.title,
+        due_date: created.due_date || null,
+        time: created.task_time || null,
+        end_time: created.task_end_time || null,
+        parent_task_id: parent?.id || null,
+        spoken: `Added ${created.title}${spokenWhen}.`,
+      },
     };
   },
 };

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { setupSnippets } from "./ai-setup";
+import { setupSnippets, siriSetup } from "./ai-setup";
 
 const URL = "https://zephyrly.app/api/mcp";
 const TOKEN = "zeph_pat_example";
@@ -41,3 +41,13 @@ describe("the plain HTTP line", () => {
   });
 });
 
+
+describe("siriSetup", () => {
+  it("points Shortcuts at the plain HTTP tools with the token as a bearer header", () => {
+    expect(siriSetup(URL, TOKEN)).toEqual({
+      agendaUrl: "https://zephyrly.app/api/v1/tools/get_agenda",
+      addUrl: "https://zephyrly.app/api/v1/tools/create_task",
+      authorization: `Bearer ${TOKEN}`,
+    });
+  });
+});

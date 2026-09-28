@@ -267,3 +267,54 @@ export function byTimeThenPriority(ctx) {
     return String(a.title).localeCompare(String(b.title));
   };
 }
+
+// ── Speech ─────────────────────────────────────────────────────────────
+// Siri reads answers aloud through Shortcuts (/api/v1 "spoken"), where ids
+// and punctuation-heavy lines are noise. These phrase the same facts as a
+// person would say them.
+
+const FULL_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+/**
+ * "9:00AM" → "9 AM", "9:30PM" → "9:30 PM".
+ * @param {string} time
+ */
+export function speakTime(time) {
+  const minutes = timeMinutes(time);
+  if (minutes == null) return time;
+  const h24 = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  const hour = h24 === 0 ? 12 : h24 > 12 ? h24 - 12 : h24;
+  return `${hour}${m ? `:${String(m).padStart(2, "0")}` : ""} ${h24 < 12 ? "AM" : "PM"}`;
+}
+
+/**
+ * "today", "tomorrow", or "Tuesday 29 September".
+ * @param {string} ymd
+ * @param {string} today
+ */
+export function speakDay(ymd, today) {
+  if (ymd === today) return "today";
+  if (ymd === addDaysYmd(today, 1)) return "tomorrow";
+  const [y, m, d] = ymd.split("-").map(Number);
+  return `${FULL_WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]} ${d} ${FULL_MONTHS[m - 1]}`;
+}
+
+/**
+ * "A", "A and B", "A, B and C", "A, B, C and 4 more".
+ * @param {string[]} items
+ * @param {number} [max]
+ */
+export function speakList(items, max = 8) {
+  if (items.length <= 1) return items[0] || "";
+  if (items.length > max) return `${items.slice(0, max).join(", ")} and ${items.length - max} more`;
+  return `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
+}
+
+/**
+ * "Pay rent at 9 AM", or just the title for an untimed task.
+ * @param {any} task
+ */
+export function speakTask(task) {
+  return task.task_time ? `${task.title} at ${speakTime(task.task_time)}` : task.title;
+}

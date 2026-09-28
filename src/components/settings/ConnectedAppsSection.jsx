@@ -15,7 +15,7 @@ import { Link } from "react-router-dom";
 import { Check, Copy } from "lucide-react";
 import { apiClient } from "@/api/apiClient";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
-import { setupSnippets } from "@/lib/ai-setup";
+import { setupSnippets, siriSetup } from "@/lib/ai-setup";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -82,8 +82,80 @@ function Mono({ children, testId }) {
   );
 }
 
+/** A value to paste into Shortcuts, with its own copy button. */
+function Paste({ label, value, testId }) {
+  return (
+    <div className="flex items-start gap-2">
+      <Mono testId={testId}>{value}</Mono>
+      <CopyButton text={value} label={`Copy ${label}`} />
+    </div>
+  );
+}
+
+/**
+ * Siri can't use MCP: it runs Shortcuts, which call the plain HTTP tools
+ * (/api/v1) and read out the answer's "spoken" sentence.
+ */
+function SiriSteps({ created }) {
+  const siri = siriSetup(created.mcp_url, created.token);
+  const step = "text-xs leading-5 text-slate-600 dark:text-slate-300";
+  return (
+    <div className="space-y-4" data-testid="ai-siri-steps">
+      <p className={step}>
+        Siri runs shortcuts. Make these in the Shortcuts app on your iPhone. The second one adds tasks, so it needs a token
+        that's allowed to change them.
+      </p>
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-slate-900 dark:text-slate-100">What's due in Zephyrly</p>
+        <ol className={`list-decimal space-y-2 pl-4 ${step}`}>
+          <li>
+            Add <strong>Get Contents of URL</strong> with this address:
+            <Paste label="agenda address" value={siri.agendaUrl} testId="ai-siri-agenda-url" />
+          </li>
+          <li>
+            Open its options: Method <strong>POST</strong>; under Headers add <strong>Authorization</strong> with this value;
+            Request Body <strong>JSON</strong>, left empty.
+            <Paste label="Authorization value" value={siri.authorization} testId="ai-siri-authorization" />
+          </li>
+          <li>
+            Add <strong>Get Dictionary Value</strong>: the value for <strong>spoken</strong> in Contents of URL.
+          </li>
+          <li>
+            Add <strong>Show Result</strong> with the Dictionary Value.
+          </li>
+          <li>Name it “What's due in Zephyrly”, then ask Siri: “What's due in Zephyrly?”</li>
+        </ol>
+      </div>
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Add to Zephyrly</p>
+        <ol className={`list-decimal space-y-2 pl-4 ${step}`}>
+          <li>
+            Add <strong>Ask for Input</strong> (Text): “What's the task?”
+          </li>
+          <li>
+            Add <strong>Ask for Input</strong> (Date): “When is it due?”
+          </li>
+          <li>
+            Add <strong>Format Date</strong> for that date, with a custom format of <strong>yyyy-MM-dd</strong>.
+          </li>
+          <li>
+            Add <strong>Get Contents of URL</strong> with this address, Method <strong>POST</strong>, the same Authorization
+            header, and a <strong>JSON</strong> body with two text fields: <strong>title</strong> set to the first Provided
+            Input, and <strong>due_date</strong> set to the Formatted Date.
+            <Paste label="add-task address" value={siri.addUrl} testId="ai-siri-add-url" />
+          </li>
+          <li>
+            Add <strong>Get Dictionary Value</strong> for <strong>spoken</strong>, then <strong>Show Result</strong>.
+          </li>
+          <li>Name it “Add to Zephyrly”, then say: “Add to Zephyrly”.</li>
+        </ol>
+      </div>
+    </div>
+  );
+}
+
 function NewToken({ created, onDone }) {
-  const snippets = setupSnippets(created.mcp_url, created.token);
+  const snippets = [...setupSnippets(created.mcp_url, created.token), { id: "siri", label: "Siri" }];
   const [app, setApp] = useState(snippets[0].id);
   const chosen = snippets.find((s) => s.id === app) || snippets[0];
   return (
@@ -122,11 +194,17 @@ function NewToken({ created, onDone }) {
             </button>
           ))}
         </div>
-        <p className="text-xs text-slate-600 dark:text-slate-300">{chosen.where}</p>
-        <div className="flex items-start gap-2">
-          <Mono testId="ai-setup-snippet">{chosen.text}</Mono>
-          <CopyButton text={chosen.text} label={`Copy ${chosen.label} setup`} />
-        </div>
+        {chosen.id === "siri" ? (
+          <SiriSteps created={created} />
+        ) : (
+          <>
+            <p className="text-xs text-slate-600 dark:text-slate-300">{chosen.where}</p>
+            <div className="flex items-start gap-2">
+              <Mono testId="ai-setup-snippet">{chosen.text}</Mono>
+              <CopyButton text={chosen.text} label={`Copy ${chosen.label} setup`} />
+            </div>
+          </>
+        )}
       </div>
       <Button type="button" variant="outline" className="w-full" onClick={onDone}>
         Done
@@ -311,7 +389,8 @@ export default function ConnectedAppsSection() {
       <div className="space-y-3 border-t border-slate-100 pt-5 dark:border-[#303030]">
         <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Connect an app with a token</h2>
         <p className="text-sm text-slate-600 dark:text-slate-300">
-          For apps you set up yourself: Claude Code, Claude Desktop, Cursor, LM Studio, Gemini CLI and Open WebUI.
+          For apps you set up yourself: Claude Code, Claude Desktop, Cursor, LM Studio, Gemini CLI, Open WebUI, scripts, and
+          Siri through Shortcuts.
         </p>
         {created ? (
           <NewToken created={created} onDone={() => setCreated(null)} />

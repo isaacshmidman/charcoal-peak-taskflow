@@ -74,3 +74,19 @@ export function setupSnippets(mcpUrl, token) {
     },
   ];
 }
+
+/**
+ * What a Siri shortcut needs: Shortcuts' "Get Contents of URL" calls the
+ * plain HTTP tools (/api/v1) and reads the answer's "spoken" sentence.
+ *
+ * @param {string} mcpUrl
+ * @param {string} token
+ */
+export function siriSetup(mcpUrl, token) {
+  const origin = mcpUrl.replace(/\/api\/mcp$/, "");
+  return {
+    agendaUrl: `${origin}/api/v1/tools/get_agenda`,
+    addUrl: `${origin}/api/v1/tools/create_task`,
+    authorization: `Bearer ${token}`,
+  };
+}

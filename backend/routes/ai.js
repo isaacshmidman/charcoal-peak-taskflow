@@ -15,7 +15,7 @@
  *   Plain HTTP (backend/ai/openapi.js), AI token:
  *   GET    /api/v1/openapi.json                     OpenAPI 3.1 (public)
  *   GET    /api/v1/tools                            this connection's tools
- *   POST   /api/v1/tools/:name                      JSON args → { ok, text, data }
+ *   POST   /api/v1/tools/:name                      JSON args → { ok, text, spoken, data }
  *
  *   "Sign in with Zephyrly" (backend/ai/oauth.js), no credentials:
  *   GET    /.well-known/oauth-protected-resource[/api/mcp]
@@ -383,10 +383,11 @@ async function handleV1(request, response, { config, db, url }) {
   }
   try {
     const { text, data } = await runTool(toolContext(db, config, found), toolMatch[1], args);
-    sendJson(response, 200, { ok: true, text, data });
+    // spoken: what Siri should say — the tool's own sentence if it has one.
+    sendJson(response, 200, { ok: true, text, spoken: typeof data?.spoken === "string" ? data.spoken : text, data });
   } catch (error) {
     if (error instanceof ToolError) {
-      sendJson(response, 200, { ok: false, text: error.message });
+      sendJson(response, 200, { ok: false, text: error.message, spoken: error.message });
       return;
     }
     throw error;

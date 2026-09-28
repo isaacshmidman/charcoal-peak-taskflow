@@ -53,9 +53,10 @@ export function openApiDocument(config) {
           properties: {
             ok: { type: "boolean", description: "false when the tool refused or the arguments were wrong." },
             text: { type: "string", description: "A readable answer, with ids." },
+            spoken: { type: "string", description: "The answer as a sentence to read aloud, without ids." },
             data: { description: "The same facts as structured data (absent when ok is false)." },
           },
-          required: ["ok", "text"],
+          required: ["ok", "text", "spoken"],
         },
       },
     },

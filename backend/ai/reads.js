@@ -16,6 +16,9 @@ import {
   fromCalendar,
   isCalendarEvent,
   isFromCalendar,
+  speakDay,
+  speakList,
+  speakTask,
   taskData,
   taskLine,
   todayIn,
@@ -85,6 +88,18 @@ const getAgenda = {
       dayData.push({ date, tasks: open.map((t) => taskData(t, view)), done_count: done });
     }
 
+    // The same agenda as a couple of sentences, for Siri.
+    const spokenDays = dayData.map(({ date }) => {
+      const open = topLevel.filter((t) => t.due_date === date && t.status !== "done").sort(sort);
+      const when = speakDay(date, today);
+      const label = when === "today" || when === "tomorrow" ? `${when.charAt(0).toUpperCase()}${when.slice(1)}` : `On ${when}`;
+      if (!open.length) return `${label} there's nothing due.`;
+      return `${label} you have ${open.length === 1 ? "one thing" : `${open.length} things`}: ${speakList(open.map(speakTask))}.`;
+    });
+    if (overdue.length) {
+      spokenDays.push(`Also ${overdue.length} overdue: ${speakList(overdue.map((t) => t.title), 5)}.`);
+    }
+
     return {
       text: lines.join("\n"),
       data: {
@@ -95,6 +110,7 @@ const getAgenda = {
         overdue: overdue.slice(0, MAX_OVERDUE).map((t) => taskData(t, view)),
         overdue_count: overdue.length,
         days: dayData,
+        spoken: spokenDays.join(" "),
       },
     };
   },

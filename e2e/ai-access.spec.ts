@@ -32,6 +32,11 @@ test("making a token shows it once with setup lines, then the connection can be 
   await expect(page.getByTestId("ai-setup-snippet")).toContainText("Authorization: Bearer zeph_pat_e2e1");
   await page.getByRole("tab", { name: "LM Studio" }).click();
   await expect(page.getByTestId("ai-setup-snippet")).toContainText('"Authorization": "Bearer zeph_pat_e2e1"');
+  await page.getByRole("tab", { name: "Siri" }).click();
+  await expect(page.getByTestId("ai-siri-steps")).toContainText("What's due in Zephyrly");
+  await expect(page.getByTestId("ai-siri-agenda-url")).toHaveText(/\/api\/v1\/tools\/get_agenda$/);
+  await expect(page.getByTestId("ai-siri-add-url")).toHaveText(/\/api\/v1\/tools\/create_task$/);
+  await expect(page.getByTestId("ai-siri-authorization")).toHaveText("Bearer zeph_pat_e2e1");
 
   await page.getByRole("button", { name: "Done" }).click();
   await expect(token).toHaveCount(0);

@@ -128,6 +128,15 @@ describe("create_task", () => {
     expect(enqueueTaskPush).toHaveBeenCalledWith(db, config, { op: "upsert", appId: APP_ID, taskSnapshot: expect.objectContaining({ id: data.id }) });
   });
 
+  it("says what it added in a sentence for Siri", async () => {
+    const { todayIn, addDaysYmd } = await import("./view.js");
+    const tomorrow = addDaysYmd(todayIn("America/New_York"), 1);
+    const { data } = await run("create_task", { title: "Buy milk", due_date: tomorrow, time: "5:30pm" });
+    expect(data.spoken).toBe("Added Buy milk for tomorrow at 5:30 PM.");
+    const later = await run("create_task", { title: "Renew passport", due_date: "2031-03-04" });
+    expect(later.data.spoken).toBe("Added Renew passport for Tuesday 4 March.");
+  });
+
   it("ends a late task at 11:59PM, not after midnight", async () => {
     const { data } = await run("create_task", { title: "Late", due_date: "2026-10-01", time: "23:30" });
     expect(get(data.id).task_end_time).toBe("11:59PM");

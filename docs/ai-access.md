@@ -62,8 +62,35 @@ the others.
 
 ## Siri
 
-Siri can't use MCP; it only reaches apps through a native iOS app. A
-Shortcuts-based setup is planned separately.
+Siri can't use MCP, and only reaches native apps directly, but it runs
+Shortcuts, and a shortcut can call Zephyrly. Make a token (allow changes if
+you want Siri to add tasks), then open the **Siri** tab under the new token:
+it walks through building two shortcuts in the Shortcuts app, with every
+address and header ready to copy.
+
+- **What's due in Zephyrly** reads today's agenda aloud: "Today you have 3
+  things: Call grandma, Pay rent at 9 AM and the dentist at 2 PM. Also 1
+  overdue: Essay outline."
+- **Add to Zephyrly** asks for the task and the day, then adds it: "Added
+  Pick up dry cleaning for tomorrow."
+
+Both call the plain HTTP version of the tools (`/api/v1/tools/<name>`) and
+read the answer's `spoken` sentence. Siri reasoning over your tasks itself
+(Apple Intelligence) would need a native iOS app with App Intents.
+
+## Scripts and other tools
+
+The same tools over plain HTTP, with a token:
+
+```
+curl -X POST https://zephyrly.app/api/v1/tools/get_agenda \
+  -H "Authorization: Bearer <token>" -H "Content-Type: application/json" -d '{}'
+```
+
+Every call answers `{ ok, text, spoken, data }`. A refusal is `ok: false`
+with the reason in `text`. `GET /api/v1/tools` lists what the token may use,
+and `https://zephyrly.app/api/v1/openapi.json` describes it all in OpenAPI
+3.1, for GPT Actions, Gemini function calling and similar.
 
 ---
 
@@ -103,9 +130,11 @@ Shortcuts-based setup is planned separately.
 | `GET /api/oauth/authorize` | Starts sign-in, opens `/connect/<id>` | none |
 | `POST /api/oauth/token` | Code or refresh token → tokens | PKCE |
 | `POST /api/oauth/revoke` | Disconnects the app | the token |
+| `POST /api/v1/tools/<name>` | The tools over plain HTTP (Siri, scripts) | AI token |
+| `GET /api/v1/openapi.json` | OpenAPI 3.1, generated from the tools | none |
 | `/api/apps/:appId/ai/*` | Settings: connections, tokens, activity, Undo, consent | signed-in session |
 
-AI tokens only work on `/api/mcp`; a signed-in session doesn't work there.
+AI tokens only work on `/api/mcp` and `/api/v1`; a signed-in session doesn't work there.
 Code lives in `backend/ai/` (tools, grants, OAuth, MCP) and
 `backend/routes/ai.js`.
 

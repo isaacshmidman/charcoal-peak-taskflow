@@ -1596,11 +1596,18 @@ describe("the same tools over plain HTTP (/api/v1)", () => {
     expect(refused.body.ok).toBe(false);
     expect(refused.body.text).toContain("can only read");
     expect((await tool(reader, "no_such_tool", {})).statusCode).toBe(404);
-    expect((await tool(reader, "get_agenda", { days: "lots" })).body).toEqual({ ok: false, text: '"days" must be a whole number.' });
+    expect((await tool(reader, "get_agenda", { days: "lots" })).body).toEqual({
+      ok: false,
+      text: '"days" must be a whole number.',
+      spoken: '"days" must be a whole number.',
+    });
+    // What Siri reads: a sentence, no ids.
+    expect(agenda.body.spoken).toBe("Today you have one thing: Water the ferns.");
 
     const writer = await makeToken(session, true);
     const added = await tool(writer, "create_task", { title: "From Siri", due_date: today() });
     expect(added.body.ok).toBe(true);
+    expect(added.body.spoken).toBe("Added From Siri for today.");
     expect((await sessionApi(session)("GET", `/entities/Task/${added.body.data.id}`)).body.title).toBe("From Siri");
   });
 
