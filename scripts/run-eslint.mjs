@@ -8,9 +8,11 @@ const eslint = new ESLint({
   overrideConfigFile: "eslint.config.js",
 });
 
+// Tracked files plus new ones not yet added (--others, minus ignored):
+// tracked-only let a brand-new file skip lint locally and fail in CI.
 const files = execFileSync(
   "git",
-  ["ls-files", "src/**/*.js", "src/**/*.jsx", "backend/**/*.js", "backend/*.js"],
+  ["ls-files", "--cached", "--others", "--exclude-standard", "src/**/*.js", "src/**/*.jsx", "backend/**/*.js", "backend/*.js"],
   { encoding: "utf8" },
 )
   .trim()

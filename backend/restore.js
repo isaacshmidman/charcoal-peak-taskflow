@@ -101,7 +101,7 @@ export async function openExport(path) {
 function parseData(raw) {
   let data;
   try {
-    data = JSON.parse(raw.toString("utf8").replace(/^﻿/, ""));
+    data = JSON.parse(raw.toString("utf8").replace(/^\uFEFF/, ""));
   } catch {
     throw new HttpError(400, "That file isn't a Zephyrly export.", "restore_not_export");
   }
