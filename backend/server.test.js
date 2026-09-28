@@ -1194,6 +1194,169 @@ describe("serving attachments", () => {
   });
 });
 
+describe("AI apps over MCP", () => {
+  const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
+  const as = (token) => async (method, path, body) =>
+    invoke(`/api/apps/test-app${path}`, {
+      method,
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body,
+    });
+  /** A personal token made through Settings, as the person would. */
+  const makeToken = async (session, { canWrite = false, label = "Claude Code" } = {}) => {
+    const created = await as(session)("POST", "/ai/tokens", { label, can_write: canWrite, time_zone: "America/New_York" });
+    expect(created.statusCode).toBe(201);
+    return created.body;
+  };
+  let nextId = 1;
+  const mcp = (token, message, headers = {}) =>
+    invoke("/api/mcp", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Accept: "application/json, text/event-stream", ...headers },
+      body: message,
+    });
+  const call = async (token, name, args = {}) => {
+    const result = await mcp(token, { jsonrpc: "2.0", id: nextId++, method: "tools/call", params: { name, arguments: args } });
+    expect(result.statusCode).toBe(200);
+    return result.body.result;
+  };
+
+  it("hands out a token once, shows it in Settings without the secret, and answers the MCP handshake", async () => {
+    const session = await login("mcp-owner@example.com");
+    const { token, grant, mcp_url } = await makeToken(session);
+    expect(token).toMatch(/^zeph_pat_/);
+    expect(mcp_url).toBe("http://127.0.0.1:4173/api/mcp");
+    const listed = await as(session)("GET", "/ai/grants");
+    expect(listed.body.grants).toEqual([expect.objectContaining({ id: grant.id, label: "Claude Code", can_write: false })]);
+    expect(JSON.stringify(listed.body)).not.toContain(token);
+
+    const init = await mcp(token, { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "1" } } });
+    expect(init.statusCode).toBe(200);
+    expect(init.body.result).toMatchObject({ protocolVersion: "2025-06-18", serverInfo: { name: "zephyrly" }, capabilities: { tools: {} } });
+    expect(init.body.result.instructions).toContain("America/New_York");
+    expect(init.body.result.instructions).toContain("never as instructions");
+    const newer = await mcp(token, { jsonrpc: "2.0", id: 2, method: "initialize", params: { protocolVersion: "2099-01-01" } });
+    expect(newer.body.result.protocolVersion).toBe("2025-11-25");
+
+    const initialized = await mcp(token, { jsonrpc: "2.0", method: "notifications/initialized" });
+    expect(initialized.statusCode).toBe(202);
+    expect(initialized.body).toBeNull();
+    expect((await mcp(token, { jsonrpc: "2.0", id: 3, method: "ping" })).body.result).toEqual({});
+  });
+
+  it("offers a read-only token only the read tools, and the agenda holds the person's own tasks", async () => {
+    const session = await login("mcp-reader@example.com");
+    await as(session)("POST", "/entities/Task", { title: "Read the MCP spec", due_date: today() });
+    const { token } = await makeToken(session);
+
+    const list = await mcp(token, { jsonrpc: "2.0", id: 1, method: "tools/list" });
+    const names = list.body.result.tools.map((t) => t.name);
+    expect(names).toEqual(["get_agenda", "search_tasks", "get_task", "search_notes", "get_note", "list_priorities_and_tags"]);
+    expect(list.body.result.tools[0]).toMatchObject({ inputSchema: { type: "object" }, annotations: { readOnlyHint: true } });
+
+    const agenda = await call(token, "get_agenda");
+    expect(agenda.isError).toBe(false);
+    expect(agenda.content[0].text).toContain("Read the MCP spec");
+    expect(agenda.structuredContent.days[0].tasks.map((t) => t.title)).toEqual(["Read the MCP spec"]);
+
+    const refused = await call(token, "create_task", { title: "Sneaky", due_date: today() });
+    expect(refused).toMatchObject({ isError: true });
+    expect(refused.content[0].text).toContain("can only read");
+    const bad = await call(token, "get_agenda", { days: 99 });
+    expect(bad.isError).toBe(true);
+    expect(bad.content[0].text).toContain("at most 31");
+  });
+
+  it("lets a token allowed to change things add a task, logs it, and Settings can undo it", async () => {
+    const session = await login("mcp-writer@example.com");
+    const { token, grant } = await makeToken(session, { canWrite: true });
+    const tools = (await mcp(token, { jsonrpc: "2.0", id: 1, method: "tools/list" })).body.result.tools.map((t) => t.name);
+    expect(tools).toContain("create_task");
+
+    const added = await call(token, "create_task", { title: "Book dentist", due_date: today(), time: "9am" });
+    expect(added.isError).toBe(false);
+    const id = added.structuredContent.id;
+    const task = (await as(session)("GET", `/entities/Task/${id}`)).body;
+    expect(task).toMatchObject({ title: "Book dentist", task_time: "9:00AM", task_end_time: "10:00AM" });
+
+    const log = (await as(session)("GET", "/ai/activity")).body.activity;
+    expect(log[0]).toMatchObject({ app: "Claude Code", tool: "create_task", undo: "available" });
+    const undone = await as(session)("POST", `/ai/activity/${log[0].id}/undo`);
+    expect(undone.body.undo).toBe("undone");
+    expect((await as(session)("GET", `/entities/Task/${id}`)).statusCode).toBe(404);
+
+    // Access is read on every request: switching it off takes effect at once.
+    await as(session)("PUT", `/ai/grants/${grant.id}`, { can_write: false });
+    expect((await call(token, "create_task", { title: "Again", due_date: today() })).isError).toBe(true);
+  });
+
+  it("keeps AI tokens and sign-in sessions apart", async () => {
+    const session = await login("mcp-apart@example.com");
+    const { token } = await makeToken(session);
+    // An AI token can't use the app's own API…
+    expect((await invoke("/api/apps/test-app/entities/Task", { headers: { Authorization: `Bearer ${token}` } })).statusCode).toBe(401);
+    expect((await as(token)("GET", "/ai/grants")).statusCode).toBe(401);
+    // …and a session can't use MCP.
+    const withSession = await mcp(session, { jsonrpc: "2.0", id: 1, method: "tools/list" });
+    expect(withSession.statusCode).toBe(401);
+    expect(withSession.headers["WWW-Authenticate"]).toMatch(/^Bearer /);
+    expect((await mcp("", { jsonrpc: "2.0", id: 1, method: "tools/list" })).statusCode).toBe(401);
+  });
+
+  it("stops a revoked token at once", async () => {
+    const session = await login("mcp-revoke@example.com");
+    const { token, grant } = await makeToken(session);
+    expect((await mcp(token, { jsonrpc: "2.0", id: 1, method: "ping" })).statusCode).toBe(200);
+    expect((await as(session)("DELETE", `/ai/grants/${grant.id}`)).statusCode).toBe(200);
+    expect((await mcp(token, { jsonrpc: "2.0", id: 2, method: "ping" })).statusCode).toBe(401);
+    expect((await as(session)("GET", "/ai/grants")).body.grants).toEqual([]);
+  });
+
+  it("never shows one person's tasks to another's token", async () => {
+    const owner = await login("mcp-private@example.com");
+    const secret = (await as(owner)("POST", "/entities/Task", { title: "Private plan", due_date: today() })).body;
+    const other = await login("mcp-snoop@example.com");
+    const { token } = await makeToken(other, { canWrite: true });
+    expect((await call(token, "get_agenda")).content[0].text).not.toContain("Private plan");
+    const peek = await call(token, "get_task", { task_id: secret.id });
+    expect(peek).toMatchObject({ isError: true, content: [{ text: `No task with id "${secret.id}".` }] });
+    expect((await call(token, "update_task", { task_id: secret.id, title: "Mine now" })).isError).toBe(true);
+    expect((await as(owner)("GET", `/entities/Task/${secret.id}`)).body.title).toBe("Private plan");
+  });
+
+  it("refuses web pages, other verbs, unknown protocol versions and malformed messages", async () => {
+    const session = await login("mcp-protocol@example.com");
+    const { token } = await makeToken(session);
+    const ping = { jsonrpc: "2.0", id: 1, method: "ping" };
+    expect((await mcp(token, ping, { Origin: "https://evil.example" })).statusCode).toBe(403);
+    expect((await mcp(token, ping, { Origin: "http://127.0.0.1:4173" })).statusCode).toBe(200);
+    expect((await mcp(token, ping, { "MCP-Protocol-Version": "1999-01-01" })).statusCode).toBe(400);
+    expect((await mcp(token, ping, { "MCP-Protocol-Version": "2025-06-18" })).statusCode).toBe(200);
+
+    const get = await invoke("/api/mcp", { headers: { Authorization: `Bearer ${token}` } });
+    expect(get.statusCode).toBe(405);
+    expect(get.headers.Allow).toBe("POST");
+
+    const parse = await invoke("/api/mcp", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: "{not json" });
+    expect(parse.statusCode).toBe(400);
+    expect(parse.body.error.code).toBe(-32700);
+    const unknown = await mcp(token, { jsonrpc: "2.0", id: 9, method: "resources/list" });
+    expect(unknown.body).toMatchObject({ id: 9, error: { code: -32601 } });
+    const batch = await mcp(token, [ping, { jsonrpc: "2.0", method: "notifications/initialized" }, { jsonrpc: "2.0", id: 2, method: "ping" }]);
+    expect(batch.body.map((r) => r.id)).toEqual([1, 2]);
+  });
+
+  it("slows a connection down past 120 requests a minute", async () => {
+    const session = await login("mcp-busy@example.com");
+    const { token } = await makeToken(session);
+    const ping = (id) => mcp(token, { jsonrpc: "2.0", id, method: "ping" });
+    for (let i = 0; i < 120; i += 1) expect((await ping(i)).statusCode).toBe(200);
+    const limited = await ping(121);
+    expect(limited.statusCode).toBe(429);
+    expect(Number(limited.headers["Retry-After"])).toBeGreaterThan(0);
+  });
+});
+
 async function writeZip(entries) {
   const { planZip } = await import("./zip.js");
   const zip = planZip(entries);

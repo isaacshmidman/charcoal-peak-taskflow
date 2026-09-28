@@ -97,6 +97,18 @@ export function readJsonBody(request, { maxBytes = MAX_JSON_BODY_BYTES } = {}) {
 }
 
 /**
+ * The origin of config.publicAppUrl, or "" when it isn't a valid URL.
+ * @param {{ publicAppUrl?: string }} config
+ */
+export function publicOrigin(config) {
+  try {
+    return new URL(String(config.publicAppUrl)).origin;
+  } catch {
+    return "";
+  }
+}
+
+/**
  * Resolve a redirect target against the app's public URL and keep it only
  * if it stays on that origin; anything else becomes `fallbackPath` there.
  *

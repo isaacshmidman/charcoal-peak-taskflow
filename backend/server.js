@@ -5,7 +5,7 @@ import { extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { backendConfig, projectRoot } from "./config.js";
 import { closeDatabase, getDatabase } from "./db.js";
-import { HttpError, getRequestUrl, sendError, sendJson } from "./http.js";
+import { HttpError, getRequestUrl, publicOrigin, sendError, sendJson } from "./http.js";
 import { log } from "./log.js";
 import { purgeExpiredAuthRecords } from "./auth.js";
 import { purgeExpiredAiRecords } from "./ai/grants.js";
@@ -18,6 +18,7 @@ import { handleAttachmentsRoute } from "./routes/attachments.js";
 import { handleEntitiesRoute } from "./routes/entities.js";
 import { handleExportRoute } from "./routes/export.js";
 import { handleRestoreRoute } from "./routes/restore.js";
+import { handleAiRoute } from "./routes/ai.js";
 
 const distRoot = resolve(projectRoot, "dist");
 const CONTENT_TYPES = {
@@ -36,15 +37,6 @@ const CONTENT_TYPES = {
   ".woff": "font/woff",
   ".woff2": "font/woff2",
 };
-
-/** The origin of config.publicAppUrl, or "" when it isn't a valid URL. */
-function publicOrigin(config) {
-  try {
-    return new URL(config.publicAppUrl).origin;
-  } catch {
-    return "";
-  }
-}
 
 function parsePath(pathname) {
   return pathname.split("/").filter(Boolean);
@@ -224,6 +216,7 @@ export function createRequestHandler(config = backendConfig, db = getDatabase(co
       if (await handleAttachmentsRoute(request, response, ctx)) return;
       if (await handleExportRoute(request, response, ctx)) return;
       if (await handleRestoreRoute(request, response, ctx)) return;
+      if (await handleAiRoute(request, response, ctx)) return;
       if (await handleEntitiesRoute(request, response, ctx)) return;
 
       throw new HttpError(404, "Route not found.", "not_found");

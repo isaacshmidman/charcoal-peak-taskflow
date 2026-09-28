@@ -17,6 +17,9 @@
 /** Default JSON body cap: login, settings, push subscriptions, integrations. */
 export const MAX_JSON_BODY_BYTES = 64 * 1024;
 
+/** Body cap for a request from an AI app (a tool call with a long note). */
+export const MAX_AI_BODY_BYTES = 1024 * 1024;
+
 /** Body cap for entity saves (tasks, notes, trash snapshots with subtasks). */
 export const MAX_ENTITY_BODY_BYTES = 4 * 1024 * 1024;
 
