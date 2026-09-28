@@ -46,21 +46,46 @@ const BLOCKED_EXTENSIONS = new Set([
   "exe", "bat", "cmd", "com", "scr", "msi", "app", "dmg", "sh", "ps1",
 ]);
 
+// Images the chip and lightbox preview. No SVG: it can carry script,
+// so it's served as a download (see INLINE_MIME_TYPES) and gets the
+// file chip like any other document.
 const IMAGE_MIME_TYPES = new Set([
   "image/png",
   "image/jpeg",
   "image/jpg",
   "image/webp",
   "image/gif",
-  "image/svg+xml",
   "image/heic",
   "image/heif",
 ]);
 
-// MIME types we feed through sharp for thumbnail generation. SVG is an
-// image but sharp can't safely rasterize arbitrary SVGs without
-// security implications; GIF loses animation on resize. Both render
-// fine at original size in the chip — no thumbnail needed.
+// Types a browser may open in place from an attachment URL. The stored
+// type is whatever the uploading browser claimed, so anything not on
+// this list — HTML, SVG, XML, or a type we don't recognise — is served
+// as opaque bytes to download. Opened inline on this origin, an HTML or
+// SVG file would run its scripts with the viewer's session.
+const INLINE_MIME_TYPES = new Set([
+  ...IMAGE_MIME_TYPES,
+  "image/avif",
+  "image/bmp",
+  "application/pdf",
+  "text/plain",
+]);
+const INLINE_MEDIA_MIME = /^(audio|video)\/[a-z0-9][a-z0-9.+-]*$/;
+
+// On every attachment response, on top of the allowlist: nosniff stops
+// the browser second-guessing the type, and the sandbox gives anything
+// that does render an opaque origin with no script.
+const ATTACHMENT_CSP = "sandbox; default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'";
+// Audio and video get the same lockdown minus the sandbox. The browser's
+// player re-requests the file from the page it opened it in; from a
+// sandboxed (opaque-origin) page that request goes out cross-site, so
+// the SameSite=Lax session cookie is left off and it fails sign-in.
+const MEDIA_CSP = "default-src 'none'; media-src 'self'; img-src 'self' data:; style-src 'unsafe-inline'";
+
+// MIME types we feed through sharp for thumbnail generation. GIF loses
+// animation on resize, and renders fine at original size in the chip —
+// no thumbnail needed.
 const THUMBNAILABLE_MIME_TYPES = new Set([
   "image/png",
   "image/jpeg",
@@ -196,6 +221,17 @@ function isImageMime(mime) {
 }
 
 /**
+ * The type to serve an attachment as when it may open in place, or
+ * null when it must only ever download.
+ * @param {string} mime
+ * @returns {string | null}
+ */
+function inlineMimeType(mime) {
+  const base = String(mime || "").split(";")[0].trim().toLowerCase();
+  return INLINE_MIME_TYPES.has(base) || INLINE_MEDIA_MIME.test(base) ? base : null;
+}
+
+/**
  * @param {any} db
  * @param {{ appId: string, userId: string }} scope
  * @returns {number}
@@ -259,7 +295,9 @@ function serializeAttachment(row) {
     filename: row.filename,
     mime_type: row.mime_type,
     size_bytes: row.size_bytes,
-    is_image: Boolean(row.is_image),
+    // SVGs uploaded before they stopped counting as images are stored
+    // with is_image = 1, but no longer render in an <img>.
+    is_image: Boolean(row.is_image) && inlineMimeType(row.mime_type) !== null,
     has_thumb: Boolean(row.thumb_path),
     width: row.width ?? null,
     height: row.height ?? null,
@@ -543,7 +581,9 @@ export function searchAttachments(db, { appId, user, q, limit = 50 }) {
 
 /**
  * Stream a file to a response with the right headers. Async stat to
- * avoid blocking the event loop on slow disks.
+ * avoid blocking the event loop on slow disks. Only allowlisted types
+ * keep their type and may open in place; anything else downloads as
+ * application/octet-stream.
  *
  * @param {import("node:http").ServerResponse} response
  * @param {string} absolutePath
@@ -557,13 +597,19 @@ export async function sendAttachmentFile(response, absolutePath, meta, { asDownl
   } catch {
     throw new HttpError(404, "Attachment file missing on disk.", "not_found");
   }
-  response.setHeader("Content-Type", meta.mimeType || "application/octet-stream");
+  const inlineType = inlineMimeType(meta.mimeType);
+  response.setHeader("Content-Type", inlineType || "application/octet-stream");
   response.setHeader("Content-Length", String(stat.size));
+  response.setHeader("X-Content-Type-Options", "nosniff");
+  response.setHeader(
+    "Content-Security-Policy",
+    inlineType && INLINE_MEDIA_MIME.test(inlineType) ? MEDIA_CSP : ATTACHMENT_CSP
+  );
   // Cache for an hour — attachments are immutable (id-addressed) so we
   // could go higher, but auth cookies move quickly and we want the SW
   // not to cache anything personal indefinitely.
   response.setHeader("Cache-Control", "private, max-age=3600");
-  const disposition = asDownload ? "attachment" : "inline";
+  const disposition = asDownload || !inlineType ? "attachment" : "inline";
   const safe = String(meta.filename || "file").replace(/"/g, "");
   response.setHeader("Content-Disposition", `${disposition}; filename="${safe}"`);
   response.writeHead(200);

