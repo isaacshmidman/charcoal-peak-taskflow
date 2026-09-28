@@ -65,5 +65,12 @@ export function setupSnippets(mcpUrl, token) {
       where: "Admin panel → Settings → External tools → add a server of type MCP (Streamable HTTP):",
       text: `URL: ${mcpUrl}\nAuth: Bearer\nKey: ${token}`,
     },
+    {
+      id: "http",
+      label: "Scripts (HTTP)",
+      // The same tools without MCP: POST JSON arguments, get { ok, text, data }.
+      where: "Call any tool over plain HTTP (the full list is at /api/v1/openapi.json):",
+      text: `curl -X POST ${mcpUrl.replace(/\/api\/mcp$/, "")}/api/v1/tools/get_agenda \\\n  -H "Authorization: ${bearer}" \\\n  -H "Content-Type: application/json" -d '{}'`,
+    },
   ];
 }

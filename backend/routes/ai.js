@@ -12,6 +12,11 @@
  *   GET    /api/apps/:appId/ai/connect/:id          consent page: what's asking
  *   POST   /api/apps/:appId/ai/connect/:id          { approve, can_write, time_zone }
  *
+ *   Plain HTTP (backend/ai/openapi.js), AI token:
+ *   GET    /api/v1/openapi.json                     OpenAPI 3.1 (public)
+ *   GET    /api/v1/tools                            this connection's tools
+ *   POST   /api/v1/tools/:name                      JSON args → { ok, text, data }
+ *
  *   "Sign in with Zephyrly" (backend/ai/oauth.js), no credentials:
  *   GET    /.well-known/oauth-protected-resource[/api/mcp]
  *   GET    /.well-known/oauth-authorization-server
@@ -31,6 +36,10 @@ import { createPersonalToken, listGrants, requireAiGrant, revokeGrant, setGrantC
 import { listActivity, undoActivity } from "../ai/activity.js";
 import { PARSE_ERROR_REPLY, PROTOCOL_VERSIONS, answerMcpBody, rpcError } from "../ai/mcp.js";
 import { REQUESTS_PER_MINUTE, takeSlot } from "../ai/rate-limit.js";
+import { ToolError } from "../ai/args.js";
+import { toolContext } from "../ai/context.js";
+import { openApiDocument } from "../ai/openapi.js";
+import { allTools, runTool, toolsForGrant } from "../ai/tools.js";
 import {
   AuthorizeError,
   OAuthError,
@@ -62,6 +71,10 @@ export function mcpUrl(config) {
 export async function handleAiRoute(request, response, { config, db, url, segments }) {
   if (url.pathname === "/api/mcp") {
     await handleMcp(request, response, { config, db });
+    return true;
+  }
+  if (url.pathname === "/api/v1" || url.pathname.startsWith("/api/v1/")) {
+    await handleV1(request, response, { config, db, url });
     return true;
   }
   if (url.pathname.startsWith("/.well-known/") || url.pathname.startsWith("/api/oauth/")) {
@@ -129,7 +142,17 @@ export async function handleAiRoute(request, response, { config, db, url, segmen
  * @param {import("node:http").ServerResponse} response
  * @param {{ config: any, db: any }} env
  */
-async function handleMcp(request, response, { config, db }) {
+/**
+ * What every request from an AI app must pass: not from a foreign web page,
+ * a live AI token, and within the connection's request rate. Sends the
+ * refusal itself and returns null, or returns the grant and its person.
+ *
+ * @param {import("node:http").IncomingMessage} request
+ * @param {import("node:http").ServerResponse} response
+ * @param {{ config: any, db: any }} env
+ * @returns {{ grant: any, user: any } | null}
+ */
+function admitAiRequest(request, response, { config, db }) {
   // A web page can't be used to drive this with someone's token: browsers
   // send Origin, and only Zephyrly's own is accepted (MCP asks servers to
   // check it, against DNS rebinding). AI apps call from their servers or
@@ -137,18 +160,7 @@ async function handleMcp(request, response, { config, db }) {
   const origin = request.headers.origin;
   if (origin && origin !== publicOrigin(config)) {
     sendJson(response, 403, { message: "Requests from web pages aren't accepted here.", code: "forbidden_origin" });
-    return;
-  }
-  if (request.method !== "POST") {
-    // No server-sent event stream and no sessions to end.
-    response.writeHead(405, { Allow: "POST", "Content-Type": "application/json; charset=utf-8" });
-    response.end(JSON.stringify({ message: "Use POST.", code: "method_not_allowed" }));
-    return;
-  }
-  const version = request.headers["mcp-protocol-version"];
-  if (typeof version === "string" && !PROTOCOL_VERSIONS.includes(version)) {
-    sendJson(response, 400, { message: `Unsupported MCP protocol version ${version}.`, code: "unsupported_protocol_version" });
-    return;
+    return null;
   }
 
   /** @type {{ grant: any, user: any }} */
@@ -164,7 +176,7 @@ async function handleMcp(request, response, { config, db }) {
         { message: error.message, code: error.code },
         { "WWW-Authenticate": `${bearerChallenge(config)}${presented ? ', error="invalid_token"' : ""}` }
       );
-      return;
+      return null;
     }
     throw error;
   }
@@ -177,8 +189,30 @@ async function handleMcp(request, response, { config, db }) {
       { message: "Too many requests; slow down.", code: "rate_limited" },
       { "Retry-After": String(Math.ceil(slot.retryAfterMs / 1000)) }
     );
+    return null;
+  }
+  return found;
+}
+
+/**
+ * @param {import("node:http").IncomingMessage} request
+ * @param {import("node:http").ServerResponse} response
+ * @param {{ config: any, db: any }} env
+ */
+async function handleMcp(request, response, { config, db }) {
+  if (request.method !== "POST") {
+    // No server-sent event stream and no sessions to end.
+    response.writeHead(405, { Allow: "POST", "Content-Type": "application/json; charset=utf-8" });
+    response.end(JSON.stringify({ message: "Use POST.", code: "method_not_allowed" }));
     return;
   }
+  const version = request.headers["mcp-protocol-version"];
+  if (typeof version === "string" && !PROTOCOL_VERSIONS.includes(version)) {
+    sendJson(response, 400, { message: `Unsupported MCP protocol version ${version}.`, code: "unsupported_protocol_version" });
+    return;
+  }
+  const found = admitAiRequest(request, response, { config, db });
+  if (!found) return;
 
   let body;
   try {
@@ -308,3 +342,54 @@ async function handleOAuth(request, response, { config, db, url }) {
     sendOAuthError(response, error);
   }
 }
+
+/**
+ * The same tools over plain HTTP, for whatever doesn't speak MCP: Apple
+ * Shortcuts (Siri), scripts, GPT Actions. A refusal is still a 200 with
+ * ok: false and the reason in text (as MCP's isError), so Shortcuts can
+ * read it out; HTTP errors are for the request itself.
+ *
+ * @param {import("node:http").IncomingMessage} request
+ * @param {import("node:http").ServerResponse} response
+ * @param {{ config: any, db: any, url: URL }} env
+ */
+async function handleV1(request, response, { config, db, url }) {
+  const path = url.pathname;
+  if (request.method === "GET" && path === "/api/v1/openapi.json") {
+    sendMetadata(response, openApiDocument(config));
+    return;
+  }
+  const toolMatch = /^\/api\/v1\/tools(?:\/([a-z_]+))?$/.exec(path);
+  const unknownTool = toolMatch?.[1] && !allTools().some((t) => t.name === toolMatch[1]);
+  if (!toolMatch || unknownTool || (request.method !== "GET" && request.method !== "POST") || (request.method === "GET") === Boolean(toolMatch[1])) {
+    sendJson(response, 404, { message: "Route not found.", code: "not_found" });
+    return;
+  }
+  const found = admitAiRequest(request, response, { config, db });
+  if (!found) return;
+
+  if (request.method === "GET") {
+    sendJson(response, 200, {
+      tools: toolsForGrant(found.grant).map((t) => ({ name: t.name, title: t.title, description: t.description, input_schema: t.inputSchema, changes_things: t.write })),
+    });
+    return;
+  }
+  let args;
+  try {
+    args = await readJsonBody(request, { maxBytes: MAX_AI_BODY_BYTES });
+  } catch (error) {
+    sendError(response, error);
+    return;
+  }
+  try {
+    const { text, data } = await runTool(toolContext(db, config, found), toolMatch[1], args);
+    sendJson(response, 200, { ok: true, text, data });
+  } catch (error) {
+    if (error instanceof ToolError) {
+      sendJson(response, 200, { ok: false, text: error.message });
+      return;
+    }
+    throw error;
+  }
+}
+

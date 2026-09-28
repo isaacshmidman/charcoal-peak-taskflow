@@ -1554,6 +1554,68 @@ describe("Sign in with Zephyrly (OAuth for AI apps)", () => {
   });
 });
 
+describe("the same tools over plain HTTP (/api/v1)", () => {
+  const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
+  const sessionApi = (token) => async (method, path, body) =>
+    invoke(`/api/apps/test-app${path}`, { method, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body });
+  const makeToken = async (session, canWrite) =>
+    (await sessionApi(session)("POST", "/ai/tokens", { label: "Shortcuts", can_write: canWrite, time_zone: "America/New_York" })).body.token;
+  const tool = (token, name, args, headers = {}) =>
+    invoke(`/api/v1/tools/${name}`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...headers }, body: args });
+
+  beforeEach(() => resetRateLimits());
+
+  it("describes itself in OpenAPI, generated from the tools", async () => {
+    const doc = await invoke("/api/v1/openapi.json");
+    expect(doc.statusCode).toBe(200);
+    expect(doc.body.openapi).toBe("3.1.0");
+    expect(doc.body.servers).toEqual([{ url: "http://127.0.0.1:4173" }]);
+    expect(doc.body.paths["/api/v1/tools/get_agenda"].post).toMatchObject({ operationId: "get_agenda", security: [{ bearer: [] }] });
+    expect(doc.body.paths["/api/v1/tools/create_task"].post.requestBody.content["application/json"].schema.required).toEqual(["title"]);
+    expect(Object.keys(doc.body.paths)).toHaveLength(11);
+  });
+
+  it("answers with readable text and data, and refuses with ok: false and the reason", async () => {
+    const session = await login("v1-user@example.com");
+    await sessionApi(session)("POST", "/entities/Task", { title: "Water the ferns", due_date: today() });
+    const reader = await makeToken(session, false);
+
+    const listed = await invoke("/api/v1/tools", { headers: { Authorization: `Bearer ${reader}` } });
+    expect(listed.body.tools.map((t) => t.name)).not.toContain("create_task");
+
+    const agenda = await tool(reader, "get_agenda", {});
+    expect(agenda.statusCode).toBe(200);
+    expect(agenda.body.ok).toBe(true);
+    expect(agenda.body.text).toContain("Water the ferns");
+    expect(agenda.body.data.days[0].tasks[0].title).toBe("Water the ferns");
+    // An empty body is no arguments.
+    expect((await invoke("/api/v1/tools/get_agenda", { method: "POST", headers: { Authorization: `Bearer ${reader}` } })).body.ok).toBe(true);
+
+    const refused = await tool(reader, "create_task", { title: "From Siri", due_date: today() });
+    expect(refused.statusCode).toBe(200);
+    expect(refused.body.ok).toBe(false);
+    expect(refused.body.text).toContain("can only read");
+    expect((await tool(reader, "no_such_tool", {})).statusCode).toBe(404);
+    expect((await tool(reader, "get_agenda", { days: "lots" })).body).toEqual({ ok: false, text: '"days" must be a whole number.' });
+
+    const writer = await makeToken(session, true);
+    const added = await tool(writer, "create_task", { title: "From Siri", due_date: today() });
+    expect(added.body.ok).toBe(true);
+    expect((await sessionApi(session)("GET", `/entities/Task/${added.body.data.id}`)).body.title).toBe("From Siri");
+  });
+
+  it("holds to the same guards as MCP", async () => {
+    const session = await login("v1-guards@example.com");
+    const token = await makeToken(session, false);
+    expect((await tool("", "get_agenda", {})).statusCode).toBe(401);
+    expect((await tool(session, "get_agenda", {})).statusCode).toBe(401);
+    expect((await tool(token, "get_agenda", {}, { Origin: "https://evil.example" })).statusCode).toBe(403);
+    const badJson = await invoke("/api/v1/tools/get_agenda", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: "{nope" });
+    expect(badJson.statusCode).toBe(400);
+    expect((await invoke("/api/v1/tools/get_agenda", { headers: { Authorization: `Bearer ${token}` } })).statusCode).toBe(404);
+  });
+});
+
 async function writeZip(entries) {
   const { planZip } = await import("./zip.js");
   const zip = planZip(entries);

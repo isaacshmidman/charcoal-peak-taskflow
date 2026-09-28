@@ -23,6 +23,11 @@ import { WRITE_TOOLS } from "./writes.js";
 /** @type {Tool[]} */
 const ALL_TOOLS = [...READ_TOOLS, ...WRITE_TOOLS];
 
+/** Every tool, whoever asks: for describing the API (openapi.js). */
+export function allTools() {
+  return ALL_TOOLS;
+}
+
 /**
  * The tools this connection may use, in the order they're offered.
  * @param {any} grant
