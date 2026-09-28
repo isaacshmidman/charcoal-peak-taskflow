@@ -23,6 +23,28 @@ const note = (overrides: Record<string, any> = {}) => ({
 
 const editorBody = (page: Page) => page.getByTestId("note-scroll").locator(".tiptap-prose");
 
+/**
+ * Select the first `text.length` characters of the note from the start of
+ * the line, and wait until the editor itself has the whole selection. The
+ * browser moves its selection at once, but the editor catches up from
+ * queued selectionchange events. On a busy CI runner a click could land
+ * first and read a partial selection ("Call th").
+ */
+async function selectFromLineStart(page: Page, text: string) {
+  await editorBody(page).click();
+  await page.keyboard.press("Home");
+  for (let i = 0; i < text.length; i += 1) await page.keyboard.press("Shift+ArrowRight");
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const editor = (document.querySelector('[data-testid="note-scroll"] .tiptap-prose') as any)?.editor;
+        const { from, to } = editor.state.selection;
+        return editor.state.doc.textBetween(from, to);
+      })
+    )
+    .toBe(text);
+}
+
 async function swipeAway(page: Page, row: Locator) {
   const box = (await row.boundingBox())!;
   await page.mouse.move(box.x + box.width * 0.85, box.y + box.height / 2);
@@ -67,10 +89,7 @@ test("selected note text becomes a task, and the span tracks that task", async (
   });
   await page.goto("/Notes");
 
-  // Select "Call the plumber" from the start of the line.
-  await editorBody(page).click();
-  await page.keyboard.press("Home");
-  for (let i = 0; i < "Call the plumber".length; i += 1) await page.keyboard.press("Shift+ArrowRight");
+  await selectFromLineStart(page, "Call the plumber");
   await page.getByTestId("richtext-make-task").click();
 
   await expect(page.getByTestId("task-form-title")).toHaveValue("Call the plumber");
@@ -102,9 +121,7 @@ test("cancelling Make task links nothing and creates nothing", async ({ page }) 
     notes: [note({ content_text: "Call the plumber tomorrow" })],
   });
   await page.goto("/Notes");
-  await editorBody(page).click();
-  await page.keyboard.press("Home");
-  for (let i = 0; i < "Call the plumber".length; i += 1) await page.keyboard.press("Shift+ArrowRight");
+  await selectFromLineStart(page, "Call the plumber");
   await page.getByTestId("richtext-make-task").click();
   await page.getByTestId("task-form-cancel").click();
   await expect(page.getByTestId("task-form-dialog")).toBeHidden();
