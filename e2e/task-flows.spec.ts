@@ -41,6 +41,21 @@ const getPendingMutationCount = (page: Page) =>
     return JSON.parse(localStorage.getItem(key || "") || "[]").length;
   });
 
+/**
+ * Click outside a Radix dialog until it closes. Radix starts listening for
+ * outside presses one tick after the dialog mounts (setTimeout 0), so a
+ * click fired the instant it becomes visible can land before the listener
+ * exists and be ignored — which a slow CI runner hit. Retrying still fails
+ * if outside clicks stop dismissing; it just can't lose that race.
+ */
+async function dismissByClickingOutside(page: Page, dialogText: string) {
+  const dialog = page.getByText(dialogText);
+  await expect(async () => {
+    await page.mouse.click(10, 10);
+    await expect(dialog).toHaveCount(0, { timeout: 500 });
+  }).toPass({ timeout: 10_000 });
+}
+
 async function swipeTaskCard(page: Page, card: Locator) {
   const box = await card.boundingBox();
   if (!box) throw new Error("Task card bounds were unavailable");
@@ -122,22 +137,19 @@ test("delete dialogs close when clicking outside without deleting anything", asy
   await page.goto("/Today");
   await swipeTaskCard(page, taskCardByTitle(page, "Series task"));
   await expect(page.getByText("Delete recurring task")).toBeVisible();
-  await page.mouse.click(10, 10);
-  await expect(page.getByText("Delete recurring task")).toHaveCount(0);
+  await dismissByClickingOutside(page, "Delete recurring task");
   await expect(taskCardByTitle(page, "Series task")).toBeVisible();
 
   await page.goto("/Completed");
   await page.getByTitle("Delete all completed").click();
   await expect(page.getByText("Delete all completed tasks?")).toBeVisible();
-  await page.mouse.click(10, 10);
-  await expect(page.getByText("Delete all completed tasks?")).toHaveCount(0);
+  await dismissByClickingOutside(page, "Delete all completed tasks?");
   await expect(page.getByText("Done task")).toBeVisible();
 
   await page.goto("/RecentlyDeleted");
   await page.getByTitle("Empty recently deleted").click();
   await expect(page.getByText("Permanently Delete everything in Recently Deleted?")).toBeVisible();
-  await page.mouse.click(10, 10);
-  await expect(page.getByText("Permanently Delete everything in Recently Deleted?")).toHaveCount(0);
+  await dismissByClickingOutside(page, "Permanently Delete everything in Recently Deleted?");
 
   const state = await api.getState();
   expect(state.tasks.find((task) => task.id === "series-1")).toBeTruthy();
