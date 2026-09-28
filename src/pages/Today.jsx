@@ -21,10 +21,10 @@ import TaskForm from "@/components/tasks/TaskForm";
 import SubtaskForm from "@/components/tasks/SubtaskForm";
 import MultiSortPanel from "@/components/tasks/MultiSortPanel";
 import RecurringDeleteDialog from "@/components/tasks/RecurringDeleteDialog";
-import { compareDueDateTime } from "@/lib/sort-helpers";
+import { compareTasks } from "@/lib/task-sort";
 import { excludeExternalEvents, taskMatchesSearch } from "@/lib/task-filters";
 import { useCalendarOrderState } from "@/hooks/useCalendarOrder";
-import { calendarKeyForTask, compareByCalendarOrder } from "@/lib/calendar-order";
+import { calendarKeyForTask } from "@/lib/calendar-order";
 import { useShortcutEvent } from "@/hooks/useShortcutEvent";
 import { SHORTCUT_EVENTS } from "@/lib/shortcuts";
 
@@ -130,42 +130,11 @@ export default function Today() {
     return () => clearTimeout(timeout);
   }, [todayStart]);
 
-  const compareFn = (a, b, sortValue) => {
-    const pa = priorityOrderMap[a.priority_id] ?? 99;
-    const pb = priorityOrderMap[b.priority_id] ?? 99;
-    const ta = a.tags?.[0] || "";
-    const tb = b.tags?.[0] || "";
-    const ra = a.task_type === "recurring" ? a.recurrence || "" : "";
-    const rb = b.task_type === "recurring" ? b.recurrence || "" : "";
+  // One comparator for every task list — see lib/task-sort.js.
 
-    switch (sortValue) {
-      case "priority_asc":
-        return pa - pb;
-      case "priority_desc":
-        return pb - pa;
-      case "date_asc":
-        return compareDueDateTime(a, b, "asc");
-      case "date_desc":
-        return compareDueDateTime(a, b, "desc");
-      case "tag_az":
-        if (!ta && tb) return 1;
-        if (ta && !tb) return -1;
-        return ta.localeCompare(tb);
-      case "recurrence":
-        if (!ra && rb) return 1;
-        if (ra && !rb) return -1;
-        return ra.localeCompare(rb);
-      case "completed_first":
-        return (a.status === "done" ? 0 : 1) - (b.status === "done" ? 0 : 1);
-      case "uncompleted_first":
-        return (a.status !== "done" ? 0 : 1) - (b.status !== "done" ? 0 : 1);
-      case "calendar_order":
-        return compareByCalendarOrder(a, b, calendarIndexByKey);
-      case "none":
-      default:
-        return 0;
-    }
-  };
+  const compareFn = (a, b, sortValue) =>
+
+    compareTasks(a, b, sortValue, { priorityOrderMap, calendarIndexByKey });
 
   const todayAndPast = useMemo(() => {
     const base = tasks

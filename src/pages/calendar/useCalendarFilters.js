@@ -22,10 +22,8 @@ import { startOfYear } from "date-fns/startOfYear";
 import { deriveCalendars } from "@/components/calendar/CalendarVisibilityDropdown";
 import { calendarKeyForTask } from "@/lib/calendar-order";
 import { taskMatchesSearch } from "@/lib/task-filters";
-import {
-  compareDueDateTime,
-  compareTaskTime,
-} from "@/lib/sort-helpers";
+import { compareTaskTime } from "@/lib/sort-helpers";
+import { compareTasks } from "@/lib/task-sort";
 
 export function useCalendarFilters({ tasks, view, anchorDate, search, sorts, priorityOrderMap }) {
   const [hiddenCalendars, setHiddenCalendars] = useState(() => {
@@ -62,47 +60,9 @@ export function useCalendarFilters({ tasks, view, anchorDate, search, sorts, pri
   }, [view, anchorDate]);
 
   // Apply search + user sorts + time tiebreaker.
-  const compareFn = (a, b, sortValue) => {
-    const pa = priorityOrderMap[a.priority_id] ?? 99;
-    const pb = priorityOrderMap[b.priority_id] ?? 99;
-    const ta = a.tags?.[0] || "";
-    const tb = b.tags?.[0] || "";
-    const ra = a.task_type === "recurring" ? a.recurrence || "" : "";
-    const rb = b.task_type === "recurring" ? b.recurrence || "" : "";
-    switch (sortValue) {
-      case "priority_asc": return pa - pb;
-      case "priority_desc": return pb - pa;
-      case "date_asc": return compareDueDateTime(a, b, "asc");
-      case "date_desc": return compareDueDateTime(a, b, "desc");
-      case "tag_az":
-        if (!ta && tb) return 1;
-        if (ta && !tb) return -1;
-        return ta.localeCompare(tb);
-      case "recurrence":
-        if (!ra && rb) return 1;
-        if (ra && !rb) return -1;
-        return ra.localeCompare(rb);
-      case "completed_first":
-        return (a.status === "done" ? 0 : 1) - (b.status === "done" ? 0 : 1);
-      case "uncompleted_first":
-        return (a.status !== "done" ? 0 : 1) - (b.status !== "done" ? 0 : 1);
-      case "all_day_first": {
-        // "All-day" = no task_time set. We compare 0/1 booleans so all-day
-        // sorts ahead of timed; timed-vs-timed ties fall through to other
-        // sorts (and ultimately the time tiebreaker after this switch).
-        const aAllDay = !a.task_time ? 0 : 1;
-        const bAllDay = !b.task_time ? 0 : 1;
-        return aAllDay - bAllDay;
-      }
-      case "all_day_last": {
-        const aAllDay = !a.task_time ? 1 : 0;
-        const bAllDay = !b.task_time ? 1 : 0;
-        return aAllDay - bAllDay;
-      }
-      case "none":
-      default: return 0;
-    }
-  };
+  // One comparator for every task list — see lib/task-sort.js.
+  const compareFn = (a, b, sortValue) =>
+    compareTasks(a, b, sortValue, { priorityOrderMap });
 
   const filteredTasks = useMemo(() => {
     const q = search.toLowerCase();
