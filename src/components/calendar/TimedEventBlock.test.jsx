@@ -92,3 +92,25 @@ describe("resizing an event", () => {
     expect(onTaskClick).toHaveBeenCalled();
   });
 });
+
+describe("resizing from the keyboard", () => {
+  it("moves the end by 15 minutes per arrow, an hour with Shift, within the limits", () => {
+    const { onResize } = renderBlock();
+    const handle = screen.getByTestId("calendar-resize-t1");
+    expect(handle.getAttribute("tabindex")).toBe("0");
+    expect(handle.getAttribute("aria-valuetext")).toBe("Ends 10:30 AM");
+
+    fireEvent.keyDown(handle, { key: "ArrowDown" });
+    expect(onResize).toHaveBeenLastCalledWith(expect.objectContaining({ id: "t1" }), 10 * 60 + 45);
+    fireEvent.keyDown(handle, { key: "ArrowUp", shiftKey: true });
+    expect(onResize).toHaveBeenLastCalledWith(expect.objectContaining({ id: "t1" }), 9 * 60 + 30);
+  });
+
+  it("won't shrink below 15 minutes", () => {
+    const { onResize } = renderBlock({
+      layout: { task: task({ task_end_time: "9:15AM" }), startMin: 9 * 60, endMin: 9 * 60 + 15, col: 0, cols: 1, colSpan: 1 },
+    });
+    fireEvent.keyDown(screen.getByTestId("calendar-resize-t1"), { key: "ArrowUp" });
+    expect(onResize).not.toHaveBeenCalled();
+  });
+});

@@ -12,6 +12,9 @@
  * The end snaps to the quarter hour, stays at least 15 minutes after the
  * start and ends by 11:59 PM. Escape cancels. Nothing is saved until the
  * pointer comes up, and only if the end actually changed.
+ *
+ * Keyboard: the strip is focusable, and ↑/↓ move the end by 15 minutes
+ * (Shift: an hour), each step saved through the same snapping and limits.
  */
 import { useEffect, useRef, useState } from "react";
 
@@ -100,6 +103,19 @@ export function useResizeDuration({ startMin, endMin, hourHeight, onResize }) {
     },
     onPointerCancel() {
       stop();
+    },
+    /** @param {import("react").KeyboardEvent<HTMLElement>} e */
+    onKeyDown(e) {
+      if (e.key === "Escape") {
+        e.currentTarget.blur();
+        return;
+      }
+      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+      e.preventDefault();
+      e.stopPropagation();
+      const minutes = (e.shiftKey ? 60 : RESIZE_SNAP_MINUTES) * (e.key === "ArrowDown" ? 1 : -1);
+      const next = resizedEnd({ startMin, originalEnd: endMin, deltaY: (minutes / 60) * hourHeight, hourHeight });
+      if (next !== endMin) onResize?.(next);
     },
     /** @param {import("react").MouseEvent<HTMLElement>} e */
     onClick(e) {

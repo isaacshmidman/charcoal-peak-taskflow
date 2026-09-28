@@ -7,7 +7,7 @@
  * can't drift apart.
  */
 import MiniMiniTaskCard from "./MiniMiniTaskCard";
-import { timeRangeLabel } from "./useEmptySlotClick";
+import { slotLabel, timeRangeLabel } from "./useEmptySlotClick";
 import { useResizeDuration } from "./useResizeDuration";
 import { isReadOnlyTask } from "@/lib/task-filters";
 import { cn } from "@/lib/utils";
@@ -60,18 +60,24 @@ export default function TimedEventBlock({
           {...handleProps}
           role="separator"
           aria-orientation="horizontal"
-          aria-label="Drag to change the end time"
-          title="Drag to change the end time"
+          aria-label={`Change when ${task.title || "this task"} ends`}
+          aria-valuemin={startMin + 15}
+          aria-valuemax={24 * 60 - 1}
+          aria-valuenow={shownEnd}
+          aria-valuetext={`Ends ${slotLabel(shownEnd)}`}
+          tabIndex={0}
+          title="Drag (or use ↑/↓) to change the end time"
           data-testid={`calendar-resize-${task.id}`}
           data-no-create=""
           // A strip across the bottom edge: easy to grab, invisible until
-          // hovered. touch-none so a finger drags it instead of scrolling.
-          className="absolute inset-x-1 bottom-0 flex h-2 cursor-ns-resize touch-none items-end justify-center"
+          // hovered or focused. touch-none so a finger drags it instead of
+          // scrolling.
+          className="group/handle absolute inset-x-1 bottom-0 flex h-2 cursor-ns-resize touch-none items-end justify-center rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-slate-500 dark:focus-visible:ring-slate-300"
         >
           <span
             className={cn(
               "mb-0.5 h-0.5 w-6 rounded-full bg-slate-500/70 transition-opacity dark:bg-slate-300/70",
-              resizing ? "opacity-100" : "opacity-0 group-hover/event:opacity-100"
+              resizing ? "opacity-100" : "opacity-0 group-hover/event:opacity-100 group-focus-visible/handle:opacity-100"
             )}
           />
         </div>
