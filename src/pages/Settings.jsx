@@ -42,6 +42,7 @@ import {
   FolderOpen,
   LogOut,
   Palette,
+  Plug,
   Trash2,
 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
@@ -64,6 +65,7 @@ import AdvancedNotificationSettings from "@/components/settings/AdvancedNotifica
 import StorageSection from "@/components/settings/StorageSection";
 import FilesSection from "@/components/settings/FilesSection";
 import ExportSection from "@/components/settings/ExportSection";
+import ConnectedAppsSection from "@/components/settings/ConnectedAppsSection";
 import AppearanceSection from "@/components/settings/AppearanceSection";
 import DefaultsSection from "@/components/settings/DefaultsSection";
 import PrioritiesSection from "@/components/settings/PrioritiesSection";
@@ -246,6 +248,14 @@ export default function Settings() {
     );
   }
 
+  if (activeSection === "connected") {
+    return (
+      <SubPage title="Connected apps" onBack={returnToMain}>
+        <ConnectedAppsSection />
+      </SubPage>
+    );
+  }
+
   if (activeSection === "export") {
     return (
       <SubPage title="Export & restore" onBack={returnToMain}>
@@ -318,6 +328,12 @@ export default function Settings() {
           label="Calendars"
           subtitle="Connected calendars and display"
           onClick={() => openSection("calendars")}
+        />
+        <SettingsCard
+          icon={Plug}
+          label="Connected apps"
+          subtitle="AI apps that can read or change your tasks"
+          onClick={() => openSection("connected")}
         />
         <SettingsCard
           icon={Bell}

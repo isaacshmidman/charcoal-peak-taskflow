@@ -274,6 +274,55 @@ export function createE2EApiClient() {
         return [];
       },
     },
+    // AI connections, kept in the mock's state so e2e can walk the
+    // Settings page: make a token, toggle changes, revoke, undo.
+    ai: {
+      async grants() {
+        const state = /** @type {any} */ (backend.state);
+        return { grants: clone((state.aiGrants || []).filter((g) => !g.revoked)), mcp_url: `${window.location.origin}/api/mcp` };
+      },
+      async createToken(input) {
+        const state = /** @type {any} */ (backend.state);
+        state.aiGrants = state.aiGrants || [];
+        const grant = {
+          id: `grant-${state.aiGrants.length + 1}`,
+          kind: "token",
+          label: String(input?.label || "").trim(),
+          can_write: input?.can_write === true,
+          time_zone: input?.time_zone || "UTC",
+          created_date: new Date().toISOString(),
+          last_used_at: null,
+        };
+        state.aiGrants.push(grant);
+        persistBackend(backend);
+        return { grant: clone(grant), token: `zeph_pat_e2e${state.aiGrants.length}`, mcp_url: `${window.location.origin}/api/mcp` };
+      },
+      async setCanWrite(id, canWrite) {
+        const state = /** @type {any} */ (backend.state);
+        const grant = (state.aiGrants || []).find((g) => g.id === id);
+        if (grant) grant.can_write = canWrite;
+        persistBackend(backend);
+        return clone(grant);
+      },
+      async revoke(id) {
+        const state = /** @type {any} */ (backend.state);
+        const grant = (state.aiGrants || []).find((g) => g.id === id);
+        if (grant) grant.revoked = true;
+        persistBackend(backend);
+        return { success: true };
+      },
+      async activity() {
+        const state = /** @type {any} */ (backend.state);
+        return clone(state.aiActivity || []);
+      },
+      async undo(id) {
+        const state = /** @type {any} */ (backend.state);
+        const entry = (state.aiActivity || []).find((a) => a.id === id);
+        if (entry) entry.undo = "undone";
+        persistBackend(backend);
+        return clone(entry);
+      },
+    },
     cleanup() {},
     setToken(token) {
       backend.lastToken = token;

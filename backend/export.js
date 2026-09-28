@@ -185,8 +185,9 @@ function readme(folder, { exportedAt, counts, missingFiles }) {
     "Events imported from Google or Apple Calendar are included in data.json and",
     "tasks.csv; they are marked with the calendar they came from.",
     "",
-    "Never included: passwords, sign-in tokens, or the keys Zephyrly uses to reach",
-    "your calendars. Reconnecting a calendar needs a fresh sign-in.",
+    "Never included: passwords, sign-in tokens, the keys Zephyrly uses to reach",
+    "your calendars, or AI apps' access. Reconnecting a calendar or an AI app",
+    "needs a fresh sign-in.",
   ];
   if (missingFiles) {
     lines.push(

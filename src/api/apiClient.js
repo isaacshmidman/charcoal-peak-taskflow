@@ -66,6 +66,14 @@ import { loadFromCache, saveToCache } from "@/lib/offlineCache";
  *     usage: () => Promise<{ used_bytes: number, max_bytes: number, biggest_tasks: any[] }>,
  *     search: (q: string) => Promise<any[]>,
  *   },
+ *   ai: {
+ *     grants: () => Promise<{ grants: any[], mcp_url: string }>,
+ *     createToken: (input: { label: string, can_write: boolean, time_zone: string }) => Promise<{ grant: any, token: string, mcp_url: string }>,
+ *     setCanWrite: (id: string, canWrite: boolean) => Promise<any>,
+ *     revoke: (id: string) => Promise<any>,
+ *     activity: () => Promise<any[]>,
+ *     undo: (id: string) => Promise<any>,
+ *   },
  *   cleanup: () => void,
  * }} ApiClient
  */
@@ -586,6 +594,43 @@ const liveApiClient = {
         query: { q: q || "", limit: 50 },
       });
       return result?.attachments || [];
+    },
+  },
+  /**
+   * AI apps connected to this account (backend/routes/ai.js). Online only:
+   * access to the account is never granted or changed from a queue.
+   */
+  ai: {
+    /** @returns {Promise<{ grants: any[], mcp_url: string }>} */
+    async grants() {
+      return apiRequest(`/apps/${appConfig.appId}/ai/grants`);
+    },
+    /**
+     * @param {{ label: string, can_write: boolean, time_zone: string }} input
+     * @returns {Promise<{ grant: any, token: string, mcp_url: string }>}
+     */
+    async createToken(input) {
+      return apiRequest(`/apps/${appConfig.appId}/ai/tokens`, { method: "POST", body: input });
+    },
+    /**
+     * @param {string} id
+     * @param {boolean} canWrite
+     */
+    async setCanWrite(id, canWrite) {
+      return apiRequest(`/apps/${appConfig.appId}/ai/grants/${encodeURIComponent(id)}`, { method: "PUT", body: { can_write: canWrite } });
+    },
+    /** @param {string} id */
+    async revoke(id) {
+      return apiRequest(`/apps/${appConfig.appId}/ai/grants/${encodeURIComponent(id)}`, { method: "DELETE" });
+    },
+    /** @returns {Promise<any[]>} */
+    async activity() {
+      const result = await apiRequest(`/apps/${appConfig.appId}/ai/activity`);
+      return result?.activity || [];
+    },
+    /** @param {string} id */
+    async undo(id) {
+      return apiRequest(`/apps/${appConfig.appId}/ai/activity/${encodeURIComponent(id)}/undo`, { method: "POST" });
     },
   },
   async getPublicSettings() {
