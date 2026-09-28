@@ -22,7 +22,8 @@
  *   - "advancedNotifications" → AdvancedNotificationSettings; back
  *                                arrow returns to "notifications" (not
  *                                main) so the back-stack feels natural
- *   - "export"                → ExportSection (download a ZIP of it all)
+ *   - "export"                → ExportSection (download a ZIP of it all,
+ *                                or restore one)
  *   - "recentlyDeleted"       → RecentlyDeleted (renders its own
  *                                chrome; we just route to it)
  *
@@ -247,7 +248,7 @@ export default function Settings() {
 
   if (activeSection === "export") {
     return (
-      <SubPage title="Export your data" onBack={returnToMain}>
+      <SubPage title="Export & restore" onBack={returnToMain}>
         <ExportSection />
       </SubPage>
     );
@@ -332,8 +333,8 @@ export default function Settings() {
         />
         <SettingsCard
           icon={Download}
-          label="Export your data"
-          subtitle="Download everything as a .zip"
+          label="Export & restore"
+          subtitle="Download everything as a .zip, or bring one back"
           onClick={() => openSection("export")}
         />
         <SettingsCard

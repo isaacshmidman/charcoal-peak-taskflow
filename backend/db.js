@@ -335,6 +335,18 @@ export function createDatabase(config = backendConfig) {
     );
     CREATE INDEX IF NOT EXISTS idx_task_attachments_task ON task_attachments(app_id, task_id);
     CREATE INDEX IF NOT EXISTS idx_task_attachments_user ON task_attachments(app_id, user_id);
+
+    -- Restore from an export (restore.js): which record an exported id
+    -- became when it had to take a fresh id, so restoring the same export
+    -- again recognises it instead of adding a second copy.
+    CREATE TABLE IF NOT EXISTS restored_ids (
+      app_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      entity TEXT NOT NULL,
+      source_id TEXT NOT NULL,
+      local_id TEXT NOT NULL,
+      PRIMARY KEY (app_id, user_id, entity, source_id)
+    );
   `);
 
   // Migration: add task_end_time to existing databases.

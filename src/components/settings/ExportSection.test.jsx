@@ -7,6 +7,7 @@ import ExportSection from "./ExportSection";
 vi.mock("@/api/apiClient", () => ({
   apiClient: { attachments: { usage: async () => ({ used_bytes: 12_400_000, max_bytes: 1_000_000_000 }) } },
   exportDownloadUrl: () => "http://localhost/api/apps/app-1/export",
+  restoreFromExport: async () => ({ added: {}, notes: [] }),
 }));
 
 const renderSection = () =>

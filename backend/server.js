@@ -16,6 +16,7 @@ import { handleNotificationsRoute } from "./routes/notifications.js";
 import { handleAttachmentsRoute } from "./routes/attachments.js";
 import { handleEntitiesRoute } from "./routes/entities.js";
 import { handleExportRoute } from "./routes/export.js";
+import { handleRestoreRoute } from "./routes/restore.js";
 
 const distRoot = resolve(projectRoot, "dist");
 const CONTENT_TYPES = {
@@ -220,6 +221,7 @@ export function createRequestHandler(config = backendConfig, db = getDatabase(co
       // the generic /tasks/:id PUT/DELETE dispatch in entities.
       if (await handleAttachmentsRoute(request, response, ctx)) return;
       if (await handleExportRoute(request, response, ctx)) return;
+      if (await handleRestoreRoute(request, response, ctx)) return;
       if (await handleEntitiesRoute(request, response, ctx)) return;
 
       throw new HttpError(404, "Route not found.", "not_found");

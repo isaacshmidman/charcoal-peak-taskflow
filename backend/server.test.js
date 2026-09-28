@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { closeDatabase, createDatabase } from "./db.js";
 import { readZip } from "./test-support/readZip.js";
 import { createRequestHandler } from "./server.js";
@@ -16,7 +16,8 @@ let handler;
 let config;
 
 function createMockRequest({ method = "GET", url = "/", headers = {}, body }) {
-  const payload = body == null ? [] : [Buffer.from(typeof body === "string" ? body : JSON.stringify(body))];
+  const payload =
+    body == null ? [] : [Buffer.isBuffer(body) ? body : Buffer.from(typeof body === "string" ? body : JSON.stringify(body))];
   const request = /** @type {any} */ (Readable.from(payload));
   request.method = method;
   request.url = url;
@@ -691,3 +692,253 @@ describe("data export", () => {
   });
 });
 
+
+describe("restore from an export", () => {
+  const BOUNDARY = "----zephyrly-test-boundary";
+  /** A multipart body carrying one file, as a browser would send it. */
+  const multipart = (bytes, filename = "export.zip") =>
+    Buffer.concat([
+      Buffer.from(
+        `--${BOUNDARY}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: application/zip\r\n\r\n`
+      ),
+      bytes,
+      Buffer.from(`\r\n--${BOUNDARY}--\r\n`),
+    ]);
+  const restore = (token, bytes, filename) =>
+    invoke("/api/apps/test-app/restore", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": `multipart/form-data; boundary=${BOUNDARY}` },
+      body: multipart(bytes, filename),
+    });
+  const api = (token) => async (method, path, body) =>
+    (await invoke(`/api/apps/test-app${path}`, {
+      method,
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body,
+    })).body;
+  const exportOf = async (token) => {
+    const result = await invokeRaw("/api/apps/test-app/export", { headers: { Authorization: `Bearer ${token}` } });
+    expect(result.statusCode).toBe(200);
+    return result.body;
+  };
+  const dataJsonOf = (zip) => {
+    const files = readZip(zip);
+    const name = [...files.keys()].find((n) => n.endsWith("/data.json"));
+    return JSON.parse(files.get(name).toString("utf8"));
+  };
+  const linkDoc = (taskId) =>
+    JSON.stringify({
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text: "Call the plumber", marks: [{ type: "taskLink", attrs: { taskId } }] }] }],
+    });
+
+  /** Account A: a bit of everything. */
+  async function seedSource(email) {
+    const a = await login(email);
+    const as = api(a);
+    const me = await as("GET", "/entities/User/me");
+    const someday = await as("POST", "/entities/Priority", { name: "Someday", color: "purple", order: 9 });
+    await as("POST", "/entities/SavedTag", { name: "home" });
+    const trip = await as("POST", "/entities/Task", {
+      title: "Plan the trip", due_date: "2026-10-01", task_time: "9:00AM", task_end_time: "10:30AM",
+      reminder: "before:60", priority_id: someday.id, tags: ["home"], status: "todo",
+    });
+    await as("POST", "/entities/Task", { title: "Book flights", parent_id: trip.id, due_date: "2026-09-30" });
+    await as("POST", "/entities/Note", { title: "Trip notes", content_text: "Call the plumber", content_json: linkDoc(trip.id), priority_id: someday.id });
+    await as("POST", "/entities/DeletedTask", { task_id: "task_gone", title: "Old errand", due_date: "2026-09-01" });
+    await as("POST", "/entities/DeletedNote", { note_id: "note_gone", title: "Old idea", content_text: "gone" });
+    // From a connected calendar: sync brings these back, so restore skips them.
+    db.prepare(
+      `INSERT INTO tasks (id, app_id, title, created_by_id, created_by, created_date, updated_date, source_provider, source_kind, due_date)
+       VALUES (?, 'test-app', 'Dentist (Google)', ?, ?, ?, ?, 'google', 'event', '2026-10-02')`
+    ).run(`task_cal_${me.id}`, me.id, me.email, new Date().toISOString(), new Date().toISOString());
+    // A file on the trip.
+    const boarding = Buffer.from("%PDF-1.4 boarding pass for the trip");
+    const upload = await invoke(`/api/apps/test-app/tasks/${trip.id}/attachments`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${a}`, "Content-Type": `multipart/form-data; boundary=${BOUNDARY}` },
+      body: Buffer.concat([
+        Buffer.from(`--${BOUNDARY}\r\nContent-Disposition: form-data; name="file"; filename="Boarding.pdf"\r\nContent-Type: application/pdf\r\n\r\n`),
+        boarding,
+        Buffer.from(`\r\n--${BOUNDARY}--\r\n`),
+      ]),
+    });
+    expect(upload.statusCode).toBe(201);
+    return { a, me, trip, someday, boarding };
+  }
+
+  it("brings everything into another account, owned by that account, and a second restore adds nothing", async () => {
+    const { a, me: meA, trip, boarding } = await seedSource("restore-source@example.com");
+    const zip = await exportOf(a);
+
+    const b = await login("restore-target@example.com");
+    const bs = api(b);
+    const meB = await bs("GET", "/entities/User/me");
+
+    const first = await restore(b, zip);
+    expect(first.statusCode).toBe(200);
+    expect(first.body.added).toEqual({ tasks: 2, notes: 1, priorities: 1, tags: 1, recentlyDeleted: 2, files: 1 });
+    expect(first.body.notes.join(" ")).toContain("1 item from connected calendars skipped");
+
+    const tasks = await bs("GET", "/entities/Task");
+    const restoredTrip = tasks.find((t) => t.title === "Plan the trip");
+    const flights = tasks.find((t) => t.title === "Book flights");
+    expect(tasks.map((t) => t.title).sort()).toEqual(["Book flights", "Plan the trip"]);
+    // A's ids are taken, so B's copies get fresh ones — and still point at each other.
+    expect(restoredTrip.id).not.toBe(trip.id);
+    expect(flights.parent_id).toBe(restoredTrip.id);
+    expect(restoredTrip).toMatchObject({ task_time: "9:00AM", task_end_time: "10:30AM", reminder: "before:60", tags: ["home"] });
+
+    // Priority matched by name to B's own (created, since B had no "Someday").
+    const priorities = await bs("GET", "/entities/Priority");
+    const someday = priorities.find((p) => p.name === "Someday");
+    expect(someday).toMatchObject({ color: "purple" });
+    expect(restoredTrip.priority_id).toBe(someday.id);
+
+    // The note's task link follows the task to its new id.
+    const [note] = await bs("GET", "/entities/Note");
+    expect(note.content_json).toContain(restoredTrip.id);
+    expect(note.content_json).not.toContain(trip.id);
+    expect(note.priority_id).toBe(someday.id);
+
+    expect((await bs("GET", "/entities/DeletedTask")).map((t) => t.title)).toEqual(["Old errand"]);
+    expect((await bs("GET", "/entities/DeletedNote")).map((n) => n.title)).toEqual(["Old idea"]);
+    expect((await bs("GET", "/entities/SavedTag")).map((t) => t.name)).toContain("home");
+
+    // The file, byte for byte, on B's copy of the task and counted against B.
+    const [attachment] = (await bs("GET", `/tasks/${restoredTrip.id}/attachments`)).attachments;
+    expect(attachment).toMatchObject({ filename: "Boarding.pdf", mime_type: "application/pdf", size_bytes: boarding.length });
+    const stored = db.prepare("SELECT storage_path FROM task_attachments WHERE id = ?").get(attachment.id).storage_path;
+    expect(readFileSync(join(tempDir, "attachments", stored)).equals(boarding)).toBe(true);
+
+    // Every restored row belongs to B; nothing of A's changed hands.
+    for (const table of ["tasks", "notes", "priorities", "saved_tags", "deleted_tasks", "deleted_notes"]) {
+      const owners = db.prepare(`SELECT DISTINCT created_by_id FROM ${table} WHERE created_by_id IN (?, ?)`).all(meA.id, meB.id);
+      expect(owners.length).toBeGreaterThan(0);
+    }
+    expect(db.prepare(`SELECT COUNT(*) n FROM tasks WHERE created_by_id = ? AND title = 'Plan the trip'`).get(meA.id).n).toBe(1);
+    expect(db.prepare(`SELECT user_id FROM task_attachments WHERE id = ?`).get(attachment.id).user_id).toBe(meB.id);
+
+    // Again: already there, so nothing is added.
+    const second = await restore(b, zip);
+    expect(second.statusCode).toBe(200);
+    expect(second.body.added).toEqual({ tasks: 0, notes: 0, priorities: 0, tags: 0, recentlyDeleted: 0, files: 0 });
+    expect((await bs("GET", "/entities/Task")).length).toBe(2);
+    expect((await bs(`GET`, `/tasks/${restoredTrip.id}/attachments`)).attachments).toHaveLength(1);
+
+    // Restoring A's export into A adds nothing either.
+    const own = await restore(a, zip);
+    expect(own.body.added).toEqual({ tasks: 0, notes: 0, priorities: 0, tags: 0, recentlyDeleted: 0, files: 0 });
+  });
+
+  it("adds back only what's missing — a deleted task returns with its file, edits elsewhere are kept", async () => {
+    const c = await login("restore-partial@example.com");
+    const cs = api(c);
+    const keep = await cs("POST", "/entities/Task", { title: "Keep me", due_date: "2026-10-01" });
+    const lose = await cs("POST", "/entities/Task", { title: "Lose me", due_date: "2026-10-01" });
+    const zip = await exportOf(c);
+
+    await cs("PUT", `/entities/Task/${keep.id}`, { title: "Keep me (edited)" });
+    // Deleted outright, not via Recently Deleted.
+    db.prepare("DELETE FROM tasks WHERE id = ?").run(lose.id);
+
+    const result = await restore(c, zip);
+    expect(result.body.added.tasks).toBe(1);
+    const titles = (await cs("GET", "/entities/Task")).map((t) => t.title).sort();
+    expect(titles).toEqual(["Keep me (edited)", "Lose me"]);
+    // Its id was free again, so it comes back under the same one.
+    expect((await cs("GET", `/entities/Task/${lose.id}`)).title).toBe("Lose me");
+  });
+
+  it("leaves a task that's in Recently Deleted there", async () => {
+    const d = await login("restore-trash@example.com");
+    const ds = api(d);
+    const task = await ds("POST", "/entities/Task", { title: "Binned", due_date: "2026-10-01" });
+    const zip = await exportOf(d);
+    await ds("POST", "/entities/DeletedTask", { task_id: task.id, title: "Binned" });
+    await ds("DELETE", `/entities/Task/${task.id}`);
+
+    const result = await restore(d, zip);
+    expect(result.body.added.tasks).toBe(0);
+    expect(result.body.notes.join(" ")).toContain("in Recently Deleted");
+  });
+
+  it("contains a hostile file: owners, ids and oversized fields from the file don't get through", async () => {
+    const victim = await login("restore-victim@example.com");
+    const vs = api(victim);
+    const meVictim = await vs("GET", "/entities/User/me");
+    const theirs = await vs("POST", "/entities/Task", { title: "Victim's task", due_date: "2026-10-01" });
+
+    const attacker = await login("restore-attacker@example.com");
+    const as = api(attacker);
+    const hostile = {
+      format: "zephyrly-export",
+      version: 1,
+      tasks: [
+        // Claims the victim as owner and reuses the victim's task id.
+        { id: theirs.id, title: "Planted", due_date: "2026-10-01", created_by_id: meVictim.id, created_by: meVictim.email },
+        { id: "../../etc", title: "Odd id", due_date: "2026-10-01" },
+        { id: "task_huge", title: "x".repeat(5000), due_date: "2026-10-01" },
+        { id: "task_objects", title: { not: "text" }, due_date: "2026-10-01" },
+        { id: "task_orphan", title: "Orphan", parent_id: "task_nowhere" },
+        "not a record",
+      ],
+      notes: [{ id: "note_x", title: "Hi", created_by_id: meVictim.id, content_json: "{not json" }],
+      priorities: [{ id: "p1", name: "" }],
+      attachments: [{ id: "att_x", task_id: theirs.id, filename: "evil.html", mime_type: "text/html\r\nX-Evil: 1", file: "attachments/x/evil.html" }],
+    };
+    const result = await restore(attacker, Buffer.from(JSON.stringify(hostile)), "data.json");
+    expect(result.statusCode).toBe(200);
+    expect(result.body.added).toMatchObject({ tasks: 2, notes: 1 });
+    expect(result.body.notes.join(" ")).toMatch(/3 records couldn't be read/);
+    expect(result.body.notes.join(" ")).toMatch(/1 subtask skipped/);
+
+    // The victim's task is untouched and the victim gained nothing.
+    expect((await vs("GET", `/entities/Task/${theirs.id}`)).title).toBe("Victim's task");
+    expect((await vs("GET", "/entities/Task")).map((t) => t.title)).toEqual(["Victim's task"]);
+    expect(await vs("GET", "/entities/Note")).toEqual([]);
+
+    // The attacker's copies are the attacker's, under fresh, safe ids.
+    const planted = (await as("GET", "/entities/Task")).map((t) => ({ id: t.id, title: t.title }));
+    expect(planted.map((t) => t.title).sort()).toEqual(["Odd id", "Planted"]);
+    for (const t of planted) expect(t.id).toMatch(/^task_[0-9a-f-]{36}$/);
+    // The planted file names a task that isn't the attacker's, so it's skipped.
+    expect(db.prepare("SELECT COUNT(*) n FROM task_attachments WHERE filename = 'evil.html'").get().n).toBe(0);
+  });
+
+  it("explains what it can't use", async () => {
+    const e = await login("restore-errors@example.com");
+    const bad = async (bytes, filename = "export.zip") => (await restore(e, bytes, filename)).body;
+
+    expect((await bad(Buffer.from("PK\u0003\u0004 definitely not a real zip"))).code).toBe("restore_bad_zip");
+    expect((await bad(Buffer.from(JSON.stringify({ tasks: [] })), "data.json")).code).toBe("restore_not_export");
+    expect((await bad(Buffer.from("hello"), "notes.txt")).code).toBe("restore_not_export");
+    expect((await bad(Buffer.from(JSON.stringify({ format: "zephyrly-export", version: 2 })), "data.json")).code).toBe(
+      "restore_newer_version"
+    );
+    const noData = await writeZip([{ name: "export/README.txt", data: "hi" }]);
+    expect((await bad(noData)).code).toBe("restore_not_export");
+
+    const unsigned = await invoke("/api/apps/test-app/restore", { method: "POST", headers: {}, body: "" });
+    expect(unsigned.statusCode).toBe(401);
+  });
+
+  it("restores records from a bare data.json and says the files need the .zip", async () => {
+    const { a } = await seedSource("restore-source-json@example.com");
+    const data = dataJsonOf(await exportOf(a));
+    const f = await login("restore-json-only@example.com");
+    const result = await restore(f, Buffer.from(JSON.stringify(data)), "data.json");
+    expect(result.body.added).toMatchObject({ tasks: 2, files: 0 });
+    expect(result.body.notes.join(" ")).toContain("only data.json was uploaded");
+  });
+});
+
+async function writeZip(entries) {
+  const { planZip } = await import("./zip.js");
+  const zip = planZip(entries);
+  const chunks = [];
+  await zip.write(async (chunk) => {
+    chunks.push(chunk);
+  });
+  return Buffer.concat(chunks);
+}

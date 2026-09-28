@@ -7,7 +7,7 @@ declare const process: {
 
 declare class Buffer extends Uint8Array {
   static from(value: string | ArrayBuffer | ArrayBufferView, encoding?: string): Buffer;
-  static alloc(size: number): Buffer;
+  static alloc(size: number, fill?: number): Buffer;
   static concat(chunks: Uint8Array[]): Buffer;
   static isBuffer(value: unknown): value is Buffer;
   toString(encoding?: string): string;
@@ -53,7 +53,8 @@ declare module "node:fs" {
   export function existsSync(...args: any[]): boolean;
   export function mkdirSync(...args: any[]): void;
   export function mkdtempSync(...args: any[]): string;
-  export function readFileSync(...args: any[]): string;
+  export function readFileSync(path: any): Buffer;
+  export function readFileSync(path: any, options: any): string;
   export function rmSync(...args: any[]): void;
   export function statSync(...args: any[]): any;
 }

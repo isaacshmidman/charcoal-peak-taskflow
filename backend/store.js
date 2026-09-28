@@ -206,6 +206,19 @@ function definitionFor(entityName) {
   return Object.hasOwn(ENTITY_DEFINITIONS, entityName) ? ENTITY_DEFINITIONS[entityName] : undefined;
 }
 
+/**
+ * Every field a record of this entity can carry — what an export holds
+ * and a restore may copy back (restore.js).
+ *
+ * @param {string} entityName
+ * @returns {string[]}
+ */
+export function entityFieldNames(entityName) {
+  const definition = definitionFor(entityName);
+  if (!definition) return [];
+  return [...new Set([...Object.keys(definition.defaults), ...definition.mutableFields])];
+}
+
 function toIsoString(value, fallback = "") {
   if (!value) return fallback;
   const parsed = new Date(String(value));

@@ -1,7 +1,8 @@
 // @ts-nocheck
 /**
- * @file "Export your data" sub-page: one button that downloads a ZIP of
- * everything the user has (see backend/export.js for the contents).
+ * @file "Export & restore" sub-page: one button that downloads a ZIP of
+ * everything the user has (see backend/export.js for the contents), and
+ * below it the way back in (RestoreSection).
  *
  * The download is a plain link to the export URL, the same way
  * attachments download: the browser sends the session cookie, streams the
@@ -16,6 +17,7 @@ import { apiClient, exportDownloadUrl } from "@/api/apiClient";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import RestoreSection from "./RestoreSection";
 
 // Long enough to cover a double-tap and the server starting the stream;
 // the server refuses a second concurrent export anyway.
@@ -108,6 +110,8 @@ export default function ExportSection() {
                 : "\u00a0"}
         </p>
       </div>
+
+      <RestoreSection />
     </div>
   );
 }

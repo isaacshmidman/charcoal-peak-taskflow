@@ -536,12 +536,8 @@ const liveApiClient = {
       return result?.attachments || [];
     },
     /**
-     * Upload a single file (multipart/form-data). Returns the created
-     * attachment metadata row.
-     *
-     * Uses XMLHttpRequest rather than fetch so we get upload-progress
-     * events (fetch has none). `onProgress(percent)` is called with an
-     * integer 0–100 as bytes go out; it's a no-op-safe optional arg.
+     * Upload a single file, with progress (uploadWithProgress). Returns
+     * the created attachment metadata row.
      *
      * @param {string} taskId
      * @param {File} file
@@ -549,57 +545,7 @@ const liveApiClient = {
      * @returns {Promise<any>}
      */
     upload(taskId, file, { onProgress } = {}) {
-      return new Promise((resolve, reject) => {
-        const url = buildApiUrl(`/apps/${appConfig.appId}/tasks/${taskId}/attachments`);
-        const formData = new FormData();
-        formData.append("file", file, file.name);
-
-        const xhr = new XMLHttpRequest();
-        xhr.open("POST", url, true);
-        xhr.withCredentials = true;
-        xhr.responseType = "text";
-        xhr.setRequestHeader("Accept", "application/json");
-        // Intentionally NOT setting Content-Type — the browser sets it
-        // to "multipart/form-data; boundary=..." automatically from the
-        // FormData body, with the correct boundary.
-        if (appConfig.appId) xhr.setRequestHeader("X-App-Id", String(appConfig.appId));
-        if (currentToken) xhr.setRequestHeader("Authorization", `Bearer ${currentToken}`);
-
-        if (xhr.upload && typeof onProgress === "function") {
-          xhr.upload.onprogress = (e) => {
-            if (e.lengthComputable && e.total > 0) {
-              onProgress(Math.min(100, Math.round((e.loaded / e.total) * 100)));
-            }
-          };
-        }
-
-        const parse = (text) => {
-          if (!text) return null;
-          try { return JSON.parse(text); } catch { return text; }
-        };
-
-        xhr.onload = () => {
-          const payload = parse(xhr.responseText);
-          if (xhr.status >= 200 && xhr.status < 300) {
-            // Signal "done" so a determinate bar can snap to 100%.
-            if (typeof onProgress === "function") onProgress(100);
-            resolve(payload);
-            return;
-          }
-          const err = new Error(
-            (payload && (payload.message || payload.error)) ||
-              `Upload failed (${xhr.status})`
-          );
-          // @ts-ignore — non-standard properties for callers
-          err.code = payload?.code;
-          // @ts-ignore
-          err.status = xhr.status;
-          reject(err);
-        };
-        xhr.onerror = () => reject(new Error("Network error during upload."));
-        xhr.onabort = () => reject(new Error("Upload cancelled."));
-        xhr.send(formData);
-      });
+      return uploadWithProgress(`/apps/${appConfig.appId}/tasks/${taskId}/attachments`, file, { onProgress });
     },
     async delete(id) {
       return apiRequest(`/apps/${appConfig.appId}/attachments/${id}`, {
@@ -658,6 +604,72 @@ const liveApiClient = {
   cleanup() {},
 };
 
+/**
+ * POST one file as multipart/form-data, reporting progress.
+ *
+ * Uses XMLHttpRequest rather than fetch so we get upload-progress
+ * events (fetch has none). `onProgress(percent)` is called with an
+ * integer 0–100 as bytes go out; it's a no-op-safe optional arg.
+ *
+ * @param {string} path  API path, e.g. /apps/:appId/restore
+ * @param {File} file
+ * @param {{ onProgress?: (percent: number) => void }} [opts]
+ * @returns {Promise<any>}
+ */
+function uploadWithProgress(path, file, { onProgress } = {}) {
+  return new Promise((resolve, reject) => {
+    const url = buildApiUrl(path);
+    const formData = new FormData();
+    formData.append("file", file, file.name);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url, true);
+    xhr.withCredentials = true;
+    xhr.responseType = "text";
+    xhr.setRequestHeader("Accept", "application/json");
+    // Intentionally NOT setting Content-Type — the browser sets it
+    // to "multipart/form-data; boundary=..." automatically from the
+    // FormData body, with the correct boundary.
+    if (appConfig.appId) xhr.setRequestHeader("X-App-Id", String(appConfig.appId));
+    if (currentToken) xhr.setRequestHeader("Authorization", `Bearer ${currentToken}`);
+
+    if (xhr.upload && typeof onProgress === "function") {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && e.total > 0) {
+          onProgress(Math.min(100, Math.round((e.loaded / e.total) * 100)));
+        }
+      };
+    }
+
+    const parse = (text) => {
+      if (!text) return null;
+      try { return JSON.parse(text); } catch { return text; }
+    };
+
+    xhr.onload = () => {
+      const payload = parse(xhr.responseText);
+      if (xhr.status >= 200 && xhr.status < 300) {
+        // Signal "done" so a determinate bar can snap to 100%.
+        if (typeof onProgress === "function") onProgress(100);
+        resolve(payload);
+        return;
+      }
+      const err = new Error(
+        (payload && (payload.message || payload.error)) ||
+          `Upload failed (${xhr.status})`
+      );
+      // @ts-ignore — non-standard properties for callers
+      err.code = payload?.code;
+      // @ts-ignore
+      err.status = xhr.status;
+      reject(err);
+    };
+    xhr.onerror = () => reject(new Error("Network error during upload."));
+    xhr.onabort = () => reject(new Error("Upload cancelled."));
+    xhr.send(formData);
+  });
+}
+
 /** @type {ApiClient} */
 /**
  * Same-origin URL of the "Export your data" ZIP. Used as a plain link
@@ -669,6 +681,18 @@ const liveApiClient = {
  */
 export function exportDownloadUrl() {
   return buildApiUrl(`/apps/${appConfig.appId}/export`);
+}
+
+/**
+ * Upload an export (.zip, or its data.json) to add back whatever's
+ * missing; resolves to the server's summary ({ added, notes }). See
+ * backend/restore.js.
+ *
+ * @param {File} file
+ * @param {{ onProgress?: (percent: number) => void }} [opts]
+ */
+export function restoreFromExport(file, { onProgress } = {}) {
+  return uploadWithProgress(`/apps/${appConfig.appId}/restore`, file, { onProgress });
 }
 
 export const apiClient = createE2EApiClient() || liveApiClient;
