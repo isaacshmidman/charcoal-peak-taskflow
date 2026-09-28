@@ -68,7 +68,7 @@ export function buildUserPayload(row) {
   };
 }
 
-function getRequestIpAddress(request) {
+export function getRequestIpAddress(request) {
   const forwardedFor = request.headers["x-forwarded-for"];
   if (typeof forwardedFor === "string" && forwardedFor) {
     return forwardedFor.split(",")[0].trim();

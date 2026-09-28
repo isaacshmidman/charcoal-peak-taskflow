@@ -32,7 +32,8 @@ function createEmbeddedBackendPlugin({ appId }) {
       });
 
       server.middlewares.use(async (request, response, next) => {
-        if (!request.url?.startsWith("/api")) {
+        // /.well-known/oauth-*: discovery for AI apps signing in (backend/ai/oauth.js).
+        if (!request.url?.startsWith("/api") && !request.url?.startsWith("/.well-known/oauth-")) {
           next();
           return;
         }

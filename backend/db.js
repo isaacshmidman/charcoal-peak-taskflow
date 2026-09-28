@@ -392,6 +392,35 @@ export function createDatabase(config = backendConfig) {
       undone_at TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_ai_activity_user ON ai_activity(app_id, user_id, created_date);
+
+    -- "Sign in with Zephyrly" (backend/ai/oauth.js). Apps register
+    -- themselves (RFC 7591); only public clients using PKCE, so no secrets.
+    CREATE TABLE IF NOT EXISTS oauth_clients (
+      client_id TEXT PRIMARY KEY,
+      client_name TEXT NOT NULL,
+      redirect_uris_json TEXT NOT NULL,
+      created_date TEXT NOT NULL,
+      last_used_at TEXT
+    );
+
+    -- One sign-in in progress: made by /api/oauth/authorize, shown on the
+    -- consent page, then holds the one-time code until it's exchanged.
+    CREATE TABLE IF NOT EXISTS oauth_requests (
+      id TEXT PRIMARY KEY,               -- opaque; in the consent page's URL
+      app_id TEXT NOT NULL,
+      client_id TEXT NOT NULL,
+      redirect_uri TEXT NOT NULL,
+      state TEXT,
+      code_challenge TEXT NOT NULL,
+      scope TEXT NOT NULL DEFAULT '',
+      resource TEXT,
+      user_id TEXT,                      -- set on approval
+      grant_id TEXT,                     -- set on approval
+      code_hash TEXT UNIQUE,             -- set on approval
+      code_used_at TEXT,
+      expires_at TEXT NOT NULL,
+      created_date TEXT NOT NULL
+    );
   `);
 
   // Migration: add task_end_time to existing databases.

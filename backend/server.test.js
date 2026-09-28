@@ -4,11 +4,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { validateHeaderValue } from "node:http";
 import { Readable } from "node:stream";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { createHash, randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { closeDatabase, createDatabase } from "./db.js";
 import { readZip } from "./test-support/readZip.js";
 import { createRequestHandler } from "./server.js";
+import { resetRateLimits } from "./ai/rate-limit.js";
 
 let tempDir = "";
 let db;
@@ -75,6 +77,7 @@ function createMockResponse() {
     end(chunk = "") {
       if (ended) return;
       ended = true;
+      if (chunk && chunk.length) chunks.push(Buffer.from(chunk));
       body += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8");
       resolveDone();
     },
@@ -1354,6 +1357,200 @@ describe("AI apps over MCP", () => {
     const limited = await ping(121);
     expect(limited.statusCode).toBe(429);
     expect(Number(limited.headers["Retry-After"])).toBeGreaterThan(0);
+  });
+});
+
+describe("Sign in with Zephyrly (OAuth for AI apps)", () => {
+  const BASE = "http://127.0.0.1:4173";
+  const CALLBACK = "https://claude.ai/api/mcp/auth_callback";
+  const pkce = () => {
+    const verifier = randomBytes(32).toString("base64url");
+    return { verifier, challenge: createHash("sha256").update(verifier).digest("base64url") };
+  };
+  const session = (token) => async (method, path, body) =>
+    invoke(`/api/apps/test-app${path}`, { method, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body });
+  const form = (path, fields) =>
+    invoke(path, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams(fields).toString() });
+  const register = (body) => invoke("/api/oauth/register", { method: "POST", headers: { "Content-Type": "application/json" }, body });
+  const authorize = (params) => invokeRaw(`/api/oauth/authorize?${new URLSearchParams(params)}`);
+  const mcpList = (token) =>
+    invoke("/api/mcp", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: { jsonrpc: "2.0", id: 1, method: "tools/list" } });
+
+  /** Register, authorize and consent the way claude.ai would; returns the code and what's needed to trade it. */
+  async function signIn(email, { canWrite = false, scope = "tasks.read tasks.write", name = "Claude" } = {}) {
+    const person = await login(email);
+    const client = (await register({ client_name: name, redirect_uris: [CALLBACK], token_endpoint_auth_method: "client_secret_post" })).body;
+    const { verifier, challenge } = pkce();
+    const started = await authorize({
+      response_type: "code", client_id: client.client_id, redirect_uri: CALLBACK, code_challenge: challenge,
+      code_challenge_method: "S256", state: "st-123", scope, resource: `${BASE}/api/mcp`,
+    });
+    expect(started.statusCode).toBe(302);
+    const requestId = /\/connect\/([^/?]+)$/.exec(String(started.headers.Location))[1];
+    const decided = await session(person)("POST", `/ai/connect/${requestId}`, { approve: true, can_write: canWrite, time_zone: "Europe/London" });
+    expect(decided.statusCode).toBe(200);
+    const back = new URL(decided.body.redirect_to);
+    return { person, client, verifier, requestId, code: back.searchParams.get("code"), back };
+  }
+  const trade = (s, overrides = {}) =>
+    form("/api/oauth/token", { grant_type: "authorization_code", code: s.code, code_verifier: s.verifier, client_id: s.client.client_id, redirect_uri: CALLBACK, resource: `${BASE}/api/mcp`, ...overrides });
+
+  beforeEach(() => resetRateLimits());
+
+  it("publishes where to sign in, and /api/mcp points there when there's no token", async () => {
+    for (const path of ["/.well-known/oauth-protected-resource", "/.well-known/oauth-protected-resource/api/mcp"]) {
+      const doc = await invoke(path);
+      expect(doc.body).toMatchObject({ resource: `${BASE}/api/mcp`, authorization_servers: [BASE] });
+    }
+    const as = (await invoke("/.well-known/oauth-authorization-server")).body;
+    expect(as).toMatchObject({
+      issuer: BASE,
+      authorization_endpoint: `${BASE}/api/oauth/authorize`,
+      token_endpoint: `${BASE}/api/oauth/token`,
+      registration_endpoint: `${BASE}/api/oauth/register`,
+      code_challenge_methods_supported: ["S256"],
+      token_endpoint_auth_methods_supported: ["none"],
+    });
+    // Anything else under /.well-known is a plain 404, never the app's HTML.
+    expect((await invoke("/.well-known/openid-configuration")).statusCode).toBe(404);
+    const noToken = await invoke("/api/mcp", { method: "POST", headers: { "Content-Type": "application/json" }, body: { jsonrpc: "2.0", id: 1, method: "ping" } });
+    expect(noToken.headers["WWW-Authenticate"]).toBe(`Bearer resource_metadata="${BASE}/.well-known/oauth-protected-resource", scope="tasks.read"`);
+  });
+
+  it("registers apps with https or loopback return addresses only, and never hands out a secret", async () => {
+    const ok = await register({ client_name: "Claude\u0007", redirect_uris: [CALLBACK, "http://127.0.0.1:33418/callback"] });
+    expect(ok.statusCode).toBe(201);
+    expect(ok.body).toMatchObject({ client_name: "Claude", token_endpoint_auth_method: "none" });
+    expect(ok.body.client_secret).toBeUndefined();
+    for (const bad of ["http://evil.example/cb", "https://claude.ai/cb#x", "javascript:alert(1)", "not a url"]) {
+      const refused = await register({ client_name: "x", redirect_uris: [bad] });
+      expect(refused.statusCode).toBe(400);
+      expect(refused.body.error).toBe("invalid_redirect_uri");
+    }
+    expect((await register({ redirect_uris: [] })).statusCode).toBe(400);
+  });
+
+  it("signs an app in: consent page, code, tokens, and the connection it makes is read-only unless ticked", async () => {
+    const s = await signIn("oauth-happy@example.com");
+    expect(s.back.origin + s.back.pathname).toBe(CALLBACK);
+    expect(s.back.searchParams.get("state")).toBe("st-123");
+    expect(s.back.searchParams.get("iss")).toBe(BASE);
+
+    const tokens = await trade(s);
+    expect(tokens.statusCode).toBe(200);
+    expect(tokens.headers["Cache-Control"]).toBe("no-store");
+    expect(tokens.body).toMatchObject({ token_type: "Bearer", expires_in: 3600, scope: "tasks.read" });
+    expect(tokens.body.access_token).toMatch(/^zeph_at_/);
+    expect(tokens.body.refresh_token).toMatch(/^zeph_rt_/);
+
+    const tools = (await mcpList(tokens.body.access_token)).body.result.tools.map((t) => t.name);
+    expect(tools).not.toContain("create_task");
+    const grants = (await session(s.person)("GET", "/ai/grants")).body.grants;
+    expect(grants).toEqual([expect.objectContaining({ kind: "oauth", label: "Claude", can_write: false, time_zone: "Europe/London" })]);
+    // A refresh token isn't an access token.
+    expect((await mcpList(tokens.body.refresh_token)).statusCode).toBe(401);
+  });
+
+  it("the consent page says who's asking and where it returns, and a refusal goes back as access_denied", async () => {
+    const person = await login("oauth-deny@example.com");
+    const client = (await register({ client_name: "Totally Zephyrly", redirect_uris: ["https://evil.example/cb"] })).body;
+    const { challenge } = pkce();
+    const started = await authorize({ response_type: "code", client_id: client.client_id, redirect_uri: "https://evil.example/cb", code_challenge: challenge, code_challenge_method: "S256", state: "s1", scope: "tasks.read tasks.write" });
+    const requestId = String(started.headers.Location).split("/connect/")[1];
+    expect((await invoke(`/api/apps/test-app/ai/connect/${requestId}`)).statusCode).toBe(401);
+    const asked = await session(person)("GET", `/ai/connect/${requestId}`);
+    expect(asked.body).toEqual({ client_name: "Totally Zephyrly", redirect_host: "evil.example", wants_changes: true });
+    const denied = await session(person)("POST", `/ai/connect/${requestId}`, { approve: false });
+    const back = new URL(denied.body.redirect_to);
+    expect(Object.fromEntries(back.searchParams)).toMatchObject({ error: "access_denied", state: "s1" });
+    expect((await session(person)("GET", `/ai/connect/${requestId}`)).statusCode).toBe(404);
+    expect((await session(person)("GET", "/ai/grants")).body.grants).toEqual([]);
+  });
+
+  it("won't redirect anywhere it can't trust, and sends other mistakes back to the app", async () => {
+    const client = (await register({ client_name: "App", redirect_uris: [CALLBACK] })).body;
+    const { challenge } = pkce();
+    const good = { response_type: "code", client_id: client.client_id, redirect_uri: CALLBACK, code_challenge: challenge, code_challenge_method: "S256", state: "s9" };
+
+    const unknown = await authorize({ ...good, client_id: "zcl_nope" });
+    expect(unknown.statusCode).toBe(400);
+    expect(unknown.headers["Content-Type"]).toMatch(/^text\/html/);
+    expect(unknown.headers.Location).toBeUndefined();
+    expect(unknown.body.toString()).toContain("isn&#39;t registered");
+    const elsewhere = await authorize({ ...good, redirect_uri: "https://evil.example/steal" });
+    expect(elsewhere.statusCode).toBe(400);
+    expect(elsewhere.headers.Location).toBeUndefined();
+
+    for (const [params, error] of [
+      [{ ...good, code_challenge_method: "plain" }, "invalid_request"],
+      [{ ...good, code_challenge: "" }, "invalid_request"],
+      [{ ...good, response_type: "token" }, "unsupported_response_type"],
+      [{ ...good, resource: "https://other.example/mcp" }, "invalid_target"],
+    ]) {
+      const back = await authorize(params);
+      expect(back.statusCode).toBe(302);
+      const url = new URL(String(back.headers.Location));
+      expect(url.origin + url.pathname).toBe(CALLBACK);
+      expect(url.searchParams.get("error")).toBe(error);
+      expect(url.searchParams.get("state")).toBe("s9");
+    }
+  });
+
+  it("a code only works once, with its own verifier, client and return address; a replay ends the connection", async () => {
+    const s = await signIn("oauth-code@example.com");
+    expect((await trade(s, { code_verifier: pkce().verifier })).body.error).toBe("invalid_grant");
+    // That attempt used the code up.
+    expect((await trade(s)).body.error).toBe("invalid_grant");
+
+    const t = await signIn("oauth-code2@example.com");
+    expect((await trade(t, { client_id: "zcl_other" })).body.error).toBe("invalid_grant");
+    const u = await signIn("oauth-code3@example.com");
+    expect((await trade(u, { redirect_uri: "https://claude.ai/other" })).body.error).toBe("invalid_grant");
+
+    const v = await signIn("oauth-code4@example.com");
+    const first = await trade(v);
+    expect(first.statusCode).toBe(200);
+    const replay = await trade(v);
+    expect(replay.body.error).toBe("invalid_grant");
+    expect((await mcpList(first.body.access_token)).statusCode).toBe(401);
+  });
+
+  it("refresh tokens rotate, and a reused one disconnects the app", async () => {
+    const s = await signIn("oauth-refresh@example.com", { canWrite: true });
+    const first = (await trade(s)).body;
+    expect(first.scope).toBe("tasks.read tasks.write");
+    const second = await form("/api/oauth/token", { grant_type: "refresh_token", refresh_token: first.refresh_token, client_id: s.client.client_id });
+    expect(second.statusCode).toBe(200);
+    expect(second.body.refresh_token).not.toBe(first.refresh_token);
+    expect((await mcpList(second.body.access_token)).statusCode).toBe(200);
+
+    const stolen = await form("/api/oauth/token", { grant_type: "refresh_token", refresh_token: first.refresh_token, client_id: s.client.client_id });
+    expect(stolen.body.error).toBe("invalid_grant");
+    expect((await mcpList(second.body.access_token)).statusCode).toBe(401);
+    expect((await session(s.person)("GET", "/ai/grants")).body.grants).toEqual([]);
+  });
+
+  it("signing the same app in again updates its one connection", async () => {
+    const s = await signIn("oauth-again@example.com");
+    await trade(s);
+    const { verifier, challenge } = pkce();
+    const started = await authorize({ response_type: "code", client_id: s.client.client_id, redirect_uri: CALLBACK, code_challenge: challenge, code_challenge_method: "S256" });
+    const requestId = String(started.headers.Location).split("/connect/")[1];
+    const decided = await session(s.person)("POST", `/ai/connect/${requestId}`, { approve: true, can_write: true });
+    const code = new URL(decided.body.redirect_to).searchParams.get("code");
+    expect((await form("/api/oauth/token", { grant_type: "authorization_code", code, code_verifier: verifier, client_id: s.client.client_id })).statusCode).toBe(200);
+    const grants = (await session(s.person)("GET", "/ai/grants")).body.grants;
+    expect(grants).toHaveLength(1);
+    expect(grants[0].can_write).toBe(true);
+  });
+
+  it("revoking a token disconnects the app, and unknown tokens are accepted quietly", async () => {
+    const s = await signIn("oauth-revoke@example.com");
+    const tokens = (await trade(s)).body;
+    expect((await form("/api/oauth/revoke", { token: tokens.access_token })).statusCode).toBe(200);
+    expect((await mcpList(tokens.access_token)).statusCode).toBe(401);
+    expect((await form("/api/oauth/token", { grant_type: "refresh_token", refresh_token: tokens.refresh_token, client_id: s.client.client_id })).body.error).toBe("invalid_grant");
+    expect((await form("/api/oauth/revoke", { token: "zeph_at_unknown" })).statusCode).toBe(200);
   });
 });
 

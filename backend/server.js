@@ -9,6 +9,7 @@ import { HttpError, getRequestUrl, publicOrigin, sendError, sendJson } from "./h
 import { log } from "./log.js";
 import { purgeExpiredAuthRecords } from "./auth.js";
 import { purgeExpiredAiRecords } from "./ai/grants.js";
+import { purgeExpiredOAuthRecords } from "./ai/oauth.js";
 import { startSyncLoop } from "./sync.js";
 import { startNotificationLoop } from "./notifications.js";
 import { handleAuthRoute } from "./routes/auth.js";
@@ -97,6 +98,12 @@ function serveStaticFile(response, filePath) {
   const ext = extname(filePath).toLowerCase();
   response.setHeader("Content-Type", CONTENT_TYPES[ext] || "application/octet-stream");
   response.setHeader("Cache-Control", getCacheControl(filePath));
+  if (ext === ".html") {
+    // The app is never meant to be inside another site's frame; the
+    // consent page for AI apps especially must not be clickable through one.
+    response.setHeader("X-Frame-Options", "DENY");
+    response.setHeader("Content-Security-Policy", "frame-ancestors 'none'");
+  }
   response.writeHead(200);
   createReadStream(filePath).pipe(response);
 }
@@ -171,6 +178,14 @@ export function createRequestHandler(config = backendConfig, db = getDatabase(co
       const requestUrl = getRequestUrl(request);
       const segments = parsePath(requestUrl.pathname);
 
+      const ctx = { config, db, url: requestUrl, segments };
+      // OAuth discovery documents live at the site root, and must not fall
+      // through to the SPA's index.html.
+      if (requestUrl.pathname.startsWith("/.well-known/")) {
+        await handleAiRoute(request, response, ctx);
+        return;
+      }
+
       // Static assets — anything not under /api hits the dist/ fallback.
       if (!requestUrl.pathname.startsWith("/api")) {
         const staticFile = resolveStaticFile(requestUrl.pathname);
@@ -184,6 +199,7 @@ export function createRequestHandler(config = backendConfig, db = getDatabase(co
       if (requestUrl.pathname === "/health" || requestUrl.pathname === "/api/health") {
         purgeExpiredAuthRecords(db);
         purgeExpiredAiRecords(db);
+        purgeExpiredOAuthRecords(db);
         sendJson(response, 200, { ok: true, app_id: config.appId });
         return;
       }
@@ -207,7 +223,6 @@ export function createRequestHandler(config = backendConfig, db = getDatabase(co
       // Per-route dispatch. Each handler returns true if it matched.
       // Order matters: auth first (some routes are unauthenticated),
       // then per-feature handlers under /api/apps/:appId/*.
-      const ctx = { config, db, url: requestUrl, segments };
       if (await handleAuthRoute(request, response, ctx)) return;
       if (await handleIntegrationsRoute(request, response, ctx)) return;
       if (await handleNotificationsRoute(request, response, ctx)) return;

@@ -20,7 +20,7 @@ export class HttpError extends Error {
 }
 
 /**
- * Read and parse a JSON request body, refusing anything over `maxBytes`.
+ * Read a request body as text, refusing anything over `maxBytes`.
  *
  * Without a cap the whole body was buffered before anything looked at it —
  * and /auth/login reads its body before anyone is signed in, so a single
@@ -31,9 +31,9 @@ export class HttpError extends Error {
  *
  * @param {import("node:http").IncomingMessage} request
  * @param {{ maxBytes?: number }} [options]
- * @returns {Promise<any>}
+ * @returns {Promise<string>}  trimmed; "" for an empty body
  */
-export function readJsonBody(request, { maxBytes = MAX_JSON_BODY_BYTES } = {}) {
+export function readBodyText(request, { maxBytes = MAX_JSON_BODY_BYTES } = {}) {
   const tooLarge = () =>
     new HttpError(413, `Request body is larger than ${maxBytes} bytes.`, "payload_too_large");
 
@@ -73,16 +73,7 @@ export function readJsonBody(request, { maxBytes = MAX_JSON_BODY_BYTES } = {}) {
     }
 
     function onEnd() {
-      const rawBody = Buffer.concat(chunks).toString("utf8").trim();
-      if (!rawBody) {
-        settle(resolve, null);
-        return;
-      }
-      try {
-        settle(resolve, JSON.parse(rawBody));
-      } catch {
-        settle(reject, new HttpError(400, "Request body must be valid JSON.", "invalid_json"));
-      }
+      settle(resolve, Buffer.concat(chunks).toString("utf8").trim());
     }
 
     /** @param {Error} error */
@@ -94,6 +85,47 @@ export function readJsonBody(request, { maxBytes = MAX_JSON_BODY_BYTES } = {}) {
     request.on("end", onEnd);
     request.on("error", onError);
   });
+}
+
+/**
+ * Read and parse a JSON request body (see readBodyText for the size cap).
+ * An empty body is null.
+ *
+ * @param {import("node:http").IncomingMessage} request
+ * @param {{ maxBytes?: number }} [options]
+ * @returns {Promise<any>}
+ */
+export async function readJsonBody(request, options = {}) {
+  const rawBody = await readBodyText(request, options);
+  if (!rawBody) return null;
+  try {
+    return JSON.parse(rawBody);
+  } catch {
+    throw new HttpError(400, "Request body must be valid JSON.", "invalid_json");
+  }
+}
+
+/**
+ * Read an application/x-www-form-urlencoded body (OAuth's token and
+ * revoke endpoints) into plain fields. A JSON object body is accepted too.
+ *
+ * @param {import("node:http").IncomingMessage} request
+ * @returns {Promise<Record<string, string>>}
+ */
+export async function readFormBody(request) {
+  const raw = await readBodyText(request);
+  if (/^application\/json/i.test(String(request.headers?.["content-type"] || ""))) {
+    let parsed;
+    try {
+      parsed = raw ? JSON.parse(raw) : {};
+    } catch {
+      throw new HttpError(400, "Request body must be valid JSON.", "invalid_json");
+    }
+    return Object.fromEntries(
+      Object.entries(parsed && typeof parsed === "object" ? parsed : {}).map(([k, v]) => [k, typeof v === "string" ? v : String(v ?? "")])
+    );
+  }
+  return Object.fromEntries(new URLSearchParams(raw));
 }
 
 /**
