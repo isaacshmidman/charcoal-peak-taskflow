@@ -149,6 +149,9 @@ function readSingleFileFromMultipart(req, maxBytes) {
     try {
       bb = Busboy({
         headers: req.headers,
+        // Browsers send `filename="…"` as raw UTF-8; busboy's default
+        // (latin1) turned "Résumé.pdf" into "RÃ©sumÃ©.pdf".
+        defParamCharset: "utf8",
         limits: { fileSize: maxBytes, files: 1 },
       });
     } catch (err) {

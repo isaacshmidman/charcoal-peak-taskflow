@@ -29,6 +29,7 @@ import { createEntityRecord, entityFieldNames, validateClientInput } from "./sto
 import { createAttachment, MAX_FILE_BYTES } from "./attachments.js";
 import { EXPORT_FORMAT, EXPORT_VERSION } from "./export.js";
 import { openZip, ZipError } from "./unzip.js";
+import { repairLatin1Filename } from "./lib/filename-encoding.js";
 
 export const MAX_RESTORE_UPLOAD_BYTES = 1_200_000_000;
 const MAX_DATA_JSON_BYTES = 100 * 1_000_000;
@@ -450,7 +451,11 @@ export async function restoreExport(db, config, { appId, user, data, readFile, n
       skipFile("their task isn't here");
       continue;
     }
-    const filename = typeof attachment.filename === "string" && attachment.filename.trim() ? attachment.filename.trim().slice(0, 255) : "file";
+    const given = typeof attachment.filename === "string" && attachment.filename.trim() ? attachment.filename.trim().slice(0, 255) : "file";
+    // Exports made before uploads were read as UTF-8 carry the mangled
+    // name; the boot repair has already fixed the stored copy, so match
+    // (and restore) under the real one.
+    const filename = repairLatin1Filename(given) ?? given;
     if (alreadyAttached.get(appId, user.id, taskId, filename, Number(attachment.size_bytes) || 0)) {
       filesAlreadyHere += 1;
       continue;

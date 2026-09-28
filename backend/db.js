@@ -3,6 +3,7 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { migrateHighlightJson } from "./lib/highlight-migration.js";
+import { repairLatin1Filename } from "./lib/filename-encoding.js";
 import { backendConfig } from "./config.js";
 
 /** @type {DatabaseSync | null} */
@@ -607,6 +608,21 @@ export function createDatabase(config = backendConfig) {
     } catch {
       // Table missing on an older DB — next boot picks it up.
     }
+  }
+
+  // Backfill: attachment names uploaded before the upload parser read
+  // them as UTF-8 were stored mangled — "Résumé.pdf" as "RÃ©sumÃ©.pdf"
+  // (see lib/filename-encoding.js). Only names that decode cleanly change.
+  // Idempotent: a repaired name doesn't pass the check again.
+  try {
+    const rows = db.prepare(`SELECT id, filename FROM task_attachments`).all();
+    const update = db.prepare(`UPDATE task_attachments SET filename = ? WHERE id = ?`);
+    for (const row of rows) {
+      const repaired = repairLatin1Filename(row.filename);
+      if (repaired) update.run(repaired, row.id);
+    }
+  } catch {
+    // Never fatal to boot — the next boot tries again.
   }
 
   // Migration: older DBs have oauth_states without kind/user_id — add them.

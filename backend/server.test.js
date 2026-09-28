@@ -2,6 +2,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { validateHeaderValue } from "node:http";
 import { Readable } from "node:stream";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -935,6 +936,37 @@ describe("restore from an export", () => {
     expect(result.body.added).toMatchObject({ tasks: 2, files: 0 });
     expect(result.body.notes.join(" ")).toContain("only data.json was uploaded");
   });
+
+  it("takes an export made before names were read as UTF-8: real names, and no doubled files", async () => {
+    const realName = "Résumé 日本.pdf";
+    const oldName = Buffer.from(realName, "utf8").toString("latin1");
+    const g = await login("restore-old-names@example.com");
+    const task = await api(g)("POST", "/entities/Task", { title: "Job hunt", due_date: "2026-10-01" });
+    const upload = await invoke(`/api/apps/test-app/tasks/${task.id}/attachments`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${g}`, "Content-Type": `multipart/form-data; boundary=${BOUNDARY}` },
+      body: Buffer.concat([
+        Buffer.from(`--${BOUNDARY}\r\nContent-Disposition: form-data; name="file"; filename="${realName}"\r\nContent-Type: application/pdf\r\n\r\n`),
+        Buffer.from("%PDF-1.4 résumé"),
+        Buffer.from(`\r\n--${BOUNDARY}--\r\n`),
+      ]),
+    });
+    // Stored the way the old upload parser left it, and exported that way.
+    db.prepare("UPDATE task_attachments SET filename = ? WHERE id = ?").run(oldName, upload.body.id);
+    const zip = await exportOf(g);
+    expect(dataJsonOf(zip).attachments.map((a) => a.filename)).toEqual([oldName]);
+
+    // The boot repair fixes the stored name; the old export still matches it.
+    createDatabase(config).close();
+    expect((await restore(g, zip)).body.added.files).toBe(0);
+    expect((await api(g)("GET", `/tasks/${task.id}/attachments`)).attachments.map((a) => a.filename)).toEqual([realName]);
+
+    // Into another account, the file arrives under its real name.
+    const h = await login("restore-old-names-target@example.com");
+    expect((await restore(h, zip)).body.added).toMatchObject({ tasks: 1, files: 1 });
+    const [copy] = await api(h)("GET", "/entities/Task");
+    expect((await api(h)("GET", `/tasks/${copy.id}/attachments`)).attachments.map((a) => a.filename)).toEqual([realName]);
+  });
 });
 
 describe("serving attachments", () => {
@@ -953,8 +985,8 @@ describe("serving attachments", () => {
   });
 
   /** Upload as a browser would, with the type the browser claims. */
-  const upload = async (filename, mimeType, bytes) => {
-    const result = await invoke(`/api/apps/test-app/tasks/${taskId}/attachments`, {
+  const upload = async (filename, mimeType, bytes, onTask = taskId) => {
+    const result = await invoke(`/api/apps/test-app/tasks/${onTask}/attachments`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": `multipart/form-data; boundary=${BOUNDARY}` },
       body: Buffer.concat([
@@ -983,7 +1015,7 @@ describe("serving attachments", () => {
       const served = await open(id);
       expect(served.statusCode).toBe(200);
       expect(served.headers["Content-Type"]).toBe("application/octet-stream");
-      expect(served.headers["Content-Disposition"]).toBe(`attachment; filename="${filename}"`);
+      expect(served.headers["Content-Disposition"]).toBe(`attachment; filename="${filename}"; filename*=UTF-8''${filename}`);
       expect(served.headers["X-Content-Type-Options"]).toBe("nosniff");
       expect(served.headers["Content-Security-Policy"]).toMatch(/^sandbox; default-src 'none'/);
       expect(served.body.toString()).toBe(html);
@@ -1037,7 +1069,7 @@ describe("serving attachments", () => {
     // The download button still asks for a download, and keeps the real type.
     const download = await open(pdf.id, "?download=1");
     expect(download.headers["Content-Type"]).toBe("application/pdf");
-    expect(download.headers["Content-Disposition"]).toBe('attachment; filename="Boarding.pdf"');
+    expect(download.headers["Content-Disposition"]).toBe(`attachment; filename="Boarding.pdf"; filename*=UTF-8''Boarding.pdf`);
   });
 
   it("plays audio and video in place, without a sandbox their player can't sign in from", async () => {
@@ -1058,6 +1090,107 @@ describe("serving attachments", () => {
     expect(served.headers["Content-Type"]).toBe("image/png");
     expect(served.headers["X-Content-Type-Options"]).toBe("nosniff");
     expect(served.headers["Content-Security-Policy"]).toMatch(/^sandbox;/);
+  });
+
+  /**
+   * The Content-Disposition a file is served with, checked the way Node's
+   * real response checks it (this mock response doesn't): anything past
+   * U+00FF, or a line break, throws ERR_INVALID_CHAR and fails the request.
+   */
+  const dispositionOf = async (id, query = "") => {
+    const served = await open(id, query);
+    expect(served.statusCode).toBe(200);
+    const header = String(served.headers["Content-Disposition"]);
+    expect(() => validateHeaderValue("Content-Disposition", header)).not.toThrow();
+    expect(header).toMatch(/^[\x20-\x7e]+$/);
+    const match = /^(inline|attachment); filename="([^"]*)"; filename\*=UTF-8''([A-Za-z0-9!#$&+.^_`|~%-]+)$/.exec(header);
+    expect(match, header).not.toBeNull();
+    return { type: match[1], fallback: match[2], name: decodeURIComponent(match[3]) };
+  };
+  // Each of these tests has its own task: one task holds at most 10 files.
+  const newTask = async () =>
+    (await invoke("/api/apps/test-app/entities/Task", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: { title: "Files with names", due_date: "2026-10-01" },
+    })).body.id;
+  const listedName = async (onTask, id) =>
+    (await invoke(`/api/apps/test-app/tasks/${onTask}/attachments`, { headers: { Authorization: `Bearer ${token}` } })).body.attachments.find(
+      (a) => a.id === id
+    )?.filename;
+  // What the upload parser used to store: the browser's UTF-8 bytes read as latin1.
+  const asMojibake = (name) => Buffer.from(name, "utf8").toString("latin1");
+
+  it("keeps a file's real name when it isn't plain ASCII, from upload to download", async () => {
+    const task = await newTask();
+    // A browser sends the name as raw UTF-8 bytes (the helper's Buffer.from).
+    const resume = await upload("Résumé 日本.pdf", "application/pdf", "%PDF-1.4 résumé", task);
+    expect(resume.filename).toBe("Résumé 日本.pdf");
+    expect(await listedName(task, resume.id)).toBe("Résumé 日本.pdf");
+    expect(await dispositionOf(resume.id)).toEqual({ type: "inline", fallback: "Resume __.pdf", name: "Résumé 日本.pdf" });
+    expect(await dispositionOf(resume.id, "?download=1")).toMatchObject({ type: "attachment", name: "Résumé 日本.pdf" });
+
+    // macOS screenshots have a narrow no-break space before AM/PM.
+    const shotName = "Screenshot 2026-09-28 at 9.41.00\u202fAM.png";
+    const shot = await upload(shotName, "image/png", "not really a png", task);
+    expect(await listedName(task, shot.id)).toBe(shotName);
+    expect(await dispositionOf(shot.id)).toEqual({
+      type: "inline",
+      fallback: "Screenshot 2026-09-28 at 9.41.00 AM.png",
+      name: shotName,
+    });
+
+    // Types that only download keep their name too.
+    const page = await upload("Café menu 🍝.html", "text/html", "<!doctype html>", task);
+    expect(await dispositionOf(page.id)).toEqual({ type: "attachment", fallback: "Cafe menu _.html", name: "Café menu 🍝.html" });
+  });
+
+  it("serves a stored name that would break the header as a safe one", async () => {
+    const { id } = await upload("placeholder.txt", "text/plain", "hello", await newTask());
+    for (const [stored, expected] of [
+      // Line breaks and quotes can't split the header or end the quoted name.
+      ['Q3 "final"\r\nSet-Cookie: x=1.txt', "Q3 finalSet-Cookie: x=1.txt"],
+      // Half of an emoji (a name cut short at 255 characters can end in one).
+      ["notes \ud83d.txt", "notes \ufffd.txt"],
+      ["", "file"],
+    ]) {
+      db.prepare("UPDATE task_attachments SET filename = ? WHERE id = ?").run(stored, id);
+      expect((await dispositionOf(id)).name).toBe(expected);
+    }
+  });
+
+  it("repairs names stored before uploads were read as UTF-8, once, at boot", async () => {
+    const names = {
+      resume: "Résumé 日本.pdf",
+      shot: "Screenshot 2026-09-28 at 9.41.00\u202fAM.png",
+      emoji: "Trip 🏔️ plan.txt",
+      // Correct already, and must stay exactly as they are.
+      german: "Größe.txt",
+      japanese: "日本.txt",
+      plain: "plain.txt",
+      // Only latin1 characters, but not UTF-8 read as latin1 ("Ã" then "©" is).
+      lookalike: "Ã tête.txt",
+    };
+    const task = await newTask();
+    const ids = {};
+    for (const [key, name] of Object.entries(names)) {
+      ids[key] = (await upload(`${key}.txt`, "text/plain", key, task)).id;
+      db.prepare("UPDATE task_attachments SET filename = ? WHERE id = ?").run(name, ids[key]);
+    }
+    // The broken state, as the old parser left it.
+    for (const key of ["resume", "shot", "emoji"]) {
+      db.prepare("UPDATE task_attachments SET filename = ? WHERE id = ?").run(asMojibake(names[key]), ids[key]);
+    }
+    expect(await listedName(task, ids.resume)).toBe("RÃ©sumÃ© æ\u0097¥æ\u009c¬.pdf");
+
+    const boot = () => createDatabase(config).close();
+    boot();
+    for (const [key, name] of Object.entries(names)) expect(await listedName(task, ids[key])).toBe(name);
+    expect(await dispositionOf(ids.resume)).toMatchObject({ name: names.resume });
+
+    // A later boot changes nothing.
+    boot();
+    for (const [key, name] of Object.entries(names)) expect(await listedName(task, ids[key])).toBe(name);
   });
 });
 

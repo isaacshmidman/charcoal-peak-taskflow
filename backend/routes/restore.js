@@ -82,7 +82,7 @@ export function saveUploadToFile(request, path, maxBytes) {
   return new Promise((resolve, reject) => {
     let bb;
     try {
-      bb = Busboy({ headers: request.headers, limits: { fileSize: maxBytes, files: 1 } });
+      bb = Busboy({ headers: request.headers, defParamCharset: "utf8", limits: { fileSize: maxBytes, files: 1 } });
     } catch (error) {
       reject(new HttpError(400, `Invalid upload: ${error?.message || "unknown"}`, "invalid_multipart"));
       return;

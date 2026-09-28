@@ -232,6 +232,31 @@ function inlineMimeType(mime) {
 }
 
 /**
+ * A Content-Disposition header that carries any filename. Browsers take
+ * the real name from `filename*` (RFC 5987: percent-encoded UTF-8);
+ * `filename` is an ASCII stand-in for anything that doesn't read it. A
+ * header can't hold the name as-is — Node throws on characters past
+ * U+00FF. Line breaks and quotes are dropped from both, so a stored name
+ * can never split the header or end the quoted string early.
+ *
+ * @param {"inline" | "attachment"} disposition
+ * @param {string} filename
+ */
+function contentDisposition(disposition, filename) {
+  const name = String(filename || "").replace(/[\r\n"]/g, "") || "file";
+  const fallback = name
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "") // é → e once NFKD has split off the accent
+    .replace(/[^\x20-\x7e]|\\/gu, "_");
+  // Byte by byte, so half an emoji becomes U+FFFD instead of throwing.
+  const encoded = Array.from(Buffer.from(name, "utf8"), (byte) => {
+    const char = String.fromCharCode(byte);
+    return /[A-Za-z0-9!#$&+.^_`|~-]/.test(char) ? char : `%${byte.toString(16).toUpperCase().padStart(2, "0")}`;
+  }).join("");
+  return `${disposition}; filename="${fallback}"; filename*=UTF-8''${encoded}`;
+}
+
+/**
  * @param {any} db
  * @param {{ appId: string, userId: string }} scope
  * @returns {number}
@@ -610,8 +635,7 @@ export async function sendAttachmentFile(response, absolutePath, meta, { asDownl
   // not to cache anything personal indefinitely.
   response.setHeader("Cache-Control", "private, max-age=3600");
   const disposition = asDownload || !inlineType ? "attachment" : "inline";
-  const safe = String(meta.filename || "file").replace(/"/g, "");
-  response.setHeader("Content-Disposition", `${disposition}; filename="${safe}"`);
+  response.setHeader("Content-Disposition", contentDisposition(disposition, meta.filename));
   response.writeHead(200);
   createReadStream(absolutePath).pipe(response);
 }
