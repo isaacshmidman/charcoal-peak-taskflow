@@ -107,6 +107,7 @@ export default function AttachmentChip({
       {showImageThumb ? (
         <button
           type="button"
+          aria-label={attachment ? `Preview ${attachment.filename}` : "Uploading attachment"}
           onClick={() => attachment && onPreview && onPreview(attachment)}
           disabled={!attachment}
           className="shrink-0 w-10 h-10 rounded-md overflow-hidden bg-slate-100 dark:bg-[#161616] border border-slate-200 dark:border-[#343434] disabled:cursor-default"

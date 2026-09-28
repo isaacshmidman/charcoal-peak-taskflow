@@ -62,14 +62,15 @@ function insertTask({
   status = "todo",
   parentId = "",
   sourceKind = "",
+  reminder = "",
 }) {
   const now = new Date().toISOString();
   db.prepare(
     `INSERT INTO tasks (
        id, app_id, parent_id, title, status, task_type, recurrence,
        recurrence_days_json, due_date, task_time, tags_json, created_date,
-       updated_date, created_by_id, created_by, source_kind
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       updated_date, created_by_id, created_by, source_kind, reminder
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     "test-app",
@@ -86,7 +87,8 @@ function insertTask({
     now,
     "user_1",
     "isaac@example.com",
-    sourceKind
+    sourceKind,
+    reminder
   );
 }
 
@@ -231,6 +233,30 @@ describe("notification scheduler", () => {
       sendNotification,
     });
     expect(sentPayloads.map((p) => p.data.taskId)).toContain("task_event");
+  });
+
+  it("honours each task's own reminder over the account settings", async () => {
+    const user = seedUser();
+    updateUserNotificationSettings(db, {
+      appId: "test-app",
+      userId: user.id,
+      input: { enabled: true, timeZone: "UTC", timedOffsetMinutes: -10, allDayEnabled: true, allDayTime: "1:00PM", missedGraceMinutes: 5 },
+    });
+    upsertNotificationSubscription(db, { appId: "test-app", user, subscription: fakeSubscription("https://push.example.com/rem") });
+
+    // At 13:00Z: an hour before a 2 PM task set to "1 hour before" fires;
+    // the same task on the account default (10 min before) doesn't yet;
+    // one set to no reminder never does.
+    insertTask({ id: "rem_hour", title: "Hour", dueDate: "2026-06-01", taskTime: "2:00PM", reminder: "before:60" });
+    insertTask({ id: "rem_default", title: "Default", dueDate: "2026-06-01", taskTime: "2:00PM" });
+    insertTask({ id: "rem_none", title: "None", dueDate: "2026-06-01", taskTime: "1:10PM", reminder: "none" });
+    // The same 1:10 PM task on the default WOULD fire now (1:10 − 10 min):
+    insertTask({ id: "rem_control", title: "Control", dueDate: "2026-06-01", taskTime: "1:10PM" });
+
+    const sent = [];
+    const sendNotification = async (_config, _subscription, payload) => { sent.push(payload.data.taskId); };
+    await runNotificationSweep(db, config, { now: new Date("2026-06-01T13:00:00.000Z"), sendNotification });
+    expect(sent.sort()).toEqual(["rem_control", "rem_hour"]);
   });
 
   it("marks failed deliveries and disables expired push subscriptions", async () => {

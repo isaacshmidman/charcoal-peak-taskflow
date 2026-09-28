@@ -49,6 +49,9 @@ export default function TimeFields({ form, setForm, endTouchedRef }) {
             <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100">Set time</Label>
             <button
               type="button"
+              role="switch"
+              aria-checked={!!form.task_time}
+              aria-label="Set time"
               onClick={() => {
                 if (form.task_time) {
                   endTouchedRef.current = false;

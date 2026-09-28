@@ -153,9 +153,13 @@ export default function RecentlyDeleted({ onBack } = {}) {
 
   const handleRestore = async (record) => {
     // Re-create the task
+    // Restore the whole task. This list used to leave out the rich-text
+    // description, the end time and the reminder, so a restored task came
+    // back as plain text with no duration.
     const taskData = {
       title: record.title,
       description: record.description,
+      description_json: record.description_json || "",
       priority_id: record.priority_id,
       status: record.was_completed ? "done" : "todo",
       task_type: record.task_type,
@@ -164,6 +168,8 @@ export default function RecentlyDeleted({ onBack } = {}) {
       recurrence_end_date: record.recurrence_end_date,
       due_date: record.due_date,
       task_time: record.task_time,
+      task_end_time: record.task_end_time || "",
+      reminder: record.reminder || "",
       tags: record.tags,
       completed_at: record.completed_at,
     };

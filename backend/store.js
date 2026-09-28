@@ -35,6 +35,7 @@ const ENTITY_DEFINITIONS = {
       source_color_hex: "",
       source_writable: true,
       source_recurrence_rule: "",
+      reminder: "",
     },
     mutableFields: [
       "parent_id",
@@ -61,6 +62,7 @@ const ENTITY_DEFINITIONS = {
       "source_color_hex",
       "source_writable",
       "source_recurrence_rule",
+      "reminder",
     ],
   },
   DeletedTask: {
@@ -92,6 +94,7 @@ const ENTITY_DEFINITIONS = {
       is_completion_record: false,
       subtasks: [],
       is_sample: false,
+      reminder: "",
     },
     mutableFields: [
       "task_id",
@@ -116,6 +119,7 @@ const ENTITY_DEFINITIONS = {
       "is_completion_record",
       "subtasks",
       "is_sample",
+      "reminder",
     ],
   },
   Priority: {

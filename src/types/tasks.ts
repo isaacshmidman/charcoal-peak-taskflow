@@ -28,6 +28,8 @@ export interface TaskRecord {
   due_date?: string;
   task_time?: string;
   task_end_time?: string;
+  /** Per-task reminder rule — see backend/reminders.js. "" = account default. */
+  reminder?: string;
   tags?: string[];
   completed_at?: string;
   order?: number | null;
@@ -59,6 +61,8 @@ export interface DeletedTaskRecord {
   recurrence_end_date?: string;
   due_date?: string;
   task_time?: string;
+  task_end_time?: string;
+  reminder?: string;
   tags?: string[];
   completed_at?: string;
   deleted_at: string;

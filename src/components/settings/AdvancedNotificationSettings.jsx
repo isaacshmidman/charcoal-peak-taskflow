@@ -44,6 +44,7 @@ function OptionRow({ title, description, checked, onChange, disabled, supported 
         </p>
       </div>
       <SettingsToggle
+        label={title}
         checked={supported && checked}
         disabled={disabled || !supported}
         onChange={onChange}

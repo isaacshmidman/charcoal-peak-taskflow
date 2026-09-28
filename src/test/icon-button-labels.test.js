@@ -29,10 +29,14 @@ function lucideImports(source) {
   return names;
 }
 
-/** True when a JSX child renders only lucide icons (or nothing). */
+/** A self-closing lowercase element (`<span className="…" />`) draws a
+ *  shape — a switch knob, a dot — and says nothing. */
+const isEmptyShape = (el) => ts.isJsxSelfClosingElement(el) && /^[a-z]/.test(el.tagName.getText());
+
+/** True when a JSX child renders only lucide icons or empty shapes. */
 function iconOnly(child, icons) {
   if (ts.isJsxText(child)) return child.text.trim() === "";
-  if (ts.isJsxSelfClosingElement(child)) return icons.has(child.tagName.getText());
+  if (ts.isJsxSelfClosingElement(child)) return icons.has(child.tagName.getText()) || isEmptyShape(child);
   if (ts.isJsxElement(child)) return icons.has(child.openingElement.tagName.getText());
   if (ts.isJsxExpression(child)) {
     const expr = child.expression;
@@ -41,7 +45,7 @@ function iconOnly(child, icons) {
       if (ts.isParenthesizedExpression(e)) return check(e.expression);
       if (ts.isConditionalExpression(e)) return check(e.whenTrue) && check(e.whenFalse);
       if (ts.isBinaryExpression(e)) return check(e.right); // cond && <Icon/>
-      if (ts.isJsxSelfClosingElement(e)) return icons.has(e.tagName.getText());
+      if (ts.isJsxSelfClosingElement(e)) return icons.has(e.tagName.getText()) || isEmptyShape(e);
       if (ts.isJsxElement(e)) return icons.has(e.openingElement.tagName.getText());
       return false; // text, variables, anything else counts as a label
     };

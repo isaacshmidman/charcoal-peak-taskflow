@@ -31,6 +31,7 @@ import SubtasksField from "./SubtasksField.jsx";
 import AttachmentsField, { flushPendingUploads } from "../AttachmentsField.jsx";
 import { useAutosave } from "@/hooks/useAutosave";
 import { isReadOnlyTask } from "@/lib/task-filters";
+import ReminderField from "./ReminderField.jsx";
 
 const defaultTask = {
   title: "",
@@ -47,6 +48,7 @@ const defaultTask = {
   task_end_time: "",
   tags: [],
   subtask_titles: [],
+  reminder: "",
 };
 
 export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete, parentId, existingSubtasks = [], onToggleSubtask, onDeleteSubtask, onEditSubtask, defaultDueDate, defaultTaskTime, initialDraft }) {
@@ -318,6 +320,9 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
           />
 
           <TimeFields form={form} setForm={setForm} endTouchedRef={endTouchedRef} />
+
+          {/* Subtasks never notify, so they don't get a reminder. */}
+          {!parentId && form.due_date && <ReminderField form={form} setForm={setForm} />}
 
           <TagsField form={form} setForm={setForm} savedTags={savedTags} />
 

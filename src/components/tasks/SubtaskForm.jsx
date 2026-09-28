@@ -186,6 +186,9 @@ export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubm
                   <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100">Set time</Label>
                   <button
                     type="button"
+                    role="switch"
+                    aria-checked={!!form.task_time}
+                    aria-label="Set time"
                     onClick={() => setForm({ ...form, task_time: form.task_time ? "" : "9:00AM" })}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${form.task_time ? "bg-slate-900 dark:bg-slate-100" : "bg-slate-200 dark:bg-[#222222]"}`}
                   >

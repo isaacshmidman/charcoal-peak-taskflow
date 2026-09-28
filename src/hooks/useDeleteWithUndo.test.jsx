@@ -112,3 +112,25 @@ describe("useDeleteWithUndo", () => {
     expect(permanentlyDelete).not.toHaveBeenCalled();
   });
 });
+
+describe("buildTaskPayload", () => {
+  it("keeps everything a restored task needs — end time, reminder and rich text included", async () => {
+    const { buildTaskPayload } = await import("./useDeleteWithUndo");
+    const payload = buildTaskPayload({
+      id: "t1",
+      title: "Dentist",
+      description: "Bring card",
+      description_json: '{"type":"doc"}',
+      due_date: "2026-09-30",
+      task_time: "2:00PM",
+      task_end_time: "3:30PM",
+      reminder: "before:60",
+    });
+    expect(payload).toMatchObject({
+      description_json: '{"type":"doc"}',
+      task_time: "2:00PM",
+      task_end_time: "3:30PM",
+      reminder: "before:60",
+    });
+  });
+});

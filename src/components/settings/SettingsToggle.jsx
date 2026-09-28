@@ -8,16 +8,18 @@
  *   checked: boolean,
  *   onChange: (next: boolean) => void,
  *   disabled?: boolean,
+ *   label: string,          // what the switch turns on — its accessible name
  * }} props
  */
 import { cn } from "@/lib/utils";
 
-export default function SettingsToggle({ checked, onChange, disabled }) {
+export default function SettingsToggle({ checked, onChange, disabled, label }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
+      aria-label={label}
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={cn(

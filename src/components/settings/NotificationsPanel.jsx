@@ -224,6 +224,7 @@ export default function NotificationsPanel({ onOpenAdvanced }) {
           </p>
         </div>
         <SettingsToggle
+          label="Notifications"
           checked={draft.enabled}
           disabled={offline}
           onChange={(next) => patchDraft({ enabled: next })}

@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
 import { fromZonedTime } from "date-fns-tz";
 import { HttpError } from "./http.js";
 import { log } from "./log.js";
+import { parseReminder } from "./reminders.js";
 
 const require = createRequire(import.meta.url);
 /** @type {any} */
@@ -389,11 +390,20 @@ function listNotificationCandidateTasks(db, appId, user) {
     .all(appId, user.id, String(user.email || "").toLowerCase());
 }
 
-function getTaskNotificationTime(task, settings) {
+/**
+ * When this task's reminder fires. A task's own rule (tasks.reminder, see
+ * reminders.js) wins over the account settings; the default rule is the
+ * account's offset for timed tasks and its all-day time otherwise.
+ */
+export function getTaskNotificationTime(task, settings) {
+  const rule = parseReminder(task.reminder);
+  if (rule.kind === "none") return null;
   const taskTimeMins = parseTaskTime(task.task_time);
   if (taskTimeMins != null) {
-    return zonedDateTimeToDate(task.due_date, taskTimeMins + settings.timedOffsetMinutes, settings.timeZone);
+    const offset = rule.kind === "before" ? -rule.minutes : settings.timedOffsetMinutes;
+    return zonedDateTimeToDate(task.due_date, taskTimeMins + offset, settings.timeZone);
   }
+  if (rule.kind === "at") return zonedDateTimeToDate(task.due_date, rule.minutes, settings.timeZone);
   if (!settings.allDayEnabled) return null;
   const allDayMins = parseTaskTime(settings.allDayTime);
   if (allDayMins == null) return null;

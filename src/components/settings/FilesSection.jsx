@@ -57,6 +57,7 @@ function FileResultRow({ att, onPreview, onOpenTask }) {
       {showThumb ? (
         <button
           type="button"
+          aria-label={`Preview ${att.filename}`}
           onClick={() => onPreview(att)}
           className="shrink-0 w-10 h-10 rounded-md overflow-hidden bg-slate-100 dark:bg-[#161616] border border-slate-200 dark:border-[#343434]"
           title="Preview"

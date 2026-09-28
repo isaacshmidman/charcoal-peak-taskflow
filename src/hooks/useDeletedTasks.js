@@ -88,6 +88,8 @@ export function useDeletedTasks() {
       recurrence_end_date: task.recurrence_end_date || '',
       due_date: task.due_date || '',
       task_time: task.task_time || '',
+      task_end_time: task.task_end_time || '',
+      reminder: task.reminder || '',
       tags: task.tags || [],
       completed_at: task.completed_at || '',
       deleted_at: deletedAt,

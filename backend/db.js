@@ -393,6 +393,18 @@ export function createDatabase(config = backendConfig) {
   } catch {
     // Column already exists — ignore
   }
+  // Per-task reminder override (backend/reminders.js). Empty/null = use the
+  // account's notification settings, so existing tasks behave as before.
+  try {
+    db.exec(`ALTER TABLE tasks ADD COLUMN reminder TEXT`);
+  } catch {
+    // Column already exists — ignore
+  }
+  try {
+    db.exec(`ALTER TABLE deleted_tasks ADD COLUMN reminder TEXT`);
+  } catch {
+    // Column already exists — ignore
+  }
   // Notes gained tags + a shared priority (Tasks and Notes share both).
   try {
     db.exec(`ALTER TABLE notes ADD COLUMN tags_json TEXT`);

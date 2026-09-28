@@ -676,3 +676,38 @@ test("dragging an event's bottom edge changes when it ends, and nothing else", a
   await expect(page.getByTestId("task-form-dialog")).toHaveCount(0);
   expect((await api.getState()).tasks).toHaveLength(1);
 });
+
+test("a task can have its own reminder", async ({ page }) => {
+  const api = await installMockBackend(page, { tasks: [], priorities: [defaultPriority] });
+  await page.goto("/Today");
+  await page.getByRole("button", { name: "New Task" }).click();
+  await page.getByTestId("task-form-title").fill("Dentist");
+  await page.getByRole("switch", { name: "Set time" }).click();
+  await page.getByRole("combobox", { name: "Reminder" }).click();
+  await page.getByRole("option", { name: "1 hour before" }).click();
+  await page.getByTestId("task-form-submit").click();
+  await expect.poll(async () => (await api.getState()).tasks.find((t) => t.title === "Dentist")?.reminder).toBe("before:60");
+});
+
+test("a deleted task comes back from Recently Deleted with its end time, reminder and formatting", async ({ page }) => {
+  const richDoc = JSON.stringify({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Bring card", marks: [{ type: "bold" }] }] }] });
+  const api = await installMockBackend(page, {
+    tasks: [
+      recurringTask({
+        id: "full", title: "Full task", task_type: "one_time", recurrence: "none",
+        task_time: "2:00PM", task_end_time: "3:30PM", reminder: "before:60",
+        description: "Bring card", description_json: richDoc,
+      }),
+    ],
+    priorities: [defaultPriority],
+  });
+  await page.goto("/Today");
+  await taskCardByTitle(page, "Full task").click();
+  await page.getByTestId("task-form-delete").click();
+  await expect.poll(async () => (await api.getState()).tasks.length).toBe(0);
+
+  await page.goto("/RecentlyDeleted");
+  await page.getByRole("button", { name: "Restore" }).first().click();
+  await expect.poll(async () => (await api.getState()).tasks.find((t) => t.title === "Full task"))
+    .toMatchObject({ task_time: "2:00PM", task_end_time: "3:30PM", reminder: "before:60", description_json: richDoc });
+});

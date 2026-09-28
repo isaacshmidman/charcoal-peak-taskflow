@@ -61,6 +61,7 @@ export default function QuickNotificationsToggle() {
         </span>
       </div>
       <SettingsToggle
+        label="Notifications"
         checked={settings.enabled}
         disabled={!online || saveMutation.isPending}
         onChange={toggle}
