@@ -112,10 +112,24 @@ and `https://zephyrly.app/api/v1/openapi.json` describes it all in OpenAPI
   curl https://zephyrly.app/.well-known/oauth-authorization-server
   ```
 
-- **If an app's connection is blocked by Cloudflare** (a 403 challenge page
-  instead of JSON), Bot Fight Mode or a WAF rule is stopping requests from
-  the AI company's servers. Add a skip rule for `/api/mcp`, `/api/oauth/*`
-  and `/.well-known/oauth-*`.
+- **Cloudflare's AI-bot blocking stops Claude.** When claude.ai says it
+  can't connect, check this first. Cloudflare's "Block AI bots" (under AI
+  Crawl Control) answers any request that identifies as Anthropic's
+  `Claude-User` with a 403 "Sorry, you have been blocked" page, so Claude
+  never reaches Zephyrly (found 2026-09-29). OpenAI's `GPTBot` and
+  `ClaudeBot` are blocked too; `ChatGPT-User` gets through. To check,
+  pretend to be Claude:
+
+  ```
+  curl -s -o /dev/null -w "%{http_code}\n" -A "Claude-User/1.0" https://zephyrly.app/.well-known/oauth-authorization-server
+  ```
+
+  `403` means Cloudflare is still blocking; `200` means Claude gets
+  through. The fix is in the Cloudflare dashboard for zephyrly.app: in
+  **AI Crawl Control**, set **Claude-User** (and any other assistant you
+  use) to Allow. If your plan only has the on/off switch, turn off
+  **Block AI bots** under Security → Settings. Zephyrly has nothing a
+  crawler could train on behind sign-in anyway.
 - New tables and routes: deploying this needs a **backend restart**
   (`docker compose up -d --build`).
 
