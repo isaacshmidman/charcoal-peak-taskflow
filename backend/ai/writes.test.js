@@ -1,6 +1,6 @@
 // @ts-nocheck
 /* @vitest-environment node */
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -14,6 +14,7 @@ import { createGrant, revokeGrant } from "./grants.js";
 import { toolContext } from "./context.js";
 import { runTool, toolsForGrant } from "./tools.js";
 import { listActivity, undoActivity } from "./activity.js";
+import { createAttachment, getAttachment, listAttachmentsForTask } from "../attachments.js";
 import { WRITES_PER_HOUR, resetRateLimits, takeSlot } from "./rate-limit.js";
 
 const APP_ID = "test-app";
@@ -41,6 +42,11 @@ const tasks = () => listEntityRecords(db, { entityName: "Task", appId: APP_ID, u
 const exists = (id) => tasks().some((t) => t.id === id);
 const run = (name, args, context = ctx) => runTool(context, name, args);
 const undoLatest = () => undoActivity(db, config, { appId: APP_ID, user: ME, activityId: listActivity(db, { appId: APP_ID, userId: ME.id })[0].id });
+/** A real file on a task, and where its bytes are. */
+const attach = async (taskId, filename, text) => {
+  const file = await createAttachment(db, config, { appId: APP_ID, user: ME, taskId, file: { filename, mimeType: "application/pdf", data: Buffer.from(text) } });
+  return { ...file, path: getAttachment(db, config, { appId: APP_ID, user: ME, id: file.id }).absolutePath };
+};
 /** A little later than now, so an edit gets its own updated_date. */
 const tick = () => new Promise((r) => setTimeout(r, 5));
 
@@ -248,16 +254,26 @@ describe("delete_task", () => {
     expect(deletes.sort()).toEqual([t.id, sub.id].sort());
   });
 
-  it("refuses what would be permanent: subtasks, and tasks whose files would go with them", async () => {
+  it("refuses what would be permanent — a subtask — and a task's files go to Recently Deleted with it, to come back on restore", async () => {
     const t = task({ title: "With files", due_date: "2026-10-01" });
     const sub = task({ title: "Sub", parent_id: t.id });
     await expect(run("delete_task", { task_id: sub.id })).rejects.toThrow(/Deleting a subtask is permanent/);
-    db.prepare(
-      `INSERT INTO task_attachments (id, app_id, user_id, task_id, filename, mime_type, size_bytes, storage_path, is_image, created_date)
-       VALUES ('att_1', ?, ?, ?, 'plan.pdf', 'application/pdf', 1, 'x', 0, ?)`
-    ).run(APP_ID, ME.id, sub.id, new Date().toISOString());
-    await expect(run("delete_task", { task_id: t.id })).rejects.toThrow(/has attached files/);
-    expect(exists(t.id) && exists(sub.id)).toBe(true);
+    const plan = await attach(t.id, "plan.pdf", "%PDF plan");
+    const steps = await attach(sub.id, "steps.pdf", "%PDF steps");
+
+    const { text, data } = await run("delete_task", { task_id: t.id });
+    expect(text).toBe("Moved “With files” and its 1 subtask to Recently Deleted. The person can restore it, with its 2 files, from there for 7 days.");
+    expect(exists(t.id) || exists(sub.id)).toBe(false);
+    // Kept, byte for byte, until Recently Deleted lets go of the task.
+    expect(readFileSync(plan.path, "utf8")).toBe("%PDF plan");
+    expect(readFileSync(steps.path, "utf8")).toBe("%PDF steps");
+
+    // Restored as the app restores it, each file is back on its task.
+    const record = get(data.recently_deleted_id, "DeletedTask");
+    const back = createEntityRecord(db, { entityName: "Task", appId: APP_ID, user: ME, input: { title: record.title, due_date: record.due_date }, config, restoresTaskId: record.task_id });
+    const backSub = createEntityRecord(db, { entityName: "Task", appId: APP_ID, user: ME, input: { title: "Sub", parent_id: back.id }, config, restoresTaskId: sub.id });
+    expect(listAttachmentsForTask(db, { appId: APP_ID, user: ME, taskId: back.id }).map((a) => a.filename)).toEqual(["plan.pdf"]);
+    expect(listAttachmentsForTask(db, { appId: APP_ID, user: ME, taskId: backSub.id }).map((a) => a.filename)).toEqual(["steps.pdf"]);
   });
 });
 
@@ -317,6 +333,14 @@ describe("the activity log and Undo", () => {
     expect(undone.undo).toBe("undone");
     expect(get(t.id)).toMatchObject({ due_date: "2026-10-01", tags: ["a"], priority_id: priority("Low").id, description: "", description_json: "" });
     expect(() => undoLatest()).toThrow(/already undone/);
+  });
+
+  it("won't undo an added task the person has since attached a file to: that would delete the file for good", async () => {
+    const { data } = await run("create_task", { title: "Receipts", due_date: "2026-10-01" });
+    const receipt = await attach(data.id, "receipt.pdf", "%PDF receipt");
+    expect(() => undoLatest()).toThrow(/has had files attached since/);
+    expect(exists(data.id)).toBe(true);
+    expect(readFileSync(receipt.path, "utf8")).toBe("%PDF receipt");
   });
 
   it("won't overwrite an edit made after the AI's change", async () => {

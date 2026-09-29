@@ -5,10 +5,12 @@
  * Shows:
  *   - Big progress bar with the user's used / total bytes
  *   - Numeric "X MB of Y MB used" + "Z MB free"
- *   - Top 10 tasks by total attachment size — title + count + size each
+ *   - Top 10 tasks by total attachment size — title + count + size each.
+ *     A task in Recently Deleted still holds its files, and is marked so.
  *
  * Read-only — there's no destructive UI here. Users free up space by
- * removing attachments from individual tasks.
+ * removing attachments from individual tasks, or by deleting a task from
+ * Recently Deleted.
  */
 import { useQuery } from "@tanstack/react-query";
 import { Database, FileText, Loader2 } from "lucide-react";
@@ -94,9 +96,10 @@ export default function StorageSection() {
         </div>
 
         <p className="text-xs text-slate-400 dark:text-slate-500">
-          Attachments live alongside your tasks. Removing a task's
-          attachments frees space immediately; deleting a task removes
-          them on the same 7-day Recently Deleted timer as the task.
+          Attachments live alongside your tasks. Removing one frees its
+          space straight away. A deleted task keeps its files in Recently
+          Deleted, where they still count, until it's restored or
+          permanently deleted.
         </p>
       </section>
 
@@ -112,7 +115,7 @@ export default function StorageSection() {
           <ul className="rounded-xl border border-border-hairline bg-surface-card divide-y divide-slate-100 dark:divide-[#303030] overflow-hidden">
             {biggestTasks.map((task) => (
               <li
-                key={task.task_id}
+                key={`${task.task_id}:${task.in_recently_deleted ? "deleted" : "live"}`}
                 className="flex items-center gap-3 px-4 py-3"
               >
                 <FileText className="w-4 h-4 text-slate-400 dark:text-slate-500 shrink-0" />
@@ -122,6 +125,7 @@ export default function StorageSection() {
                   </p>
                   <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
                     {task.file_count} file{task.file_count === 1 ? "" : "s"}
+                    {task.in_recently_deleted && " · in Recently Deleted"}
                   </p>
                 </div>
                 <p className="text-xs font-medium text-slate-700 dark:text-slate-200 shrink-0">

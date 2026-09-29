@@ -1,4 +1,4 @@
-const CACHE_NAME = 'zephyrly-v10';
+const CACHE_NAME = 'zephyrly-v11';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

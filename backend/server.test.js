@@ -1,7 +1,7 @@
 /* @vitest-environment node */
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { validateHeaderValue } from "node:http";
 import { Readable } from "node:stream";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -969,6 +969,297 @@ describe("restore from an export", () => {
     expect((await restore(h, zip)).body.added).toMatchObject({ tasks: 1, files: 1 });
     const [copy] = await api(h)("GET", "/entities/Task");
     expect((await api(h)("GET", `/tasks/${copy.id}/attachments`)).attachments.map((a) => a.filename)).toEqual([realName]);
+  });
+
+  /** Upload a PDF to a task, as a browser would. */
+  const uploadPdf = async (token, taskId, filename, bytes) => {
+    const result = await invoke(`/api/apps/test-app/tasks/${taskId}/attachments`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": `multipart/form-data; boundary=${BOUNDARY}` },
+      body: Buffer.concat([
+        Buffer.from(`--${BOUNDARY}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: application/pdf\r\n\r\n`),
+        bytes,
+        Buffer.from(`\r\n--${BOUNDARY}--\r\n`),
+      ]),
+    });
+    expect(result.statusCode).toBe(201);
+    return result.body;
+  };
+
+  it("a task back under its old id gets the files held for it — once, and as a live task's", async () => {
+    const j = await login("restore-same-id@example.com");
+    const js = api(j);
+    const task = await js("POST", "/entities/Task", { title: "Taxes", due_date: "2026-10-01" });
+    const w2 = Buffer.from("%PDF-1.4 W-2");
+    const uploaded = await uploadPdf(j, task.id, "W-2.pdf", w2);
+    const zip = await exportOf(j);
+    // Deleted, and its Recently Deleted record never arrived: the file is held.
+    await js("DELETE", `/entities/Task/${task.id}`);
+    const held = () => db.prepare("SELECT COUNT(*) n FROM task_attachments WHERE task_id = ? AND task_deleted_at IS NOT NULL").get(task.id).n;
+    expect(held()).toBe(1);
+
+    const result = await restore(j, zip);
+    expect(result.body.added).toMatchObject({ tasks: 1, files: 0 });
+    // Its id was free, so it's back under it — with the file it had, not a
+    // second copy from the archive.
+    expect((await js("GET", `/entities/Task/${task.id}`)).attachment_count).toBe(1);
+    expect((await js("GET", `/tasks/${task.id}/attachments`)).attachments.map((a) => a.id)).toEqual([uploaded.id]);
+    expect(held()).toBe(0);
+    // A live task's file now, so the held-file timer leaves it be.
+    await invoke("/api/health");
+    const bytes = await invokeRaw(`/api/apps/test-app/attachments/${uploaded.id}`, { headers: { Authorization: `Bearer ${j}` } });
+    expect(bytes.body.equals(w2)).toBe(true);
+  });
+
+  it("a task in Recently Deleted comes across with its files, which come back when it's restored from there", async () => {
+    const k = await login("restore-trash-files@example.com");
+    const ks = api(k);
+    const task = await ks("POST", "/entities/Task", { title: "Old receipts", due_date: "2026-10-01" });
+    const receipt = Buffer.from("%PDF-1.4 receipt");
+    await uploadPdf(k, task.id, "receipt.pdf", receipt);
+    await ks("DELETE", `/entities/Task/${task.id}`);
+    await ks("POST", "/entities/DeletedTask", { task_id: task.id, title: "Old receipts", due_date: "2026-10-01" });
+    const zip = await exportOf(k);
+    const inZip = [...readZip(zip).entries()].find(([name]) => name.endsWith("/attachments/Old receipts/receipt.pdf"));
+    expect(inZip?.[1].equals(receipt)).toBe(true);
+
+    const m = await login("restore-trash-files-target@example.com");
+    const ms = api(m);
+    expect((await restore(m, zip)).body.added).toMatchObject({ tasks: 0, recentlyDeleted: 1, files: 1 });
+    // Held for the item in Recently Deleted, and counted against this account.
+    expect((await ms("GET", "/attachments/usage")).biggest_tasks).toEqual([
+      expect.objectContaining({ task_title: "Old receipts", file_count: 1, total_bytes: receipt.length, in_recently_deleted: true }),
+    ]);
+    expect((await ms("GET", "/attachments?q=receipt")).attachments).toEqual([]);
+    // Again: already there, file included.
+    expect((await restore(m, zip)).body.added).toMatchObject({ recentlyDeleted: 0, files: 0 });
+
+    // Restored from Recently Deleted the way the app does it.
+    const [record] = await ms("GET", "/entities/DeletedTask");
+    const back = await ms("POST", "/entities/Task", { title: record.title, due_date: record.due_date, restores_task_id: record.task_id });
+    await ms("DELETE", `/entities/DeletedTask/${record.id}`);
+    const [file] = (await ms("GET", `/tasks/${back.id}/attachments`)).attachments;
+    expect(file.filename).toBe("receipt.pdf");
+    const bytes = await invokeRaw(`/api/apps/test-app/attachments/${file.id}`, { headers: { Authorization: `Bearer ${m}` } });
+    expect(bytes.body.equals(receipt)).toBe(true);
+    // The first account's copy is its own, still held in its Recently Deleted.
+    expect((await ks("GET", "/attachments/usage")).biggest_tasks).toEqual([
+      expect.objectContaining({ task_title: "Old receipts", in_recently_deleted: true }),
+    ]);
+  });
+});
+
+describe("a deleted task's files", () => {
+  const BOUNDARY = "----zephyrly-held-files-boundary";
+  const DAY = 24 * 60 * 60 * 1000;
+  const api = (token) => async (method, path, body) =>
+    (await invoke(`/api/apps/test-app${path}`, {
+      method,
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body,
+    })).body;
+  const upload = async (token, taskId, filename, text) => {
+    const result = await invoke(`/api/apps/test-app/tasks/${taskId}/attachments`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": `multipart/form-data; boundary=${BOUNDARY}` },
+      body: Buffer.concat([
+        Buffer.from(`--${BOUNDARY}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: application/pdf\r\n\r\n`),
+        Buffer.from(text),
+        Buffer.from(`\r\n--${BOUNDARY}--\r\n`),
+      ]),
+    });
+    expect(result.statusCode).toBe(201);
+    return result.body;
+  };
+  /** Where a file's bytes are, read while its row still exists. */
+  const pathOf = (attachmentId) =>
+    join(tempDir, "attachments", db.prepare("SELECT storage_path FROM task_attachments WHERE id = ?").get(attachmentId).storage_path);
+  const heldRows = (userId) =>
+    db.prepare("SELECT id FROM task_attachments WHERE user_id = ? AND task_deleted_at IS NOT NULL").all(userId).map((r) => r.id);
+  const filenames = async (as, taskId) => (await as("GET", `/tasks/${taskId}/attachments`)).attachments.map((a) => a.filename);
+  const health = () => invoke("/api/health");
+
+  /**
+   * The app's delete (useOfflineMutation.deleteTasks): the task and each
+   * subtask are deleted, and a snapshot goes to Recently Deleted. Online the
+   * requests race; offline the deletes replay first — as here.
+   */
+  const deleteLikeTheApp = async (as, task, subtasks = []) => {
+    for (const subtask of subtasks) await as("DELETE", `/entities/Task/${subtask.id}`);
+    await as("DELETE", `/entities/Task/${task.id}`);
+    return as("POST", "/entities/DeletedTask", {
+      task_id: task.id,
+      title: task.title,
+      due_date: task.due_date,
+      subtasks: subtasks.map((s) => ({ id: s.id, title: s.title, status: "todo" })),
+    });
+  };
+  /** The app's restore (RecentlyDeleted.handleRestore): new tasks naming the ones they bring back, then the record goes. */
+  const restoreLikeTheApp = async (as, record) => {
+    const task = await as("POST", "/entities/Task", { title: record.title, due_date: record.due_date, restores_task_id: record.task_id });
+    const subtasks = [];
+    for (const s of record.subtasks) {
+      subtasks.push(await as("POST", "/entities/Task", { title: s.title, parent_id: task.id, restores_task_id: s.id }));
+    }
+    await as("DELETE", `/entities/DeletedTask/${record.id}`);
+    return { task, subtasks };
+  };
+
+  it("keeps them in Recently Deleted — on disk and counted, on no task — and a restore puts each back on its task", async () => {
+    const token = await login("held-restore@example.com");
+    const as = api(token);
+    const me = await as("GET", "/entities/User/me");
+    const trip = await as("POST", "/entities/Task", { title: "Plan the trip", due_date: "2026-10-01" });
+    const flights = await as("POST", "/entities/Task", { title: "Book flights", parent_id: trip.id, due_date: "2026-10-01" });
+    const pass = await upload(token, trip.id, "Boarding.pdf", "%PDF-1.4 boarding pass");
+    const receipt = await upload(token, flights.id, "Receipt.pdf", "%PDF-1.4 the flight receipt, which is longer");
+    const passPath = pathOf(pass.id);
+    const receiptPath = pathOf(receipt.id);
+
+    const record = await deleteLikeTheApp(as, trip, [flights]);
+
+    // The bytes stay where they were, and still count against storage…
+    expect(readFileSync(passPath, "utf8")).toBe("%PDF-1.4 boarding pass");
+    expect(readFileSync(receiptPath, "utf8")).toBe("%PDF-1.4 the flight receipt, which is longer");
+    const usage = await as("GET", "/attachments/usage");
+    expect(usage.used_bytes).toBe(pass.size_bytes + receipt.size_bytes);
+    // …as one line for the item in Recently Deleted, the subtask's file included…
+    expect(usage.biggest_tasks).toEqual([
+      { task_id: trip.id, task_title: "Plan the trip", total_bytes: pass.size_bytes + receipt.size_bytes, file_count: 2, in_recently_deleted: true },
+    ]);
+    // …but they're on no task: none to list them on, and not in search.
+    const listed = await invoke(`/api/apps/test-app/tasks/${trip.id}/attachments`, { headers: { Authorization: `Bearer ${token}` } });
+    expect(listed.statusCode).toBe(404);
+    expect((await as("GET", "/attachments?q=pdf")).attachments).toEqual([]);
+    expect(heldRows(me.id).sort()).toEqual([pass.id, receipt.id].sort());
+
+    const { task, subtasks: [sub] } = await restoreLikeTheApp(as, record);
+
+    // A new task, carrying its file — the same file, byte for byte.
+    expect(task.id).not.toBe(trip.id);
+    expect(task.attachment_count).toBe(1);
+    expect(await filenames(as, task.id)).toEqual(["Boarding.pdf"]);
+    expect(await filenames(as, sub.id)).toEqual(["Receipt.pdf"]);
+    const bytes = await invokeRaw(`/api/apps/test-app/attachments/${pass.id}`, { headers: { Authorization: `Bearer ${token}` } });
+    expect(bytes.body.toString()).toBe("%PDF-1.4 boarding pass");
+    const tasks = await as("GET", "/entities/Task");
+    expect(tasks.find((t) => t.id === task.id).attachment_count).toBe(1);
+    expect(tasks.find((t) => t.id === sub.id).attachment_count).toBe(1);
+
+    // Nothing is held now, and deleting the record took nothing with it.
+    expect(heldRows(me.id)).toEqual([]);
+    expect(existsSync(passPath) && existsSync(receiptPath)).toBe(true);
+    expect((await as("GET", "/attachments/usage")).biggest_tasks.map((l) => [l.task_title, l.file_count, l.in_recently_deleted])).toEqual([
+      ["Book flights", 1, false],
+      ["Plan the trip", 1, false],
+    ]);
+    expect((await as("GET", "/attachments?q=pdf")).attachments.map((a) => a.task_title).sort()).toEqual(["Book flights", "Plan the trip"]);
+  });
+
+  it("deleting it from Recently Deleted removes its files for good — its own, and no one else's", async () => {
+    const token = await login("held-permanent@example.com");
+    const as = api(token);
+    const oldPlan = await as("POST", "/entities/Task", { title: "Old plan", due_date: "2026-10-01" });
+    const otherPlan = await as("POST", "/entities/Task", { title: "Other plan", due_date: "2026-10-01" });
+    const live = await as("POST", "/entities/Task", { title: "Live plan", due_date: "2026-10-01" });
+    const oldFile = await upload(token, oldPlan.id, "old.pdf", "old");
+    const otherFile = await upload(token, otherPlan.id, "other.pdf", "other");
+    const liveFile = await upload(token, live.id, "live.pdf", "live");
+    const oldPath = pathOf(oldFile.id);
+    const oldRecord = await deleteLikeTheApp(as, oldPlan);
+    const otherRecord = await deleteLikeTheApp(as, otherPlan);
+
+    await as("DELETE", `/entities/DeletedTask/${oldRecord.id}`);
+
+    expect(existsSync(oldPath)).toBe(false);
+    // Its folder goes with it once empty.
+    expect(existsSync(dirname(oldPath))).toBe(false);
+    expect(db.prepare("SELECT COUNT(*) n FROM task_attachments WHERE id = ?").get(oldFile.id).n).toBe(0);
+    expect((await as("GET", "/attachments/usage")).used_bytes).toBe(otherFile.size_bytes + liveFile.size_bytes);
+    expect(await filenames(as, live.id)).toEqual(["live.pdf"]);
+
+    // The other one still comes back with its file.
+    const { task } = await restoreLikeTheApp(as, otherRecord);
+    expect(await filenames(as, task.id)).toEqual(["other.pdf"]);
+  });
+
+  it("they go when the item's time in Recently Deleted runs out, whenever that's set to — even if no one opens it", async () => {
+    const token = await login("held-expiry@example.com");
+    const as = api(token);
+    const expiring = await as("POST", "/entities/Task", { title: "Expiring", due_date: "2026-10-01" });
+    const keptLong = await as("POST", "/entities/Task", { title: "Kept a year", due_date: "2026-10-01" });
+    const expiringFile = await upload(token, expiring.id, "expiring.pdf", "expiring");
+    const keptFile = await upload(token, keptLong.id, "kept.pdf", "kept");
+    const expiringPath = pathOf(expiringFile.id);
+    const keptPath = pathOf(keptFile.id);
+    const expiringRecord = await deleteLikeTheApp(as, expiring);
+    const keptRecord = await deleteLikeTheApp(as, keptLong);
+
+    // The item's own expiry decides, not how long its files have been held:
+    // one deleted two days ago ran out yesterday (inside the server's 7-day
+    // window), the other was deleted a month ago but is kept for a year.
+    const ago = (days) => new Date(Date.now() - days * DAY).toISOString();
+    db.prepare("UPDATE task_attachments SET task_deleted_at = ? WHERE id = ?").run(ago(2), expiringFile.id);
+    db.prepare("UPDATE deleted_tasks SET deleted_at = ?, expires_at = ? WHERE id = ?").run(ago(2), ago(1), expiringRecord.id);
+    db.prepare("UPDATE task_attachments SET task_deleted_at = ? WHERE id = ?").run(ago(30), keptFile.id);
+    db.prepare("UPDATE deleted_tasks SET deleted_at = ?, expires_at = ? WHERE id = ?").run(ago(30), ago(-335), keptRecord.id);
+
+    // The health check (every 30s in production) runs the timer.
+    expect((await health()).statusCode).toBe(200);
+
+    expect(existsSync(expiringPath)).toBe(false);
+    expect(db.prepare("SELECT COUNT(*) n FROM task_attachments WHERE id = ?").get(expiringFile.id).n).toBe(0);
+    expect(readFileSync(keptPath, "utf8")).toBe("kept");
+    expect((await as("GET", "/entities/DeletedTask")).map((r) => r.title)).toEqual(["Kept a year"]);
+    const { task } = await restoreLikeTheApp(as, keptRecord);
+    expect(await filenames(as, task.id)).toEqual(["kept.pdf"]);
+  });
+
+  it("a subtask deleted on its own keeps its files for its Undo, until the retention window has passed", async () => {
+    const token = await login("held-subtask@example.com");
+    const as = api(token);
+    const me = await as("GET", "/entities/User/me");
+    const parent = await as("POST", "/entities/Task", { title: "Move house", due_date: "2026-10-01" });
+    const lease = await as("POST", "/entities/Task", { title: "Sign lease", parent_id: parent.id });
+    const quotes = await as("POST", "/entities/Task", { title: "Get quotes", parent_id: parent.id });
+    const leaseFile = await upload(token, lease.id, "lease.pdf", "lease");
+    const quotesFile = await upload(token, quotes.id, "quotes.pdf", "quotes");
+    const quotesPath = pathOf(quotesFile.id);
+
+    // Undo right after (useDeleteWithUndo): the subtask comes back with its file.
+    await as("DELETE", `/entities/Task/${lease.id}`);
+    expect(heldRows(me.id)).toEqual([leaseFile.id]);
+    const leaseBack = await as("POST", "/entities/Task", { title: "Sign lease", parent_id: parent.id, restores_task_id: lease.id });
+    expect(await filenames(as, leaseBack.id)).toEqual(["lease.pdf"]);
+
+    // No Undo: held for the retention window, then gone.
+    await as("DELETE", `/entities/Task/${quotes.id}`);
+    await health();
+    expect(existsSync(quotesPath)).toBe(true);
+    db.prepare("UPDATE task_attachments SET task_deleted_at = ? WHERE id = ?").run(new Date(Date.now() - 8 * DAY).toISOString(), quotesFile.id);
+    await health();
+    expect(existsSync(quotesPath)).toBe(false);
+    expect(heldRows(me.id)).toEqual([]);
+    expect(await filenames(as, leaseBack.id)).toEqual(["lease.pdf"]);
+  });
+
+  it("a restore only ever brings back the person's own files", async () => {
+    const ownerToken = await login("held-owner@example.com");
+    const owner = api(ownerToken);
+    const task = await owner("POST", "/entities/Task", { title: "Private", due_date: "2026-10-01" });
+    await upload(ownerToken, task.id, "private.pdf", "private");
+    const record = await deleteLikeTheApp(owner, task);
+
+    const intruder = api(await login("held-intruder@example.com"));
+    const theirs = await intruder("POST", "/entities/Task", { title: "Grab it", due_date: "2026-10-01", restores_task_id: task.id });
+    expect(theirs.attachment_count).toBeUndefined();
+    expect(await filenames(intruder, theirs.id)).toEqual([]);
+    // Nor can the intruder's Recently Deleted let go of the owner's files.
+    const decoy = await intruder("POST", "/entities/DeletedTask", { task_id: task.id, title: "Decoy" });
+    await intruder("DELETE", `/entities/DeletedTask/${decoy.id}`);
+
+    const { task: back } = await restoreLikeTheApp(owner, record);
+    expect(await filenames(owner, back.id)).toEqual(["private.pdf"]);
   });
 });
 

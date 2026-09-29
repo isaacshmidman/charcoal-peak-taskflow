@@ -460,6 +460,17 @@ export function createDatabase(config = backendConfig) {
   } catch {
     // Column already exists — ignore
   }
+  // When the file's task was deleted. Set, the file is held for Recently
+  // Deleted: kept, and counted toward storage, but on no live task until
+  // the task is restored or leaves Recently Deleted (attachments.js).
+  try {
+    db.exec(`ALTER TABLE task_attachments ADD COLUMN task_deleted_at TEXT`);
+  } catch {
+    // Column already exists — ignore
+  }
+  db.exec(
+    `CREATE INDEX IF NOT EXISTS idx_task_attachments_held ON task_attachments(task_deleted_at) WHERE task_deleted_at IS NOT NULL`
+  );
   try {
     db.exec(`ALTER TABLE external_event_map ADD COLUMN zephyrly_metadata_synced_at TEXT`);
   } catch {

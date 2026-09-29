@@ -11,6 +11,7 @@ declare global {
         savedTags: Record<string, any>[];
         notes: Record<string, any>[];
         deletedNotes: Record<string, any>[];
+        attachments: Record<string, any>[];
         currentUser: Record<string, any> | null;
       };
       counters: {

@@ -51,13 +51,14 @@ export async function handleEntitiesRoute(request, response, { config, db, url, 
         limit: parseLimit(url.searchParams.get("limit")),
         fields: url.searchParams.get("fields") || undefined,
         query: parseQueryFilter(url.searchParams),
+        config,
       })
     );
     return true;
   }
 
   if (request.method === "GET" && entityName && entityId) {
-    sendJson(response, 200, getEntityRecord(db, { entityName, appId, user, id: entityId }));
+    sendJson(response, 200, getEntityRecord(db, { entityName, appId, user, id: entityId, config }));
     return true;
   }
 
@@ -70,6 +71,9 @@ export async function handleEntitiesRoute(request, response, { config, db, url, 
       user,
       input: body,
       config,
+      // A restore (from Recently Deleted, or an Undo) names the task it
+      // brings back, so that task's files come back on it.
+      restoresTaskId: restoredTaskId(entityName, body),
     });
     if (entityName === "Task") {
       enqueueTaskPush(db, config, { op: "upsert", appId, taskSnapshot: created });
@@ -81,7 +85,7 @@ export async function handleEntitiesRoute(request, response, { config, db, url, 
   if (request.method === "PUT" && entityName && entityId) {
     const body = (await readJsonBody(request, { maxBytes: MAX_ENTITY_BODY_BYTES })) || {};
     validateClientInput(entityName, body);
-    const updated = updateEntityRecord(db, { entityName, appId, user, id: entityId, input: body });
+    const updated = updateEntityRecord(db, { entityName, appId, user, id: entityId, input: body, config });
     if (entityName === "Task") {
       enqueueTaskPush(db, config, { op: "upsert", appId, taskSnapshot: updated });
     }
@@ -95,12 +99,14 @@ export async function handleEntitiesRoute(request, response, { config, db, url, 
     let snapshot = null;
     if (entityName === "Task") {
       try {
-        snapshot = getEntityRecord(db, { entityName, appId, user, id: entityId });
+        snapshot = getEntityRecord(db, { entityName, appId, user, id: entityId, config });
       } catch {
         // Already gone; nothing to snapshot.
       }
     }
-    const result = deleteEntityRecord(db, { entityName, appId, user, id: entityId });
+    // The app's delete moves a task to Recently Deleted (a subtask: behind
+    // an Undo), so its files are held for the restore, not deleted.
+    const result = deleteEntityRecord(db, { entityName, appId, user, id: entityId, config, holdFiles: true });
     if (entityName === "Task" && snapshot) {
       enqueueTaskPush(db, config, { op: "delete", appId, taskSnapshot: snapshot });
     }
@@ -109,6 +115,15 @@ export async function handleEntitiesRoute(request, response, { config, db, url, 
   }
 
   throw new HttpError(404, "Route not found.", "not_found");
+}
+
+/**
+ * @param {string} entityName
+ * @param {any} body
+ */
+function restoredTaskId(entityName, body) {
+  const id = entityName === "Task" ? body.restores_task_id : undefined;
+  return typeof id === "string" && id.length <= 200 ? id : "";
 }
 
 function parseLimit(value) {

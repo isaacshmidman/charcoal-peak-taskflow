@@ -208,7 +208,7 @@ const getTask = {
     const subtasks = all.filter((t) => t.parent_id === task.id);
     const parent = task.parent_id ? all.find((t) => t.id === task.parent_id) : null;
     const files = ctx.db
-      .prepare(`SELECT filename FROM task_attachments WHERE app_id = ? AND task_id = ? AND user_id = ? ORDER BY created_date`)
+      .prepare(`SELECT filename FROM task_attachments WHERE app_id = ? AND task_id = ? AND user_id = ? AND task_deleted_at IS NULL ORDER BY created_date`)
       .all(ctx.appId, task.id, ctx.user.id)
       .map((/** @type {any} */ row) => row.filename);
 

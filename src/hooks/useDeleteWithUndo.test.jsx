@@ -71,6 +71,8 @@ describe("useDeleteWithUndo", () => {
         title: "Parent task",
         due_date: "2026-03-28",
         tags: ["Work"],
+        // Names what it restores, so the server brings its files back on it.
+        restores_task_id: "task-1",
       })
     );
     expect(createTask).toHaveBeenNthCalledWith(
@@ -78,6 +80,7 @@ describe("useDeleteWithUndo", () => {
       expect.objectContaining({
         title: "Child task",
         parent_id: "restored-parent",
+        restores_task_id: "subtask-1",
       })
     );
     expect(permanentlyDelete).toHaveBeenCalledWith("deleted-1");
@@ -107,9 +110,27 @@ describe("useDeleteWithUndo", () => {
       expect.objectContaining({
         title: "Child task",
         parent_id: "task-1",
+        restores_task_id: "subtask-1",
       })
     );
     expect(permanentlyDelete).not.toHaveBeenCalled();
+  });
+
+  it("names nothing for a task the server never had", async () => {
+    const createTask = vi.fn().mockResolvedValueOnce({ id: "restored-parent" }).mockResolvedValueOnce({ id: "restored-sub" });
+    const deleteTask = vi.fn().mockResolvedValue({
+      task: { id: "offline_123_abc", title: "Made offline", status: "todo" },
+      subtasks: [{ id: "offline_456_def", title: "Offline step", parent_id: "offline_123_abc" }],
+      deletedRecordId: null,
+    });
+
+    const { useDeleteWithUndo } = await import("./useDeleteWithUndo");
+    const { result } = renderHook(() => useDeleteWithUndo(deleteTask, createTask));
+    await result.current({ id: "offline_123_abc", title: "Made offline" });
+    await showDeleteToast.mock.calls[0][0].onUndo();
+
+    expect(createTask).toHaveBeenCalledTimes(2);
+    for (const [payload] of createTask.mock.calls) expect(payload).not.toHaveProperty("restores_task_id");
   });
 });
 

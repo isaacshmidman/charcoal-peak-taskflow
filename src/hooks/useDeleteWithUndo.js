@@ -76,6 +76,19 @@ export function buildTaskPayload(task, overrides = {}) {
 }
 
 /**
+ * What a restore adds to the task it creates, naming the deleted task it
+ * brings back, so the server moves that task's files onto the new one
+ * (backend/store.js createEntityRecord). Nothing for a task that only ever
+ * existed offline: the server never held files for it.
+ *
+ * @param {string | null | undefined} deletedTaskId
+ * @returns {{ restores_task_id?: string }}
+ */
+export function restoring(deletedTaskId) {
+  return deletedTaskId && !String(deletedTaskId).startsWith("offline_") ? { restores_task_id: String(deletedTaskId) } : {};
+}
+
+/**
  * @param {DeleteSnapshot} deletion
  * @param {{
  *   createTask: (data: TaskCreateInput) => Promise<TaskRecord | undefined>,
@@ -86,16 +99,16 @@ export async function restoreDeletionSnapshot({ task, subtasks = [], deletedReco
   if (!task || !createTask) return;
 
   if (task.parent_id) {
-    await createTask(buildTaskPayload(task));
+    await createTask(buildTaskPayload(task, restoring(task.id)));
     return;
   }
 
-  const restoredTask = await createTask(buildTaskPayload(task));
+  const restoredTask = await createTask(buildTaskPayload(task, restoring(task.id)));
   const restoredParentId = restoredTask?.id;
 
   if (restoredParentId) {
     for (const subtask of [...subtasks].sort((a, b) => (a.order ?? 999) - (b.order ?? 999))) {
-      await createTask(buildTaskPayload(subtask, { parent_id: restoredParentId }));
+      await createTask(buildTaskPayload(subtask, { parent_id: restoredParentId, ...restoring(subtask.id) }));
     }
   }
 

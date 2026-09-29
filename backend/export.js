@@ -180,7 +180,8 @@ function readme(folder, { exportedAt, counts, missingFiles }) {
     "                 which calendars are connected. The complete copy.",
     "tasks.csv        Tasks and subtasks, for Excel, Numbers or Google Sheets.",
     `notes/           Each note as a Markdown file (${counts.notes}).`,
-    `attachments/     Files attached to tasks, one folder per task (${counts.files}).`,
+    `attachments/     Files attached to tasks, one folder per task (${counts.files}),`,
+    "                 tasks in Recently Deleted included.",
     "",
     "Events imported from Google or Apple Calendar are included in data.json and",
     "tasks.csv; they are marked with the calendar they came from.",
@@ -213,7 +214,7 @@ function readme(folder, { exportedAt, counts, missingFiles }) {
 export async function buildExport(db, config, { appId, user, now = new Date() }) {
   /** @param {string} entityName @returns {any[]} */
   const list = (entityName) =>
-    listEntityRecords(db, { entityName, appId, user, sort: "created_date", limit: undefined, fields: undefined, query: null });
+    listEntityRecords(db, { entityName, appId, user, sort: "created_date", limit: undefined, fields: undefined, query: null, config });
   const tasks = list("Task");
   const notes = list("Note");
   const priorities = list("Priority");
@@ -225,7 +226,9 @@ export async function buildExport(db, config, { appId, user, now = new Date() })
   const folder = `zephyrly-export-${stamp}`;
   const exportedAt = now.toISOString();
 
-  // Attachments: one folder per task, named after it.
+  // Attachments: one folder per task, named after it. Files held for a
+  // task in Recently Deleted are included — they're still the person's,
+  // and a restore puts them back with it.
   const root = attachmentsRoot(config);
   const attachmentRows = db
     .prepare(
@@ -236,7 +239,12 @@ export async function buildExport(db, config, { appId, user, now = new Date() })
   // Live titles win over a trashed copy's.
   /** @type {Map<string, string>} */
   const titleOfTask = new Map();
-  for (const t of deletedTasks) titleOfTask.set(t.task_id, t.title);
+  for (const t of deletedTasks) {
+    for (const subtask of Array.isArray(t.subtasks) ? t.subtasks : []) {
+      if (subtask?.id) titleOfTask.set(subtask.id, subtask.title);
+    }
+    titleOfTask.set(t.task_id, t.title);
+  }
   for (const t of tasks) titleOfTask.set(t.id, t.title);
   const folderNamer = uniqueNamer();
   /** @type {Map<string, { dir: string, name: (base: string, ext?: string) => string }>} */

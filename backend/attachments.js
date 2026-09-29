@@ -16,10 +16,28 @@
  * HEIC bytes — chip + lightbox will still render the file-icon
  * fallback but the image won't preview in non-Safari browsers.
  *
- * Cascades (handled by callers):
- *   - Permanent task delete → deleteAttachmentsForTask
- *   - Soft delete (Recently Deleted window) → no cascade; on restore
- *     the attachments are still there because the task_id row persists.
+ * When a task is deleted (store.js deleteEntityRecord), its files and
+ * its subtasks' files go one of two ways:
+ *   - Into Recently Deleted with it (the app's delete, an AI app's
+ *     delete_task): the files are HELD. The rows stay, with
+ *     task_deleted_at set and task_id still the deleted task's id; the
+ *     bytes stay on disk and still count toward storage; no live task
+ *     lists them. Then:
+ *       · restoring the task — a Task create naming it in
+ *         restores_task_id — moves them onto the restored task
+ *         (releaseHeldAttachments);
+ *       · deleting it from Recently Deleted for good, or its time there
+ *         running out, removes them (purgeHeldAttachments);
+ *       · held files no Recently Deleted item stands for (a subtask
+ *         deleted on its own, whose Undo can still bring them back) are
+ *         removed once they've been held for the retention window
+ *         (purgeStaleHeldAttachments).
+ *   - Gone for good (calendar sync removing an event, an AI app's
+ *     Undo): deleteAttachmentsForTasks, at once.
+ *
+ * Purges go by the held marker, never by task id alone: a restore from
+ * an export can bring a task back under its old id, and whatever files
+ * it has then are a live task's.
  */
 import fs, { promises as fsp, createReadStream } from "node:fs";
 import sharp from "sharp";
@@ -28,12 +46,12 @@ import { dirname, join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { HttpError } from "./http.js";
 
-// @types/node in this repo doesn't expose `unlinkSync`/`rmSync` from
+// @types/node in this repo doesn't expose `unlinkSync`/`rmdirSync` from
 // the default export; pull them off the namespace via an `any` cast.
 /** @type {any} */
 const fsAny = fs;
 const unlinkSyncSafe = /** @type {(path: string) => void} */ (fsAny.unlinkSync);
-const rmSyncSafe = /** @type {(path: string, opts: any) => void} */ (fsAny.rmSync);
+const rmdirSyncSafe = /** @type {(path: string) => void} */ (fsAny.rmdirSync);
 
 // ─ Limits — single source of truth. SI units (10^6 / 10^9) so the
 //   numbers match what users mean by "MB" / "GB". The StorageSection
@@ -269,13 +287,20 @@ export function getUserStorageBytes(db, { appId, userId }) {
 }
 
 /**
+ * The files on a live task — or, with `heldFor`, the ones held for that
+ * person's deleted task.
+ *
  * @param {any} db
- * @param {{ appId: string, taskId: string }} scope
+ * @param {{ appId: string, taskId: string, heldFor?: string }} scope
  */
-function countAttachmentsForTask(db, { appId, taskId }) {
-  const row = db
-    .prepare(`SELECT COUNT(*) AS n FROM task_attachments WHERE app_id = ? AND task_id = ?`)
-    .get(appId, taskId);
+function countAttachmentsForTask(db, { appId, taskId, heldFor = "" }) {
+  const row = heldFor
+    ? db
+        .prepare(`SELECT COUNT(*) AS n FROM task_attachments WHERE app_id = ? AND task_id = ? AND user_id = ? AND task_deleted_at IS NOT NULL`)
+        .get(appId, taskId, heldFor)
+    : db
+        .prepare(`SELECT COUNT(*) AS n FROM task_attachments WHERE app_id = ? AND task_id = ? AND task_deleted_at IS NULL`)
+        .get(appId, taskId);
   return Number(row?.n || 0);
 }
 
@@ -339,7 +364,7 @@ export function listAttachmentsForTask(db, { appId, user, taskId }) {
   const rows = db
     .prepare(
       `SELECT * FROM task_attachments
-       WHERE app_id = ? AND task_id = ?
+       WHERE app_id = ? AND task_id = ? AND task_deleted_at IS NULL
        ORDER BY created_date ASC`
     )
     .all(appId, taskId);
@@ -374,11 +399,22 @@ export function getAttachment(db, config, { appId, user, id, thumb = false }) {
 }
 
 /**
+ * Store a file on a task. With `taskDeletedAt`, the task is one in
+ * Recently Deleted (a restore from an export bringing back its files):
+ * the file is stored held for it, as though it had been there when the
+ * task was deleted.
+ *
  * @param {any} db
  * @param {any} config
- * @param {{ appId: string, user: any, taskId: string, file: { filename: string, mimeType: string, data: Buffer } }} args
+ * @param {{
+ *   appId: string,
+ *   user: any,
+ *   taskId: string,
+ *   file: { filename: string, mimeType: string, data: Buffer },
+ *   taskDeletedAt?: string | null,
+ * }} args
  */
-export async function createAttachment(db, config, { appId, user, taskId, file: rawFile }) {
+export async function createAttachment(db, config, { appId, user, taskId, file: rawFile, taskDeletedAt = null }) {
   if (!rawFile || !rawFile.data || rawFile.data.length === 0) {
     throw new HttpError(400, "No file uploaded.", "no_file");
   }
@@ -397,9 +433,9 @@ export async function createAttachment(db, config, { appId, user, taskId, file: 
     throw new HttpError(413, `File too large (max ${Math.round(MAX_FILE_BYTES / 1_000_000)} MB).`, "file_too_large");
   }
 
-  assertTaskOwnership(db, { appId, taskId, userId: user.id });
+  if (!taskDeletedAt) assertTaskOwnership(db, { appId, taskId, userId: user.id });
 
-  const existingCount = countAttachmentsForTask(db, { appId, taskId });
+  const existingCount = countAttachmentsForTask(db, { appId, taskId, heldFor: taskDeletedAt ? user.id : "" });
   if (existingCount >= MAX_ATTACHMENTS_PER_TASK) {
     throw new HttpError(
       400,
@@ -441,11 +477,20 @@ export async function createAttachment(db, config, { appId, user, taskId, file: 
   db.prepare(
     `INSERT INTO task_attachments (
        id, app_id, user_id, task_id, filename, mime_type, size_bytes,
-       storage_path, thumb_path, is_image, width, height, created_date
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)`
-  ).run(id, appId, user.id, taskId, file.filename, file.mimeType, size, relPath, thumbRelPath, isImage, now);
+       storage_path, thumb_path, is_image, width, height, created_date, task_deleted_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?)`
+  ).run(id, appId, user.id, taskId, file.filename, file.mimeType, size, relPath, thumbRelPath, isImage, now, taskDeletedAt);
 
-  refreshTaskAttachmentCount(db, config, { appId, taskId });
+  if (!taskDeletedAt) {
+    // The task can be deleted while its file is still being written. Then
+    // the file is held with it, like the files it already had, rather than
+    // left on a task that's gone.
+    if (db.prepare(`SELECT 1 FROM tasks WHERE app_id = ? AND id = ?`).get(appId, taskId)) {
+      refreshTaskAttachmentCount(db, config, { appId, taskId });
+    } else {
+      db.prepare(`UPDATE task_attachments SET task_deleted_at = ? WHERE id = ?`).run(now, id);
+    }
+  }
 
   const row = db.prepare(`SELECT * FROM task_attachments WHERE id = ?`).get(id);
   return serializeAttachment(row);
@@ -481,27 +526,86 @@ export async function deleteAttachment(db, config, { appId, user, id }) {
   return { success: true };
 }
 
+/** @param {unknown[]} ids */
+const placeholders = (ids) => ids.map(() => "?").join(", ");
+
 /**
- * Cascade. Called from `deleteEntityRecord` (synchronous) when a Task
- * is permanently deleted — NOT when it's soft-deleted to Recently
- * Deleted, since the row needs to survive the 7-day undo window.
+ * Every task a Recently Deleted record stands for: the task itself and
+ * the subtasks that went with it. Takes the API's shape (`subtasks`) or a
+ * raw row (`subtasks_json`).
  *
- * Synchronous file unlinks: the caller is sync, and we want the files
- * to actually be gone by the time we return (otherwise rapid
- * create-then-delete cycles can leak disk). Each unlink is a fast
- * syscall; for the typical case of ≤10 attachments per task the total
- * blocking time is negligible.
+ * @param {{ task_id?: unknown, subtasks?: unknown, subtasks_json?: unknown }} record
+ * @returns {string[]}
+ */
+export function taskIdsOfDeletedTask(record) {
+  let subtasks = record.subtasks;
+  if (subtasks === undefined && typeof record.subtasks_json === "string") {
+    try {
+      subtasks = JSON.parse(record.subtasks_json);
+    } catch {
+      subtasks = [];
+    }
+  }
+  const ids = [record.task_id, ...(Array.isArray(subtasks) ? subtasks.map((subtask) => subtask?.id) : [])];
+  return [...new Set(ids.filter((id) => typeof id === "string" && id))];
+}
+
+/**
+ * The person's user id, from an owner that may only carry an email (a
+ * Recently Deleted record made by the Base44 import).
+ *
+ * @param {any} db
+ * @param {string} appId
+ * @param {{ id?: string, email?: string }} owner
+ */
+function ownerUserId(db, appId, owner) {
+  if (owner.id) return owner.id;
+  if (!owner.email) return "";
+  const row = db.prepare(`SELECT id FROM users WHERE app_id = ? AND LOWER(email) = ?`).get(appId, String(owner.email).toLowerCase());
+  return row ? String(row.id) : "";
+}
+
+/**
+ * What the person has in Recently Deleted, by task id: each task and
+ * subtask id maps to the item it went in with.
+ *
+ * @param {any} db
+ * @param {{ appId: string, owner: { id?: string, email?: string } }} args
+ * @returns {Map<string, { id: string, task_id: string, title: string }>}
+ */
+function recentlyDeletedTasks(db, { appId, owner }) {
+  const rows = db
+    .prepare(
+      `SELECT id, task_id, title, subtasks_json FROM deleted_tasks
+       WHERE app_id = ? AND ((created_by_id = ? AND created_by_id != '') OR LOWER(created_by) = ?)`
+    )
+    .all(appId, owner.id || "", owner.email ? String(owner.email).toLowerCase() : null);
+  /** @type {Map<string, { id: string, task_id: string, title: string }>} */
+  const items = new Map();
+  for (const row of rows) {
+    for (const taskId of taskIdsOfDeletedTask(row)) items.set(taskId, row);
+  }
+  return items;
+}
+
+const FILE_COLUMNS = "id, storage_path, thumb_path";
+
+/**
+ * Remove files for good: unlink the bytes, then delete the rows.
+ * Synchronous, like its callers, so the files are gone when they return
+ * (otherwise rapid create-then-delete cycles can leak disk). Folders left
+ * empty go too — never recursively: a file restored onto another task
+ * keeps its path, so one task's folder can hold another task's files.
  *
  * @param {any} db
  * @param {any} config
- * @param {{ appId: string, taskId: string }} args
+ * @param {{ id: string, storage_path: string, thumb_path: string | null }[]} rows
  */
-export function deleteAttachmentsForTask(db, config, { appId, taskId }) {
-  const rows = db
-    .prepare(`SELECT id, storage_path, thumb_path FROM task_attachments WHERE app_id = ? AND task_id = ?`)
-    .all(appId, taskId);
-  if (rows.length === 0) return;
+function removeAttachmentRows(db, config, rows) {
+  if (!rows.length) return;
   const root = attachmentsRoot(config);
+  const folders = new Set();
+  const deleteRow = db.prepare(`DELETE FROM task_attachments WHERE id = ?`);
   for (const row of rows) {
     for (const relPath of [row.storage_path, row.thumb_path]) {
       if (!relPath) continue;
@@ -510,56 +614,176 @@ export function deleteAttachmentsForTask(db, config, { appId, taskId }) {
       try {
         unlinkSyncSafe(abs);
       } catch {
-        // Missing file is fine — the row is still removed below.
+        // Missing file is fine — the row is still removed.
       }
+      folders.add(dirname(abs));
+    }
+    deleteRow.run(row.id);
+  }
+  for (const folder of folders) {
+    try {
+      rmdirSyncSafe(folder);
+    } catch {
+      // Not empty, or already gone.
     }
   }
-  db.prepare(`DELETE FROM task_attachments WHERE app_id = ? AND task_id = ?`).run(appId, taskId);
-  // Also try to remove the now-empty per-task directory.
-  if (rows.length) {
-    const taskDir = dirname(resolve(root, rows[0].storage_path));
-    try {
-      rmSyncSafe(taskDir, { recursive: true, force: true });
-    } catch {
-      // Ignore — directory might already be gone or non-empty
-    }
+}
+
+/**
+ * Tasks going into Recently Deleted — a task and its subtasks: hold
+ * their files.
+ *
+ * @param {any} db
+ * @param {{ appId: string, taskIds: string[] }} args
+ */
+export function holdAttachmentsForTasks(db, { appId, taskIds }) {
+  if (!taskIds.length) return;
+  db.prepare(
+    `UPDATE task_attachments SET task_deleted_at = ?
+     WHERE app_id = ? AND task_deleted_at IS NULL AND task_id IN (${placeholders(taskIds)})`
+  ).run(new Date().toISOString(), appId, ...taskIds);
+}
+
+/**
+ * A task has come back — restored from Recently Deleted as a new task
+ * naming the one it restores, or under its old id by a restore from an
+ * export — and the files held for it move onto it. Only the person's
+ * own files move.
+ *
+ * @param {any} db
+ * @param {{ appId: string, userId: string, fromTaskIds: string[], toTaskId: string }} args
+ * @returns {number} how many files the task has now; 0 when none came back
+ */
+export function releaseHeldAttachments(db, { appId, userId, fromTaskIds, toTaskId }) {
+  const ids = [...new Set(fromTaskIds.filter(Boolean))];
+  if (!ids.length || !userId) return 0;
+  const { changes } = db
+    .prepare(
+      `UPDATE task_attachments SET task_id = ?, task_deleted_at = NULL
+       WHERE app_id = ? AND user_id = ? AND task_deleted_at IS NOT NULL AND task_id IN (${placeholders(ids)})`
+    )
+    .run(toTaskId, appId, userId, ...ids);
+  if (!Number(changes)) return 0;
+  refreshTaskAttachmentCount(db, null, { appId, taskId: toTaskId });
+  return countAttachmentsForTask(db, { appId, taskId: toTaskId });
+}
+
+/**
+ * Tasks deleted for good, not into Recently Deleted (calendar sync, an
+ * AI app's Undo): their files go at once.
+ *
+ * @param {any} db
+ * @param {any} config
+ * @param {{ appId: string, taskIds: string[] }} args
+ */
+export function deleteAttachmentsForTasks(db, config, { appId, taskIds }) {
+  if (!taskIds.length) return;
+  const rows = db
+    .prepare(`SELECT ${FILE_COLUMNS} FROM task_attachments WHERE app_id = ? AND task_id IN (${placeholders(taskIds)})`)
+    .all(appId, ...taskIds);
+  removeAttachmentRows(db, config, rows);
+}
+
+/**
+ * These tasks have left the person's Recently Deleted: deleted from there
+ * for good, run out of time, or restored (and then nothing is held for
+ * them any more). Whatever is still held for them goes — unless another
+ * item in Recently Deleted stands for the same task.
+ *
+ * @param {any} db
+ * @param {any} config
+ * @param {{ appId: string, owner: { id?: string, email?: string }, taskIds: string[] }} args
+ */
+export function purgeHeldAttachments(db, config, { appId, owner, taskIds }) {
+  const userId = ownerUserId(db, appId, owner);
+  if (!userId || !taskIds.length) return;
+  const stillThere = recentlyDeletedTasks(db, { appId, owner });
+  const ids = taskIds.filter((id) => !stillThere.has(id));
+  if (!ids.length) return;
+  const rows = db
+    .prepare(
+      `SELECT ${FILE_COLUMNS} FROM task_attachments
+       WHERE app_id = ? AND user_id = ? AND task_deleted_at IS NOT NULL AND task_id IN (${placeholders(ids)})`
+    )
+    .all(appId, userId, ...ids);
+  removeAttachmentRows(db, config, rows);
+}
+
+/**
+ * Held files no Recently Deleted item stands for — a subtask deleted on
+ * its own (its Undo can still bring them back), or a delete whose
+ * Recently Deleted record never arrived — are kept as long as an item
+ * would have been, then removed.
+ *
+ * @param {any} db
+ * @param {any} config
+ * @param {{ appId: string, heldBefore: string }} args
+ */
+export function purgeStaleHeldAttachments(db, config, { appId, heldBefore }) {
+  const rows = db
+    .prepare(
+      `SELECT a.id, a.storage_path, a.thumb_path, a.task_id, a.user_id, u.email
+       FROM task_attachments a
+       LEFT JOIN users u ON u.id = a.user_id AND u.app_id = a.app_id
+       WHERE a.app_id = ? AND a.task_deleted_at IS NOT NULL AND a.task_deleted_at <= ?`
+    )
+    .all(appId, heldBefore);
+  /** @type {Map<string, any[]>} */
+  const byOwner = new Map();
+  for (const row of rows) byOwner.set(row.user_id, [...(byOwner.get(row.user_id) || []), row]);
+  for (const [userId, owned] of byOwner) {
+    const inRecentlyDeleted = recentlyDeletedTasks(db, { appId, owner: { id: userId, email: owned[0].email || "" } });
+    removeAttachmentRows(db, config, owned.filter((row) => !inRecentlyDeleted.has(row.task_id)));
   }
 }
 
 /**
  * Aggregate storage stats for the user — total bytes used plus the
  * top-N tasks by total attachment size. Drives the Settings → Storage
- * sub-page.
+ * sub-page. Files held for Recently Deleted count as well, each item's
+ * as one line (its subtasks' files included) under the title it has
+ * there.
  *
  * @param {any} db
  * @param {{ appId: string, user: any, limit?: number }} args
  */
 export function getStorageOverview(db, { appId, user, limit = 10 }) {
   const usedBytes = getUserStorageBytes(db, { appId, userId: user.id });
-  const biggest = db
+  const groups = db
     .prepare(
       `SELECT
          a.task_id,
+         a.task_deleted_at IS NOT NULL AS held,
          t.title AS task_title,
          SUM(a.size_bytes) AS total_bytes,
          COUNT(*) AS file_count
        FROM task_attachments a
        LEFT JOIN tasks t ON t.id = a.task_id AND t.app_id = a.app_id
        WHERE a.app_id = ? AND a.user_id = ?
-       GROUP BY a.task_id
-       ORDER BY total_bytes DESC
-       LIMIT ?`
+       GROUP BY a.task_id, held`
     )
-    .all(appId, user.id, limit);
+    .all(appId, user.id);
+  const inRecentlyDeleted = recentlyDeletedTasks(db, { appId, owner: user });
+  /** @type {Map<string, { task_id: string, task_title: string, total_bytes: number, file_count: number, in_recently_deleted: boolean }>} */
+  const lines = new Map();
+  for (const group of groups) {
+    const item = group.held ? inRecentlyDeleted.get(group.task_id) : undefined;
+    const key = item ? `deleted:${item.id}` : `${group.held ? "held" : "task"}:${group.task_id}`;
+    const line = lines.get(key) || {
+      task_id: item ? item.task_id : group.task_id,
+      task_title: (item ? item.title : group.task_title) || "(deleted task)",
+      total_bytes: 0,
+      file_count: 0,
+      in_recently_deleted: Boolean(item),
+    };
+    line.total_bytes += Number(group.total_bytes || 0);
+    line.file_count += Number(group.file_count || 0);
+    lines.set(key, line);
+  }
   return {
     used_bytes: usedBytes,
     max_bytes: MAX_TOTAL_BYTES_PER_USER,
-    biggest_tasks: biggest.map((b) => ({
-      task_id: b.task_id,
-      task_title: b.task_title || "(deleted task)",
-      total_bytes: Number(b.total_bytes || 0),
-      file_count: Number(b.file_count || 0),
-    })),
+    biggest_tasks: [...lines.values()].sort((a, b) => b.total_bytes - a.total_bytes).slice(0, limit),
   };
 }
 
@@ -567,7 +791,8 @@ export function getStorageOverview(db, { appId, user, limit = 10 }) {
  * Search the user's attachments by filename (case-insensitive
  * substring). Returns the same serialized shape as listAttachmentsForTask
  * plus the parent task's title for display. Scoped to the user — never
- * leaks another user's files.
+ * leaks another user's files. Files held for Recently Deleted aren't
+ * listed: there's no task to open them on until it's restored.
  *
  * @param {any} db
  * @param {{ appId: string, user: any, q: string, limit?: number }} args
@@ -582,7 +807,7 @@ export function searchAttachments(db, { appId, user, q, limit = 50 }) {
           `SELECT a.*, t.title AS task_title
            FROM task_attachments a
            LEFT JOIN tasks t ON t.id = a.task_id AND t.app_id = a.app_id
-           WHERE a.app_id = ? AND a.user_id = ?
+           WHERE a.app_id = ? AND a.user_id = ? AND a.task_deleted_at IS NULL
              AND LOWER(a.filename) LIKE LOWER(?) ESCAPE '\\'
            ORDER BY a.created_date DESC
            LIMIT ?`
@@ -593,7 +818,7 @@ export function searchAttachments(db, { appId, user, q, limit = 50 }) {
           `SELECT a.*, t.title AS task_title
            FROM task_attachments a
            LEFT JOIN tasks t ON t.id = a.task_id AND t.app_id = a.app_id
-           WHERE a.app_id = ? AND a.user_id = ?
+           WHERE a.app_id = ? AND a.user_id = ? AND a.task_deleted_at IS NULL
            ORDER BY a.created_date DESC
            LIMIT ?`
         )

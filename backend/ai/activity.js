@@ -113,12 +113,29 @@ export function undoActivity(db, config, { appId, user, activityId }) {
     }
   };
 
+  /**
+   * Undoing an addition deletes the task for good, so files the person has
+   * attached to it (or its subtasks) since would go with it: that counts as
+   * a change too.
+   * @param {any} record
+   */
+  const noFilesSince = (record) => {
+    const ids = [record.id, ...db.prepare(`SELECT id FROM tasks WHERE app_id = ? AND parent_id = ?`).all(appId, record.id).map((/** @type {any} */ r) => r.id)];
+    const files = db
+      .prepare(`SELECT COUNT(*) AS n FROM task_attachments WHERE app_id = ? AND task_id IN (${ids.map(() => "?").join(", ")})`)
+      .get(appId, ...ids);
+    if (Number(files?.n || 0) > 0) {
+      throw new HttpError(409, `"${record.title || "It"}" has had files attached since, so this can't be undone automatically.`, "changed_since");
+    }
+  };
+
   withTransaction(db, () => {
     if (undo.kind === "create_task") {
       const task = current("Task", undo.task_id);
       if (task) {
         unchangedSince(task, undo.updated_date);
-        deleteEntityRecord(db, { entityName: "Task", ...scope, id: task.id });
+        noFilesSince(task);
+        deleteEntityRecord(db, { entityName: "Task", ...scope, id: task.id, config });
         pushes.push({ op: "delete", taskSnapshot: task });
       }
     } else if (undo.kind === "update_task") {
@@ -133,12 +150,15 @@ export function undoActivity(db, config, { appId, user, activityId }) {
       const subtasks = undo.subtasks.map((/** @type {any} */ s) => ({ ...s, record: current("Task", s.id) })).filter((/** @type {any} */ s) => s.record);
       for (const s of subtasks) unchangedSince(s.record, s.updated_date);
       const snapshot = current("Task", undo.snapshot_id);
-      if (snapshot) unchangedSince(snapshot, undo.snapshot_updated_date);
+      if (snapshot) {
+        unchangedSince(snapshot, undo.snapshot_updated_date);
+        noFilesSince(snapshot);
+      }
 
       if (snapshot) {
         const copies = undo.copy_ids.map((/** @type {string} */ id) => current("Task", id)).filter(Boolean);
         // Deleting the snapshot takes its subtask copies with it.
-        deleteEntityRecord(db, { entityName: "Task", ...scope, id: snapshot.id });
+        deleteEntityRecord(db, { entityName: "Task", ...scope, id: snapshot.id, config });
         for (const record of [snapshot, ...copies]) pushes.push({ op: "delete", taskSnapshot: record });
       }
       pushes.push({ op: "upsert", taskSnapshot: updateEntityRecord(db, { entityName: "Task", ...scope, id: series.id, input: undo.before }) });
@@ -149,7 +169,7 @@ export function undoActivity(db, config, { appId, user, activityId }) {
       const note = current("Note", undo.note_id);
       if (note) {
         unchangedSince(note, undo.updated_date);
-        deleteEntityRecord(db, { entityName: "Note", ...scope, id: note.id });
+        deleteEntityRecord(db, { entityName: "Note", ...scope, id: note.id, config });
       }
     } else {
       throw new HttpError(400, "That change can't be undone from here.", "not_undoable");
