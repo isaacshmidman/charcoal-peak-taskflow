@@ -19,6 +19,7 @@ import { promises as fsp } from "node:fs";
 import { resolve } from "node:path";
 import { listEntityRecords } from "./store.js";
 import { attachmentsRoot } from "./attachments.js";
+import { activeSchedule, formatRange } from "./lib/schedule.js";
 
 export const EXPORT_FORMAT = "zephyrly-export";
 export const EXPORT_VERSION = 1;
@@ -326,9 +327,13 @@ export async function buildExport(db, config, { appId, user, now = new Date() })
   const noteEntries = notes.map((note) => {
     const title = String(note.title || "").trim();
     const body = String(note.content_text || "").trim();
+    // A note showing as a schedule is its schedule, slot by slot.
+    const schedule = activeSchedule(note);
+    const slots = schedule ? schedule.slots.map((slot) => `- ${formatRange(slot)}${slot.text.trim() ? `: ${slot.text.trim()}` : ""}`).join("\n") : "";
+    const text = [slots, body].filter(Boolean).join("\n\n");
     return {
       name: `${folder}/notes/${noteNamer(safeFileName(title, "Untitled note"), ".md")}`,
-      data: `${title ? `# ${title}\n\n` : ""}${body}\n`,
+      data: `${title ? `# ${title}\n\n` : ""}${text}\n`,
       date: new Date(note.updated_date || note.created_date || now),
     };
   });

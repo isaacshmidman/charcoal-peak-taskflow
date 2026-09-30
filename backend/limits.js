@@ -34,6 +34,8 @@ export const FIELD_MAX_CHARS = {
   content_text: 200_000,
   description_json: 2_000_000,
   content_json: 2_000_000,
+  // A note's schedule: up to a slot a minute, 1,000 characters each.
+  schedule_json: 500_000,
   // Recurring events carry every exception date in their RRULE/EXDATE.
   source_recurrence_rule: 100_000,
 };

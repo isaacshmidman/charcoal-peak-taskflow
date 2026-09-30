@@ -12,6 +12,7 @@ import { readZip } from "./test-support/readZip.js";
 import { createRequestHandler } from "./server.js";
 import { resetRateLimits } from "./ai/rate-limit.js";
 import { allTools } from "./ai/tools.js";
+import { changeEnd, newSchedule } from "./lib/schedule.js";
 
 let tempDir = "";
 let db;
@@ -430,6 +431,46 @@ describe("registry entities: Note", () => {
   });
 });
 
+describe("a note's schedule", () => {
+  it("round-trips, and a broken one is refused rather than stored", async () => {
+    const token = await login("schedule@example.com");
+    const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+    const created = await invoke("/api/apps/test-app/entities/Note", { method: "POST", headers, body: { title: "Saturday" } });
+    expect(created.body.schedule_json).toBe("");
+
+    const schedule = changeEnd(newSchedule(), 7, 450).schedule;
+    const saved = await invoke(`/api/apps/test-app/entities/Note/${created.body.id}`, {
+      method: "PUT",
+      headers,
+      body: { schedule_json: JSON.stringify(schedule) },
+    });
+    expect(saved.statusCode).toBe(200);
+    expect(JSON.parse(saved.body.schedule_json)).toEqual(schedule);
+
+    const overlapping = { ...schedule, slots: schedule.slots.map((slot, i) => (i === 3 ? { ...slot, start: slot.start - 5 } : slot)) };
+    for (const [body, message] of [
+      [{ schedule_json: JSON.stringify(overlapping) }, "schedule_json has slots that overlap or leave gaps."],
+      [{ schedule_json: "{not json" }, "schedule_json isn't a schedule."],
+      [{ schedule_json: JSON.stringify({ ...schedule, gap: -5 }) }, "schedule_json has a gap that isn't 0–240 minutes."],
+    ]) {
+      const refused = await invoke(`/api/apps/test-app/entities/Note/${created.body.id}`, { method: "PUT", headers, body });
+      expect(refused.statusCode).toBe(400);
+      expect(refused.body.message).toBe(message);
+    }
+    const stored = await invoke(`/api/apps/test-app/entities/Note/${created.body.id}`, { headers });
+    expect(JSON.parse(stored.body.schedule_json)).toEqual(schedule);
+
+    // Recently Deleted keeps it too.
+    const trashed = await invoke("/api/apps/test-app/entities/DeletedNote", {
+      method: "POST",
+      headers,
+      body: { note_id: created.body.id, title: "Saturday", schedule_json: JSON.stringify(schedule) },
+    });
+    expect(trashed.statusCode).toBe(201);
+    expect(JSON.parse(trashed.body.schedule_json)).toEqual(schedule);
+  });
+});
+
 describe("registry entities: DeletedNote", () => {
   it("supports CRUD, defaults expiry from retention, and purges expired records lazily", async () => {
     const token = await login("isaac@example.com");
@@ -620,6 +661,9 @@ describe("data export", () => {
     });
     await post("Task", { title: "Pack bags", parent_id: trip.id, due_date: "2026-09-30" });
     await post("Note", { title: "Plans/2026", content_text: "Line one\nLine two" });
+    const day = newSchedule({ start: 7 * 60, end: 9 * 60 });
+    day.slots[0].text = "Breakfast";
+    await post("Note", { title: "Saturday", content_text: "Hidden while it's a schedule", schedule_json: JSON.stringify(day) });
     await post("DeletedNote", { note_id: "note_old", title: "Old idea", content_text: "gone" });
     await post("Task", { title: "Not yours", due_date: "2026-10-01" }, other);
 
@@ -662,7 +706,7 @@ describe("data export", () => {
     expect(data.format).toBe("zephyrly-export");
     expect(data.account.email).toBe("exporter@example.com");
     expect(data.tasks.map((t) => t.title).sort()).toEqual(["Pack bags", 'Trip, "big" one']);
-    expect(data.notes.map((n) => n.title)).toEqual(["Plans/2026"]);
+    expect(data.notes.map((n) => n.title).sort()).toEqual(["Plans/2026", "Saturday"]);
     expect(data.recently_deleted.notes.map((n) => n.title)).toEqual(["Old idea"]);
     expect(data.priorities.length).toBeGreaterThan(0);
     expect(data.calendar_connections).toEqual([
@@ -685,6 +729,10 @@ describe("data export", () => {
 
     // Notes as Markdown, with a filename that can't escape its folder.
     expect(at("notes/Plans 2026.md")?.toString()).toBe("# Plans/2026\n\nLine one\nLine two\n");
+    // A schedule note is its slots, then any text it keeps underneath.
+    expect(at("notes/Saturday.md")?.toString()).toBe(
+      "# Saturday\n\n- 7:00 AM – 8:00 AM: Breakfast\n- 8:00 AM – 9:00 AM\n\nHidden while it's a schedule\n"
+    );
 
     // CSV: quoted properly, with the planted formula defused.
     const csv = at("tasks.csv").toString();
@@ -741,6 +789,8 @@ describe("restore from an export", () => {
       content: [{ type: "paragraph", content: [{ type: "text", text: "Call the plumber", marks: [{ type: "taskLink", attrs: { taskId } }] }] }],
     });
 
+  const tripDay = JSON.stringify(changeEnd(newSchedule(), 7, 450).schedule);
+
   /** Account A: a bit of everything. */
   async function seedSource(email) {
     const a = await login(email);
@@ -753,7 +803,9 @@ describe("restore from an export", () => {
       reminder: "before:60", priority_id: someday.id, tags: ["home"], status: "todo",
     });
     await as("POST", "/entities/Task", { title: "Book flights", parent_id: trip.id, due_date: "2026-09-30" });
-    await as("POST", "/entities/Note", { title: "Trip notes", content_text: "Call the plumber", content_json: linkDoc(trip.id), priority_id: someday.id });
+    await as("POST", "/entities/Note", {
+      title: "Trip notes", content_text: "Call the plumber", content_json: linkDoc(trip.id), priority_id: someday.id, schedule_json: tripDay,
+    });
     await as("POST", "/entities/DeletedTask", { task_id: "task_gone", title: "Old errand", due_date: "2026-09-01" });
     await as("POST", "/entities/DeletedNote", { note_id: "note_gone", title: "Old idea", content_text: "gone" });
     // From a connected calendar: sync brings these back, so restore skips them.
@@ -809,6 +861,7 @@ describe("restore from an export", () => {
     expect(note.content_json).toContain(restoredTrip.id);
     expect(note.content_json).not.toContain(trip.id);
     expect(note.priority_id).toBe(someday.id);
+    expect(note.schedule_json).toBe(tripDay);
 
     expect((await bs("GET", "/entities/DeletedTask")).map((t) => t.title)).toEqual(["Old errand"]);
     expect((await bs("GET", "/entities/DeletedNote")).map((n) => n.title)).toEqual(["Old idea"]);

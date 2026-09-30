@@ -209,6 +209,7 @@ export function createDatabase(config = backendConfig) {
       title TEXT NOT NULL DEFAULT '',
       content_json TEXT NOT NULL DEFAULT '',
       content_text TEXT NOT NULL DEFAULT '',
+      schedule_json TEXT NOT NULL DEFAULT '',
       tags_json TEXT,
       priority_id TEXT,
       pinned INTEGER NOT NULL DEFAULT 0,
@@ -227,6 +228,7 @@ export function createDatabase(config = backendConfig) {
       title TEXT NOT NULL DEFAULT '',
       content_json TEXT NOT NULL DEFAULT '',
       content_text TEXT NOT NULL DEFAULT '',
+      schedule_json TEXT NOT NULL DEFAULT '',
       pinned INTEGER NOT NULL DEFAULT 0,
       tags_json TEXT NOT NULL DEFAULT '[]',
       priority_id TEXT NOT NULL DEFAULT '',
@@ -512,6 +514,14 @@ export function createDatabase(config = backendConfig) {
     db.exec(`ALTER TABLE notes ADD COLUMN priority_id TEXT`);
   } catch {
     // Column already exists — ignore
+  }
+  // A note can be a schedule (backend/lib/schedule.js); '' = never was.
+  for (const table of ["notes", "deleted_notes"]) {
+    try {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN schedule_json TEXT NOT NULL DEFAULT ''`);
+    } catch {
+      // Column already exists — ignore
+    }
   }
 
   // Backfill: for any (app_id, user_id) that has active integrations but no

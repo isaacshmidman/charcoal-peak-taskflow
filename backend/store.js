@@ -11,6 +11,7 @@ import {
   taskIdsOfDeletedTask,
 } from "./attachments.js";
 import { ARRAY_LIMITS, DEFAULT_FIELD_MAX_CHARS, FIELD_MAX_CHARS } from "./limits.js";
+import { scheduleProblem } from "./lib/schedule.js";
 
 const ENTITY_DEFINITIONS = {
   Task: {
@@ -164,12 +165,13 @@ const ENTITY_DEFINITIONS = {
       title: "",
       content_json: "",
       content_text: "",
+      schedule_json: "",
       pinned: false,
       tags: [],
       priority_id: "",
       is_sample: false,
     },
-    mutableFields: ["note_id", "title", "content_json", "content_text", "pinned", "tags", "priority_id", "deleted_at", "expires_at", "is_sample"],
+    mutableFields: ["note_id", "title", "content_json", "content_text", "schedule_json", "pinned", "tags", "priority_id", "deleted_at", "expires_at", "is_sample"],
   },
   // Notes have no manual ordering: the Notes page groups by tag and orders
   // within each group by the sort panel (priority / created date / tag) with
@@ -185,12 +187,14 @@ const ENTITY_DEFINITIONS = {
       title: "",
       content_json: "",
       content_text: "",
+      // The note as a schedule (backend/lib/schedule.js), '' if it never was.
+      schedule_json: "",
       tags: [],
       priority_id: "",
       pinned: false,
       is_sample: false,
     },
-    mutableFields: ["title", "content_json", "content_text", "tags", "priority_id", "pinned", "is_sample"],
+    mutableFields: ["title", "content_json", "content_text", "schedule_json", "tags", "priority_id", "pinned", "is_sample"],
   },
 };
 
@@ -553,8 +557,26 @@ export function validateClientInput(entityName, input) {
       if (value.length > max) {
         throw new HttpError(400, `${field} is longer than ${max} characters.`, "field_too_long", { field });
       }
+      if (field === "schedule_json" && value) checkSchedule(value);
     }
   }
+}
+
+/**
+ * A note's schedule has to be sound — every page and AI tool that reads
+ * one relies on its slots never overlapping — so a broken one is refused
+ * rather than stored.
+ * @param {string} value
+ */
+function checkSchedule(value) {
+  let parsed;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw fieldError("schedule_json", "isn't a schedule");
+  }
+  const problem = scheduleProblem(parsed);
+  if (problem) throw fieldError("schedule_json", problem);
 }
 
 function buildInsertRow(entityName, input, { appId, user, config, allowSystemFields = false }) {
