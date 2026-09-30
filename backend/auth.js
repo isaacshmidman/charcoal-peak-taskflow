@@ -3,6 +3,7 @@ import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from
 import { HttpError } from "./http.js";
 import { ensureDefaultPrioritiesForUser, findUserByEmail } from "./store.js";
 import { getGoogleRedirectUrl } from "./config.js";
+import { log } from "./log.js";
 
 export function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
@@ -68,12 +69,35 @@ export function buildUserPayload(row) {
   };
 }
 
+/**
+ * The visitor's address, for rate limits and the signed-in devices list.
+ * Cloudflare (the tunnel in front of zephyrly.app) sets CF-Connecting-IP
+ * itself, replacing anything a visitor sent. X-Forwarded-For is never
+ * used: its first entry is whatever the visitor claims, so it let anyone
+ * pick their own address and step around a limit.
+ * @param {any} request  a node:http IncomingMessage
+ */
 export function getRequestIpAddress(request) {
-  const forwardedFor = request.headers["x-forwarded-for"];
-  if (typeof forwardedFor === "string" && forwardedFor) {
-    return forwardedFor.split(",")[0].trim();
+  const cloudflare = request.headers["cf-connecting-ip"];
+  if (typeof cloudflare === "string" && cloudflare.trim()) return cloudflare.trim();
+  return request.socket?.remoteAddress || "";
+}
+
+/**
+ * Whether sign-in with any password (a development convenience) may run:
+ * only when the app's own address is this machine. On a public server it
+ * would let anyone sign in as anyone, so there it's ignored even if
+ * TASKFLOW_ALLOW_ANY_PASSWORD is set.
+ * @param {{ allowAnyPassword?: boolean, publicAppUrl?: string }} config
+ */
+export function anyPasswordAllowed(config) {
+  if (!config.allowAnyPassword) return false;
+  try {
+    const { hostname } = new URL(String(config.publicAppUrl));
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]" || hostname.endsWith(".localhost");
+  } catch {
+    return false;
   }
-  return request.socket.remoteAddress || "";
 }
 
 export function clearSessionCookie(config) {
@@ -244,6 +268,11 @@ export function findOrCreateUserByEmail(
   }
 
   const existing = findUserByEmail(db, appId, normalizedEmail);
+  if (existing && googleSubject && existing.google_subject && existing.google_subject !== googleSubject) {
+    // The email belongs to an account already signed in with a different
+    // Google account. Linking this one would hand that account over.
+    throw new HttpError(403, "This email address is already linked to a different Google account.", "google_account_mismatch");
+  }
   if (existing) {
     db.prepare(
       `
@@ -326,7 +355,7 @@ export function loginWithEmailPassword(db, config, request, { appId, email, pass
     throw new HttpError(400, "Email and password are required.", "credentials_required");
   }
 
-  if (config.allowAnyPassword) {
+  if (anyPasswordAllowed(config)) {
     // Open-access dev mode: auto-create users, accept any password
     const user = findOrCreateUserByEmail(db, config, {
       appId,
@@ -435,9 +464,10 @@ export async function completeGoogleLogin(db, config, request, { state, code }) 
     }),
   });
 
+  // What Google said stays in the server log; the browser gets a plain line.
   if (!tokenResponse.ok) {
-    const errorBody = await tokenResponse.text();
-    throw new HttpError(502, `Google token exchange failed: ${errorBody}`, "google_token_failed");
+    log.warn(`[auth] Google token exchange failed (${tokenResponse.status}): ${(await tokenResponse.text()).slice(0, 500)}`);
+    throw new HttpError(502, "Google sign-in didn't complete. Please try again.", "google_sign_in_failed");
   }
 
   const tokenData = await tokenResponse.json();
@@ -448,11 +478,16 @@ export async function completeGoogleLogin(db, config, request, { state, code }) 
   });
 
   if (!userInfoResponse.ok) {
-    const errorBody = await userInfoResponse.text();
-    throw new HttpError(502, `Google profile lookup failed: ${errorBody}`, "google_profile_failed");
+    log.warn(`[auth] Google profile lookup failed (${userInfoResponse.status}): ${(await userInfoResponse.text()).slice(0, 500)}`);
+    throw new HttpError(502, "Google sign-in didn't complete. Please try again.", "google_sign_in_failed");
   }
 
   const userInfo = await userInfoResponse.json();
+  // Accounts are found by email, so an email Google hasn't confirmed
+  // belongs to this person could open someone else's account.
+  if (userInfo.email_verified !== true || !userInfo.email) {
+    throw new HttpError(403, "Google hasn't confirmed this email address, so it can't be used to sign in.", "google_email_unverified");
+  }
   const user = findOrCreateUserByEmail(db, config, {
     appId: stateRow.app_id,
     email: userInfo.email,

@@ -5,6 +5,15 @@ import { apiClient } from "@/api/apiClient";
 import { useAuth } from "@/lib/AuthContext";
 import { sanitizeNavRoute } from "@/lib/navigation";
 
+const SIGN_IN_ERRORS = {
+  google_not_configured: "Google sign-in isn't set up on this server yet.",
+  google_sign_in_failed: "Google sign-in didn't complete. Please try again.",
+  google_email_unverified: "Google hasn't confirmed this account's email address, so it can't be used to sign in.",
+  google_account_mismatch: "This email address is already linked to a different Google account. Sign in with that one.",
+  invalid_oauth_state: "That sign-in link has expired. Please try again.",
+  too_many_attempts: "Too many sign-in attempts. Wait a minute and try again.",
+};
+
 // Tracks which provider the user successfully signed in with last on this
 // device. Per-device only — not synced server-side. Retained because
 // AuthCallback records it on Google sign-in; the on-screen "Last used"
@@ -54,9 +63,12 @@ export default function Login() {
     return normalizeNextUrl(params.get("next") || params.get("from_url"));
   }, [location.search]);
 
+  // What went wrong, by code: the words are the page's own, never text
+  // from the link, which anyone could write and send.
   const routeAuthError = useMemo(() => {
-    const params = new URLSearchParams(location.search);
-    return params.get("auth_error_message") || "";
+    const code = new URLSearchParams(location.search).get("auth_error");
+    if (!code) return "";
+    return SIGN_IN_ERRORS[code] || SIGN_IN_ERRORS.google_sign_in_failed;
   }, [location.search]);
 
   useEffect(() => {
