@@ -17,6 +17,8 @@ import { Database, FileText, Loader2 } from "lucide-react";
 import { apiClient } from "@/api/apiClient";
 import { cn } from "@/lib/utils";
 import { SettingsSection, settingsHint } from "./parts";
+import PlusPrompt from "@/components/PlusPrompt";
+import { useBilling } from "@/hooks/useBilling";
 
 /**
  * SI units (1 KB = 1000 bytes, 1 MB = 10^6, 1 GB = 10^9) so the
@@ -34,6 +36,7 @@ function formatBytes(bytes) {
 }
 
 export default function StorageSection() {
+  const { isBasic } = useBilling();
   const { data, isLoading, error } = useQuery({
     queryKey: ["storageUsage"],
     queryFn: () => apiClient.attachments.usage(),
@@ -73,6 +76,7 @@ export default function StorageSection() {
 
   return (
     <div className="space-y-8">
+      {isBasic && pct >= 80 && <PlusPrompt feature="More room for files" detail="Plus has 1 GB." />}
       <SettingsSection label="Storage">
       <div className="rounded-xl border border-border-hairline bg-surface-card px-4 py-4 space-y-3">
         <div className="flex items-start justify-between gap-3">

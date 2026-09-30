@@ -17,6 +17,8 @@ export interface MockState {
   aiConnectRequests?: Record<string, EntityRecord>;
   /** How Home is arranged: [{ id, size }]. Left out = never arranged. */
   homeLayout?: EntityRecord[] | null;
+  /** The account's plan, as GET /billing says it; Plus (founding) when left out. */
+  billing?: EntityRecord;
   currentUser?: EntityRecord | null;
 }
 
@@ -90,6 +92,7 @@ export async function installMockBackend(page: Page, initialState: MockState = {
             aiActivity: state.aiActivity ?? [],
             aiConnectRequests: state.aiConnectRequests ?? {},
             homeLayout: state.homeLayout ?? null,
+            billing: state.billing,
             currentUser: state.currentUser === undefined ? defaultUser : state.currentUser,
           },
           counters: {

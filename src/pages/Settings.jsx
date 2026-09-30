@@ -40,6 +40,7 @@ import {
   Palette,
   Plug,
   ShieldCheck,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
@@ -64,6 +65,8 @@ import FilesSection from "@/components/settings/FilesSection";
 import ExportSection from "@/components/settings/ExportSection";
 import ConnectedAppsSection from "@/components/settings/ConnectedAppsSection";
 import SessionsSection from "@/components/settings/SessionsSection";
+import PlusSection from "@/components/settings/PlusSection";
+import { useBilling } from "@/hooks/useBilling";
 import DefaultsSection from "@/components/settings/DefaultsSection";
 import PrioritiesSection from "@/components/settings/PrioritiesSection";
 import TagsSection from "@/components/settings/TagsSection";
@@ -104,6 +107,7 @@ export default function Settings() {
   const pendingScrollRestoreRef = useRef(null);
   const { user, logout } = useAuth();
   const location = useLocation();
+  const { isPlus } = useBilling();
 
   // Deep links from elsewhere in the app:
   //   - Calendar page's "Connect Calendars in Settings" → state.scrollTo === "bottom"
@@ -119,9 +123,12 @@ export default function Settings() {
       next = "calendars";
     } else if (scrollTarget === "notifications" || hash === "notifications") {
       next = "notifications";
+    } else if (hash === "plus" || new URLSearchParams(location.search).has("plus")) {
+      // Upgrade prompts, and coming back from Stripe.
+      next = "plus";
     }
     if (next) setActiveSection(next);
-  }, [location.state, location.hash]);
+  }, [location.state, location.hash, location.search]);
 
   // Restore scroll when returning to main from any sub-page.
   useLayoutEffect(() => {
@@ -213,6 +220,14 @@ export default function Settings() {
     return (
       <SubPage title="Connected apps" onBack={returnToMain}>
         <ConnectedAppsSection />
+      </SubPage>
+    );
+  }
+
+  if (activeSection === "plus") {
+    return (
+      <SubPage title="Zephyrly Plus" onBack={returnToMain}>
+        <PlusSection />
       </SubPage>
     );
   }
@@ -310,6 +325,12 @@ export default function Settings() {
         </SettingsGroup>
 
         <SettingsGroup label="Account">
+          <SettingsLink
+            icon={Sparkles}
+            label="Zephyrly Plus"
+            subtitle={isPlus ? "You have Plus" : "Calendar sync, AI apps and more room, once"}
+            onClick={() => openSection("plus")}
+          />
           <SettingsLink
             icon={ShieldCheck}
             label="Signed-in devices"
