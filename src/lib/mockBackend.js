@@ -241,6 +241,17 @@ export function createE2EApiClient() {
         return { success: true, calendars: [] };
       },
     },
+    scheduleDefaults: {
+      async get() {
+        return clone(/** @type {any} */ (backend.state).scheduleDefaults || {});
+      },
+      async set(defaults) {
+        const state = /** @type {any} */ (backend.state);
+        state.scheduleDefaults = { ...defaults };
+        persistBackend(backend);
+        return clone(state.scheduleDefaults);
+      },
+    },
     notifications: {
       async getSettings() {
         const state = /** @type {any} */ (backend.state);

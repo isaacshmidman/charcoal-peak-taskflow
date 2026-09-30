@@ -471,6 +471,35 @@ describe("a note's schedule", () => {
   });
 });
 
+describe("pinned schedule settings", () => {
+  it("are kept per person, only what makes sense, and exported", async () => {
+    const token = await login("pins@example.com");
+    const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+    const none = await invoke("/api/apps/test-app/schedule-defaults", { headers });
+    expect(none.body).toEqual({ defaults: {} });
+
+    const saved = await invoke("/api/apps/test-app/schedule-defaults", {
+      method: "PUT",
+      headers,
+      body: { defaults: { dayStart: 420, gap: 5, cascade: "sideways", slot: 3, now: false, html: "<b>" } },
+    });
+    expect(saved.statusCode).toBe(200);
+    expect(saved.body).toEqual({ defaults: { dayStart: 420, gap: 5, now: false } });
+    expect((await invoke("/api/apps/test-app/schedule-defaults", { headers })).body.defaults).toEqual({ dayStart: 420, gap: 5, now: false });
+
+    // Someone else's are their own.
+    const other = await login("pins-other@example.com");
+    expect((await invoke("/api/apps/test-app/schedule-defaults", { headers: { Authorization: `Bearer ${other}` } })).body.defaults).toEqual({});
+    // Signed out: no.
+    expect((await invoke("/api/apps/test-app/schedule-defaults", {})).statusCode).toBe(401);
+
+    const zip = await invokeRaw("/api/apps/test-app/export", { headers: { Authorization: `Bearer ${token}` } });
+    const files = readZip(zip.body);
+    const data = JSON.parse(files.get([...files.keys()].find((n) => n.endsWith("/data.json"))).toString("utf8"));
+    expect(data.schedule_defaults).toEqual({ dayStart: 420, gap: 5, now: false });
+  });
+});
+
 describe("registry entities: DeletedNote", () => {
   it("supports CRUD, defaults expiry from retention, and purges expired records lazily", async () => {
     const token = await login("isaac@example.com");

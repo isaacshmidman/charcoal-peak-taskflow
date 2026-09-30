@@ -4,6 +4,7 @@ import {
   activeSchedule,
   changeEnd,
   changeStart,
+  cleanDefaults,
   clearAll,
   clockParts,
   cutTime,
@@ -16,12 +17,14 @@ import {
   partsToMinutes,
   placeEntry,
   removeSlot,
+  scheduleFromDefaults,
   scheduleProblem,
   schedulePreview,
   setDayBounds,
   setGap,
   setSlotLength,
   setSlotText,
+  settingsOf,
   splitSlot,
 } from "./schedule.js";
 
@@ -318,6 +321,21 @@ describe("stored schedules", () => {
     expect(schedulePreview(newSchedule())).toBe("Empty schedule");
     const s = fill(fill(newSchedule(), h(7), "Breakfast"), h(9), "Work");
     expect(schedulePreview(s)).toBe("7:00 AM Breakfast · 9:00 AM Work");
+  });
+});
+
+describe("pinned settings", () => {
+  it("start a new schedule where they say, and give way when they can't all hold", () => {
+    const s = scheduleFromDefaults({ dayStart: h(7), dayEnd: h(22), gap: 5, slot: 30, cascade: "next", now: false });
+    expect(scheduleProblem(s)).toBeNull();
+    expect(settingsOf(s)).toEqual({ dayStart: h(7), dayEnd: h(22), gap: 5, slot: 30, cascade: "next", now: false });
+    expect(ranges(s)[0]).toBe("7:00 AM – 7:25 AM");
+    expect(ranges(scheduleFromDefaults({}))).toEqual(ranges(newSchedule()));
+    // An end pinned before a start pinned elsewhere: the day runs to midnight.
+    expect(settingsOf(scheduleFromDefaults({ dayStart: h(9), dayEnd: h(6) }))).toMatchObject({ dayStart: h(9), dayEnd: DAY });
+    // A gap as long as the slots: no gap.
+    expect(scheduleFromDefaults({ gap: 30, slot: 30 }).gap).toBe(0);
+    expect(cleanDefaults({ gap: -1, slot: 2, dayStart: "7", cascade: "up", extra: true })).toEqual({});
   });
 });
 

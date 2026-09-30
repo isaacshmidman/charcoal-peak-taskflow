@@ -272,3 +272,47 @@ test("switching Schedule off shows the note's text again, untouched", async ({ p
   await expect(editorBody(page)).toContainText("Pack the tent");
   await expect(slots(page)).toHaveCount(0);
 });
+
+test("the day's start and end in Advanced settings change how many slots there are", async ({ page }) => {
+  await installMockBackend(page, { tasks: [], priorities: [defaultPriority], notes: [note()] });
+  await page.goto("/Notes");
+  await page.getByRole("switch", { name: "Schedule builder" }).click();
+  await page.getByRole("button", { name: "Advanced settings" }).click();
+
+  // "7 to 11": typed over midnight at the end of the day, 11 is 11 PM.
+  await page.getByRole("textbox", { name: "Day starts, hour" }).click();
+  await page.keyboard.type("7");
+  await page.getByRole("textbox", { name: "Day ends, hour" }).click();
+  await page.keyboard.type("11");
+  await page.keyboard.press("Enter");
+  await expect(slots(page)).toHaveCount(16);
+  const ranges = await slotRanges(page);
+  expect([ranges[0], ranges.at(-1)]).toEqual(["7:00 AM – 8:00 AM", "10:00 PM – 11:00 PM"]);
+
+  // "7 to 1": 1 PM, the nearer side of the day.
+  await page.getByRole("textbox", { name: "Day ends, hour" }).click();
+  await page.keyboard.type("1");
+  await page.keyboard.press("Enter");
+  await expect(slots(page)).toHaveCount(6);
+  expect((await slotRanges(page)).at(-1)).toBe("12:00 PM – 1:00 PM");
+});
+
+test("a pinned setting is where every new schedule starts", async ({ page }) => {
+  // Not "note-1": the mock numbers the notes it creates the same way.
+  const api = await installMockBackend(page, { tasks: [], priorities: [defaultPriority], notes: [note({ id: "routine", title: "Routine" })] });
+  await page.goto("/Notes");
+  await page.getByRole("switch", { name: "Schedule builder" }).click();
+  await page.getByRole("button", { name: "Advanced settings" }).click();
+  await page.getByRole("textbox", { name: "Day starts, hour" }).click();
+  await page.keyboard.type("7");
+  await page.keyboard.press("Enter");
+  await page.getByRole("button", { name: "Pin when the day starts for every new schedule" }).click();
+  await expect(page.getByRole("button", { name: "Pin when the day starts for every new schedule" })).toHaveAttribute("aria-pressed", "true");
+  await expect.poll(async () => ((await api.getState()) as any).scheduleDefaults).toEqual({ dayStart: 7 * 60 });
+  await page.keyboard.press("Escape");
+
+  await page.getByTestId("new-note-button").click();
+  await page.getByRole("switch", { name: "Schedule builder" }).click();
+  await expect(slots(page)).toHaveCount(17);
+  expect((await slotRanges(page))[0]).toBe("7:00 AM – 8:00 AM");
+});

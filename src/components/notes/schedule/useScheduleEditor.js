@@ -34,24 +34,27 @@ export function useScheduleEditor(schedule, onChange) {
 
   const undo = useCallback(() => {
     const previous = historyRef.current.pop();
-    if (previous) put(previous);
+    if (!previous) return;
+    put(previous.schedule);
+    previous.alsoUndo?.();
   }, [put]);
 
   /**
    * @param {(s: any) => { schedule?: any, error?: string }} change
-   * @param {{ editedId?: string, done?: string, quiet?: boolean }} [opts]
+   * @param {{ editedId?: string, done?: string, quiet?: boolean, alsoUndo?: () => void }} [opts]
    *   editedId: the slot changed on purpose (not counted as "other").
    *   done: what was done, said first ("Split in two.").
    *   quiet: don't list what else moved.
+   *   alsoUndo: puts back anything else the change did (a pinned setting).
    * @returns {string | null} a refusal, or null
    */
   const apply = useCallback(
-    (change, { editedId, done, quiet = false } = {}) => {
+    (change, { editedId, done, quiet = false, alsoUndo } = {}) => {
       const before = scheduleRef.current;
       const result = change(before);
       if (result.error) return result.error;
       if (JSON.stringify(result.schedule) === JSON.stringify(before)) return null;
-      historyRef.current = [...historyRef.current.slice(1 - HISTORY), before];
+      historyRef.current = [...historyRef.current.slice(1 - HISTORY), { schedule: before, alsoUndo }];
       put(result.schedule);
       const effect = quiet ? null : describeChange(before, result.schedule, editedId);
       const label = [done, effect].filter(Boolean).join(" ");
@@ -76,7 +79,10 @@ export function useScheduleEditor(schedule, onChange) {
     showDeleteToast({ label: message, hideUndo: true, duration: 6000 });
   }, []);
 
-  return { apply, undo, setText, problem };
+  /** The schedule as of the last change, before React has re-rendered. */
+  const get = useCallback(() => scheduleRef.current, []);
+
+  return { apply, undo, setText, problem, get };
 }
 
 /** Where a slot is now, by id — slots move as the schedule changes. */

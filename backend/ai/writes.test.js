@@ -863,6 +863,38 @@ describe("schedules", () => {
     expect(slotTexts(data.id)).toEqual(["1080-1140 Dinner"]);
   });
 
+  it("pins settings for every new schedule, and a pinned setting changed here takes the pin with it; Undo puts both back", async () => {
+    const { getScheduleDefaults } = await import("../schedule-defaults.js");
+    const pins = () => getScheduleDefaults(db, { appId: APP_ID, userId: ME.id });
+    const n = note({ title: "Routine" });
+    const pinned = await run("edit_schedule", { note_id: n.id, on: true, day_start: "7:00AM", gap_minutes: 5, pin: ["day_start", "gap_minutes"] });
+    expect(pins()).toEqual({ dayStart: 420, gap: 5 });
+    expect(pinned.text).toContain("Pinned for every new schedule: day_start 7:00AM, gap_minutes 5.");
+
+    // A new schedule starts from them — from the app's switch or an AI app.
+    const { data } = await run("create_note", { title: "Next week", schedule: {} });
+    const fresh = scheduleOf(data.id);
+    expect([fresh.slots[0].start, fresh.gap]).toEqual([420, 5]);
+    const other = note({ title: "Another" });
+    await run("edit_schedule", { note_id: other.id, on: true, gap_minutes: 10 });
+    // Made in that call: its settings are its own, the pin stays.
+    expect(pins()).toEqual({ dayStart: 420, gap: 5 });
+    expect(scheduleOf(other.id).slots[0].start).toBe(420);
+    const read = await run("get_note", { note_id: other.id });
+    expect(read.data.schedule.pinned_for_new_schedules).toEqual({ day_start: "7:00AM", gap_minutes: 5 });
+
+    // Routine has the pinned start, so changing it moves the pin, as in the app.
+    const before = get(n.id, "Note").schedule_json;
+    await run("edit_schedule", { note_id: n.id, day_start: "6:00AM" });
+    expect(pins()).toEqual({ dayStart: 360, gap: 5 });
+    undoLatest();
+    expect(pins()).toEqual({ dayStart: 420, gap: 5 });
+    expect(get(n.id, "Note").schedule_json).toBe(before);
+
+    await run("edit_schedule", { note_id: n.id, unpin: ["gap_minutes"] });
+    expect(pins()).toEqual({ dayStart: 420 });
+  });
+
   it("search_notes finds slot text, and delete_note keeps the schedule for Recently Deleted", async () => {
     const { data } = await run("create_note", { title: "Friday", schedule: { fill: [{ start: "6pm", end: "8pm", text: "Pottery class" }] } });
     const found = await run("search_notes", { text: "pottery" });

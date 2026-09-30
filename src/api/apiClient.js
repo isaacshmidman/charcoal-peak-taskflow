@@ -39,6 +39,10 @@ import { loadFromCache, saveToCache } from "@/lib/offlineCache";
  *   },
   *   setToken: (token: string, saveToStorage?: boolean) => void,
  *   getPublicSettings: () => Promise<any>,
+ *   scheduleDefaults: {
+ *     get: () => Promise<Record<string, any>>,
+ *     set: (defaults: Record<string, any>) => Promise<Record<string, any>>,
+ *   },
  *   notifications: {
  *     getSettings: () => Promise<any>,
  *     updateSettings: (settings: any) => Promise<any>,
@@ -100,6 +104,7 @@ const PUBLIC_SETTINGS_CACHE_KEY = "publicSettings";
 const INTEGRATIONS_CACHE_KEY = "integrations";
 const INTEGRATION_CALENDARS_CACHE_KEY = "integrationCalendars";
 const NOTIFICATION_SETTINGS_CACHE_KEY = "notificationSettings";
+const SCHEDULE_DEFAULTS_CACHE_KEY = "scheduleDefaults";
 const ENTITY_CACHE_KEYS = {
   Task: "tasks",
   Priority: "priorities",
@@ -498,6 +503,30 @@ const liveApiClient = {
         });
       }
       return data;
+    },
+  },
+  // Settings pinned so every new schedule starts with them.
+  scheduleDefaults: {
+    async get() {
+      try {
+        const result = await apiRequest(`/apps/${appConfig.appId}/schedule-defaults`);
+        saveToCache(SCHEDULE_DEFAULTS_CACHE_KEY, result.defaults || {});
+        return result.defaults || {};
+      } catch (error) {
+        if (isRecoverableReadError(error)) {
+          const cached = loadFromCache(SCHEDULE_DEFAULTS_CACHE_KEY);
+          if (cached) return cached;
+        }
+        throw error;
+      }
+    },
+    async set(defaults) {
+      const result = await apiRequest(`/apps/${appConfig.appId}/schedule-defaults`, {
+        method: "PUT",
+        body: { defaults },
+      });
+      saveToCache(SCHEDULE_DEFAULTS_CACHE_KEY, result.defaults || {});
+      return result.defaults || {};
     },
   },
   notifications: {

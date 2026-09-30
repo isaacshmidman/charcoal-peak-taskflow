@@ -757,3 +757,56 @@ export function placeEntry(s, start, end, text) {
   const tail = nextIndex >= 0 ? slots.slice(nextIndex) : [];
   return done(s, [...head, ...left, entry, ...right, ...tail]);
 }
+
+// ── Pinned settings: where every new schedule starts ───────────────────
+
+/**
+ * The settings a person can pin, so every new schedule starts with them.
+ * Schedules that already exist keep their own.
+ * @typedef {{ dayStart?: number, dayEnd?: number, gap?: number, slot?: number, cascade?: Cascade, now?: boolean }} ScheduleDefaults
+ */
+export const PINNABLE = /** @type {const} */ (["dayStart", "dayEnd", "gap", "slot", "cascade", "now"]);
+
+/**
+ * A schedule's settings, under the names they're pinned by.
+ * @param {Schedule} s
+ * @returns {Required<ScheduleDefaults>}
+ */
+export function settingsOf(s) {
+  return { dayStart: s.slots[0].start, dayEnd: s.slots[s.slots.length - 1].end, gap: s.gap, slot: s.slot, cascade: s.cascade, now: s.now };
+}
+
+/**
+ * Only the pinned settings that make sense; anything else is dropped.
+ * @param {any} input
+ * @returns {ScheduleDefaults}
+ */
+export function cleanDefaults(input) {
+  /** @type {ScheduleDefaults} */
+  const out = {};
+  if (!input || typeof input !== "object" || Array.isArray(input)) return out;
+  const whole = (/** @type {unknown} */ v, /** @type {number} */ lo, /** @type {number} */ hi) => Number.isInteger(v) && Number(v) >= lo && Number(v) <= hi;
+  if (whole(input.dayStart, 0, DAY - 1)) out.dayStart = input.dayStart;
+  if (whole(input.dayEnd, 1, DAY)) out.dayEnd = input.dayEnd;
+  if (whole(input.gap, 0, MAX_GAP)) out.gap = input.gap;
+  if (whole(input.slot, MIN_SLOT_LENGTH, MAX_SLOT_LENGTH)) out.slot = input.slot;
+  if (input.cascade === "shift" || input.cascade === "next") out.cascade = input.cascade;
+  if (typeof input.now === "boolean") out.now = input.now;
+  return out;
+}
+
+/**
+ * A new schedule, starting from the pinned settings. Pins that can't all
+ * hold at once (pinned in different schedules) give way: a day that would
+ * end before it starts runs to midnight, and a gap as long as a slot goes.
+ * @param {ScheduleDefaults | null | undefined} defaults
+ * @returns {Schedule}
+ */
+export function scheduleFromDefaults(defaults) {
+  const d = cleanDefaults(defaults);
+  const start = d.dayStart ?? 0;
+  const end = (d.dayEnd ?? DAY) > start ? d.dayEnd ?? DAY : DAY;
+  const slot = d.slot ?? 60;
+  const gap = (d.gap ?? 0) < slot ? d.gap ?? 0 : 0;
+  return newSchedule({ gap, slot, cascade: d.cascade ?? "shift", now: d.now ?? true, start, end });
+}

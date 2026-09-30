@@ -15,6 +15,7 @@ import { withTransaction } from "../db.js";
 import { deleteEntityRecord, getEntityRecord, importEntityRecord, updateEntityRecord } from "../store.js";
 import { enqueueTaskPush } from "../push.js";
 import { deleteAttachmentNow } from "../attachments.js";
+import { setScheduleDefaults } from "../schedule-defaults.js";
 
 const DEFAULT_LIST_LIMIT = 50;
 
@@ -211,6 +212,8 @@ export function undoActivity(db, config, { appId, user, activityId }) {
       if (!note) throw new HttpError(409, "That note is gone, so there's nothing to undo.", "gone");
       unchangedSince(note, undo.updated_date);
       updateEntityRecord(db, { entityName: "Note", ...scope, id: note.id, input: undo.before });
+      // Settings pinned for new schedules that the change moved too.
+      if (undo.defaults_before) setScheduleDefaults(db, { appId, userId: user.id, defaults: undo.defaults_before });
     } else if (undo.kind === "create_note") {
       const note = current("Note", undo.note_id);
       if (note) {

@@ -7,7 +7,8 @@ import { getEntityRecord } from "../store.js";
 import { storedDoc } from "../lib/plain-text-doc.js";
 import { docToMarkdown } from "../lib/markdown-doc.js";
 import { parseSchedule, schedulePreview, scheduleSearchText } from "../lib/schedule.js";
-import { scheduleData, scheduleText } from "./schedules.js";
+import { pinnedData, pinnedLine, scheduleData, scheduleText } from "./schedules.js";
+import { getScheduleDefaults } from "../schedule-defaults.js";
 import { ToolError } from "./args.js";
 import { DATE, asToolError, findPriority, getOwnTask, hasTag, listRecords, loadPriorities, loadTasks, lower } from "./context.js";
 import {
@@ -311,8 +312,11 @@ const getNote = {
     const schedule = parseSchedule(note.schedule_json);
     const heading = `${note.title || "Untitled"}${(note.tags || []).map((/** @type {string} */ t) => ` #${t}`).join("")}${priority ? ` [${priority.name}]` : ""} (id ${note.id})`;
     let content = body || "(empty)";
+    const defaults = schedule ? getScheduleDefaults(ctx.db, { appId: ctx.appId, userId: ctx.user.id }) : {};
     if (schedule?.enabled) {
       content = `It shows as a schedule. ${scheduleText(schedule)}`;
+      const pinned = pinnedLine(defaults);
+      if (pinned) content += `\n${pinned}`;
       if (body) content += `\n\nIts text, kept but hidden while the schedule shows:\n\n${body}`;
     } else if (schedule) {
       content += "\n\n(It also has a schedule, switched off: edit_schedule with on: true shows it again.)";
@@ -328,7 +332,7 @@ const getNote = {
         markdown: body,
         text: String(note.content_text || "").slice(0, NOTE_MAX_CHARS),
         truncated: cut,
-        schedule: schedule ? scheduleData(schedule) : null,
+        schedule: schedule ? { ...scheduleData(schedule), pinned_for_new_schedules: pinnedData(defaults) } : null,
         updated_date: note.updated_date,
       },
     };

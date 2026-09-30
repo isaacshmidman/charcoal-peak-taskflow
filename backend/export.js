@@ -19,7 +19,7 @@ import { promises as fsp } from "node:fs";
 import { resolve } from "node:path";
 import { listEntityRecords } from "./store.js";
 import { attachmentsRoot } from "./attachments.js";
-import { activeSchedule, formatRange } from "./lib/schedule.js";
+import { activeSchedule, cleanDefaults, formatRange } from "./lib/schedule.js";
 
 export const EXPORT_FORMAT = "zephyrly-export";
 export const EXPORT_VERSION = 1;
@@ -314,6 +314,8 @@ export async function buildExport(db, config, { appId, user, now = new Date() })
       member_since: account?.created_date ?? null,
     },
     notification_settings: preferences.notificationSettings ?? null,
+    // Settings pinned so every new schedule starts with them.
+    schedule_defaults: cleanDefaults(preferences.scheduleDefaults),
     tasks,
     notes,
     priorities,

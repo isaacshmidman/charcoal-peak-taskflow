@@ -26,8 +26,9 @@ import { PRIORITY_COLORS } from "../priority-color.js";
 import { countWords, docToText, plainTextToDoc, storedDoc } from "../lib/plain-text-doc.js";
 import { isAllowedHref, markdownToDoc } from "../lib/markdown-doc.js";
 import { applyBlockChanges, applyMarks, findText, linkTextToTask, markChanges } from "./note-format.js";
-import { describeChange, newSchedule, parseSchedule } from "../lib/schedule.js";
-import { SCHEDULE_CHANGES, applyScheduleChanges, newScheduleWith, scheduleData, scheduleText } from "./schedules.js";
+import { describeChange, parseSchedule, scheduleFromDefaults } from "../lib/schedule.js";
+import { PIN_ARGS, SCHEDULE_CHANGES, applyScheduleChanges, newScheduleWith, pinnedData, pinnedLine, pinsAfter, scheduleData, scheduleText } from "./schedules.js";
+import { getScheduleDefaults, setScheduleDefaults } from "../schedule-defaults.js";
 import { ToolError, isRealDate } from "./args.js";
 import { logActivity } from "./activity.js";
 import { DATE, findPriority, getOwnNote, getOwnTask, listRecords, loadPriorities, loadTasks, lower } from "./context.js";
@@ -769,8 +770,8 @@ const createNote = {
         properties: SCHEDULE_CHANGES,
         additionalProperties: false,
         description:
-          "Make the note a schedule: the whole day in hour slots, with any of these applied — fill puts in what's happening, " +
-          "day_start and day_end trim the day. {} for an empty day. Change it later with edit_schedule.",
+          "Make the note a schedule: it starts from the person's pinned settings (the whole day in hour slots if none), with any of these applied — " +
+          "fill puts in what's happening, day_start and day_end trim the day. {} for an empty day. Change it later with edit_schedule.",
       },
     },
     additionalProperties: false,
@@ -780,7 +781,9 @@ const createNote = {
   handler(ctx, args) {
     if (args.text == null && !args.schedule) throw new ToolError('Give the note "text", or make it a "schedule".');
     // Built before anything is saved, so a schedule that can't be made adds nothing.
-    const schedule = args.schedule ? newScheduleWith(args.schedule).schedule : null;
+    const schedule = args.schedule
+      ? newScheduleWith(getScheduleDefaults(ctx.db, { appId: ctx.appId, userId: ctx.user.id }), args.schedule).schedule
+      : null;
     const doc = docFromAiText(ctx, args.text || "", args.format);
     const text = docToText(doc);
     if (countWords(text) > NOTE_WORDS) throw new ToolError(`A note can be at most ${NOTE_WORDS} words.`);
@@ -1373,6 +1376,7 @@ const editSchedule = {
     "Read the note with get_note first; slots are named by their start times, like 7:00AM. " +
     "This turns a note's schedule on or off, changes its settings, empties slots (clear, clear_all), puts in what's happening at given times (fill), " +
     "and changes a slot's start or end the way the person does in the app (change_time). " +
+    "pin and unpin choose which settings every new schedule starts with. " +
     "One call can do several; they apply in that order, and if any can't be done, nothing changes. Every change can be undone in Zephyrly.",
   inputSchema: {
     type: "object",
@@ -1380,9 +1384,11 @@ const editSchedule = {
       note_id: { type: "string", maxLength: 200, description: "The note's id." },
       on: {
         type: "boolean",
-        description: "true shows the note as a schedule (the first time: the whole day in hour slots); false shows its text again and keeps the schedule.",
+        description:
+          "true shows the note as a schedule (the first time: from the pinned settings, or the whole day in hour slots); false shows its text again and keeps the schedule.",
       },
       ...SCHEDULE_CHANGES,
+      ...PIN_ARGS,
     },
     required: ["note_id"],
     additionalProperties: false,
@@ -1392,14 +1398,15 @@ const editSchedule = {
   handler(ctx, args) {
     const note = getOwnNote(ctx, args.note_id);
     const existing = parseSchedule(note.schedule_json);
+    const defaults = getScheduleDefaults(ctx.db, { appId: ctx.appId, userId: ctx.user.id });
     const asked = Object.keys(args).filter((key) => key !== "note_id" && key !== "on");
-    if (args.on == null && !asked.length) throw new ToolError("Say what to change: on, a setting, clear, clear_all, fill or change_time.");
+    if (args.on == null && !asked.length) throw new ToolError("Say what to change: on, a setting, clear, clear_all, fill, change_time, pin or unpin.");
     /** @type {string[]} */
     const done = [];
     let start = existing;
     if (args.on === true) {
-      start = existing ? { ...existing, enabled: true } : newSchedule();
-      if (!existing) done.push("made it a schedule, the whole day in hour slots");
+      start = existing ? { ...existing, enabled: true } : scheduleFromDefaults(defaults);
+      if (!existing) done.push(Object.keys(defaults).length ? "made it a schedule, from the pinned settings" : "made it a schedule, the whole day in hour slots");
       else if (!existing.enabled) done.push("switched the schedule back on");
     }
     if (!start) {
@@ -1415,27 +1422,33 @@ const editSchedule = {
     }
     const name = note.title ? quote(note.title) : "the untitled note";
     const json = JSON.stringify(schedule);
-    if (json === (note.schedule_json || "")) {
-      return { text: `Nothing changed in the schedule of ${name}.\n\n${scheduleText(schedule)}`, data: { id: note.id, schedule: scheduleData(schedule) } };
-    }
+    const pins = pinsAfter(defaults, existing ? start : null, schedule, args);
+    const pinsChanged = JSON.stringify(pins) !== JSON.stringify(defaults);
+    if (args.pin?.length) done.push(`pinned ${args.pin.join(", ")} for every new schedule`);
+    if (args.unpin?.length) done.push(`unpinned ${args.unpin.join(", ")}`);
+    const reply = (/** @type {string} */ head) => ({
+      text: `${head}\n\n${scheduleText(schedule)}${pinnedLine(pins) ? `\n${pinnedLine(pins)}` : ""}`,
+      data: { id: note.id, schedule: { ...scheduleData(schedule), pinned_for_new_schedules: pinnedData(pins) } },
+    });
+    if (json === (note.schedule_json || "") && !pinsChanged) return reply(`Nothing changed in the schedule of ${name}.`);
     const patch = { schedule_json: json };
     validateClientInput("Note", patch);
     spendWrite(ctx);
-    const updated = inTransaction(ctx.db, () =>
-      updateEntityRecord(ctx.db, { entityName: "Note", appId: ctx.appId, user: ctx.user, id: note.id, input: patch })
-    );
+    const updated = inTransaction(ctx.db, () => {
+      if (pinsChanged) setScheduleDefaults(ctx.db, { appId: ctx.appId, userId: ctx.user.id, defaults: pins });
+      return updateEntityRecord(ctx.db, { entityName: "Note", appId: ctx.appId, user: ctx.user, id: note.id, input: patch });
+    });
     const summary = `Schedule of ${name}: ${done.join("; ") || "changed"}.`;
     logActivity(ctx, "edit_schedule", summary, {
       kind: "update_note",
       note_id: note.id,
       before: { schedule_json: note.schedule_json || "" },
       updated_date: updated.updated_date,
+      // Undo puts the pinned settings back too.
+      ...(pinsChanged ? { defaults_before: defaults } : {}),
     });
     const effect = existing ? describeChange(existing, schedule, applied.changedSlot) : null;
-    return {
-      text: `${summary}${effect ? ` ${effect}` : ""}${schedule.enabled ? "" : " The schedule is switched off."}\n\n${scheduleText(schedule)}`,
-      data: { id: note.id, schedule: scheduleData(schedule) },
-    };
+    return reply(`${summary}${effect ? ` ${effect}` : ""}${schedule.enabled ? "" : " The schedule is switched off."}`);
   },
 };
 

@@ -14,11 +14,13 @@ import {
   MIN_SLOT_LENGTH,
   changeEnd,
   changeStart,
+  cleanDefaults,
   clearAll,
   formatClock,
   isFilled,
-  newSchedule,
   parseClock,
+  scheduleFromDefaults,
+  settingsOf,
   placeEntry,
   setDayBounds,
   setGap,
@@ -198,11 +200,92 @@ export function applyScheduleChanges(start, args) {
 }
 
 /**
- * A new schedule with changes applied (create_note with schedule).
+ * A new schedule, from the person's pinned settings, with changes applied
+ * (create_note with schedule).
+ * @param {import("../lib/schedule.js").ScheduleDefaults} defaults
  * @param {Record<string, any>} args
  */
-export function newScheduleWith(args) {
-  return applyScheduleChanges(newSchedule(), args);
+export function newScheduleWith(defaults, args) {
+  return applyScheduleChanges(scheduleFromDefaults(defaults), args);
+}
+
+// ── Pinned settings ─────────────────────────────────────────────────────
+
+/** The AI's names for the settings, and the names they're pinned by. */
+export const PIN_NAMES = /** @type {Record<string, keyof import("../lib/schedule.js").ScheduleDefaults>} */ ({
+  day_start: "dayStart",
+  day_end: "dayEnd",
+  gap_minutes: "gap",
+  slot_minutes: "slot",
+  when_time_changes: "cascade",
+  highlight_now: "now",
+});
+
+export const PIN_ARGS = {
+  pin: {
+    type: "array",
+    maxItems: 6,
+    items: { type: "string", enum: Object.keys(PIN_NAMES) },
+    description:
+      "Pin these settings, as they are after this call's other changes, so every new schedule starts with them (the pins in the app's Advanced settings). " +
+      "Schedules that already exist keep their own.",
+  },
+  unpin: {
+    type: "array",
+    maxItems: 6,
+    items: { type: "string", enum: Object.keys(PIN_NAMES) },
+    description: "Stop pinning these settings: new schedules go back to the usual (the whole day, hour slots, no gap).",
+  },
+};
+
+/**
+ * The pinned settings after an edit, as the app does it: a setting changed
+ * in a schedule that had the pinned value takes the pin with it; then pin
+ * and unpin.
+ * A schedule made in the same call takes nothing with it: its settings
+ * are its own until pinned.
+ * @param {import("../lib/schedule.js").ScheduleDefaults} defaults
+ * @param {Schedule | null} before  the schedule before this call, or null if it's new
+ * @param {Schedule} after
+ * @param {Record<string, any>} args
+ */
+export function pinsAfter(defaults, before, after, args) {
+  /** @type {Record<string, any>} */
+  const next = { ...defaults };
+  const was = before ? settingsOf(before) : null;
+  const now = settingsOf(after);
+  if (was) for (const [name, key] of Object.entries(PIN_NAMES)) {
+    const asked = name === "day_start" || name === "day_end" ? args[name] : args[name] != null;
+    if (asked && Object.hasOwn(defaults, key) && /** @type {any} */ (defaults)[key] === was[key]) next[key] = now[key];
+  }
+  for (const name of args.pin || []) next[PIN_NAMES[name]] = now[PIN_NAMES[name]];
+  for (const name of args.unpin || []) delete next[PIN_NAMES[name]];
+  return cleanDefaults(next);
+}
+
+/**
+ * Pinned settings as an AI app reads them.
+ * @param {import("../lib/schedule.js").ScheduleDefaults} defaults
+ */
+export function pinnedData(defaults) {
+  /** @type {Record<string, string | number | boolean>} */
+  const out = {};
+  const d = /** @type {Record<string, any>} */ (cleanDefaults(defaults));
+  for (const [name, key] of Object.entries(PIN_NAMES)) {
+    if (!Object.hasOwn(d, key)) continue;
+    const value = d[key];
+    out[name] = key === "dayStart" || key === "dayEnd" ? at(value) : key === "cascade" ? (value === "shift" ? "move_others" : "next_only") : value;
+  }
+  return out;
+}
+
+/**
+ * "Pinned for every new schedule: day_start 7:00AM, gap_minutes 5." or "".
+ * @param {import("../lib/schedule.js").ScheduleDefaults} defaults
+ */
+export function pinnedLine(defaults) {
+  const pinned = Object.entries(pinnedData(defaults));
+  return pinned.length ? `Pinned for every new schedule: ${pinned.map(([name, value]) => `${name} ${value}`).join(", ")}.` : "";
 }
 
 /**

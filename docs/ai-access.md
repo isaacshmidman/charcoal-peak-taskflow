@@ -42,7 +42,9 @@ PDFs or images). With changes allowed, it can also:
   happening at given times; empty slots; change a slot's start or end with
   the same knock-on effect as in the app; set the gap, slot length, when
   the day starts and ends, and what changing a time does to the other
-  slots; switch it off again (the schedule is kept). A slot with something
+  slots; pin or unpin settings so every new schedule starts with them (as
+  the pins in Advanced settings do); switch it off again (the schedule is
+  kept). A slot with something
   in it is never dropped or pushed out of the day to make room: that
   change is refused, and nothing in that call is made;
 - add, rename, recolour, reorder or delete priorities, and add, remove or

@@ -27,10 +27,11 @@ import Toolbar from "@/components/tasks/richtext/Toolbar";
 import { useAutosave } from "@/hooks/useAutosave";
 import { useKeyboardInset } from "@/hooks/useKeyboardInset";
 import SettingsToggle from "@/components/settings/SettingsToggle";
-import { newSchedule, parseSchedule } from "@/lib/schedule";
+import { parseSchedule, scheduleFromDefaults } from "@/lib/schedule";
 import ScheduleBuilder from "./schedule/ScheduleBuilder";
 import ScheduleSettings from "./schedule/ScheduleSettings";
 import { useScheduleEditor } from "./schedule/useScheduleEditor";
+import { useScheduleDefaults } from "./schedule/useScheduleDefaults";
 
 const RichDescriptionEditor = lazy(() => import("@/components/tasks/RichDescriptionEditor"));
 
@@ -74,8 +75,9 @@ export default function NoteCanvas({
   const schedule = useMemo(() => parseSchedule(form.schedule_json), [form.schedule_json]);
   const scheduleOn = !!schedule?.enabled;
   const scheduleEditor = useScheduleEditor(schedule, (next) => setForm((f) => ({ ...f, schedule_json: JSON.stringify(next) })));
+  const { defaults: scheduleDefaults, save: saveScheduleDefaults } = useScheduleDefaults();
   // Off keeps the schedule (and on brings it back); the first time on lays
-  // out the whole day in hours.
+  // out the day from the pinned settings — the whole day in hours if none.
   const setScheduleOn = (on) => {
     // The text editor unmounts while the schedule shows; the bar must not
     // hold on to it (a new one arrives through onEditorReady).
@@ -83,7 +85,7 @@ export default function NoteCanvas({
     setForm((f) => {
       const existing = parseSchedule(f.schedule_json);
       if (!existing && !on) return f;
-      return { ...f, schedule_json: JSON.stringify(existing ? { ...existing, enabled: on } : newSchedule()) };
+      return { ...f, schedule_json: JSON.stringify(existing ? { ...existing, enabled: on } : scheduleFromDefaults(scheduleDefaults)) };
     });
   };
 
@@ -150,7 +152,9 @@ export default function NoteCanvas({
         />
         {/* Top corner: the Schedule switch, and its settings once it's on. */}
         <div className="flex shrink-0 items-center gap-1 pt-1">
-          {scheduleOn && <ScheduleSettings schedule={schedule} editor={scheduleEditor} />}
+          {scheduleOn && (
+            <ScheduleSettings schedule={schedule} editor={scheduleEditor} defaults={scheduleDefaults} saveDefaults={saveScheduleDefaults} />
+          )}
           <label className="flex cursor-pointer items-center gap-2 pl-1 text-xs font-medium text-slate-500 dark:text-slate-400">
             Schedule
             <SettingsToggle checked={scheduleOn} onChange={setScheduleOn} label="Schedule builder" />
