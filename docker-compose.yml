@@ -41,6 +41,10 @@ services:
       - TASKFLOW_BACKUPS=${TASKFLOW_BACKUPS:-true}
       - TASKFLOW_BACKUP_KEEP=${TASKFLOW_BACKUP_KEEP:-14}
       - TASKFLOW_SUPPORT_EMAIL=${TASKFLOW_SUPPORT_EMAIL:-}
+      # Zephyrly Plus (docs/plus.md). Leave unset and buying is off.
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
+      - STRIPE_PRICE_ID=${STRIPE_PRICE_ID:-}
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/api/health').then(r=>{if(!r.ok)throw 1})"]
       interval: 30s

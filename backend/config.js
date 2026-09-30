@@ -145,6 +145,11 @@ export const backendConfig = {
   vapidSubject: deriveVapidSubject(),
   // Where people reach a person: shown on the Terms and Privacy pages.
   supportEmail: deriveSupportEmail(),
+  // Buying Zephyrly Plus (backend/billing.js). All three, or buying is off.
+  // Use a restricted key: Checkout Sessions write + read, Prices read.
+  stripeSecretKey: process.env.STRIPE_SECRET_KEY || "",
+  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
+  stripePriceId: process.env.STRIPE_PRICE_ID || "",
 };
 
 /**
