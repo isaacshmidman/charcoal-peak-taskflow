@@ -12,6 +12,10 @@ Everything about access is in **Settings → Connected apps**: what's
 connected, whether each app may change things, disconnecting, and every
 change an AI app made, with Undo.
 
+Connecting AI apps is part of **Zephyrly Plus** (see docs/plus.md);
+founding members have it. Without Plus, existing connections stay listed
+but stop working.
+
 ## What an AI app can and can't do
 
 It can read your agenda, search tasks and notes, read a task or note in

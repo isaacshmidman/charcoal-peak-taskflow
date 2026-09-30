@@ -27,7 +27,20 @@ import Toolbar from "@/components/tasks/richtext/Toolbar";
 import { useAutosave } from "@/hooks/useAutosave";
 import { useKeyboardInset } from "@/hooks/useKeyboardInset";
 import SettingsToggle from "@/components/settings/SettingsToggle";
-import { parseSchedule, scheduleFromDefaults } from "@/lib/schedule";
+import { activeSchedule, parseSchedule, scheduleFromDefaults } from "@/lib/schedule";
+import { useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
+import { useBilling } from "@/hooks/useBilling";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import ScheduleBuilder from "./schedule/ScheduleBuilder";
 import ScheduleSettings from "./schedule/ScheduleSettings";
 import AddToCalendar from "./schedule/AddToCalendar";
@@ -79,7 +92,21 @@ export default function NoteCanvas({
   const { defaults: scheduleDefaults, save: saveScheduleDefaults } = useScheduleDefaults();
   // Off keeps the schedule (and on brings it back); the first time on lays
   // out the day from the pinned settings — the whole day in hours if none.
+  // Basic has one schedule at a time (the server enforces it; this says
+  // which one is on, before a save it would refuse).
+  const { isBasic } = useBilling();
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const [limitNote, setLimitNote] = useState(null);
+
   const setScheduleOn = (on) => {
+    if (on && isBasic) {
+      const other = (queryClient.getQueryData(["notes"]) || []).find((n) => n.id !== note.id && activeSchedule(n));
+      if (other) {
+        setLimitNote(other);
+        return;
+      }
+    }
     // The text editor unmounts while the schedule shows; the bar must not
     // hold on to it (a new one arrives through onEditorReady).
     if (on) setEditor(null);
@@ -227,6 +254,21 @@ export default function NoteCanvas({
           />
         )}
       </div>
+      <AlertDialog open={!!limitNote} onOpenChange={(open) => { if (!open) setLimitNote(null); }}>
+        <AlertDialogContent data-testid="schedule-limit">
+          <AlertDialogHeader>
+            <AlertDialogTitle>One schedule at a time on Basic</AlertDialogTitle>
+            <AlertDialogDescription>
+              {limitNote?.title?.trim() ? `“${limitNote.title.trim()}”` : "Another note"} is showing as a schedule. Switch it off
+              first, or get Zephyrly Plus for as many as you like.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Not now</AlertDialogCancel>
+            <AlertDialogAction onClick={() => navigate("/Settings#plus")}>See Plus</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }

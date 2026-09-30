@@ -7,6 +7,8 @@ import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { Loader2, AlertTriangle, Settings2, X, Star } from "lucide-react";
 import ConfigureCalendarsModal from "./ConfigureCalendarsModal";
 import ConnectAppleModal from "./ConnectAppleModal";
+import PlusPrompt from "@/components/PlusPrompt";
+import { useBilling } from "@/hooks/useBilling";
 
 const PROVIDERS = [
   { id: "google", label: "Google Calendar" },
@@ -139,6 +141,8 @@ function ConnectCard({ provider, onConnect, connecting, disabled }) {
 export default function IntegrationsPanel() {
   const online = useOnlineStatus();
   const offline = !online;
+  // Connecting a calendar is Plus (the server enforces it; this only says so).
+  const { isBasic } = useBilling();
   const {
     integrations,
     isLoading,
@@ -214,6 +218,7 @@ export default function IntegrationsPanel() {
           Couldn't load integrations: {error.message || "network error"}
         </p>
       )}
+      {isBasic && <PlusPrompt feature="Google and Apple Calendar sync" />}
       {isLoading ? (
         <div className="flex items-center gap-2 text-xs text-slate-400 dark:text-slate-500">
           <Loader2 className="w-3 h-3 animate-spin" /> Loading…
@@ -231,7 +236,7 @@ export default function IntegrationsPanel() {
               settingDefault={settingDefault}
               offline={offline}
             />
-          ) : (
+          ) : isBasic ? null : (
             <ConnectCard
               provider={PROVIDERS[0]}
               onConnect={handleConnect}
@@ -250,7 +255,7 @@ export default function IntegrationsPanel() {
               settingDefault={settingDefault}
               offline={offline}
             />
-          ) : (
+          ) : isBasic ? null : (
             <ConnectCard
               provider={PROVIDERS[1]}
               onConnect={handleConnect}

@@ -15,6 +15,8 @@ export interface MockState {
   aiGrants?: EntityRecord[];
   aiActivity?: EntityRecord[];
   aiConnectRequests?: Record<string, EntityRecord>;
+  /** The account's plan, as GET /billing says it; Plus (founding) when left out. */
+  billing?: EntityRecord;
   currentUser?: EntityRecord | null;
 }
 
@@ -84,6 +86,7 @@ export async function installMockBackend(page: Page, initialState: MockState = {
             aiGrants: state.aiGrants ?? [],
             aiActivity: state.aiActivity ?? [],
             aiConnectRequests: state.aiConnectRequests ?? {},
+            billing: state.billing,
             currentUser: state.currentUser === undefined ? defaultUser : state.currentUser,
           },
           counters: {

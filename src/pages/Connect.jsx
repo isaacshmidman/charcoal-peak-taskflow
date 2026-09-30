@@ -13,6 +13,8 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { apiClient } from "@/api/apiClient";
 import { Checkbox } from "@/components/ui/checkbox";
+import PlusPrompt from "@/components/PlusPrompt";
+import { useBilling } from "@/hooks/useBilling";
 
 const browserTimeZone = () => {
   try {
@@ -23,6 +25,9 @@ const browserTimeZone = () => {
 };
 
 export default function Connect() {
+  // AI apps are Plus: a Basic account can only say no here (and the server
+  // would refuse a yes anyway).
+  const { isBasic } = useBilling();
   const { requestId } = useParams();
   // loading | ready (request) | gone (message) | sending | failed (message)
   const [state, setState] = useState({ phase: "loading" });
@@ -102,7 +107,10 @@ export default function Connect() {
 
             {state.phase === "failed" && <p className="mt-4 text-sm text-red-600 dark:text-red-300">{state.message}</p>}
 
+            {isBasic && <PlusPrompt className="mt-5" feature="Connecting AI apps" />}
+
             <div className="mt-6 space-y-2">
+              {!isBasic && (
               <button
                 type="button"
                 data-testid="connect-allow"
@@ -112,6 +120,7 @@ export default function Connect() {
               >
                 {busy ? "Connecting…" : "Allow"}
               </button>
+              )}
               <button
                 type="button"
                 data-testid="connect-deny"

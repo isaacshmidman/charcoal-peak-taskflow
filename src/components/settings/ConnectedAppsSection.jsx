@@ -21,6 +21,8 @@ import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import SettingsToggle from "@/components/settings/SettingsToggle";
+import PlusPrompt from "@/components/PlusPrompt";
+import { useBilling } from "@/hooks/useBilling";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -333,6 +335,8 @@ export default function ConnectedAppsSection() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
   const [created, setCreated] = useState(null);
+  // AI apps are Plus (the server enforces it; this only says so).
+  const { isBasic } = useBilling();
 
   const load = useCallback(async () => {
     try {
@@ -392,7 +396,9 @@ export default function ConnectedAppsSection() {
           For apps you set up yourself: Claude Code, Claude Desktop, Cursor, LM Studio, Gemini CLI, Open WebUI, scripts, and
           Siri through Shortcuts.
         </p>
-        {created ? (
+        {isBasic ? (
+          <PlusPrompt feature="Connecting AI apps" detail="Claude, ChatGPT, Gemini, local models and Siri." />
+        ) : created ? (
           <NewToken created={created} onDone={() => setCreated(null)} />
         ) : (
           <form onSubmit={create} className="space-y-3">

@@ -72,6 +72,11 @@ import { loadFromCache, saveToCache } from "@/lib/offlineCache";
  *     usage: () => Promise<{ used_bytes: number, max_bytes: number, biggest_tasks: any[] }>,
  *     search: (q: string) => Promise<any[]>,
  *   },
+ *   billing: {
+ *     status: () => Promise<any>,
+ *     checkout: () => Promise<{ url: string }>,
+ *     confirm: (sessionId: string) => Promise<any>,
+ *   },
  *   sessions: {
  *     list: () => Promise<any[]>,
  *     signOut: (id: string) => Promise<any>,
@@ -661,6 +666,19 @@ const liveApiClient = {
    * AI apps connected to this account (backend/routes/ai.js). Online only:
    * access to the account is never granted or changed from a queue.
    */
+  // Zephyrly Plus: the plan, and buying it on Stripe's Checkout page. The
+  // plan is only ever changed by the server (backend/plans.js).
+  billing: {
+    async status() {
+      return apiRequest(`/apps/${appConfig.appId}/billing`);
+    },
+    async checkout() {
+      return apiRequest(`/apps/${appConfig.appId}/billing/checkout`, { method: "POST" });
+    },
+    async confirm(sessionId) {
+      return apiRequest(`/apps/${appConfig.appId}/billing/confirm`, { method: "POST", body: { session_id: sessionId } });
+    },
+  },
   // Where the account is signed in. Online only, like AI access: signing
   // someone out is never left in a queue.
   sessions: {

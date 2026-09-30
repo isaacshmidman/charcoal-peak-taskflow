@@ -363,6 +363,39 @@ export function createE2EApiClient() {
     },
     // AI connections, kept in the mock's state so e2e can walk the
     // Settings page: make a token, toggle changes, revoke, undo.
+    // Test accounts have Plus unless a test sets state.billing (see e2e/notes.spec.ts).
+    billing: {
+      async status() {
+        const state = /** @type {any} */ (backend.state);
+        return clone(
+          state.billing || {
+            plan: "plus",
+            source: "founding",
+            since: "2026-09-30T00:00:00.000Z",
+            limits: { storage_bytes: 1_000_000_000, active_schedules: null, calendar_sync: true, ai_apps: true },
+            buy: { available: false, price: null },
+          }
+        );
+      },
+      async checkout() {
+        return { url: "https://checkout.stripe.com/c/pay/cs_test_mock" };
+      },
+      // Back from Checkout: a session id starting cs_test_paid is one Stripe says was paid.
+      async confirm(sessionId) {
+        const state = /** @type {any} */ (backend.state);
+        if (String(sessionId).startsWith("cs_test_paid")) {
+          state.billing = {
+            plan: "plus",
+            source: "stripe",
+            since: new Date().toISOString(),
+            limits: { storage_bytes: 1_000_000_000, active_schedules: null, calendar_sync: true, ai_apps: true },
+            buy: { available: false, price: null },
+          };
+          persistBackend(backend);
+        }
+        return clone(state.billing || {});
+      },
+    },
     sessions: {
       async list() {
         const state = /** @type {any} */ (backend.state);
