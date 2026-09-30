@@ -363,6 +363,29 @@ export function createE2EApiClient() {
     },
     // AI connections, kept in the mock's state so e2e can walk the
     // Settings page: make a token, toggle changes, revoke, undo.
+    sessions: {
+      async list() {
+        const state = /** @type {any} */ (backend.state);
+        return clone(
+          state.sessions || [
+            { id: "session-here", device: "Chrome on Mac", ip_address: "127.0.0.1", signed_in_with: "google", signed_in_at: new Date().toISOString(), last_active_at: new Date().toISOString(), current: true },
+          ]
+        );
+      },
+      async signOut(id) {
+        const state = /** @type {any} */ (backend.state);
+        state.sessions = (state.sessions || []).filter((s) => s.id !== id);
+        persistBackend(backend);
+        return { success: true };
+      },
+      async signOutOthers() {
+        const state = /** @type {any} */ (backend.state);
+        const before = (state.sessions || []).length;
+        state.sessions = (state.sessions || []).filter((s) => s.current);
+        persistBackend(backend);
+        return { signed_out: Math.max(0, before - state.sessions.length) };
+      },
+    },
     ai: {
       async grants() {
         const state = /** @type {any} */ (backend.state);

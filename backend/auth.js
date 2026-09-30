@@ -157,6 +157,12 @@ export function getAuthorizedSession(db, config, request, appId) {
 
   if (!session) return null;
 
+  // "Last active" for the signed-in devices list, refreshed now and then
+  // rather than on every request.
+  if (Date.now() - Date.parse(session.updated_date) > 10 * 60 * 1000) {
+    db.prepare("UPDATE sessions SET updated_date = ? WHERE id = ?").run(new Date().toISOString(), session.id);
+  }
+
   return {
     session,
     user: {

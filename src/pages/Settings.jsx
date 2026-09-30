@@ -43,6 +43,7 @@ import {
   LogOut,
   Palette,
   Plug,
+  ShieldCheck,
   Trash2,
 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
@@ -66,6 +67,7 @@ import StorageSection from "@/components/settings/StorageSection";
 import FilesSection from "@/components/settings/FilesSection";
 import ExportSection from "@/components/settings/ExportSection";
 import ConnectedAppsSection from "@/components/settings/ConnectedAppsSection";
+import SessionsSection from "@/components/settings/SessionsSection";
 import AppearanceSection from "@/components/settings/AppearanceSection";
 import DefaultsSection from "@/components/settings/DefaultsSection";
 import PrioritiesSection from "@/components/settings/PrioritiesSection";
@@ -256,6 +258,14 @@ export default function Settings() {
     );
   }
 
+  if (activeSection === "devices") {
+    return (
+      <SubPage title="Signed-in devices" onBack={returnToMain}>
+        <SessionsSection />
+      </SubPage>
+    );
+  }
+
   if (activeSection === "export") {
     return (
       <SubPage title="Export & restore" onBack={returnToMain}>
@@ -346,6 +356,12 @@ export default function Settings() {
           label="Files"
           subtitle="Search attachments and check storage"
           onClick={() => openSection("files")}
+        />
+        <SettingsCard
+          icon={ShieldCheck}
+          label="Signed-in devices"
+          subtitle="Where your account is signed in"
+          onClick={() => openSection("devices")}
         />
         <SettingsCard
           icon={Download}
