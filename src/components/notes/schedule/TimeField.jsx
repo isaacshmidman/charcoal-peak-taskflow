@@ -9,6 +9,12 @@
  * hour moves on to the minutes, finished minutes to AM/PM. Arrow keys
  * step the part, Left/Right move between parts, Esc puts the time back.
  *
+ * A typed hour lands on the side of the day nearest the time already
+ * there: 11 over midnight at the end of the day is 11 PM, 1 over 11:00 AM
+ * is 1 PM, 7 over 8:00 AM stays AM. Without this, typing an evening end
+ * over "12:00 AM" gave a morning time, or one before the start that was
+ * quietly refused. AM/PM shows what was chosen, and flips with a click.
+ *
  * Nothing changes the schedule until the time is finished: the minutes
  * typed in full, AM/PM flipped, Enter, or leaving the field. Only a time
  * that passes `validate` is committed; while one doesn't, the field says
@@ -81,8 +87,17 @@ export default function TimeField({ value, end = false, label, validate, onCommi
     const { part, digit } = pendingRef.current;
     if (!part) return base;
     const n = Number(digit);
-    if (part === "hour") return n >= 1 ? { ...base, hour: n } : base;
+    if (part === "hour") return n >= 1 ? withHour(base, n) : base;
     return { ...base, minute: n };
+  };
+
+  /** A typed hour, on the side of the day nearest the time already there. */
+  const withHour = (base, hour) => {
+    const am = { ...base, hour, pm: false };
+    const pm = { ...base, hour, pm: true };
+    const away = (choice) => Math.abs(partsToMinutes(choice, { end }) - value);
+    const [a, p] = [away(am), away(pm)];
+    return a === p ? { ...base, hour } : a < p ? am : pm;
   };
 
   const takePending = () => {
@@ -139,7 +154,7 @@ export default function TimeField({ value, end = false, label, validate, onCommi
         const n = Number(first + digit);
         pendingRef.current = NOTHING;
         if (n >= 1 && n <= 12) {
-          setDraft({ ...current(), hour: n });
+          setDraft(withHour(current(), n));
           focusPart("minute");
           return "minute";
         }
@@ -149,7 +164,7 @@ export default function TimeField({ value, end = false, label, validate, onCommi
         setPending({ part: "hour", digit });
         return "hour";
       }
-      setDraft({ ...current(), hour: d });
+      setDraft(withHour(current(), d));
       focusPart("minute");
       return "minute";
     }

@@ -153,6 +153,25 @@ describe("TimeField", () => {
     expect(onCommit).toHaveBeenLastCalledWith(9 * 60 + 45);
   });
 
+  it("a typed hour lands on the side of the day nearest the time already there", () => {
+    const onCommit = vi.fn();
+    // The day's end, at midnight: 11 means 11 PM, not 11 in the morning.
+    const { unmount } = render(<EndOfSlot start={7 * 60} initial={DAY} onCommit={onCommit} />);
+    act(() => part("hour").focus());
+    type(part("hour"), ["1", "1"]);
+    leave();
+    expect(onCommit).toHaveBeenLastCalledWith(23 * 60);
+    expect(shown()).toBe("11:00 PM");
+    unmount();
+    // 11:00 AM, then 1: 1 PM is nearer than 1 AM, and after the 7 AM start.
+    render(<EndOfSlot start={7 * 60} initial={11 * 60} onCommit={onCommit} />);
+    act(() => part("hour").focus());
+    type(part("hour"), ["1"]);
+    type(part("hour"), ["Enter"]);
+    expect(onCommit).toHaveBeenLastCalledWith(13 * 60);
+    expect(shown()).toBe("1:00 PM");
+  });
+
   it("a phone keyboard that doesn't report keys still types", () => {
     const onCommit = vi.fn();
     render(<EndOfSlot onCommit={onCommit} />);
