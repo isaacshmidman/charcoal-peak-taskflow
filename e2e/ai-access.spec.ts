@@ -165,3 +165,34 @@ test("someone not signed in signs in first and comes back to the same request", 
   await expect(page).toHaveURL(/\/login\?next=.*%2Fconnect%2Freq-1/);
 });
 
+
+test("changes ticked by mistake can be unticked, so the app stays read-only", async ({ page }) => {
+  // A ticked box used to ignore the click that should untick it.
+  await installMockBackend(page, {
+    tasks: [],
+    priorities: [defaultPriority],
+    aiConnectRequests: { "req-u": { client_name: "Claude", redirect_uri: CALLBACK, wants_changes: true, state: "u" } },
+  });
+  await openConnectedApps(page);
+  await page.getByTestId("ai-token-label").fill("Cursor");
+  const tokenBox = page.getByTestId("ai-token-allow-changes");
+  await tokenBox.click();
+  await expect(tokenBox).toHaveAttribute("aria-checked", "true");
+  await tokenBox.click();
+  await expect(tokenBox).toHaveAttribute("aria-checked", "false");
+  await page.getByTestId("ai-token-create").click();
+  await page.getByRole("button", { name: "Done" }).click();
+  await expect(page.getByTestId("ai-grant-grant-1")).toContainText("Can read");
+  await expect(page.getByTestId("ai-grant-grant-1")).not.toContainText("change tasks");
+
+  const returned = await catchReturn(page);
+  await page.goto("/connect/req-u");
+  const consentBox = page.getByTestId("connect-allow-changes");
+  await consentBox.click();
+  await expect(consentBox).toHaveAttribute("aria-checked", "true");
+  await consentBox.click();
+  await expect(consentBox).toHaveAttribute("aria-checked", "false");
+  await page.getByTestId("connect-allow").click();
+  await expect(page.getByText("Back in the app")).toBeVisible();
+  expect(new URL(returned[0]).searchParams.get("code")).toBe("e2e-code-read");
+});
