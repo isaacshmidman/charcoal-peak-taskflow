@@ -66,3 +66,24 @@ export function docToText(doc) {
   walk(doc);
   return blocks.join("\n\n").trim();
 }
+
+/**
+ * A stored rich-text body as a document: its saved JSON, or its plain
+ * text laid out as the editor would open it (one paragraph per line).
+ *
+ * @param {unknown} json  the *_json column
+ * @param {unknown} text  the plain-text mirror
+ * @returns {{ type: "doc", content: any[] }}
+ */
+export function storedDoc(json, text) {
+  if (typeof json === "string" && json.trim()) {
+    try {
+      const parsed = JSON.parse(json);
+      if (parsed && parsed.type === "doc") return { ...parsed, content: Array.isArray(parsed.content) ? parsed.content : [] };
+    } catch {
+      // Fall through to the plain text.
+    }
+  }
+  return typeof text === "string" && text ? plainTextToDoc(text) : { type: "doc", content: [] };
+}
+

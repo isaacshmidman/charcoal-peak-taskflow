@@ -279,9 +279,10 @@ describe("delete_task", () => {
 
 describe("create_note", () => {
   it("stores the text as the note editor would, one paragraph per line", async () => {
-    const { data } = await run("create_note", { text: "Packing list\n\nPassport", title: "Trip", tags: ["travel"] });
+    const { data } = await run("create_note", { text: "Packing list\n\nPassport", title: "Trip", tags: ["travel"], format: "plain" });
     const note = get(data.id, "Note");
-    expect(note).toMatchObject({ title: "Trip", content_text: "Packing list\n\nPassport", tags: ["travel"], pinned: false });
+    // The plain-text mirror is what the editor would save for these blocks.
+    expect(note).toMatchObject({ title: "Trip", content_text: "Packing list\n\n\n\nPassport", tags: ["travel"], pinned: false });
     expect(JSON.parse(note.content_json).content).toEqual([
       { type: "paragraph", content: [{ type: "text", text: "Packing list" }] },
       { type: "paragraph" },
@@ -466,7 +467,7 @@ describe("editing notes", () => {
 
   it("adds text at the end without touching what's there", async () => {
     const n = note({ title: "Trip", content_json: LINKED("task_y"), content_text: "Trip plan\n\nFirst call the plumber then pack the bag" });
-    await run("update_note", { note_id: n.id, append_text: "Book the train\nCharge the camera" });
+    await run("update_note", { note_id: n.id, append_text: "Book the train\nCharge the camera", format: "plain" });
     const doc = JSON.parse(get(n.id, "Note").content_json);
     expect(doc.content).toHaveLength(4);
     expect(doc.content[1].content[1].marks[0].type).toBe("taskLink");
@@ -626,3 +627,74 @@ describe("edit_tags", () => {
     expect(get(t.id).tags).toEqual(["Calculus"]);
   });
 });
+
+describe("notes in Markdown", () => {
+  const note = (input) => createEntityRecord(db, { entityName: "Note", appId: APP_ID, user: ME, input, config });
+
+  it("writes a note from Markdown, with lists, checklists, formatting and a link to one of the person's own tasks", async () => {
+    const t = task({ title: "Call plumber", due_date: "2026-10-05" });
+    const md = [
+      "## Weekend",
+      "",
+      `Remember to [call the plumber](zephyrly-task:${t.id}) and **pay rent**.`,
+      "",
+      "- [ ] Laundry",
+      "- [x] Groceries",
+      "",
+      "1. First",
+      "2. Second",
+      "",
+      "[not mine](zephyrly-task:task_elsewhere) [bad](javascript:alert(1)) <b>raw</b>",
+    ].join("\n");
+    const { data } = await run("create_note", { title: "Plans", text: md, priority: "High" });
+    const saved = get(data.id, "Note");
+    const doc = JSON.parse(saved.content_json);
+    expect(doc.content.map((n) => n.type)).toEqual(["heading", "paragraph", "taskList", "orderedList", "paragraph"]);
+    expect(doc.content[0].attrs.level).toBe(2);
+    const linked = doc.content[1].content.find((n) => n.text === "call the plumber");
+    expect(linked.marks).toEqual([{ type: "taskLink", attrs: { taskId: t.id } }]);
+    expect(doc.content[1].content.find((n) => n.text === "pay rent").marks).toEqual([{ type: "bold" }]);
+    expect(doc.content[2].content.map((i) => i.attrs.checked)).toEqual([false, true]);
+    // Another person's task id, a script link and raw HTML all stay plain text.
+    const last = doc.content[4].content;
+    expect(last.every((n) => !n.marks)).toBe(true);
+    expect(last.map((n) => n.text).join("")).toBe("not mine bad <b>raw</b>");
+    expect(saved.priority_id).toBe(priority("High").id);
+    expect(saved.content_text).toContain("Laundry");
+  });
+
+  it("get_note shows a note as Markdown, links to tasks included", async () => {
+    const n = note({
+      title: "Trip",
+      content_json: JSON.stringify({
+        type: "doc",
+        content: [
+          { type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: "Plan" }] },
+          {
+            type: "paragraph",
+            content: [
+              { type: "text", text: "call the plumber", marks: [{ type: "taskLink", attrs: { taskId: "task_x" } }] },
+              { type: "text", text: " and " },
+              { type: "text", text: "pack", marks: [{ type: "bold" }] },
+            ],
+          },
+          { type: "taskList", content: [{ type: "taskItem", attrs: { checked: true }, content: [{ type: "paragraph", content: [{ type: "text", text: "tickets" }] }] }] },
+        ],
+      }),
+      content_text: "Plan\n\ncall the plumber and pack\n\ntickets",
+    });
+    const { data } = await run("get_note", { note_id: n.id });
+    expect(data.markdown).toBe("# Plan\n\n[call the plumber](zephyrly-task:task_x) and **pack**\n\n- [x] tickets");
+  });
+
+  it("appending Markdown keeps what was there and adds structure after it", async () => {
+    const n = note({ title: "List", content_text: "Intro" });
+    await run("update_note", { note_id: n.id, append_text: "- one\n- two", priority: "Low" });
+    const saved = get(n.id, "Note");
+    expect(JSON.parse(saved.content_json).content.map((b) => b.type)).toEqual(["paragraph", "bulletList"]);
+    expect(saved.priority_id).toBe(priority("Low").id);
+    await run("update_note", { note_id: n.id, priority: "none" });
+    expect(get(n.id, "Note").priority_id).toBe("");
+  });
+});
+

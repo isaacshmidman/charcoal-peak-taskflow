@@ -23,7 +23,8 @@ import { enqueueTaskPush } from "../push.js";
 import { MAX_BEFORE_MINUTES, parseReminder } from "../reminders.js";
 import { getNextRecurringDueDate } from "../lib/recurrence.js";
 import { PRIORITY_COLORS } from "../priority-color.js";
-import { countWords, docToText, plainTextToDoc } from "../lib/plain-text-doc.js";
+import { countWords, docToText, plainTextToDoc, storedDoc } from "../lib/plain-text-doc.js";
+import { markdownToDoc } from "../lib/markdown-doc.js";
 import { ToolError, isRealDate } from "./args.js";
 import { logActivity } from "./activity.js";
 import { DATE, findPriority, getOwnNote, getOwnTask, listRecords, loadPriorities, loadTasks, lower } from "./context.js";
@@ -712,17 +713,52 @@ const deleteTask = {
   },
 };
 
+const FORMAT = {
+  type: "string",
+  enum: ["markdown", "plain"],
+  description:
+    'How to read the text. "markdown" (default): # headings, **bold**, *italic*, ~~strike~~, `code`, [links](https://…), ' +
+    "- bullets, 1. numbers, - [ ] checklists, > quotes, ``` code blocks, and [text](zephyrly-task:<task id>) to link text to a task. " +
+    '"plain": exactly as written, one paragraph per line.',
+};
+
+/**
+ * Text an AI app wrote for a note, as a document: Markdown unless it
+ * asked for plain text. Links to tasks only survive for the person's own
+ * tasks.
+ * @param {ToolContext} ctx
+ * @param {string} text
+ * @param {string | undefined} format
+ */
+function docFromAiText(ctx, text, format) {
+  if (format === "plain") return plainTextToDoc(text);
+  const own = new Set(loadTasks(ctx).map((t) => t.id));
+  return markdownToDoc(text, { taskLinkAllowed: (id) => own.has(id) });
+}
+
+/**
+ * A note's priority by name or id, or "" for "none".
+ * @param {ToolContext} ctx
+ * @param {string} wanted
+ */
+function notePriorityId(ctx, wanted) {
+  if (lower(wanted) === "none") return "";
+  return priorityNamed(loadPriorities(ctx), wanted).id;
+}
+
 /** @type {Tool} */
 const createNote = {
   name: "create_note",
   title: "Add a note",
-  description: `Add a note from plain text (one paragraph per line, at most ${NOTE_WORDS} words).`,
+  description: `Add a note, written in Markdown (headings, lists, checklists, bold, links, links to tasks) or plain text; at most ${NOTE_WORDS} words.`,
   inputSchema: {
     type: "object",
     properties: {
       text: { type: "string", maxLength: 100_000, description: "The note's text." },
+      format: FORMAT,
       title: { type: "string", maxLength: 200, description: "A title. Optional." },
       tags: { ...TAG_LIST, description: "Tags, without #." },
+      priority: { type: "string", maxLength: 200, description: 'A priority name or id, or "none". Optional.' },
     },
     required: ["text"],
     additionalProperties: false,
@@ -730,11 +766,14 @@ const createNote = {
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   write: true,
   handler(ctx, args) {
-    if (countWords(args.text) > NOTE_WORDS) throw new ToolError(`A note can be at most ${NOTE_WORDS} words.`);
+    const doc = docFromAiText(ctx, args.text, args.format);
+    const text = docToText(doc);
+    if (countWords(text) > NOTE_WORDS) throw new ToolError(`A note can be at most ${NOTE_WORDS} words.`);
     const input = {
       title: args.title || "",
-      content_text: args.text,
-      content_json: JSON.stringify(plainTextToDoc(args.text)),
+      content_text: text,
+      content_json: text ? JSON.stringify(doc) : "",
+      priority_id: args.priority ? notePriorityId(ctx, args.priority) : "",
       tags: cleanTags(args.tags),
       pinned: false,
     };
@@ -750,21 +789,10 @@ const createNote = {
 };
 
 /**
- * A note's body as a rich-text document: its saved JSON, or its plain
- * text laid out as the editor would open it.
+ * A note's body as a rich-text document.
  * @param {any} note
  */
-function noteDoc(note) {
-  if (note.content_json) {
-    try {
-      const parsed = JSON.parse(note.content_json);
-      if (parsed && parsed.type === "doc") return parsed;
-    } catch {
-      // Fall through to the plain text.
-    }
-  }
-  return note.content_text ? plainTextToDoc(note.content_text) : { type: "doc", content: [] };
-}
+const noteDoc = (note) => storedDoc(note.content_json, note.content_text);
 
 /**
  * Replace `find` inside the document's text, one run of text at a time, so
@@ -809,7 +837,8 @@ const updateNote = {
   description:
     "Change a note (read it first with get_note): its title, tags or pinning; add text at the end (append_text); " +
     "swap words inside it (find and replace_with, which keeps its formatting and links to tasks); or replace all of its text " +
-    "(replace_all_text, which drops its formatting and task links). Every change can be undone in Zephyrly.",
+    "(replace_all_text, which drops its formatting and task links). New text is Markdown unless format is plain. " +
+    "Every change can be undone in Zephyrly.",
   inputSchema: {
     type: "object",
     properties: {
@@ -818,10 +847,12 @@ const updateNote = {
       add_tags: { ...TAG_LIST, description: "Tags to add, without #." },
       remove_tags: { ...TAG_LIST, description: "Tags to remove." },
       pinned: { type: "boolean", description: "Pin it to the top, or unpin it." },
-      append_text: { type: "string", maxLength: 100_000, description: "Plain text to add at the end, one paragraph per line." },
+      priority: { type: "string", maxLength: 200, description: 'A priority name or id, or "none".' },
+      append_text: { type: "string", maxLength: 100_000, description: "Text to add at the end (Markdown unless format is plain)." },
       find: { type: "string", maxLength: 2000, description: "Exact text to look for; every match is replaced." },
       replace_with: { type: "string", maxLength: 20_000, "x-allow-empty": true, description: "What find becomes (empty to delete it)." },
-      replace_all_text: { type: "string", maxLength: 100_000, description: "New text for the whole note, one paragraph per line." },
+      replace_all_text: { type: "string", maxLength: 100_000, description: "New text for the whole note (Markdown unless format is plain)." },
+      format: FORMAT,
     },
     required: ["note_id"],
     additionalProperties: false,
@@ -831,7 +862,7 @@ const updateNote = {
   handler(ctx, args) {
     const note = getOwnNote(ctx, args.note_id);
     if (Object.keys(args).length === 1) {
-      throw new ToolError("Say what to change: title, tags, pinned, append_text, find and replace_with, or replace_all_text.");
+      throw new ToolError("Say what to change: title, tags, pinned, priority, append_text, find and replace_with, or replace_all_text.");
     }
     if ((args.find != null) !== (args.replace_with != null)) throw new ToolError(`"find" and "replace_with" go together.`);
     if (args.replace_all_text != null && (args.append_text != null || args.find != null)) {
@@ -858,12 +889,19 @@ const updateNote = {
       patch.pinned = args.pinned;
       changes.push(args.pinned ? "pinned" : "unpinned");
     }
+    if (args.priority != null) {
+      const id = notePriorityId(ctx, args.priority);
+      if (id !== (note.priority_id || "")) {
+        patch.priority_id = id;
+        changes.push(id ? `priority ${loadPriorities(ctx).find((p) => p.id === id)?.name}` : "no priority");
+      }
+    }
 
     if (args.replace_all_text != null || args.find != null || args.append_text != null) {
       let doc = noteDoc(note);
       if (args.replace_all_text != null) {
         const links = countTaskLinks(doc);
-        doc = plainTextToDoc(args.replace_all_text);
+        doc = docFromAiText(ctx, args.replace_all_text, args.format);
         changes.push(`replaced all its text${links ? `, removing ${links} link${links === 1 ? "" : "s"} to tasks` : ""}`);
       }
       if (args.find != null) {
@@ -876,7 +914,7 @@ const updateNote = {
         changes.push(`replaced "${args.find}"${found > 1 ? ` (${found} times)` : ""}`);
       }
       if (args.append_text != null) {
-        doc.content = [...(doc.content || []), ...plainTextToDoc(args.append_text).content];
+        doc.content = [...(doc.content || []), ...docFromAiText(ctx, args.append_text, args.format).content];
         changes.push("added text at the end");
       }
       const text = docToText(doc);

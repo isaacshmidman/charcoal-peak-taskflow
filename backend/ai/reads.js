@@ -4,6 +4,8 @@
  * and the person's priorities and tags. Offered to every connection.
  */
 import { getEntityRecord } from "../store.js";
+import { storedDoc } from "../lib/plain-text-doc.js";
+import { docToMarkdown } from "../lib/markdown-doc.js";
 import { ToolError } from "./args.js";
 import { DATE, asToolError, findPriority, getOwnTask, hasTag, listRecords, loadPriorities, loadTasks, lower } from "./context.js";
 import {
@@ -269,7 +271,9 @@ const searchNotes = {
 const getNote = {
   name: "get_note",
   title: "Read a note",
-  description: `The full text of one note (up to ${NOTE_MAX_CHARS.toLocaleString("en-US")} characters).`,
+  description:
+    `One note in full (up to ${NOTE_MAX_CHARS.toLocaleString("en-US")} characters), as Markdown: headings, lists, checklists, ` +
+    "bold, links, and text linked to a task as [text](zephyrly-task:<task id>). Colours, highlights and fonts don't show.",
   inputSchema: {
     type: "object",
     properties: { note_id: { type: "string", maxLength: 200, description: "The note's id." } },
@@ -281,12 +285,25 @@ const getNote = {
   handler(ctx, args) {
     /** @type {any} */
     const note = asToolError(() => getEntityRecord(ctx.db, { entityName: "Note", appId: ctx.appId, user: ctx.user, id: args.note_id }), `No note with id "${args.note_id}".`);
-    const text = String(note.content_text || "");
-    const cut = text.length > NOTE_MAX_CHARS;
-    const body = cut ? `${text.slice(0, NOTE_MAX_CHARS)}\n\n(cut off at ${NOTE_MAX_CHARS.toLocaleString("en-US")} characters)` : text;
+    // Shown as Markdown, so headings, lists, checklists, bold and links to
+    // tasks are visible; colours, highlights and fonts aren't in Markdown.
+    const markdown = docToMarkdown(storedDoc(note.content_json, note.content_text));
+    const cut = markdown.length > NOTE_MAX_CHARS;
+    const body = cut ? `${markdown.slice(0, NOTE_MAX_CHARS)}\n\n(cut off at ${NOTE_MAX_CHARS.toLocaleString("en-US")} characters)` : markdown;
+    const priority = loadPriorities(ctx).find((p) => p.id === note.priority_id);
     return {
-      text: `${note.title || "Untitled"}${(note.tags || []).map((/** @type {string} */ t) => ` #${t}`).join("")} (id ${note.id})\n\n${body || "(empty)"}`,
-      data: { id: note.id, title: note.title || "Untitled", tags: note.tags || [], pinned: Boolean(note.pinned), text: body, truncated: cut, updated_date: note.updated_date },
+      text: `${note.title || "Untitled"}${(note.tags || []).map((/** @type {string} */ t) => ` #${t}`).join("")}${priority ? ` [${priority.name}]` : ""} (id ${note.id})\n\n${body || "(empty)"}`,
+      data: {
+        id: note.id,
+        title: note.title || "Untitled",
+        tags: note.tags || [],
+        priority: priority?.name || null,
+        pinned: Boolean(note.pinned),
+        markdown: body,
+        text: String(note.content_text || "").slice(0, NOTE_MAX_CHARS),
+        truncated: cut,
+        updated_date: note.updated_date,
+      },
     };
   },
 };
