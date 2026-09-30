@@ -5,14 +5,15 @@ import { SHORTCUT_EVENTS } from "@/lib/shortcuts";
 
 /**
  * Usage: call showDeleteToast({ label: "Task X was deleted", onUndo: fn })
+ * `duration` (ms, default 3000) keeps a longer sentence up long enough to read.
  * This component renders itself in the bottom-left, pointer-events:none when hidden.
  * Pressing `z` (or Mod+Z) while the toast is visible triggers Undo.
  */
 
 let _setToast = null;
 
-export function showDeleteToast({ label, onUndo, hideUndo = false }) {
-  if (_setToast) _setToast({ label, onUndo, hideUndo: hideUndo || !onUndo, id: Date.now() });
+export function showDeleteToast({ label, onUndo, hideUndo = false, duration = 3000 }) {
+  if (_setToast) _setToast({ label, onUndo, hideUndo: hideUndo || !onUndo, duration, id: Date.now() });
 }
 
 export default function DeleteToast() {
@@ -27,7 +28,7 @@ export default function DeleteToast() {
 
   useEffect(() => {
     if (!toast) return;
-    const timer = setTimeout(() => setToast(null), 3000);
+    const timer = setTimeout(() => setToast(null), toast.duration ?? 3000);
     return () => clearTimeout(timer);
   }, [toast?.id]);
 
@@ -49,7 +50,7 @@ export default function DeleteToast() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 12 }}
             transition={{ duration: 0.18 }}
-            className="pointer-events-auto flex items-center gap-3 bg-slate-900 dark:bg-slate-100 px-4 py-2.5 rounded-xl shadow-lg"
+            className="pointer-events-auto flex max-w-[calc(100vw-2rem)] items-center gap-3 bg-slate-900 dark:bg-slate-100 px-4 py-2.5 rounded-xl shadow-lg sm:max-w-md"
             data-testid="delete-toast"
           >
             <span className="text-xs font-medium text-white dark:text-slate-900">{toast.label}</span>

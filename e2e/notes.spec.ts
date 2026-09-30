@@ -187,3 +187,88 @@ test("on a phone, tapping Notes in the nav goes back from a note to the list", a
   await expect(page.getByTestId("note-row-note-1")).toBeVisible();
   await expect(page.getByTestId("note-back")).toBeHidden();
 });
+
+// ── Schedule Builder ────────────────────────────────────────────────────
+
+const slots = (page: Page) => page.getByTestId("schedule-slot");
+/** "7:00 AM – 8:00 AM" for each slot, from its start field's name. */
+const slotRanges = (page: Page) =>
+  page.getByTestId("slot-start").evaluateAll((els) => els.map((el) => el.getAttribute("aria-label")!.replace("Start of ", "")));
+const savedSchedule = async (api: Awaited<ReturnType<typeof installMockBackend>>, id: string) => {
+  const stored = (await api.getState()).notes.find((n) => n.id === id)?.schedule_json;
+  return stored ? JSON.parse(stored) : null;
+};
+
+test("Schedule turns a note into the day by the hour, and typing a new end moves the slots after it", async ({ page }) => {
+  const api = await installMockBackend(page, { tasks: [], priorities: [defaultPriority], notes: [note({ title: "Saturday" })] });
+  await page.goto("/Notes");
+  await page.getByRole("switch", { name: "Schedule builder" }).click();
+
+  await expect(slots(page)).toHaveCount(24);
+  const ranges = await slotRanges(page);
+  expect(ranges.slice(0, 2)).toEqual(["12:00 AM – 1:00 AM", "1:00 AM – 2:00 AM"]);
+  expect(ranges.at(-1)).toBe("11:00 PM – 12:00 AM");
+
+  // 7:00 – 8:00 AM: click the end's hour, type 07 then 30.
+  await page.getByRole("textbox", { name: "End of 7:00 AM – 8:00 AM, hour" }).click();
+  await page.keyboard.type("07");
+  await expect(page.getByRole("alert")).toHaveText("The end has to be after the start (7:00 AM).");
+  await page.keyboard.type("30");
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(page.getByTestId("delete-toast")).toContainText("Adjusted 16 other slots and added 1 empty slot.");
+  expect((await slotRanges(page)).slice(7, 10)).toEqual(["7:00 AM – 7:30 AM", "7:30 AM – 8:30 AM", "8:30 AM – 9:30 AM"]);
+
+  await page.getByRole("textbox", { name: "What’s happening 7:00 AM – 7:30 AM" }).fill("Breakfast");
+  await expect.poll(async () => (await savedSchedule(api, "note-1"))?.slots.find((s: any) => s.text === "Breakfast"))
+    .toMatchObject({ start: 7 * 60, end: 7 * 60 + 30 });
+
+  await page.reload();
+  await expect(page.getByTestId("note-row-note-1")).toContainText("7:00 AM Breakfast");
+  await expect(page.getByRole("textbox", { name: "What’s happening 7:00 AM – 7:30 AM" })).toHaveValue("Breakfast");
+});
+
+test("an end before its start is put back, with the reason", async ({ page }) => {
+  await installMockBackend(page, { tasks: [], priorities: [defaultPriority], notes: [note()] });
+  await page.goto("/Notes");
+  await page.getByRole("switch", { name: "Schedule builder" }).click();
+
+  await page.getByRole("textbox", { name: "End of 7:00 AM – 8:00 AM, hour" }).click();
+  await page.keyboard.type("6");
+  await page.getByTestId("note-title-input").click();
+  await expect(page.getByTestId("delete-toast")).toContainText("The end has to be after the start (7:00 AM).");
+  expect((await slotRanges(page))[7]).toBe("7:00 AM – 8:00 AM");
+});
+
+test("Advanced settings: a 5-minute gap ends every slot 5 minutes before the next", async ({ page }) => {
+  const api = await installMockBackend(page, { tasks: [], priorities: [defaultPriority], notes: [note()] });
+  await page.goto("/Notes");
+  await page.getByRole("switch", { name: "Schedule builder" }).click();
+  await page.getByRole("button", { name: "Advanced settings" }).click();
+  await page.getByTestId("gap-5").click();
+
+  expect((await slotRanges(page)).slice(0, 2)).toEqual(["12:00 AM – 12:55 AM", "1:00 AM – 1:55 AM"]);
+  await expect.poll(async () => (await savedSchedule(api, "note-1"))?.gap).toBe(5);
+
+  // Only the slot next to a change moves, when chosen.
+  await page.getByRole("radio", { name: /Only change the slot next to it/ }).click();
+  await page.keyboard.press("Escape");
+  await page.getByRole("textbox", { name: "End of 7:00 AM – 7:55 AM, minutes" }).click();
+  await page.keyboard.type("25");
+  expect((await slotRanges(page)).slice(7, 10)).toEqual(["7:00 AM – 7:25 AM", "7:30 AM – 8:55 AM", "9:00 AM – 9:55 AM"]);
+});
+
+test("switching Schedule off shows the note's text again, untouched", async ({ page }) => {
+  await installMockBackend(page, {
+    tasks: [],
+    priorities: [defaultPriority],
+    notes: [note({ content_text: "Pack the tent" })],
+  });
+  await page.goto("/Notes");
+  await expect(editorBody(page)).toContainText("Pack the tent");
+  const toggle = page.getByRole("switch", { name: "Schedule builder" });
+  await toggle.click();
+  await expect(page.getByText("This note’s text is kept. Turn Schedule off to see it.")).toBeVisible();
+  await toggle.click();
+  await expect(editorBody(page)).toContainText("Pack the tent");
+  await expect(slots(page)).toHaveCount(0);
+});

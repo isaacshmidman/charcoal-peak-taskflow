@@ -34,6 +34,7 @@ import SplitDivider from "@/components/ui/split-divider";
 import TaskForm from "@/components/tasks/TaskForm";
 import NoteSidebar from "@/components/notes/NoteSidebar";
 import NoteCanvas from "@/components/notes/NoteCanvas";
+import { activeSchedule, scheduleSearchText } from "@/lib/schedule";
 
 export default function Notes() {
   const [search, setSearch] = useState("");
@@ -116,7 +117,8 @@ export default function Notes() {
       ? notes.filter(
           (n) =>
             (n.title || "").toLowerCase().includes(q) ||
-            (n.content_text || "").toLowerCase().includes(q)
+            (n.content_text || "").toLowerCase().includes(q) ||
+            scheduleSearchText(activeSchedule(n)).toLowerCase().includes(q)
         )
       : notes;
     return [...matched].sort((a, b) =>
@@ -138,7 +140,7 @@ export default function Notes() {
   // A blank note is created immediately and kept — pressing New note
   // gives you a blank page that's already real, Apple Notes style.
   const newNote = async () => {
-    const created = await noteMutation.create({ title: "", content_json: "", content_text: "" });
+    const created = await noteMutation.create({ title: "", content_json: "", content_text: "", schedule_json: "" });
     if (created?.id) setOpenNoteId(created.id);
     setMobilePane("editor");
   };
@@ -153,6 +155,7 @@ export default function Notes() {
       title: note.title || "",
       content_json: note.content_json || "",
       content_text: note.content_text || "",
+      schedule_json: note.schedule_json || "",
       pinned: !!note.pinned,
       tags: note.tags || [],
       priority_id: note.priority_id || "",

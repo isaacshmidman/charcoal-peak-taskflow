@@ -28,6 +28,7 @@ import {
 import MultiSortPanel from "@/components/tasks/MultiSortPanel";
 import { colorBg, isDarkColor } from "@/lib/colors";
 import { compareDeletedNote, compareDeletedTask, sortTrash } from "@/lib/trash-sort";
+import { activeSchedule, schedulePreview, scheduleSearchText } from "@/lib/schedule";
 
 const RETENTION_OPTIONS = [
   { value: "7", label: "1 week" },
@@ -131,7 +132,7 @@ export default function RecentlyDeleted({ onBack } = {}) {
   const displayedNotes = useMemo(() => {
     const q = search.toLowerCase();
     const filtered = rawDeletedNotes.filter(n =>
-      !q || (n.title || "").toLowerCase().includes(q) || (n.content_text || "").toLowerCase().includes(q) || (n.tags || []).some(t => t.toLowerCase().includes(q))
+      !q || (n.title || "").toLowerCase().includes(q) || (n.content_text || "").toLowerCase().includes(q) || scheduleSearchText(activeSchedule(n)).toLowerCase().includes(q) || (n.tags || []).some(t => t.toLowerCase().includes(q))
     );
     return sortTrash(filtered, sorts, compareDeletedNote, priorityRank);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -140,7 +141,7 @@ export default function RecentlyDeleted({ onBack } = {}) {
   const handleRestoreNote = async (record) => {
     await noteMutation.create({
       title: record.title, content_json: record.content_json, content_text: record.content_text,
-      pinned: !!record.pinned, tags: record.tags || [], priority_id: record.priority_id || "",
+      schedule_json: record.schedule_json || "", pinned: !!record.pinned, tags: record.tags || [], priority_id: record.priority_id || "",
     });
     await deletedNoteMutation.remove(record.id);
     showDeleteToast({ label: formatDeleteLabel({ scenario: "restore_single", title: record.title || "Untitled" }), hideUndo: true });
@@ -397,7 +398,11 @@ const DeletedNoteCard = forwardRef(function DeletedNoteCard(
               )}>
                 {record.title || "Untitled"}
               </p>
-              {record.content_text?.trim() && (
+              {activeSchedule(record) ? (
+                <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                  {schedulePreview(activeSchedule(record))}
+                </p>
+              ) : record.content_text?.trim() && (
                 <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
                   {record.content_text}
                 </p>

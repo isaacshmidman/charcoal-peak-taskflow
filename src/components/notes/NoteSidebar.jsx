@@ -8,13 +8,16 @@
  * ordering. Search and New note live in the page header with every other
  * nav's, so this pane is only the list.
  */
-import { Trash2 } from "lucide-react";
+import { CalendarClock, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
 import { useSwipeToDelete } from "@/hooks/useSwipeToDelete";
 import { cn } from "@/lib/utils";
+import { activeSchedule, schedulePreview } from "@/lib/schedule";
 
-/** First non-empty line of the body, for the preview row. */
+/** First non-empty line of the body, for the preview row — or, for a schedule, its first slots. */
 function previewOf(note) {
+  const schedule = activeSchedule(note);
+  if (schedule) return schedulePreview(schedule);
   const text = (note.content_text || "").trim();
   if (!text) return "No additional text";
   const firstLine = text.split("\n").find((line) => line.trim());
@@ -82,11 +85,12 @@ function NoteRow({ note, active, onSelect, onDelete }) {
         </p>
         <p
           className={cn(
-            "truncate text-[11px]",
+            "flex items-center gap-1 truncate text-[11px]",
             active ? "text-white/70 dark:text-slate-900/70" : "text-slate-400 dark:text-slate-500"
           )}
         >
-          {previewOf(note)}
+          {activeSchedule(note) && <CalendarClock aria-label="Schedule" className="h-3 w-3 shrink-0" />}
+          <span className="truncate">{previewOf(note)}</span>
         </p>
         <p
           className={cn(

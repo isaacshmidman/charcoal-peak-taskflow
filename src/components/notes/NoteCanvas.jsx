@@ -11,6 +11,11 @@
  * Notes autosave, including while blank: pressing New note creates the
  * note immediately and an empty note is kept, the opposite of the task
  * forms, where nothing is written until the button.
+ *
+ * The Schedule switch in the header turns the note into a schedule
+ * builder (schedule/ScheduleBuilder.jsx): the day in slots, in place of
+ * the text. Switching it off shows the text again, untouched, and keeps
+ * the schedule for next time.
  */
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
@@ -21,6 +26,11 @@ import { EditorLoadBoundary } from "@/components/tasks/TaskForm/TitleAndDescript
 import Toolbar from "@/components/tasks/richtext/Toolbar";
 import { useAutosave } from "@/hooks/useAutosave";
 import { useKeyboardInset } from "@/hooks/useKeyboardInset";
+import SettingsToggle from "@/components/settings/SettingsToggle";
+import { newSchedule, parseSchedule } from "@/lib/schedule";
+import ScheduleBuilder from "./schedule/ScheduleBuilder";
+import ScheduleSettings from "./schedule/ScheduleSettings";
+import { useScheduleEditor } from "./schedule/useScheduleEditor";
 
 const RichDescriptionEditor = lazy(() => import("@/components/tasks/RichDescriptionEditor"));
 
@@ -53,12 +63,29 @@ export default function NoteCanvas({
     title: note.title || "",
     content_json: note.content_json || "",
     content_text: note.content_text || "",
+    schedule_json: note.schedule_json || "",
   });
 
   const payload = useMemo(
-    () => ({ title: form.title, content_json: form.content_json, content_text: form.content_text }),
+    () => ({ title: form.title, content_json: form.content_json, content_text: form.content_text, schedule_json: form.schedule_json }),
     [form]
   );
+
+  const schedule = useMemo(() => parseSchedule(form.schedule_json), [form.schedule_json]);
+  const scheduleOn = !!schedule?.enabled;
+  const scheduleEditor = useScheduleEditor(schedule, (next) => setForm((f) => ({ ...f, schedule_json: JSON.stringify(next) })));
+  // Off keeps the schedule (and on brings it back); the first time on lays
+  // out the whole day in hours.
+  const setScheduleOn = (on) => {
+    // The text editor unmounts while the schedule shows; the bar must not
+    // hold on to it (a new one arrives through onEditorReady).
+    if (on) setEditor(null);
+    setForm((f) => {
+      const existing = parseSchedule(f.schedule_json);
+      if (!existing && !on) return f;
+      return { ...f, schedule_json: JSON.stringify(existing ? { ...existing, enabled: on } : newSchedule()) };
+    });
+  };
 
   const saveNote = useCallback((data) => onSave(note.id, data), [onSave, note.id]);
 
@@ -71,6 +98,7 @@ export default function NoteCanvas({
       title: note.title || "",
       content_json: note.content_json || "",
       content_text: note.content_text || "",
+      schedule_json: note.schedule_json || "",
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [note.id]);
@@ -120,9 +148,20 @@ export default function NoteCanvas({
           }}
           className="min-w-0 flex-1 bg-transparent text-lg font-semibold text-slate-900 outline-none placeholder:text-slate-300 dark:text-slate-100 dark:placeholder:text-slate-600"
         />
+        {/* Top corner: the Schedule switch, and its settings once it's on. */}
+        <div className="flex shrink-0 items-center gap-1 pt-1">
+          {scheduleOn && <ScheduleSettings schedule={schedule} editor={scheduleEditor} />}
+          <label className="flex cursor-pointer items-center gap-2 pl-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+            Schedule
+            <SettingsToggle checked={scheduleOn} onChange={setScheduleOn} label="Schedule builder" />
+          </label>
+        </div>
       </div>
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-1" data-testid="note-scroll">
+        {scheduleOn ? (
+          <ScheduleBuilder schedule={schedule} editor={scheduleEditor} noteHasText={!!form.content_text.trim()} />
+        ) : (
         <EditorLoadBoundary
           fallback={
             <Textarea
@@ -139,8 +178,10 @@ export default function NoteCanvas({
             }
           >
             <RichDescriptionEditor
-              valueJson={note.content_json}
-              plainFallback={note.content_text}
+              // Read once, when it mounts — which is again after the
+              // schedule is switched off, so it starts from the latest text.
+              valueJson={form.content_json}
+              plainFallback={form.content_text}
               wordLimit={NOTE_WORD_LIMIT}
               chromeless
               minHeight="60vh"
@@ -154,6 +195,7 @@ export default function NoteCanvas({
             />
           </Suspense>
         </EditorLoadBoundary>
+        )}
       </div>
 
       {/* Formatting bar docked at the bottom, spanning the pane's full
@@ -165,10 +207,11 @@ export default function NoteCanvas({
         data-richtext-toolbar
         className={cn(
           "shrink-0 border-t border-border-hairline bg-slate-50 transition-opacity dark:bg-[#0c0c0c]",
-          showToolbar ? "opacity-100" : "pointer-events-none opacity-0"
+          showToolbar && !scheduleOn ? "opacity-100" : "pointer-events-none opacity-0",
+          scheduleOn && "hidden"
         )}
       >
-        {editor && (
+        {editor && !editor.isDestroyed && !scheduleOn && (
           <Toolbar
             editor={editor}
             placement="flush"
