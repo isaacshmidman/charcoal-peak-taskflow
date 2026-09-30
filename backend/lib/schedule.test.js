@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   DAY,
   activeSchedule,
+  alreadyOnCalendar,
   changeEnd,
   changeStart,
   cleanDefaults,
@@ -25,6 +26,7 @@ import {
   setSlotLength,
   setSlotText,
   settingsOf,
+  slotsAsTasks,
   splitSlot,
 } from "./schedule.js";
 
@@ -336,6 +338,29 @@ describe("pinned settings", () => {
     // A gap as long as the slots: no gap.
     expect(scheduleFromDefaults({ gap: 30, slot: 30 }).gap).toBe(0);
     expect(cleanDefaults({ gap: -1, slot: 2, dayStart: "7", cascade: "up", extra: true })).toEqual({});
+  });
+});
+
+describe("to the calendar", () => {
+  it("each slot with something in it becomes a task at its times; a midnight end is 11:59 PM", () => {
+    let s = fill(fill(newSchedule(), h(7), "Breakfast"), h(23), "  Wind   down ");
+    s = ok(placeEntry(s, h(9, 15), h(10, 45), "Exam"));
+    const tasks = slotsAsTasks(s, "2026-10-03");
+    expect(tasks.map(({ slotId, ...t }) => t)).toEqual([
+      { title: "Breakfast", due_date: "2026-10-03", task_time: "7:00AM", task_end_time: "8:00AM" },
+      { title: "Exam", due_date: "2026-10-03", task_time: "9:15AM", task_end_time: "10:45AM" },
+      { title: "Wind down", due_date: "2026-10-03", task_time: "11:00PM", task_end_time: "11:59PM" },
+    ]);
+    expect(slotsAsTasks(s, "2026-10-03", [tasks[1].slotId]).map((t) => t.title)).toEqual(["Exam"]);
+  });
+
+  it("knows what's already on that day, so adding twice doesn't double it", () => {
+    const [breakfast] = slotsAsTasks(fill(newSchedule(), h(7), "Breakfast"), "2026-10-03");
+    const on = (overrides) => [{ title: "breakfast", due_date: "2026-10-03", task_time: "7:00AM", task_end_time: "8:00AM", ...overrides }];
+    expect(alreadyOnCalendar(on({}), breakfast)).toBe(true);
+    expect(alreadyOnCalendar(on({ due_date: "2026-10-04" }), breakfast)).toBe(false);
+    expect(alreadyOnCalendar(on({ task_time: "7:30AM" }), breakfast)).toBe(false);
+    expect(alreadyOnCalendar(on({ parent_id: "task_x" }), breakfast)).toBe(false);
   });
 });
 

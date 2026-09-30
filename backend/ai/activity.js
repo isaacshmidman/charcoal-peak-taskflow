@@ -140,6 +140,20 @@ export function undoActivity(db, config, { appId, user, activityId }) {
         deleteEntityRecord(db, { entityName: "Task", ...scope, id: task.id, config });
         pushes.push({ op: "delete", taskSnapshot: task });
       }
+    } else if (undo.kind === "create_tasks") {
+      // Several tasks added in one go (a schedule added to the calendar):
+      // all checked before any is removed, so it's all or nothing.
+      const tasks = undo.tasks
+        .map((/** @type {any} */ t) => ({ ...t, record: current("Task", t.task_id) }))
+        .filter((/** @type {any} */ t) => t.record);
+      for (const t of tasks) {
+        unchangedSince(t.record, t.updated_date);
+        noFilesSince(t.record);
+      }
+      for (const t of tasks) {
+        deleteEntityRecord(db, { entityName: "Task", ...scope, id: t.record.id, config });
+        pushes.push({ op: "delete", taskSnapshot: t.record });
+      }
     } else if (undo.kind === "update_task") {
       const task = current("Task", undo.task_id);
       if (!task) throw new HttpError(409, "That task is gone, so there's nothing to undo.", "gone");

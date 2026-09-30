@@ -810,3 +810,50 @@ export function scheduleFromDefaults(defaults) {
   const gap = (d.gap ?? 0) < slot ? d.gap ?? 0 : 0;
   return newSchedule({ gap, slot, cascade: d.cascade ?? "shift", now: d.now ?? true, start, end });
 }
+
+// ── To the calendar ─────────────────────────────────────────────────────
+
+/**
+ * @typedef {{ slotId: string, title: string, due_date: string, task_time: string, task_end_time: string }} SlotTask
+ */
+
+/**
+ * The tasks a schedule becomes on `date` (YYYY-MM-DD): one for each slot
+ * with something in it, at its times, in the app's time format. A slot
+ * that ends at midnight ends at 11:59 PM: a task's day doesn't run into
+ * the next one (the task form and calendar drags stop there too).
+ * @param {Schedule} s
+ * @param {string} date
+ * @param {string[]} [slotIds]  only these slots
+ * @returns {SlotTask[]}
+ */
+export function slotsAsTasks(s, date, slotIds) {
+  const wanted = slotIds ? new Set(slotIds) : null;
+  return s.slots
+    .filter((slot) => isFilled(slot) && (!wanted || wanted.has(slot.id)))
+    .map((slot) => ({
+      slotId: slot.id,
+      title: slot.text.trim().replace(/\s+/g, " "),
+      due_date: date,
+      task_time: formatClock(slot.start, { compact: true }),
+      task_end_time: formatClock(Math.min(slot.end, DAY - 1), { compact: true }),
+    }));
+}
+
+/**
+ * Whether a task like this is already on that day — same title and times —
+ * so adding a schedule to the same day twice doesn't double it.
+ * @param {Array<{ title?: string, due_date?: string, task_time?: string, task_end_time?: string, parent_id?: string | null }>} tasks
+ * @param {SlotTask} task
+ */
+export function alreadyOnCalendar(tasks, task) {
+  const title = task.title.toLowerCase();
+  return tasks.some(
+    (t) =>
+      !t.parent_id &&
+      t.due_date === task.due_date &&
+      t.task_time === task.task_time &&
+      t.task_end_time === task.task_end_time &&
+      String(t.title || "").trim().replace(/\s+/g, " ").toLowerCase() === title
+  );
+}

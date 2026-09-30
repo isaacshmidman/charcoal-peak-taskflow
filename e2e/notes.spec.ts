@@ -316,3 +316,43 @@ test("a pinned setting is where every new schedule starts", async ({ page }) => 
   await expect(slots(page)).toHaveCount(17);
   expect((await slotRanges(page))[0]).toBe("7:00 AM – 8:00 AM");
 });
+
+test("Add to calendar turns filled slots into tasks on the day chosen, once, and Undo takes them back", async ({ page }) => {
+  const api = await installMockBackend(page, { tasks: [], priorities: [defaultPriority], notes: [note({ id: "plan", title: "Plan" })] });
+  await page.goto("/Notes");
+  await page.getByRole("switch", { name: "Schedule builder" }).click();
+  await page.getByRole("textbox", { name: "What’s happening 7:00 AM – 8:00 AM" }).fill("Breakfast");
+  await page.getByRole("textbox", { name: "What’s happening 9:00 AM – 10:00 AM" }).fill("Gym");
+
+  const tomorrow = await page.evaluate(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
+  const added = async () =>
+    (await api.getState()).tasks.filter((t: any) => t.due_date === tomorrow).map((t: any) => `${t.title} ${t.task_time}-${t.task_end_time}`).sort();
+
+  await page.getByRole("button", { name: "Add to calendar" }).click();
+  await page.getByRole("button", { name: "Tomorrow" }).click();
+  await page.getByRole("checkbox", { name: "Add Gym" }).click();
+  await expect(page.getByRole("checkbox", { name: "Add Gym" })).toHaveAttribute("aria-checked", "false");
+  // The row's text ticks it too, once.
+  await page.getByTestId("add-to-calendar-slots").getByText("Gym").click();
+  await expect(page.getByRole("checkbox", { name: "Add Gym" })).toHaveAttribute("aria-checked", "true");
+  await page.getByRole("checkbox", { name: "Add Gym" }).click();
+  await page.getByTestId("add-to-calendar-confirm").click();
+  await expect(page.getByTestId("delete-toast")).toContainText("Added 1 task to");
+  await expect.poll(added).toEqual(["Breakfast 7:00AM-8:00AM"]);
+
+  // Opened again for the same day: Breakfast is already there.
+  await page.getByRole("button", { name: "Add to calendar" }).click();
+  await page.getByRole("button", { name: "Tomorrow" }).click();
+  await expect(page.getByTestId("add-to-calendar-slots")).toContainText("Already on this day");
+  await expect(page.getByTestId("add-to-calendar-confirm")).toHaveText(/^Add 1 task to /);
+  await page.getByTestId("add-to-calendar-confirm").click();
+  await expect.poll(added).toEqual(["Breakfast 7:00AM-8:00AM", "Gym 9:00AM-10:00AM"]);
+
+  // The newest toast (the one before may still be fading out).
+  await page.getByTestId("delete-toast-undo").last().click();
+  await expect.poll(added).toEqual(["Breakfast 7:00AM-8:00AM"]);
+});

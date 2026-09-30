@@ -26,7 +26,7 @@ import { PRIORITY_COLORS } from "../priority-color.js";
 import { countWords, docToText, plainTextToDoc, storedDoc } from "../lib/plain-text-doc.js";
 import { isAllowedHref, markdownToDoc } from "../lib/markdown-doc.js";
 import { applyBlockChanges, applyMarks, findText, linkTextToTask, markChanges } from "./note-format.js";
-import { describeChange, parseSchedule, scheduleFromDefaults } from "../lib/schedule.js";
+import { alreadyOnCalendar, describeChange, isFilled, parseClock, parseSchedule, scheduleFromDefaults, slotsAsTasks } from "../lib/schedule.js";
 import { PIN_ARGS, SCHEDULE_CHANGES, applyScheduleChanges, newScheduleWith, pinnedData, pinnedLine, pinsAfter, scheduleData, scheduleText } from "./schedules.js";
 import { getScheduleDefaults, setScheduleDefaults } from "../schedule-defaults.js";
 import { ToolError, isRealDate } from "./args.js";
@@ -1452,6 +1452,100 @@ const editSchedule = {
   },
 };
 
+/** @type {Tool} */
+const addScheduleToCalendar = {
+  name: "add_schedule_to_calendar",
+  title: "Add a schedule to the calendar",
+  description:
+    "Add a note's schedule to the calendar on a day: each slot with something in it becomes a task at its times, as the app's Add to calendar button does, " +
+    "so it shows on the person's calendar and reaches a connected Google or Apple calendar like any task. " +
+    "A slot already on that day (same title and times) is left out, so adding twice doesn't double it. " +
+    "The tasks get the task form's defaults (the middle priority, the account's reminder). One Undo in Zephyrly takes them all back.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      note_id: { type: "string", maxLength: 200, description: "The schedule note's id." },
+      date: { ...DATE, description: "The day, as YYYY-MM-DD." },
+      slots: {
+        type: "array",
+        maxItems: 200,
+        items: { type: "string", maxLength: 20 },
+        description: "Only these slots, by their start times (like 7:00AM). Leave out for every slot with something in it.",
+      },
+    },
+    required: ["note_id", "date"],
+    additionalProperties: false,
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  write: true,
+  handler(ctx, args) {
+    const note = getOwnNote(ctx, args.note_id);
+    const schedule = parseSchedule(note.schedule_json);
+    if (!schedule) throw new ToolError("That note isn't a schedule. edit_schedule with on: true makes it one.");
+    /** @type {string[] | undefined} */
+    let only;
+    if (args.slots?.length) {
+      only = args.slots.map((/** @type {string} */ time) => {
+        const minutes = parseClock(time);
+        if (minutes == null) throw new ToolError(`"slots" must be start times like 7:30AM or 19:30.`);
+        const slot = schedule.slots.find((s) => s.start === minutes);
+        if (!slot) throw new ToolError(`No slot starts at ${formatTime(minutes)}. get_note shows every slot's times.`);
+        if (!isFilled(slot)) throw new ToolError(`The ${formatTime(minutes)} slot is empty, so there's nothing to add from it.`);
+        return slot.id;
+      });
+    }
+    const wanted = slotsAsTasks(schedule, args.date, only);
+    if (!wanted.length) throw new ToolError("Nothing to add: no slot in that schedule has anything in it yet.");
+    const existing = loadTasks(ctx);
+    const toAdd = wanted.filter((task) => !alreadyOnCalendar(existing, task));
+    const skipped = wanted.filter((task) => alreadyOnCalendar(existing, task)).map((task) => task.title);
+    const day = dayLabel(args.date);
+    const name = note.title ? quote(note.title) : "the untitled note";
+    if (!toAdd.length) {
+      return {
+        text: `Everything from ${name} is already on ${day}, so nothing was added.`,
+        data: { date: args.date, added: [], already_there: skipped },
+      };
+    }
+    // The task form's default: the middle priority by order.
+    const priorities = loadPriorities(ctx);
+    const priority = priorities[Math.floor(priorities.length / 2)] || null;
+    const inputs = toAdd.map(({ slotId, ...task }) => ({
+      ...task,
+      status: "todo",
+      task_type: "one_time",
+      recurrence: "none",
+      priority_id: priority?.id || "",
+      tags: [],
+      reminder: "",
+      description: "",
+      description_json: "",
+    }));
+    for (const input of inputs) validateClientInput("Task", input);
+    spendWrite(ctx);
+    const created = inTransaction(ctx.db, () =>
+      inputs.map((input) => createEntityRecord(ctx.db, { entityName: "Task", appId: ctx.appId, user: ctx.user, input, config: ctx.config }))
+    );
+    for (const task of created) push(ctx, "upsert", task);
+    const count = `${created.length} task${created.length === 1 ? "" : "s"}`;
+    logActivity(ctx, "add_schedule_to_calendar", `Added ${count} from the schedule ${name} to ${day}.`, {
+      kind: "create_tasks",
+      tasks: created.map((task) => ({ task_id: task.id, updated_date: task.updated_date })),
+    });
+    const lines = created.map((task) => `- ${task.task_time}–${task.task_end_time} ${quote(task.title)} (id ${task.id})`);
+    return {
+      text:
+        `Added ${count} from ${name} to ${day}:\n${lines.join("\n")}` +
+        (skipped.length ? `\nAlready on ${day}, so left out: ${skipped.map(quote).join(", ")}.` : ""),
+      data: {
+        date: args.date,
+        added: created.map((task) => ({ id: task.id, title: task.title, time: task.task_time, end_time: task.task_end_time })),
+        already_there: skipped,
+      },
+    };
+  },
+};
+
 /** @type {Tool[]} */
 export const WRITE_TOOLS = [
   createTask,
@@ -1464,6 +1558,7 @@ export const WRITE_TOOLS = [
   formatNote,
   makeTaskFromNote,
   editSchedule,
+  addScheduleToCalendar,
   deleteNote,
   editPriorities,
   editTags,

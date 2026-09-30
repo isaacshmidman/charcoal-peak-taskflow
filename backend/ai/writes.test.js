@@ -895,6 +895,42 @@ describe("schedules", () => {
     expect(pins()).toEqual({ dayStart: 420 });
   });
 
+  it("add_schedule_to_calendar makes each filled slot a task on the day, never twice; one Undo takes them all back", async () => {
+    const { data } = await run("create_note", {
+      title: "Saturday",
+      schedule: { fill: [{ start: "7:30AM", end: "8:00AM", text: "Breakfast" }, { start: "11:00PM", end: "12:00AM", text: "Read" }, { start: "1pm", end: "2pm", text: "Lunch" }] },
+    });
+    const onDay = () => tasks().filter((t) => t.due_date === "2026-10-03").map((t) => `${t.title} ${t.task_time}-${t.task_end_time}`).sort();
+
+    const first = await run("add_schedule_to_calendar", { note_id: data.id, date: "2026-10-03", slots: ["7:30AM", "11pm"] });
+    expect(onDay()).toEqual(["Breakfast 7:30AM-8:00AM", "Read 11:00PM-11:59PM"]);
+    expect(first.text).toContain("Added 2 tasks from “Saturday” to Sat 3 Oct:");
+    const firstEntry = listActivity(db, { appId: APP_ID, userId: ME.id })[0];
+    expect(firstEntry.summary).toBe("Added 2 tasks from the schedule “Saturday” to Sat 3 Oct.");
+    expect(tasks().find((t) => t.title === "Breakfast")).toMatchObject({ status: "todo", priority_id: priority("Normal").id, reminder: "" });
+    expect(enqueueTaskPush).toHaveBeenCalledTimes(2);
+
+    // Again, all of them: only Lunch is new.
+    const second = await run("add_schedule_to_calendar", { note_id: data.id, date: "2026-10-03" });
+    expect(second.data.added.map((t) => t.title)).toEqual(["Lunch"]);
+    expect(second.data.already_there).toEqual(["Breakfast", "Read"]);
+    expect(onDay()).toHaveLength(3);
+
+    undoLatest();
+    expect(onDay()).toEqual(["Breakfast 7:30AM-8:00AM", "Read 11:00PM-11:59PM"]);
+    undoActivity(db, config, { appId: APP_ID, user: ME, activityId: firstEntry.id });
+    expect(onDay()).toEqual([]);
+  });
+
+  it("add_schedule_to_calendar says what's wrong instead of guessing", async () => {
+    const plain = note({ title: "Plain" });
+    await expect(run("add_schedule_to_calendar", { note_id: plain.id, date: "2026-10-03" })).rejects.toThrow("That note isn't a schedule.");
+    const { data } = await run("create_note", { title: "Empty", schedule: {} });
+    await expect(run("add_schedule_to_calendar", { note_id: data.id, date: "2026-10-03" })).rejects.toThrow("Nothing to add");
+    await expect(run("add_schedule_to_calendar", { note_id: data.id, date: "2026-10-03", slots: ["7:00AM"] })).rejects.toThrow("The 7:00AM slot is empty");
+    await expect(run("add_schedule_to_calendar", { note_id: data.id, date: "Saturday" })).rejects.toThrow('"date" must be a date written like 2026-09-28.');
+  });
+
   it("search_notes finds slot text, and delete_note keeps the schedule for Recently Deleted", async () => {
     const { data } = await run("create_note", { title: "Friday", schedule: { fill: [{ start: "6pm", end: "8pm", text: "Pottery class" }] } });
     const found = await run("search_notes", { text: "pottery" });

@@ -30,6 +30,7 @@ import SettingsToggle from "@/components/settings/SettingsToggle";
 import { parseSchedule, scheduleFromDefaults } from "@/lib/schedule";
 import ScheduleBuilder from "./schedule/ScheduleBuilder";
 import ScheduleSettings from "./schedule/ScheduleSettings";
+import AddToCalendar from "./schedule/AddToCalendar";
 import { useScheduleEditor } from "./schedule/useScheduleEditor";
 import { useScheduleDefaults } from "./schedule/useScheduleDefaults";
 
@@ -152,6 +153,7 @@ export default function NoteCanvas({
         />
         {/* Top corner: the Schedule switch, and its settings once it's on. */}
         <div className="flex shrink-0 items-center gap-1 pt-1">
+          {scheduleOn && <AddToCalendar schedule={schedule} />}
           {scheduleOn && (
             <ScheduleSettings schedule={schedule} editor={scheduleEditor} defaults={scheduleDefaults} saveDefaults={saveScheduleDefaults} />
           )}

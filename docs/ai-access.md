@@ -47,6 +47,9 @@ PDFs or images). With changes allowed, it can also:
   kept). A slot with something
   in it is never dropped or pushed out of the day to make room: that
   change is refused, and nothing in that call is made;
+- add a schedule to the calendar on a day you name, as the Add to
+  calendar button does: each slot with something in it becomes a task at
+  its times; ones already on that day are left out;
 - add, rename, recolour, reorder or delete priorities, and add, remove or
   rename saved tags (a rename changes every task and note that has it);
 - save text as a file attached to a task (.txt, .md or .csv, up to 1 MB).
