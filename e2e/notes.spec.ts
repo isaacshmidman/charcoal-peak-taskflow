@@ -23,26 +23,31 @@ const note = (overrides: Record<string, any> = {}) => ({
 
 const editorBody = (page: Page) => page.getByTestId("note-scroll").locator(".tiptap-prose");
 
+/** The text the editor itself has selected (what Make task reads). */
+const editorSelection = (page: Page) =>
+  page.evaluate(() => {
+    const editor = (document.querySelector('[data-testid="note-scroll"] .tiptap-prose') as any)?.editor;
+    if (!editor) return null;
+    const { from, to } = editor.state.selection;
+    return editor.state.doc.textBetween(from, to);
+  });
+
 /**
  * Select the first `text.length` characters of the note from the start of
- * the line, and wait until the editor itself has the whole selection. The
- * browser moves its selection at once, but the editor catches up from
- * queued selectionchange events. On a busy CI runner a click could land
- * first and read a partial selection ("Call th").
+ * the line, and don't move on until the editor itself holds that
+ * selection. On a busy CI runner the keys can race the editor: it has
+ * taken in only part of the selection ("Call th", a click landing too
+ * early), or none of it (the keys arriving before it had focus). Checking
+ * once didn't cover the second, so select, wait a moment for the editor to
+ * catch up, and start over if it hasn't.
  */
 async function selectFromLineStart(page: Page, text: string) {
-  await editorBody(page).click();
-  await page.keyboard.press("Home");
-  for (let i = 0; i < text.length; i += 1) await page.keyboard.press("Shift+ArrowRight");
-  await expect
-    .poll(() =>
-      page.evaluate(() => {
-        const editor = (document.querySelector('[data-testid="note-scroll"] .tiptap-prose') as any)?.editor;
-        const { from, to } = editor.state.selection;
-        return editor.state.doc.textBetween(from, to);
-      })
-    )
-    .toBe(text);
+  await expect(async () => {
+    await editorBody(page).click();
+    await page.keyboard.press("Home");
+    for (let i = 0; i < text.length; i += 1) await page.keyboard.press("Shift+ArrowRight");
+    await expect.poll(() => editorSelection(page), { timeout: 3_000 }).toBe(text);
+  }).toPass({ timeout: 20_000 });
 }
 
 async function swipeAway(page: Page, row: Locator) {
