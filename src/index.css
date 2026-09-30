@@ -348,26 +348,41 @@
   text-decoration-thickness: 1.5px;
 }
 
-/* The dot is a widget decoration, never document content. */
+/* The dot is a widget decoration, never document content. It's the
+   highlight's own yellow, with no dark ring: a ring that thin blended into
+   the fill and made the dot read darker than the text it belongs to. */
 .tiptap-prose .task-link-dot {
+  position: relative;
   display: inline-block;
   width: 0.5rem;
   height: 0.5rem;
   margin: 0 0.15rem 0 0.2rem;
+  padding: 0;
+  border: 0;
   border-radius: 9999px;
   vertical-align: baseline;
   background-color: var(--brand-yellow);
-  border: 1.5px solid var(--brand-ink);
   cursor: pointer;
   transition: transform 0.1s ease;
+}
+
+/* What you can click is bigger than what you see, so the dot is easy to
+   hit, above all with a finger. */
+.tiptap-prose .task-link-dot::before {
+  content: "";
+  position: absolute;
+  inset: -0.4rem;
+  border-radius: 9999px;
 }
 
 .tiptap-prose .task-link-dot:hover {
   transform: scale(1.35);
 }
 
-/* A completed task's dot fills in, matching the strikethrough. */
+/* A completed task's dot fills in, matching the strikethrough, inside a
+   ring of the same yellow so it still shows on a dark page. */
 .tiptap-prose .task-link-done + .task-link-dot,
 .tiptap-prose .task-link-dot[aria-label="Open completed task"] {
   background-color: var(--brand-ink);
+  box-shadow: inset 0 0 0 1.5px var(--brand-yellow);
 }
