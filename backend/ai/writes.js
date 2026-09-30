@@ -63,7 +63,7 @@ function localYmd(date) {
  * @param {ToolContext} ctx
  * @param {any} task
  */
-function assertEditable(ctx, task) {
+export function assertEditable(ctx, task) {
   /** @param {any} item */
   const refuse = (item) =>
     new ToolError(
@@ -82,7 +82,7 @@ function assertEditable(ctx, task) {
  * change has passed its checks, just before it's saved.
  * @param {ToolContext} ctx
  */
-function spendWrite(ctx) {
+export function spendWrite(ctx) {
   const slot = takeSlot(`write:${ctx.grant.id}`, WRITES_PER_HOUR, 60 * 60 * 1000);
   if (!slot.ok) {
     throw new ToolError(

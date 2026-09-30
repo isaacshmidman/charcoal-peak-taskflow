@@ -13,6 +13,7 @@ import { HttpError } from "../http.js";
 import { ToolError, validateArgs } from "./args.js";
 import { READ_TOOLS } from "./reads.js";
 import { WRITE_TOOLS } from "./writes.js";
+import { FILE_READ_TOOLS, FILE_WRITE_TOOLS } from "./files.js";
 
 /**
  * @typedef {import("./context.js").Tool} Tool
@@ -21,7 +22,9 @@ import { WRITE_TOOLS } from "./writes.js";
  */
 
 /** @type {Tool[]} */
-const ALL_TOOLS = [...READ_TOOLS, ...WRITE_TOOLS];
+const READING = [...READ_TOOLS, ...FILE_READ_TOOLS];
+/** @type {Tool[]} */
+const ALL_TOOLS = [...READING, ...WRITE_TOOLS, ...FILE_WRITE_TOOLS];
 
 /** Every tool, whoever asks: for describing the API (openapi.js). */
 export function allTools() {
@@ -33,7 +36,7 @@ export function allTools() {
  * @param {any} grant
  */
 export function toolsForGrant(grant) {
-  return grant.can_write ? ALL_TOOLS : READ_TOOLS;
+  return grant.can_write ? ALL_TOOLS : READING;
 }
 
 /**

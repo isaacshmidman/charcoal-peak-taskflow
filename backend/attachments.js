@@ -526,6 +526,33 @@ export async function deleteAttachment(db, config, { appId, user, id }) {
   return { success: true };
 }
 
+/**
+ * deleteAttachment, synchronously, for callers inside a transaction (an
+ * AI app's Undo of a file it attached). Same steps: the bytes and any
+ * thumbnail, the row, then the task's count.
+ *
+ * @param {any} db
+ * @param {any} config
+ * @param {{ appId: string, userId: string, id: string }} args
+ */
+export function deleteAttachmentNow(db, config, { appId, userId, id }) {
+  const row = db.prepare(`SELECT * FROM task_attachments WHERE app_id = ? AND id = ? AND user_id = ?`).get(appId, id, userId);
+  if (!row) return false;
+  const root = attachmentsRoot(config);
+  for (const relPath of [row.storage_path, row.thumb_path]) {
+    if (!relPath) continue;
+    const abs = resolve(root, relPath);
+    try {
+      if (abs.startsWith(root)) unlinkSyncSafe(abs);
+    } catch {
+      // File missing on disk — ignore; we still remove the row.
+    }
+  }
+  db.prepare(`DELETE FROM task_attachments WHERE id = ?`).run(id);
+  refreshTaskAttachmentCount(db, config, { appId, taskId: row.task_id });
+  return true;
+}
+
 /** @param {unknown[]} ids */
 const placeholders = (ids) => ids.map(() => "?").join(", ");
 

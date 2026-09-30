@@ -1546,7 +1546,7 @@ describe("AI apps over MCP", () => {
 
     const list = await mcp(token, { jsonrpc: "2.0", id: 1, method: "tools/list" });
     const names = list.body.result.tools.map((t) => t.name);
-    expect(names).toEqual(["get_agenda", "search_tasks", "get_task", "search_notes", "get_note", "list_priorities_and_tags"]);
+    expect(names).toEqual(["get_agenda", "search_tasks", "get_task", "search_notes", "get_note", "list_priorities_and_tags", "list_files", "read_file"]);
     expect(list.body.result.tools[0]).toMatchObject({ inputSchema: { type: "object" }, annotations: { readOnlyHint: true } });
 
     const agenda = await call(token, "get_agenda");

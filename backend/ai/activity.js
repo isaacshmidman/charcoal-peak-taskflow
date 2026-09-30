@@ -14,6 +14,7 @@ import { HttpError } from "../http.js";
 import { withTransaction } from "../db.js";
 import { deleteEntityRecord, getEntityRecord, importEntityRecord, updateEntityRecord } from "../store.js";
 import { enqueueTaskPush } from "../push.js";
+import { deleteAttachmentNow } from "../attachments.js";
 
 const DEFAULT_LIST_LIMIT = 50;
 
@@ -202,6 +203,9 @@ export function undoActivity(db, config, { appId, user, activityId }) {
           }
         }
       }
+    } else if (undo.kind === "attach_file") {
+      // Files don't change once stored; taking it off is the whole undo.
+      deleteAttachmentNow(db, config, { appId, userId: user.id, id: undo.file_id });
     } else if (undo.kind === "update_note") {
       const note = current("Note", undo.note_id);
       if (!note) throw new HttpError(409, "That note is gone, so there's nothing to undo.", "gone");
