@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { validateHeaderValue } from "node:http";
 import { Readable } from "node:stream";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createHash, randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { closeDatabase, createDatabase } from "./db.js";
@@ -18,7 +18,10 @@ import { getRequestIpAddress } from "./auth.js";
 import { inlineScriptHashes, policyFor } from "./security-headers.js";
 import { deviceLabel } from "./sessions.js";
 import { grantPlus, revokePlus } from "./plans.js";
-import { createHash as hashOf } from "node:crypto";
+import { createHash as hashOf, createHmac } from "node:crypto";
+
+/** A Stripe-style v1 signature. */
+const createHmacFor = (secret, payload) => createHmac("sha256", secret).update(payload).digest("hex");
 
 let tempDir = "";
 let db;
@@ -609,6 +612,103 @@ describe("Zephyrly Plus", () => {
       body: { jsonrpc: "2.0", id: 1, method: "tools/list" },
     });
     expect(mcp.statusCode).toBe(401);
+  });
+
+  describe("buying it", () => {
+    const stripeConfig = { stripeSecretKey: "rk_test_x", stripeWebhookSecret: "whsec_route", stripePriceId: "price_plus" };
+    let saved;
+    let stripeCalls;
+    beforeEach(async () => {
+      const { resetBillingCache } = await import("./billing.js");
+      resetBillingCache();
+      saved = handler;
+      handler = makeHandler({ ...config, ...stripeConfig }, db);
+      stripeCalls = [];
+      vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init = {}) => {
+        stripeCalls.push({ url: String(url), method: init.method, body: String(init.body || "") });
+        const u = String(url);
+        if (u.includes("/prices/price_plus")) return new Response(JSON.stringify({ id: "price_plus", unit_amount: 900, currency: "usd" }), { status: 200 });
+        if (u.endsWith("/checkout/sessions") && init.method === "POST") return new Response(JSON.stringify({ id: "cs_test_new1234567890", url: "https://checkout.stripe.com/c/pay/cs_test_new1234567890" }), { status: 200 });
+        const session = /\/checkout\/sessions\/(cs_test_\w+)/.exec(u);
+        if (session) return new Response(JSON.stringify(stripeSessions[session[1]] || {}), { status: session[1] in stripeSessions ? 200 : 404 });
+        return new Response("{}", { status: 404 });
+      });
+    });
+    afterEach(() => {
+      vi.restoreAllMocks();
+      handler = saved;
+    });
+    /** Sessions as Stripe would have them. */
+    const stripeSessions = {};
+    const paid = (id, userId) => ({
+      id, mode: "payment", payment_status: "paid", client_reference_id: userId, metadata: { app_id: "test-app" },
+      payment_intent: `pi_${id}`, amount_total: 900, currency: "usd", line_items: { data: [{ price: { id: "price_plus" }, quantity: 1 }] },
+    });
+
+    it("Checkout is for this account at the server's price, whatever the app sends", async () => {
+      const token = await login("buyer@example.com", { basic: true });
+      const buyer = api(token);
+      expect((await buyer("GET", "/billing")).body.buy).toEqual({ available: true, price: { amount: 900, currency: "usd", label: "$9" } });
+      const started = await buyer("POST", "/billing/checkout", { price: "price_free", amount: 1, client_reference_id: "someone_else" });
+      expect(started.statusCode).toBe(200);
+      expect(started.body.url).toBe("https://checkout.stripe.com/c/pay/cs_test_new1234567890");
+      const sent = new URLSearchParams(stripeCalls.find((c) => c.method === "POST").body);
+      const me = (await buyer("GET", "/entities/User/me")).body;
+      expect(sent.get("line_items[0][price]")).toBe("price_plus");
+      expect(sent.get("line_items[0][quantity]")).toBe("1");
+      expect(sent.get("client_reference_id")).toBe(me.id);
+      expect(sent.get("mode")).toBe("payment");
+      expect(sent.get("consent_collection[terms_of_service]")).toBe("required");
+      expect(sent.get("custom_text[terms_of_service_acceptance][message]")).toContain("isn't refundable");
+      expect(sent.get("success_url")).toBe("http://127.0.0.1:4173/Settings?plus=done&session_id={CHECKOUT_SESSION_ID}");
+    });
+
+    it("coming back grants Plus only if Stripe says this account paid", async () => {
+      const buyerToken = await login("returning@example.com", { basic: true });
+      const buyer = api(buyerToken);
+      const me = (await buyer("GET", "/entities/User/me")).body;
+      const someone = (await api(await login("someone@example.com", { basic: true }))("GET", "/entities/User/me")).body;
+      stripeSessions.cs_test_theirs123456 = paid("cs_test_theirs123456", someone.id);
+      stripeSessions.cs_test_unpaid123456 = { ...paid("cs_test_unpaid123456", me.id), payment_status: "unpaid" };
+      stripeSessions.cs_test_mine12345678 = paid("cs_test_mine12345678", me.id);
+
+      // Someone else's paid session, an unpaid one, a made-up id: nothing.
+      for (const id of ["cs_test_theirs123456", "cs_test_unpaid123456"]) {
+        expect((await buyer("POST", "/billing/confirm", { session_id: id })).body.plan).toBe("basic");
+      }
+      expect((await buyer("POST", "/billing/confirm", { session_id: "../../v1/charges" })).statusCode).toBe(400);
+      expect((await buyer("POST", "/billing/confirm", { session_id: "cs_test_mine12345678" })).body).toMatchObject({ plan: "plus", source: "stripe" });
+      // And the other person didn't get it from my link.
+      expect((await api(await login("someone@example.com", { basic: true }))("GET", "/billing")).body.plan).toBe("basic");
+      // Already Plus: no second checkout.
+      expect((await buyer("POST", "/billing/checkout")).statusCode).toBe(409);
+    });
+
+    it("the webhook needs Stripe's signature, and each event counts once", async () => {
+      const me = (await api(await login("hooked@example.com", { basic: true }))("GET", "/entities/User/me")).body;
+      stripeSessions.cs_test_hook12345678 = paid("cs_test_hook12345678", me.id);
+      const event = JSON.stringify({ id: "evt_route_1", type: "checkout.session.completed", data: { object: { id: "cs_test_hook12345678" } } });
+      const hook = (body, signature) =>
+        invoke("/api/billing/stripe/webhook", { method: "POST", headers: { "Content-Type": "application/json", ...(signature ? { "Stripe-Signature": signature } : {}) }, body });
+      const t = Math.floor(Date.now() / 1000);
+      const signed = `t=${t},v1=${createHmacFor("whsec_route", `${t}.${event}`)}`;
+
+      expect((await hook(event)).statusCode).toBe(400);
+      expect((await hook(event, `t=${t},v1=${createHmacFor("whsec_guess", `${t}.${event}`)}`)).statusCode).toBe(400);
+      expect(db.prepare("SELECT COUNT(*) AS n FROM entitlements WHERE user_id = ?").get(me.id).n).toBe(0);
+
+      expect((await hook(event, signed)).statusCode).toBe(200);
+      expect((await hook(event, signed)).statusCode).toBe(200);
+      expect(db.prepare("SELECT COUNT(*) AS n FROM entitlements WHERE user_id = ? AND revoked_at IS NULL").get(me.id).n).toBe(1);
+    });
+
+    it("with Stripe not set up, buying is off and says so", async () => {
+      handler = saved;
+      const basic = api(await login("nostripe@example.com", { basic: true }));
+      expect((await basic("GET", "/billing")).body.buy).toEqual({ available: false, price: null });
+      expect((await basic("POST", "/billing/checkout")).statusCode).toBe(503);
+      expect((await invoke("/api/billing/stripe/webhook", { method: "POST", body: "{}" })).statusCode).toBe(503);
+    });
   });
 
   it("everyone already here when Plus launched gets it once, as a founding member; later sign-ups start on Basic", () => {

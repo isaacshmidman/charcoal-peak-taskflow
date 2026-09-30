@@ -29,6 +29,10 @@ services:
       - TASKFLOW_NOTIFICATION_POLL_MS=${TASKFLOW_NOTIFICATION_POLL_MS:-60000}
       - TASKFLOW_ALLOW_ANY_PASSWORD=${TASKFLOW_ALLOW_ANY_PASSWORD:-false}
       - TASKFLOW_DELETED_TASK_RETENTION_DAYS=${TASKFLOW_DELETED_TASK_RETENTION_DAYS:-7}
+      # Zephyrly Plus (docs/plus.md). Leave unset and buying is off.
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
+      - STRIPE_PRICE_ID=${STRIPE_PRICE_ID:-}
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/api/health').then(r=>{if(!r.ok)throw 1})"]
       interval: 30s

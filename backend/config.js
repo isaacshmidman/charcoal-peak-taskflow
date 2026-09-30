@@ -131,6 +131,11 @@ export const backendConfig = {
   vapidPublicKey: process.env.TASKFLOW_VAPID_PUBLIC_KEY || "",
   vapidPrivateKey: process.env.TASKFLOW_VAPID_PRIVATE_KEY || "",
   vapidSubject: deriveVapidSubject(),
+  // Buying Zephyrly Plus (backend/billing.js). All three, or buying is off.
+  // Use a restricted key: Checkout Sessions write + read, Prices read.
+  stripeSecretKey: process.env.STRIPE_SECRET_KEY || "",
+  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
+  stripePriceId: process.env.STRIPE_PRICE_ID || "",
 };
 
 export function getGoogleCalendarRedirectUrl(config = backendConfig) {
