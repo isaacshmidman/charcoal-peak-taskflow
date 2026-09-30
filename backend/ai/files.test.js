@@ -4,6 +4,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { grantPlus } from "../plans.js";
 import { createDatabase } from "../db.js";
 import { createAttachment, getAttachment } from "../attachments.js";
 import { createEntityRecord, ensureDefaultPrioritiesForUser } from "../store.js";
@@ -28,6 +29,8 @@ function seedUser(user) {
      VALUES (?, ?, '', ?, 'user', 'local', '{}', ?, ?)`
   ).run(user.id, APP_ID, user.email, now, now);
   ensureDefaultPrioritiesForUser(db, { appId: APP_ID, user, config });
+  // Test accounts have Plus (AI apps are Plus; see backend/plans.js).
+  grantPlus(db, { appId: APP_ID, userId: user.id, source: "gift" });
 }
 const task = (input, user = ME) => createEntityRecord(db, { entityName: "Task", appId: APP_ID, user, input, config });
 const attach = (taskId, filename, mimeType, text, user = ME) =>

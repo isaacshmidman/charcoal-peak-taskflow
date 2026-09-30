@@ -34,6 +34,7 @@ import { createAttachment, MAX_FILE_BYTES, taskIdsOfDeletedTask } from "./attach
 import { EXPORT_FORMAT, EXPORT_VERSION } from "./export.js";
 import { openZip, ZipError } from "./unzip.js";
 import { repairLatin1Filename } from "./lib/filename-encoding.js";
+import { scheduleWithinPlan } from "./plans.js";
 
 export const MAX_RESTORE_UPLOAD_BYTES = 1_200_000_000;
 const MAX_DATA_JSON_BYTES = 100 * 1_000_000;
@@ -403,6 +404,8 @@ export async function restoreExport(db, config, { appId, user, data, readFile, n
         restoreRecord("Note", "notes", note, {
           priority_id: priorityFor(note.priority_id),
           content_json: remapTaskLinks(note.content_json, taskIds),
+          // Kept, but switched off past Basic's one schedule at a time.
+          ...(Object.hasOwn(note, "schedule_json") ? { schedule_json: scheduleWithinPlan(db, { appId, userId: user.id }, note.schedule_json) } : {}),
         })
       ) {
         added.notes += 1;
