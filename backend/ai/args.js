@@ -32,19 +32,31 @@ export function isRealDate(value) {
 }
 
 /**
- * @param {any} schema  the tool's inputSchema
+ * @param {any} schema  the tool's inputSchema, or an object inside it
  * @param {unknown} args
+ * @param {string} [path]  where an object inside the arguments sits ("fill[2]")
  * @returns {Record<string, any>}
  */
-export function validateArgs(schema, args) {
-  const input = args == null ? {} : args;
-  if (typeof input !== "object" || Array.isArray(input)) throw new ToolError("Arguments must be an object.");
+export function validateArgs(schema, args, path = "") {
+  let input = args == null ? {} : args;
+  // An object inside the arguments sent as JSON text: a slip small models make.
+  if (path && typeof input === "string") {
+    try {
+      input = JSON.parse(input);
+    } catch {
+      // refused just below
+    }
+  }
+  if (typeof input !== "object" || Array.isArray(input)) {
+    throw new ToolError(path ? `"${path}" must be an object.` : "Arguments must be an object.");
+  }
   const record = /** @type {Record<string, unknown>} */ (input);
   const properties = schema.properties || {};
+  const named = (/** @type {string} */ key) => (path ? `${path}.${key}` : key);
   for (const key of Object.keys(record)) {
     if (!Object.hasOwn(properties, key)) {
       const allowed = Object.keys(properties);
-      throw new ToolError(`Unknown argument "${key}". ${allowed.length ? `Allowed: ${allowed.join(", ")}.` : "This tool takes none."}`);
+      throw new ToolError(`Unknown argument "${named(key)}". ${allowed.length ? `Allowed: ${allowed.join(", ")}.` : "This tool takes none."}`);
     }
   }
   /** @type {Record<string, any>} */
@@ -54,10 +66,10 @@ export function validateArgs(schema, args) {
     // An empty string means "not given", unless the schema marks it as a
     // real value (x-allow-empty: replacing a word with nothing).
     if (value == null || (value === "" && !spec["x-allow-empty"])) continue;
-    out[key] = value === "" ? "" : checkValue(key, spec, value);
+    out[key] = value === "" ? "" : checkValue(named(key), spec, value);
   }
   for (const key of schema.required || []) {
-    if (out[key] == null || (Array.isArray(out[key]) && out[key].length === 0)) throw new ToolError(`"${key}" is required.`);
+    if (out[key] == null || (Array.isArray(out[key]) && out[key].length === 0)) throw new ToolError(`"${named(key)}" is required.`);
   }
   return out;
 }
@@ -81,11 +93,24 @@ function checkValue(key, spec, value) {
     if (value === false || value === "false") return false;
     throw new ToolError(`"${key}" must be true or false.`);
   }
+  // `true` for an object whose parts are all optional: "yes, with none of them".
+  if (spec.type === "object") return validateArgs(spec, value === true || value === "true" ? {} : value, key);
   if (spec.type === "array") {
-    const list = typeof value === "string" ? [value] : value;
+    const items = spec.items || { type: "string" };
+    let list = value;
+    if (typeof list === "string" && items.type === "object") {
+      try {
+        list = JSON.parse(list);
+      } catch {
+        // refused just below
+      }
+    }
+    if (typeof list === "string") list = [list];
+    if (list && typeof list === "object" && !Array.isArray(list) && items.type === "object") list = [list];
     if (!Array.isArray(list)) throw new ToolError(`"${key}" must be a list.`);
     if (spec.maxItems != null && list.length > spec.maxItems) throw new ToolError(`"${key}" can have at most ${spec.maxItems} items.`);
-    return list.map((item, i) => checkString(`${key}[${i}]`, spec.items || { type: "string" }, item)).filter(Boolean);
+    if (items.type === "object") return list.map((item, i) => validateArgs(items, item, `${key}[${i}]`));
+    return list.map((item, i) => checkString(`${key}[${i}]`, items, item)).filter(Boolean);
   }
   throw new ToolError(`"${key}" has an unsupported type.`);
 }

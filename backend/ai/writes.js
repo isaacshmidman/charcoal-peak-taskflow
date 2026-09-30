@@ -26,6 +26,8 @@ import { PRIORITY_COLORS } from "../priority-color.js";
 import { countWords, docToText, plainTextToDoc, storedDoc } from "../lib/plain-text-doc.js";
 import { isAllowedHref, markdownToDoc } from "../lib/markdown-doc.js";
 import { applyBlockChanges, applyMarks, findText, linkTextToTask, markChanges } from "./note-format.js";
+import { describeChange, newSchedule, parseSchedule } from "../lib/schedule.js";
+import { SCHEDULE_CHANGES, applyScheduleChanges, newScheduleWith, scheduleData, scheduleText } from "./schedules.js";
 import { ToolError, isRealDate } from "./args.js";
 import { logActivity } from "./activity.js";
 import { DATE, findPriority, getOwnNote, getOwnTask, listRecords, loadPriorities, loadTasks, lower } from "./context.js";
@@ -751,23 +753,35 @@ function notePriorityId(ctx, wanted) {
 const createNote = {
   name: "create_note",
   title: "Add a note",
-  description: `Add a note, written in Markdown (headings, lists, checklists, bold, links, links to tasks) or plain text; at most ${NOTE_WORDS} words.`,
+  description:
+    `Add a note, written in Markdown (headings, lists, checklists, bold, links, links to tasks) or plain text; at most ${NOTE_WORDS} words. ` +
+    "Or add it as a schedule — the day in slots of time, each with what's happening then — with schedule (text is optional then).",
   inputSchema: {
     type: "object",
     properties: {
-      text: { type: "string", maxLength: 100_000, description: "The note's text." },
+      text: { type: "string", maxLength: 100_000, description: "The note's text. Optional for a schedule." },
       format: FORMAT,
       title: { type: "string", maxLength: 200, description: "A title. Optional." },
       tags: { ...TAG_LIST, description: "Tags, without #." },
       priority: { type: "string", maxLength: 200, description: 'A priority name or id, or "none". Optional.' },
+      schedule: {
+        type: "object",
+        properties: SCHEDULE_CHANGES,
+        additionalProperties: false,
+        description:
+          "Make the note a schedule: the whole day in hour slots, with any of these applied — fill puts in what's happening, " +
+          "day_start and day_end trim the day. {} for an empty day. Change it later with edit_schedule.",
+      },
     },
-    required: ["text"],
     additionalProperties: false,
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   write: true,
   handler(ctx, args) {
-    const doc = docFromAiText(ctx, args.text, args.format);
+    if (args.text == null && !args.schedule) throw new ToolError('Give the note "text", or make it a "schedule".');
+    // Built before anything is saved, so a schedule that can't be made adds nothing.
+    const schedule = args.schedule ? newScheduleWith(args.schedule).schedule : null;
+    const doc = docFromAiText(ctx, args.text || "", args.format);
     const text = docToText(doc);
     if (countWords(text) > NOTE_WORDS) throw new ToolError(`A note can be at most ${NOTE_WORDS} words.`);
     const input = {
@@ -777,6 +791,7 @@ const createNote = {
       priority_id: args.priority ? notePriorityId(ctx, args.priority) : "",
       tags: cleanTags(args.tags),
       pinned: false,
+      schedule_json: schedule ? JSON.stringify(schedule) : "",
     };
     validateClientInput("Note", input);
     spendWrite(ctx);
@@ -784,8 +799,12 @@ const createNote = {
       createEntityRecord(ctx.db, { entityName: "Note", appId: ctx.appId, user: ctx.user, input, config: ctx.config })
     );
     const name = created.title ? quote(created.title) : "an untitled note";
-    logActivity(ctx, "create_note", `Added the note ${name}.`, { kind: "create_note", note_id: created.id, updated_date: created.updated_date });
-    return { text: `Added the note ${name} (id ${created.id}).`, data: { id: created.id, title: created.title || "Untitled" } };
+    const what = schedule ? `the schedule ${name}` : `the note ${name}`;
+    logActivity(ctx, "create_note", `Added ${what}.`, { kind: "create_note", note_id: created.id, updated_date: created.updated_date });
+    return {
+      text: `Added ${what} (id ${created.id}).${schedule ? `\n\n${scheduleText(schedule)}` : ""}`,
+      data: { id: created.id, title: created.title || "Untitled", ...(schedule ? { schedule: scheduleData(schedule) } : {}) },
+    };
   },
 };
 
@@ -839,7 +858,7 @@ const updateNote = {
     "Change a note (read it first with get_note): its title, tags or pinning; add text at the end (append_text); " +
     "swap words inside it (find and replace_with, which keeps its formatting and links to tasks); or replace all of its text " +
     "(replace_all_text, which drops its formatting and task links). New text is Markdown unless format is plain. " +
-    "Every change can be undone in Zephyrly.",
+    "A note's schedule is changed with edit_schedule. Every change can be undone in Zephyrly.",
   inputSchema: {
     type: "object",
     properties: {
@@ -961,6 +980,7 @@ const deleteNote = {
       title: note.title || "",
       content_json: note.content_json || "",
       content_text: note.content_text || "",
+      schedule_json: note.schedule_json || "",
       pinned: Boolean(note.pinned),
       tags: note.tags || [],
       priority_id: note.priority_id || "",
@@ -1344,6 +1364,81 @@ const makeTaskFromNote = {
   },
 };
 
+/** @type {Tool} */
+const editSchedule = {
+  name: "edit_schedule",
+  title: "Build or change a note's schedule",
+  description:
+    "A note can be a schedule: the day in slots of time, each with what's happening then (the Schedule switch at the top of a note). " +
+    "Read the note with get_note first; slots are named by their start times, like 7:00AM. " +
+    "This turns a note's schedule on or off, changes its settings, empties slots (clear, clear_all), puts in what's happening at given times (fill), " +
+    "and changes a slot's start or end the way the person does in the app (change_time). " +
+    "One call can do several; they apply in that order, and if any can't be done, nothing changes. Every change can be undone in Zephyrly.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      note_id: { type: "string", maxLength: 200, description: "The note's id." },
+      on: {
+        type: "boolean",
+        description: "true shows the note as a schedule (the first time: the whole day in hour slots); false shows its text again and keeps the schedule.",
+      },
+      ...SCHEDULE_CHANGES,
+    },
+    required: ["note_id"],
+    additionalProperties: false,
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  write: true,
+  handler(ctx, args) {
+    const note = getOwnNote(ctx, args.note_id);
+    const existing = parseSchedule(note.schedule_json);
+    const asked = Object.keys(args).filter((key) => key !== "note_id" && key !== "on");
+    if (args.on == null && !asked.length) throw new ToolError("Say what to change: on, a setting, clear, clear_all, fill or change_time.");
+    /** @type {string[]} */
+    const done = [];
+    let start = existing;
+    if (args.on === true) {
+      start = existing ? { ...existing, enabled: true } : newSchedule();
+      if (!existing) done.push("made it a schedule, the whole day in hour slots");
+      else if (!existing.enabled) done.push("switched the schedule back on");
+    }
+    if (!start) {
+      if (args.on === false) throw new ToolError("That note isn't a schedule, so there's nothing to switch off.");
+      throw new ToolError("That note isn't a schedule yet. Pass on: true to make it one (the whole day in hour slots), with any changes in the same call.");
+    }
+    const applied = applyScheduleChanges(start, args);
+    let schedule = applied.schedule;
+    done.push(...applied.done);
+    if (args.on === false && schedule.enabled) {
+      schedule = { ...schedule, enabled: false };
+      done.push("switched the schedule off (the note shows its text again; the schedule is kept)");
+    }
+    const name = note.title ? quote(note.title) : "the untitled note";
+    const json = JSON.stringify(schedule);
+    if (json === (note.schedule_json || "")) {
+      return { text: `Nothing changed in the schedule of ${name}.\n\n${scheduleText(schedule)}`, data: { id: note.id, schedule: scheduleData(schedule) } };
+    }
+    const patch = { schedule_json: json };
+    validateClientInput("Note", patch);
+    spendWrite(ctx);
+    const updated = inTransaction(ctx.db, () =>
+      updateEntityRecord(ctx.db, { entityName: "Note", appId: ctx.appId, user: ctx.user, id: note.id, input: patch })
+    );
+    const summary = `Schedule of ${name}: ${done.join("; ") || "changed"}.`;
+    logActivity(ctx, "edit_schedule", summary, {
+      kind: "update_note",
+      note_id: note.id,
+      before: { schedule_json: note.schedule_json || "" },
+      updated_date: updated.updated_date,
+    });
+    const effect = existing ? describeChange(existing, schedule, applied.changedSlot) : null;
+    return {
+      text: `${summary}${effect ? ` ${effect}` : ""}${schedule.enabled ? "" : " The schedule is switched off."}\n\n${scheduleText(schedule)}`,
+      data: { id: note.id, schedule: scheduleData(schedule) },
+    };
+  },
+};
+
 /** @type {Tool[]} */
 export const WRITE_TOOLS = [
   createTask,
@@ -1355,6 +1450,7 @@ export const WRITE_TOOLS = [
   updateNote,
   formatNote,
   makeTaskFromNote,
+  editSchedule,
   deleteNote,
   editPriorities,
   editTags,

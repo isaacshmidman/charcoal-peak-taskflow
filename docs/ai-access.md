@@ -16,8 +16,9 @@ change an AI app made, with Undo.
 
 It can read your agenda, search tasks and notes, read a task or note in
 full (notes come as Markdown, so headings, lists, checklists and links to
-tasks come across), see a task's files, and read text files (txt, md, csv
-and the like; never PDFs or images). With changes allowed, it can also:
+tasks come across; a schedule note comes as every slot with its times),
+see a task's files, and read text files (txt, md, csv and the like; never
+PDFs or images). With changes allowed, it can also:
 
 - add tasks and subtasks, and change a task's title, date, time, priority,
   tags, description, reminder, or how it repeats (the same choices as the
@@ -36,6 +37,14 @@ and the like; never PDFs or images). With changes allowed, it can also:
   indents. Clearing formatting keeps links to tasks, as the toolbar does;
 - make a task from text in a note, linking the text to it, as the note
   editor's Make task does;
+- build and change schedules (a note's Schedule switch): make a note a
+  schedule, or add one as a schedule already filled in; put what's
+  happening at given times; empty slots; change a slot's start or end with
+  the same knock-on effect as in the app; set the gap, slot length, when
+  the day starts and ends, and what changing a time does to the other
+  slots; switch it off again (the schedule is kept). A slot with something
+  in it is never dropped or pushed out of the day to make room: that
+  change is refused, and nothing in that call is made;
 - add, rename, recolour, reorder or delete priorities, and add, remove or
   rename saved tags (a rename changes every task and note that has it);
 - save text as a file attached to a task (.txt, .md or .csv, up to 1 MB).

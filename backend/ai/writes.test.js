@@ -750,3 +750,125 @@ describe("format_note and make_task_from_note", () => {
     expect(tasks()).toHaveLength(before);
   });
 });
+
+describe("schedules", () => {
+  const note = (input) => createEntityRecord(db, { entityName: "Note", appId: APP_ID, user: ME, input, config });
+  const scheduleOf = (id) => JSON.parse(get(id, "Note").schedule_json);
+  const slotTexts = (id) => scheduleOf(id).slots.filter((s) => s.text).map((s) => `${s.start}-${s.end} ${s.text}`);
+
+  it("create_note makes a schedule filled in one call, and get_note reads it back", async () => {
+    const { data, text } = await run("create_note", {
+      title: "Saturday",
+      schedule: {
+        day_start: "7am",
+        day_end: "10pm",
+        fill: [
+          { start: "7:00AM", end: "7:30AM", text: "Breakfast" },
+          { start: "9:00", end: "12:00", text: "Hike" },
+        ],
+      },
+    });
+    expect(slotTexts(data.id)).toEqual(["420-450 Breakfast", "540-720 Hike"]);
+    const saved = scheduleOf(data.id);
+    expect([saved.slots[0].start, saved.slots.at(-1).end]).toEqual([420, 1320]);
+    expect(text).toContain("Added the schedule “Saturday”");
+    expect(text).toContain("- 7:00AM–7:30AM: Breakfast");
+
+    const read = await run("get_note", { note_id: data.id });
+    expect(read.text).toContain("It shows as a schedule.");
+    expect(read.text).toContain("- 7:30AM–8:00AM (empty)");
+    expect(read.text).toContain("- 9:00AM–12:00PM: Hike");
+    expect(read.data.schedule).toMatchObject({ on: true, gap_minutes: 0, slot_minutes: 60, day_start: "7:00AM", day_end: "10:00PM", when_time_changes: "move_others" });
+    expect(read.data.schedule.slots[0]).toEqual({ start: "7:00AM", end: "7:30AM", text: "Breakfast" });
+  });
+
+  it("edit_schedule turns a note into a schedule, and change_time cascades as in the app; one Undo puts it back", async () => {
+    const n = note({ title: "Monday", content_text: "Remember the laundry" });
+    await run("edit_schedule", { note_id: n.id, on: true, fill: [{ start: "8am", end: "9am", text: "Standup" }] });
+    expect(scheduleOf(n.id).slots).toHaveLength(24);
+    const before = get(n.id, "Note").schedule_json;
+
+    const { text } = await run("edit_schedule", { note_id: n.id, change_time: { slot: "7:00AM", end: "7:30AM" } });
+    expect(text).toContain("the 7:00AM slot now runs 7:00AM–7:30AM");
+    expect(text).toContain("Adjusted 16 other slots and added 1 empty slot.");
+    // Standup moved along with everything after, keeping its hour.
+    expect(slotTexts(n.id)).toEqual(["450-510 Standup"]);
+    expect(get(n.id, "Note").content_text).toBe("Remember the laundry");
+    expect(listActivity(db, { appId: APP_ID, userId: ME.id })[0]).toMatchObject({ tool: "edit_schedule" });
+
+    undoLatest();
+    expect(get(n.id, "Note").schedule_json).toBe(before);
+  });
+
+  it("with next_only, only the next slot changes, and a slot with text in the way refuses", async () => {
+    const n = note({ title: "Tuesday" });
+    await run("edit_schedule", {
+      note_id: n.id,
+      on: true,
+      when_time_changes: "next_only",
+      fill: [{ start: "9:00AM", end: "10:00AM", text: "Class" }],
+    });
+    await run("edit_schedule", { note_id: n.id, change_time: { slot: "7am", end: "7:30am" } });
+    // The empty 8:00 slot stretches back to 7:30; Class doesn't move.
+    expect(scheduleOf(n.id).slots.slice(7, 10).map((s) => [s.start, s.end])).toEqual([[420, 450], [450, 540], [540, 600]]);
+    const kept = get(n.id, "Note").schedule_json;
+    await expect(run("edit_schedule", { note_id: n.id, change_time: { slot: "7:00AM", end: "10:30AM" } })).rejects.toThrow(
+      "“Class” (9:00 AM – 10:00 AM) is in the way."
+    );
+    // All or nothing: a later step failing leaves the earlier ones undone too.
+    await expect(
+      run("edit_schedule", { note_id: n.id, gap_minutes: 5, fill: [{ start: "9:30AM", end: "10:30AM", text: "Gym" }] })
+    ).rejects.toThrow("runs into “Class”");
+    expect(get(n.id, "Note").schedule_json).toBe(kept);
+  });
+
+  it("settings, clearing, and switching off keep everything consistent", async () => {
+    const n = note({ title: "Wednesday" });
+    await run("edit_schedule", { note_id: n.id, on: true, fill: [{ start: "9:00AM", end: "9:45AM", text: "Run" }] });
+    await run("edit_schedule", { note_id: n.id, slot_minutes: 30, gap_minutes: 5, day_start: "6:00AM", day_end: "9:00PM" });
+    const s = scheduleOf(n.id);
+    expect(s).toMatchObject({ gap: 5, slot: 30 });
+    expect([s.slots[0].start, s.slots.at(-1).end]).toEqual([360, 1260]);
+    // Run keeps its start and ends 5 minutes before the next slot.
+    expect(slotTexts(n.id)).toEqual(["540-580 Run"]);
+
+    await run("edit_schedule", { note_id: n.id, clear: ["9:00AM"] });
+    expect(slotTexts(n.id)).toEqual([]);
+
+    await run("edit_schedule", { note_id: n.id, on: false });
+    expect(scheduleOf(n.id).enabled).toBe(false);
+    const read = await run("get_note", { note_id: n.id });
+    expect(read.text).toContain("It also has a schedule, switched off");
+    expect(read.data.schedule.on).toBe(false);
+  });
+
+  it("says what's wrong instead of guessing", async () => {
+    const n = note({ title: "Plain" });
+    await expect(run("edit_schedule", { note_id: n.id, fill: [{ start: "7am", end: "8am", text: "x" }] })).rejects.toThrow(
+      "That note isn't a schedule yet. Pass on: true"
+    );
+    await expect(run("edit_schedule", { note_id: n.id, on: true, day_start: "seven" })).rejects.toThrow('"day_start" must be a time like 7:30AM or 19:30.');
+    await expect(run("edit_schedule", { note_id: n.id, on: true, fill: [{ start: "7am", end: "8am" }] })).rejects.toThrow('"fill[0].text" is required.');
+    await expect(run("edit_schedule", { note_id: n.id, on: true, fill: [{ start: "7am", end: "8am", text: "x", color: "red" }] })).rejects.toThrow(
+      'Unknown argument "fill[0].color"'
+    );
+    await expect(run("edit_schedule", { note_id: n.id, on: true, clear: ["7:15AM"] })).rejects.toThrow("No slot starts at 7:15AM.");
+    expect(get(n.id, "Note").schedule_json).toBe("");
+  });
+
+  it("takes what small models send: JSON text for a list, true for an empty schedule", async () => {
+    const { data } = await run("create_note", { title: "Quick", schedule: "true" });
+    expect(scheduleOf(data.id).slots).toHaveLength(24);
+    await run("edit_schedule", { note_id: data.id, fill: '[{"start":"6pm","end":"7pm","text":"Dinner"}]' });
+    expect(slotTexts(data.id)).toEqual(["1080-1140 Dinner"]);
+  });
+
+  it("search_notes finds slot text, and delete_note keeps the schedule for Recently Deleted", async () => {
+    const { data } = await run("create_note", { title: "Friday", schedule: { fill: [{ start: "6pm", end: "8pm", text: "Pottery class" }] } });
+    const found = await run("search_notes", { text: "pottery" });
+    expect(found.data.notes).toEqual([expect.objectContaining({ id: data.id, schedule: true, snippet: "6:00 PM Pottery class" })]);
+    const schedule = get(data.id, "Note").schedule_json;
+    const { data: deleted } = await run("delete_note", { note_id: data.id });
+    expect(get(deleted.recently_deleted_id, "DeletedNote").schedule_json).toBe(schedule);
+  });
+});

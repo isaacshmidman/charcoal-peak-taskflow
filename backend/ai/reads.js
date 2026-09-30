@@ -6,6 +6,8 @@
 import { getEntityRecord } from "../store.js";
 import { storedDoc } from "../lib/plain-text-doc.js";
 import { docToMarkdown } from "../lib/markdown-doc.js";
+import { parseSchedule, schedulePreview, scheduleSearchText } from "../lib/schedule.js";
+import { scheduleData, scheduleText } from "./schedules.js";
 import { ToolError } from "./args.js";
 import { DATE, asToolError, findPriority, getOwnTask, hasTag, listRecords, loadPriorities, loadTasks, lower } from "./context.js";
 import {
@@ -234,7 +236,7 @@ const getTask = {
 const searchNotes = {
   name: "search_notes",
   title: "Search notes",
-  description: "Find notes by words in the title or text, or by tag. Pinned notes first, then most recently edited.",
+  description: "Find notes by words in the title, text or schedule, or by tag. Pinned notes first, then most recently edited.",
   inputSchema: {
     type: "object",
     properties: {
@@ -249,19 +251,33 @@ const searchNotes = {
   handler(ctx, args) {
     const notes = listRecords(ctx, "Note");
     const words = args.text ? lower(args.text).split(/\s+/).filter(Boolean) : [];
+    const shownSchedule = (/** @type {any} */ n) => {
+      const schedule = parseSchedule(n.schedule_json);
+      return schedule?.enabled ? schedule : null;
+    };
     const matches = notes
-      .filter((n) => (!args.tag || hasTag(n.tags, args.tag)) && words.every((w) => lower(`${n.title} ${n.content_text}`).includes(w)))
+      .filter(
+        (n) =>
+          (!args.tag || hasTag(n.tags, args.tag)) &&
+          words.every((w) => lower(`${n.title} ${n.content_text} ${scheduleSearchText(parseSchedule(n.schedule_json))}`).includes(w))
+      )
       .sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) || String(b.updated_date).localeCompare(String(a.updated_date)));
     const shown = matches.slice(0, args.limit || 20);
-    const data = shown.map((n) => ({
-      id: n.id,
-      title: n.title || "Untitled",
-      tags: n.tags || [],
-      pinned: Boolean(n.pinned),
-      snippet: clip(n.content_text, 200),
-      updated_date: n.updated_date,
-    }));
-    const lines = data.map((n) => `- ${n.pinned ? "(pinned) " : ""}${n.title}${n.tags.map((t) => ` #${t}`).join("")} — ${n.snippet || "empty"} (id ${n.id})`);
+    const data = shown.map((n) => {
+      const schedule = shownSchedule(n);
+      return {
+        id: n.id,
+        title: n.title || "Untitled",
+        tags: n.tags || [],
+        pinned: Boolean(n.pinned),
+        schedule: Boolean(schedule),
+        snippet: schedule ? schedulePreview(schedule) : clip(n.content_text, 200),
+        updated_date: n.updated_date,
+      };
+    });
+    const lines = data.map(
+      (n) => `- ${n.pinned ? "(pinned) " : ""}${n.schedule ? "(schedule) " : ""}${n.title}${n.tags.map((t) => ` #${t}`).join("")} — ${n.snippet || "empty"} (id ${n.id})`
+    );
     const header = matches.length ? `${matches.length} matching note${matches.length === 1 ? "" : "s"}${matches.length > shown.length ? `, showing ${shown.length}` : ""}:` : "No notes match.";
     return { text: [header, ...lines].join("\n"), data: { total: matches.length, notes: data } };
   },
@@ -273,7 +289,8 @@ const getNote = {
   title: "Read a note",
   description:
     `One note in full (up to ${NOTE_MAX_CHARS.toLocaleString("en-US")} characters), as Markdown: headings, lists, checklists, ` +
-    "bold, links, and text linked to a task as [text](zephyrly-task:<task id>). Colours, highlights and fonts don't show.",
+    "bold, links, and text linked to a task as [text](zephyrly-task:<task id>). Colours, highlights and fonts don't show. " +
+    "A note can be a schedule (the day in slots of time, each with what's happening then): then every slot and the schedule's settings come first.",
   inputSchema: {
     type: "object",
     properties: { note_id: { type: "string", maxLength: 200, description: "The note's id." } },
@@ -291,8 +308,17 @@ const getNote = {
     const cut = markdown.length > NOTE_MAX_CHARS;
     const body = cut ? `${markdown.slice(0, NOTE_MAX_CHARS)}\n\n(cut off at ${NOTE_MAX_CHARS.toLocaleString("en-US")} characters)` : markdown;
     const priority = loadPriorities(ctx).find((p) => p.id === note.priority_id);
+    const schedule = parseSchedule(note.schedule_json);
+    const heading = `${note.title || "Untitled"}${(note.tags || []).map((/** @type {string} */ t) => ` #${t}`).join("")}${priority ? ` [${priority.name}]` : ""} (id ${note.id})`;
+    let content = body || "(empty)";
+    if (schedule?.enabled) {
+      content = `It shows as a schedule. ${scheduleText(schedule)}`;
+      if (body) content += `\n\nIts text, kept but hidden while the schedule shows:\n\n${body}`;
+    } else if (schedule) {
+      content += "\n\n(It also has a schedule, switched off: edit_schedule with on: true shows it again.)";
+    }
     return {
-      text: `${note.title || "Untitled"}${(note.tags || []).map((/** @type {string} */ t) => ` #${t}`).join("")}${priority ? ` [${priority.name}]` : ""} (id ${note.id})\n\n${body || "(empty)"}`,
+      text: `${heading}\n\n${content}`,
       data: {
         id: note.id,
         title: note.title || "Untitled",
@@ -302,6 +328,7 @@ const getNote = {
         markdown: body,
         text: String(note.content_text || "").slice(0, NOTE_MAX_CHARS),
         truncated: cut,
+        schedule: schedule ? scheduleData(schedule) : null,
         updated_date: note.updated_date,
       },
     };
