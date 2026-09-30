@@ -15,8 +15,40 @@ import {
   completeGoogleLogin,
   destroySession,
   getGoogleAuthUrl,
+  getRequestIpAddress,
   loginWithEmailPassword,
 } from "../auth.js";
+import { takeSlot } from "../ai/rate-limit.js";
+
+/** Sign-in attempts one address may make a minute (Google's two steps count as two). */
+export const SIGN_INS_PER_MINUTE = 20;
+
+/**
+ * Slows down anyone trying sign-in after sign-in. Refuses with 429 once an
+ * address is over the limit.
+ * @param {import("node:http").IncomingMessage} request
+ */
+function limitSignIns(request) {
+  const slot = takeSlot(`sign-in:${getRequestIpAddress(request)}`, SIGN_INS_PER_MINUTE, 60_000);
+  if (!slot.ok) {
+    throw new HttpError(429, "Too many sign-in attempts. Wait a minute and try again.", "too_many_attempts");
+  }
+}
+
+/**
+ * Back to the login page with what went wrong, by code: the page shows its
+ * own words for each, never text from the link (which anyone could write).
+ * @param {import("node:http").ServerResponse} response
+ * @param {any} config
+ * @param {string} code
+ * @param {string} [next]
+ */
+function backToLogin(response, config, code, next) {
+  const loginUrl = new URL("/login", config.publicAppUrl);
+  if (next) loginUrl.searchParams.set("next", next);
+  loginUrl.searchParams.set("auth_error", code);
+  redirect(response, loginUrl.toString());
+}
 
 /**
  * @param {import("node:http").IncomingMessage} request
@@ -35,6 +67,7 @@ export async function handleAuthRoute(request, response, { config, db, url, segm
   ) {
     const appId = segments[2];
     ensureAppId(appId, config);
+    limitSignIns(request);
     const body = (await readJsonBody(request)) || {};
     const result = loginWithEmailPassword(db, config, request, {
       appId,
@@ -59,6 +92,7 @@ export async function handleAuthRoute(request, response, { config, db, url, segm
   ) {
     const appId = url.searchParams.get("app_id") || config.appId;
     ensureAppId(appId, config);
+    limitSignIns(request);
     // Stored with the OAuth state and followed after Google sign-in, so it
     // must stay on this app's origin (see sameOriginUrl).
     const fromUrl = sameOriginUrl(url.searchParams.get("from_url"), config.publicAppUrl, "/Today");
@@ -72,16 +106,8 @@ export async function handleAuthRoute(request, response, { config, db, url, segm
       }
     } catch (error) {
       if (error instanceof HttpError && error.code === "google_not_configured") {
-        const loginUrl = new URL("/login", config.publicAppUrl);
         const resolvedFromUrl = new URL(fromUrl, config.publicAppUrl);
-        loginUrl.searchParams.set(
-          "next",
-          resolvedFromUrl.searchParams.get("next") ||
-            `${resolvedFromUrl.pathname}${resolvedFromUrl.search}`
-        );
-        loginUrl.searchParams.set("auth_error", error.code);
-        loginUrl.searchParams.set("auth_error_message", error.message);
-        redirect(response, loginUrl.toString());
+        backToLogin(response, config, error.code, resolvedFromUrl.searchParams.get("next") || `${resolvedFromUrl.pathname}${resolvedFromUrl.search}`);
         return true;
       }
       throw error;
@@ -99,9 +125,21 @@ export async function handleAuthRoute(request, response, { config, db, url, segm
     const state = url.searchParams.get("state");
     const code = url.searchParams.get("code");
     if (!state || !code) {
-      throw new HttpError(400, "Google sign-in callback is missing state or code.", "invalid_google_callback");
+      // Also what Google sends when the person cancels.
+      backToLogin(response, config, "google_sign_in_failed");
+      return true;
     }
-    const result = await completeGoogleLogin(db, config, request, { state, code });
+    let result;
+    try {
+      limitSignIns(request);
+      result = await completeGoogleLogin(db, config, request, { state, code });
+    } catch (error) {
+      if (error instanceof HttpError) {
+        backToLogin(response, config, error.code);
+        return true;
+      }
+      throw error;
+    }
     // Checked again here: states written before the check above existed
     // may still hold an off-site address.
     redirect(response, sameOriginUrl(result.redirectTo, config.publicAppUrl, "/Today"), {

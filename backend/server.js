@@ -7,7 +7,8 @@ import { backendConfig, projectRoot } from "./config.js";
 import { closeDatabase, getDatabase } from "./db.js";
 import { HttpError, getRequestUrl, publicOrigin, sendError, sendJson } from "./http.js";
 import { log } from "./log.js";
-import { purgeExpiredAuthRecords } from "./auth.js";
+import { anyPasswordAllowed, purgeExpiredAuthRecords } from "./auth.js";
+import { contentSecurityPolicy, securityHeaders } from "./security-headers.js";
 import { purgeExpiredAiRecords } from "./ai/grants.js";
 import { purgeExpiredOAuthRecords } from "./ai/oauth.js";
 import { purgeExpiredDeletedTasks } from "./store.js";
@@ -58,7 +59,7 @@ function getPublicSettings(config) {
       // Email/password login is gated by the same flag that actually
       // accepts the request inside loginWithEmailPassword — keeps the
       // login UI honest about what will work.
-      email_password: !!config.allowAnyPassword,
+      email_password: anyPasswordAllowed(config),
     },
     deleted_task_retention_days: config.deletedTaskRetentionDays,
   };
@@ -104,7 +105,9 @@ function serveStaticFile(response, filePath) {
     // The app is never meant to be inside another site's frame; the
     // consent page for AI apps especially must not be clickable through one.
     response.setHeader("X-Frame-Options", "DENY");
-    response.setHeader("Content-Security-Policy", "frame-ancestors 'none'");
+    // And the page may only run its own scripts, so an injected one can't
+    // read the sign-in token (see security-headers.js).
+    response.setHeader("Content-Security-Policy", contentSecurityPolicy(filePath));
   }
   response.writeHead(200);
   createReadStream(filePath).pipe(response);
@@ -127,6 +130,11 @@ export function createTaskflowServer(config = backendConfig) {
       return new Promise((resolveStart) => {
         server.listen(config.port, config.host, () => {
           log.info(`backend listening on http://${config.host}:${config.port}`);
+          if (config.allowAnyPassword && !anyPasswordAllowed(config)) {
+            log.warn(
+              `TASKFLOW_ALLOW_ANY_PASSWORD is set but IGNORED: it only works when the app's address is this machine (${config.publicAppUrl} isn't). Remove it from the server's .env.`
+            );
+          }
           syncHandle = startSyncLoop(db, config);
           notificationHandle = startNotificationLoop(db, config);
           resolveStart(server);
@@ -153,7 +161,9 @@ export function createTaskflowServer(config = backendConfig) {
 }
 
 export function createRequestHandler(config = backendConfig, db = getDatabase(config)) {
+  const baseHeaders = securityHeaders(config);
   return async (request, response) => {
+    for (const [name, value] of baseHeaders) response.setHeader(name, value);
     // CORS for the app's own origin only. This used to echo back ANY
     // Origin with credentials allowed, i.e. "every website may call this
     // API as the signed-in user". The SameSite=Lax session cookie kept

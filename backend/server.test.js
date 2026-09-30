@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { validateHeaderValue } from "node:http";
 import { Readable } from "node:stream";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createHash, randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { closeDatabase, createDatabase } from "./db.js";
@@ -13,6 +13,10 @@ import { createRequestHandler } from "./server.js";
 import { resetRateLimits } from "./ai/rate-limit.js";
 import { allTools } from "./ai/tools.js";
 import { changeEnd, newSchedule } from "./lib/schedule.js";
+import { createRequestHandler as makeHandler } from "./server.js";
+import { getRequestIpAddress } from "./auth.js";
+import { inlineScriptHashes, policyFor } from "./security-headers.js";
+import { createHash as hashOf } from "node:crypto";
 
 let tempDir = "";
 let db;
@@ -165,6 +169,10 @@ beforeAll(() => {
   db = createDatabase(config);
   handler = createRequestHandler(config, db);
 });
+
+// Sign-ins are rate limited per address, and every test signs in from the
+// same one.
+beforeEach(() => resetRateLimits());
 
 afterAll(() => {
   closeDatabase();
@@ -428,6 +436,111 @@ describe("registry entities: Note", () => {
       headers: auth,
     });
     expect(deleted.statusCode).toBe(200);
+  });
+});
+
+describe("account safety", () => {
+  it("limits sign-in attempts from one address", async () => {
+    const attempt = () => invoke("/api/apps/test-app/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: { email: "limit@example.com", password: "x" } });
+    for (let i = 0; i < 20; i += 1) expect((await attempt()).statusCode).toBe(200);
+    const refused = await attempt();
+    expect(refused.statusCode).toBe(429);
+    expect(refused.body.code).toBe("too_many_attempts");
+  });
+
+  it("takes the visitor's address from Cloudflare, never from X-Forwarded-For", () => {
+    const request = (headers) => ({ headers, socket: { remoteAddress: "10.0.0.5" } });
+    expect(getRequestIpAddress(request({ "cf-connecting-ip": "203.0.113.9", "x-forwarded-for": "1.2.3.4" }))).toBe("203.0.113.9");
+    expect(getRequestIpAddress(request({ "x-forwarded-for": "1.2.3.4" }))).toBe("10.0.0.5");
+  });
+
+  it("ignores the any-password switch anywhere but this machine", async () => {
+    const saved = handler;
+    handler = makeHandler({ ...config, publicAppUrl: "https://zephyrly.app" }, db);
+    try {
+      const attempt = await invoke("/api/apps/test-app/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: { email: "stranger@example.com", password: "anything" },
+      });
+      expect(attempt.statusCode).toBe(401);
+      const settings = await invoke("/api/apps/public/prod/public-settings/by-id/test-app");
+      expect(settings.body.auth_providers.email_password).toBe(false);
+      expect(db.prepare("SELECT COUNT(*) AS n FROM users WHERE email = ?").get("stranger@example.com").n).toBe(0);
+    } finally {
+      handler = saved;
+    }
+  });
+
+  it("Google sign-in needs an email Google has confirmed, and never moves an account to another Google account", async () => {
+    const saved = handler;
+    handler = makeHandler({ ...config, googleMode: "oauth", googleClientId: "id", googleClientSecret: "secret", hasGoogleCredentials: true }, db);
+    let profile = {};
+    const fetchSpy = /** @type {any} */ (vi.spyOn(globalThis, "fetch")).mockImplementation(async (/** @type {any} */ url) =>
+      String(url).includes("oauth2.googleapis.com/token")
+        ? new Response(JSON.stringify({ access_token: "google-access" }), { status: 200 })
+        : new Response(JSON.stringify(profile), { status: 200 })
+    );
+    const signIn = async (info) => {
+      profile = info;
+      const start = await invoke("/api/apps/auth/login?app_id=test-app", { headers: { Accept: "application/json" } });
+      const state = new URL(start.body.redirect_url).searchParams.get("state");
+      return invoke(`/api/apps/auth/google/callback?state=${state}&code=abc`);
+    };
+    try {
+      const unverified = await signIn({ sub: "g-1", email: "gina@example.com", email_verified: false, name: "Gina" });
+      expect(unverified.statusCode).toBe(302);
+      expect(new URL(String(unverified.headers.Location)).searchParams.get("auth_error")).toBe("google_email_unverified");
+      expect(unverified.headers["Set-Cookie"]).toBeUndefined();
+      expect(db.prepare("SELECT COUNT(*) AS n FROM users WHERE email = ?").get("gina@example.com").n).toBe(0);
+
+      const ok = await signIn({ sub: "g-1", email: "gina@example.com", email_verified: true, name: "Gina" });
+      expect(ok.statusCode).toBe(302);
+      expect(String(ok.headers["Set-Cookie"])).toContain("taskflow_test_session=");
+
+      // Someone else's Google account claiming the same email: refused.
+      const other = await signIn({ sub: "g-2", email: "gina@example.com", email_verified: true, name: "Not Gina" });
+      expect(new URL(String(other.headers.Location)).searchParams.get("auth_error")).toBe("google_account_mismatch");
+      expect(other.headers["Set-Cookie"]).toBeUndefined();
+      expect(db.prepare("SELECT google_subject FROM users WHERE email = ?").get("gina@example.com").google_subject).toBe("g-1");
+
+      // Google's own error text never reaches the browser.
+      fetchSpy.mockImplementationOnce(async () => new Response("secret internal detail", { status: 400 }));
+      const failed = await signIn({});
+      expect(new URL(String(failed.headers.Location)).searchParams.get("auth_error")).toBe("google_sign_in_failed");
+      expect(failed.headers.Location).not.toContain("secret");
+    } finally {
+      fetchSpy.mockRestore();
+      handler = saved;
+    }
+  });
+
+  it("sends browser protections with every response, and a script policy for the page", async () => {
+    const health = await invoke("/api/health");
+    expect(health.headers).toMatchObject({
+      "X-Content-Type-Options": "nosniff",
+      "Referrer-Policy": "strict-origin-when-cross-origin",
+      "Cross-Origin-Opener-Policy": "same-origin",
+    });
+    // HSTS only over HTTPS.
+    expect(health.headers["Strict-Transport-Security"]).toBeUndefined();
+    const saved = handler;
+    handler = makeHandler({ ...config, publicAppUrl: "https://zephyrly.app" }, db);
+    try {
+      expect((await invoke("/api/health")).headers["Strict-Transport-Security"]).toBe("max-age=31536000");
+    } finally {
+      handler = saved;
+    }
+
+    // The page's one inline script (dark mode before load) is allowed by its exact hash, and no other inline script is.
+    const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+    const inline = /<script>([\s\S]*?)<\/script>/.exec(html)[1];
+    const policy = policyFor(html);
+    expect(policy).toContain(`script-src 'self' 'sha256-${hashOf("sha256").update(inline).digest("base64")}'`);
+    expect(policy).not.toMatch(/script-src[^;]*unsafe-inline/);
+    expect(policy).toContain("frame-ancestors 'none'");
+    expect(policy).toContain("object-src 'none'");
+    expect(inlineScriptHashes('<script src="/a.js"></script><script>x()</script>')).toHaveLength(1);
   });
 });
 
