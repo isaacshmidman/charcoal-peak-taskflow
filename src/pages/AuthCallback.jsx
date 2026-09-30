@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { LoaderCircle } from "lucide-react";
 import { appConfig, getStoredAccessToken } from "@/lib/app-config";
 import { useAuth } from "@/lib/AuthContext";
-import { sanitizeNavRoute } from "@/lib/navigation";
+import { safeInAppPath, sanitizeNavRoute } from "@/lib/navigation";
 import { recordLastSignIn } from "@/pages/Login";
 
 function buildFallbackRoute() {
@@ -11,18 +11,8 @@ function buildFallbackRoute() {
 }
 
 function resolveNextPath(rawValue) {
-  const fallback = buildFallbackRoute();
-  if (!rawValue) return fallback;
-
-  try {
-    const nextUrl = new URL(rawValue, window.location.origin);
-    if (nextUrl.origin !== window.location.origin) {
-      return fallback;
-    }
-    return `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}` || fallback;
-  } catch {
-    return fallback;
-  }
+  // Only this site's pages, never "//elsewhere" (see safeInAppPath).
+  return safeInAppPath(rawValue) || buildFallbackRoute();
 }
 
 export default function AuthCallback() {

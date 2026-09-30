@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { KeyRound, Mail } from "lucide-react";
 import { apiClient } from "@/api/apiClient";
 import { useAuth } from "@/lib/AuthContext";
-import { sanitizeNavRoute } from "@/lib/navigation";
+import { safeInAppPath, sanitizeNavRoute } from "@/lib/navigation";
 
 const SIGN_IN_ERRORS = {
   google_not_configured: "Google sign-in isn't set up on this server yet.",
@@ -34,15 +34,15 @@ function normalizeNextUrl(rawValue) {
   const fallbackUrl = buildDefaultReturnUrl();
   if (!rawValue) return fallbackUrl;
 
-  try {
-    const resolved = new URL(rawValue, window.location.origin);
-    if (resolved.origin === window.location.origin && resolved.pathname === "/login") {
-      return fallbackUrl;
-    }
-    return resolved.toString();
-  } catch {
-    return fallbackUrl;
-  }
+  // Only this site's pages (see safeInAppPath); anything else goes to the default.
+  const path = safeInAppPath(rawValue);
+  if (!path || new URL(path, window.location.origin).pathname === "/login") return fallbackUrl;
+  return new URL(path, window.location.origin).toString();
+}
+
+/** Where to go once signed in: the next= page, or the default one. */
+function afterSignIn(nextUrl) {
+  return safeInAppPath(new URL(nextUrl).pathname) || sanitizeNavRoute(localStorage.getItem("defaultNav"));
 }
 
 export default function Login() {
@@ -73,8 +73,7 @@ export default function Login() {
 
   useEffect(() => {
     if (!hasSession) return;
-    const nextRoute = new URL(nextUrl).pathname || sanitizeNavRoute(localStorage.getItem("defaultNav"));
-    navigate(nextRoute, { replace: true });
+    navigate(afterSignIn(nextUrl), { replace: true });
   }, [hasSession, navigate, nextUrl]);
 
   useEffect(() => {
@@ -94,8 +93,7 @@ export default function Login() {
     try {
       await loginWithEmailPassword(email.trim(), password);
       recordLastSignIn("email");
-      const nextRoute = new URL(nextUrl).pathname || sanitizeNavRoute(localStorage.getItem("defaultNav"));
-      navigate(nextRoute, { replace: true });
+      navigate(afterSignIn(nextUrl), { replace: true });
     } catch (error) {
       setLoginError(error.message || "Sign-in failed. Please try again.");
     }

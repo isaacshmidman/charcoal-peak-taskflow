@@ -3,6 +3,28 @@ export const VALID_NAV_ROUTES = ["/Today", "/Groupings", "/Calendar", "/Active",
 export const DEFAULT_NAV_ORDER = [...VALID_NAV_ROUTES];
 
 /**
+ * A path inside the app taken from a link's next= value, or null. Only
+ * this site's own pages, and never a path the router would read as
+ * another site: "//evil.com" (or "/\\evil.com", which URLs turn into it)
+ * would send someone already signed in straight to a look-alike page.
+ * @param {unknown} raw
+ * @param {string} [origin]
+ * @returns {string | null}
+ */
+export function safeInAppPath(raw, origin = window.location.origin) {
+  if (typeof raw !== "string" || !raw) return null;
+  try {
+    const url = new URL(raw, origin);
+    if (url.origin !== origin) return null;
+    const path = `${url.pathname}${url.search}${url.hash}`;
+    if (!path.startsWith("/") || path.startsWith("//") || path.startsWith("/\\")) return null;
+    return path;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * @param {unknown} route
  */
 export function sanitizeNavRoute(route) {
