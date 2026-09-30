@@ -72,6 +72,11 @@ import { loadFromCache, saveToCache } from "@/lib/offlineCache";
  *     usage: () => Promise<{ used_bytes: number, max_bytes: number, biggest_tasks: any[] }>,
  *     search: (q: string) => Promise<any[]>,
  *   },
+ *   sessions: {
+ *     list: () => Promise<any[]>,
+ *     signOut: (id: string) => Promise<any>,
+ *     signOutOthers: () => Promise<{ signed_out: number }>,
+ *   },
  *   ai: {
  *     grants: () => Promise<{ grants: any[], mcp_url: string }>,
  *     createToken: (input: { label: string, can_write: boolean, time_zone: string }) => Promise<{ grant: any, token: string, mcp_url: string }>,
@@ -656,6 +661,19 @@ const liveApiClient = {
    * AI apps connected to this account (backend/routes/ai.js). Online only:
    * access to the account is never granted or changed from a queue.
    */
+  // Where the account is signed in. Online only, like AI access: signing
+  // someone out is never left in a queue.
+  sessions: {
+    async list() {
+      return (await apiRequest(`/apps/${appConfig.appId}/sessions`)).sessions || [];
+    },
+    async signOut(id) {
+      return apiRequest(`/apps/${appConfig.appId}/sessions/${encodeURIComponent(id)}`, { method: "DELETE" });
+    },
+    async signOutOthers() {
+      return apiRequest(`/apps/${appConfig.appId}/sessions/sign-out-others`, { method: "POST" });
+    },
+  },
   ai: {
     /** @returns {Promise<{ grants: any[], mcp_url: string }>} */
     async grants() {

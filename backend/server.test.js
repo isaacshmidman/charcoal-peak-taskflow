@@ -16,6 +16,7 @@ import { changeEnd, newSchedule } from "./lib/schedule.js";
 import { createRequestHandler as makeHandler } from "./server.js";
 import { getRequestIpAddress } from "./auth.js";
 import { inlineScriptHashes, policyFor } from "./security-headers.js";
+import { deviceLabel } from "./sessions.js";
 import { createHash as hashOf } from "node:crypto";
 
 let tempDir = "";
@@ -543,6 +544,56 @@ describe("account safety", () => {
     expect(policy).toContain("frame-ancestors 'none'");
     expect(policy).toContain("object-src 'none'");
     expect(inlineScriptHashes('<script src="/a.js"></script><script>x()</script>')).toHaveLength(1);
+  });
+});
+
+describe("signed-in devices", () => {
+  it("lists where the account is signed in, and signs out one or everywhere else", async () => {
+    const signIn = async (userAgent) => {
+      const result = await invoke("/api/apps/test-app/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "User-Agent": userAgent },
+        body: { email: "devices@example.com", password: "x" },
+      });
+      return { Authorization: `Bearer ${result.body.access_token}` };
+    };
+    const phone = await signIn("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1");
+    const laptop = await signIn("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/140.0 Safari/537.36");
+    const tablet = await signIn("Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Safari/604.1");
+
+    const listed = await invoke("/api/apps/test-app/sessions", { headers: laptop });
+    expect(listed.statusCode).toBe(200);
+    expect(listed.body.sessions.map((s) => [s.device, s.current]).sort()).toEqual([
+      ["Chrome on Mac", true],
+      ["Safari on iPad", false],
+      ["Safari on iPhone", false],
+    ]);
+
+    // Signing out the iPad: its token stops working at once.
+    const ipad = listed.body.sessions.find((s) => s.device === "Safari on iPad");
+    expect((await invoke(`/api/apps/test-app/sessions/${ipad.id}`, { method: "DELETE", headers: laptop })).statusCode).toBe(200);
+    expect((await invoke("/api/apps/test-app/entities/User/me", { headers: tablet })).statusCode).toBe(401);
+
+    // This device isn't signed out from here, and nobody else's can be touched.
+    const mine = listed.body.sessions.find((s) => s.current);
+    expect((await invoke(`/api/apps/test-app/sessions/${mine.id}`, { method: "DELETE", headers: laptop })).statusCode).toBe(400);
+    const stranger = { Authorization: `Bearer ${await login("stranger-devices@example.com")}` };
+    expect((await invoke(`/api/apps/test-app/sessions/${mine.id}`, { method: "DELETE", headers: stranger })).statusCode).toBe(404);
+    expect((await invoke("/api/apps/test-app/sessions", { headers: stranger })).body.sessions).toHaveLength(1);
+
+    // Everywhere else: the phone is out, the laptop stays in.
+    const others = await invoke("/api/apps/test-app/sessions/sign-out-others", { method: "POST", headers: laptop });
+    expect(others.body.signed_out).toBe(1);
+    expect((await invoke("/api/apps/test-app/entities/User/me", { headers: phone })).statusCode).toBe(401);
+    expect((await invoke("/api/apps/test-app/entities/User/me", { headers: laptop })).statusCode).toBe(200);
+    expect((await invoke("/api/apps/test-app/sessions", {})).statusCode).toBe(401);
+  });
+
+  it("names devices from their browser", () => {
+    expect(deviceLabel("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140.0 Safari/537.36 Edg/140.0")).toBe("Edge on Windows");
+    expect(deviceLabel("Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/140.0 Mobile Safari/537.36")).toBe("Chrome on Android");
+    expect(deviceLabel("Mozilla/5.0 (X11; Linux x86_64; rv:130.0) Gecko/20100101 Firefox/130.0")).toBe("Firefox on Linux");
+    expect(deviceLabel("")).toBe("Unknown device");
   });
 });
 
