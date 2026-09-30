@@ -36,3 +36,33 @@ export function countWords(text) {
   if (!t) return 0;
   return t.split(/\s+/).length;
 }
+
+/**
+ * A rich-text document's plain text, the way the editors save it
+ * (TipTap's getText(): each block's text, blocks separated by a blank
+ * line, hard breaks as line breaks), trimmed.
+ *
+ * @param {any} doc
+ * @returns {string}
+ */
+export function docToText(doc) {
+  /** @type {string[]} */
+  const blocks = [];
+  /** @param {any} node */
+  const inlineText = (node) =>
+    (node.content || [])
+      .map((/** @type {any} */ child) => (child.type === "text" ? child.text || "" : child.type === "hardBreak" ? "\n" : inlineText(child)))
+      .join("");
+  /** @param {any} node */
+  const walk = (node) => {
+    const children = node?.content || [];
+    const isTextblock = children.length === 0 || children.some((/** @type {any} */ c) => c.type === "text" || c.type === "hardBreak");
+    if (node !== doc && isTextblock) {
+      blocks.push(inlineText(node));
+      return;
+    }
+    for (const child of children) walk(child);
+  };
+  walk(doc);
+  return blocks.join("\n\n").trim();
+}

@@ -1863,7 +1863,7 @@ describe("the same tools over plain HTTP (/api/v1)", () => {
     expect(doc.body.servers).toEqual([{ url: "http://127.0.0.1:4173" }]);
     expect(doc.body.paths["/api/v1/tools/get_agenda"].post).toMatchObject({ operationId: "get_agenda", security: [{ bearer: [] }] });
     expect(doc.body.paths["/api/v1/tools/create_task"].post.requestBody.content["application/json"].schema.required).toEqual(["title"]);
-    expect(Object.keys(doc.body.paths)).toHaveLength(11);
+    expect(Object.keys(doc.body.paths)).toHaveLength(13);
   });
 
   it("answers with readable text and data, and refuses with ok: false and the reason", async () => {

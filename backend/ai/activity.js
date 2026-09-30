@@ -46,7 +46,7 @@ function serializeActivity(row) {
     summary: row.summary,
     created_date: row.created_date,
     // available | undone | recently_deleted (restore it there) | none
-    undo: row.undone_at ? "undone" : !undo ? "none" : undo.kind === "delete_task" ? "recently_deleted" : "available",
+    undo: row.undone_at ? "undone" : !undo ? "none" : undo.kind === "delete_task" || undo.kind === "delete_note" ? "recently_deleted" : "available",
   };
 }
 
@@ -80,7 +80,7 @@ export function undoActivity(db, config, { appId, user, activityId }) {
   if (row.undone_at) throw new HttpError(400, "That change was already undone.", "already_undone");
   const undo = row.undo_json ? JSON.parse(row.undo_json) : null;
   if (!undo) throw new HttpError(400, "That change can't be undone from here.", "not_undoable");
-  if (undo.kind === "delete_task") {
+  if (undo.kind === "delete_task" || undo.kind === "delete_note") {
     throw new HttpError(400, "Restore it from Recently Deleted.", "use_recently_deleted");
   }
 
@@ -165,6 +165,11 @@ export function undoActivity(db, config, { appId, user, activityId }) {
       for (const s of subtasks) {
         pushes.push({ op: "upsert", taskSnapshot: updateEntityRecord(db, { entityName: "Task", ...scope, id: s.id, input: s.before }) });
       }
+    } else if (undo.kind === "update_note") {
+      const note = current("Note", undo.note_id);
+      if (!note) throw new HttpError(409, "That note is gone, so there's nothing to undo.", "gone");
+      unchangedSince(note, undo.updated_date);
+      updateEntityRecord(db, { entityName: "Note", ...scope, id: note.id, input: undo.before });
     } else if (undo.kind === "create_note") {
       const note = current("Note", undo.note_id);
       if (note) {

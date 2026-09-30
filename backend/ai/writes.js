@@ -22,12 +22,12 @@ import { createEntityRecord, deleteEntityRecord, updateEntityRecord, validateCli
 import { enqueueTaskPush } from "../push.js";
 import { MAX_BEFORE_MINUTES, parseReminder } from "../reminders.js";
 import { getNextRecurringDueDate } from "../lib/recurrence.js";
-import { countWords, plainTextToDoc } from "../lib/plain-text-doc.js";
-import { ToolError } from "./args.js";
+import { countWords, docToText, plainTextToDoc } from "../lib/plain-text-doc.js";
+import { ToolError, isRealDate } from "./args.js";
 import { logActivity } from "./activity.js";
-import { DATE, findPriority, getOwnTask, loadPriorities, loadTasks, lower } from "./context.js";
+import { DATE, findPriority, getOwnNote, getOwnTask, loadPriorities, loadTasks, lower } from "./context.js";
 import { WRITES_PER_HOUR, takeSlot } from "./rate-limit.js";
-import { dayLabel, defaultEndTime, describeReminder, formatTime, fromCalendar, isFromCalendar, normalizeTime, speakDay, speakTime, timeMinutes, todayIn } from "./view.js";
+import { dayLabel, defaultEndTime, describeRecurrence, describeReminder, formatTime, fromCalendar, isFromCalendar, normalizeTime, speakDay, speakTime, timeMinutes, todayIn } from "./view.js";
 
 /** The task editor's limit (richtext/content.js WORD_LIMIT). */
 const TASK_DESCRIPTION_WORDS = 500;
@@ -223,6 +223,64 @@ const REMINDER = {
 };
 const TAG_LIST = { type: "array", maxItems: 100, items: { type: "string", maxLength: 100 } };
 
+// Repeating, as the task form offers it (TaskForm/RecurrenceFields.jsx).
+const REPEATS = ["none", "daily", "weekdays", "weekly", "biweekly", "monthly", "quarterly", "yearly", "custom_days"];
+const WEEKDAY_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+const REPEAT_FIELDS = {
+  repeats: {
+    type: "string",
+    enum: REPEATS,
+    description: 'How it repeats; "none" stops it repeating. custom_days needs repeat_days.',
+  },
+  repeat_days: {
+    type: "array",
+    maxItems: 7,
+    items: { type: "string", enum: WEEKDAY_NAMES },
+    description: "For custom_days: the weekdays, e.g. [\"monday\", \"thursday\"].",
+  },
+  repeat_until: {
+    type: "string",
+    maxLength: 10,
+    description: 'Last day it can come round, YYYY-MM-DD, or "never".',
+  },
+};
+
+/**
+ * The recurrence fields a task should have after this call, or null when
+ * the call doesn't touch repeating. Stored exactly as the task form stores
+ * them: task_type "recurring" with a recurrence, days only for
+ * custom_days, and all of it cleared when it stops repeating.
+ * @param {Record<string, any>} args
+ * @param {any} current  the task as it is ({} for a new one)
+ * @param {string} dueDate  the due date it will have
+ */
+function resolveRepeats(args, current, dueDate) {
+  if (args.repeats == null && args.repeat_days == null && args.repeat_until == null) return null;
+  const currentlyRepeating = current.recurrence && current.recurrence !== "none";
+  const recurrence = args.repeats ?? (currentlyRepeating ? current.recurrence : "none");
+  if (recurrence === "none") {
+    if (args.repeat_days || args.repeat_until) throw new ToolError(`"repeat_days" and "repeat_until" only apply to a task that repeats.`);
+    return { task_type: "one_time", recurrence: "none", recurrence_days: [], recurrence_end_date: "" };
+  }
+  if (!dueDate) throw new ToolError("A repeating task needs a due date: that's when it first comes round.");
+  let days = [];
+  if (recurrence === "custom_days") {
+    const names = args.repeat_days ?? (current.recurrence === "custom_days" ? (current.recurrence_days || []).map((/** @type {number} */ d) => WEEKDAY_NAMES[d]) : []);
+    days = [...new Set(names.map((/** @type {string} */ n) => WEEKDAY_NAMES.indexOf(n)))].filter((d) => d >= 0).sort((a, b) => a - b);
+    if (!days.length) throw new ToolError(`"custom_days" needs "repeat_days", e.g. ["monday", "thursday"].`);
+  } else if (args.repeat_days) {
+    throw new ToolError(`"repeat_days" only applies with repeats "custom_days".`);
+  }
+  let until = currentlyRepeating ? current.recurrence_end_date || "" : "";
+  if (args.repeat_until != null) {
+    if (args.repeat_until === "never") until = "";
+    else if (isRealDate(args.repeat_until)) until = args.repeat_until;
+    else throw new ToolError(`"repeat_until" must be a date written like 2026-12-31, or "never".`);
+  }
+  if (until && until < dueDate) throw new ToolError(`"repeat_until" can't be before the due date, ${dueDate}.`);
+  return { task_type: "recurring", recurrence, recurrence_days: days, recurrence_end_date: until };
+}
+
 /** @type {Tool} */
 const createTask = {
   name: "create_task",
@@ -230,7 +288,7 @@ const createTask = {
   description:
     "Add a task (due_date required), or a subtask under parent_task_id (title, due_date, time and description only). " +
     "With a time and no end_time it gets an hour, like the app's task form; with no priority it gets the middle one. " +
-    "Can't add to items from connected calendars.",
+    "repeats makes it a repeating task (subtasks can't repeat). Can't add to items from connected calendars.",
   inputSchema: {
     type: "object",
     properties: {
@@ -242,6 +300,7 @@ const createTask = {
       tags: { ...TAG_LIST, description: "Tags, without #." },
       description: { type: "string", maxLength: 20_000, description: `Plain text, at most ${TASK_DESCRIPTION_WORDS} words.` },
       reminder: REMINDER,
+      ...REPEAT_FIELDS,
       parent_task_id: { type: "string", maxLength: 200, description: "Make it a subtask of this task." },
     },
     required: ["title"],
@@ -287,6 +346,7 @@ const createTask = {
         tags: cleanTags(args.tags),
         ...(args.description ? descriptionFields(args.description) : {}),
         reminder: args.reminder ? reminderValue(args.reminder, Boolean(times.task_time)) : "",
+        ...(resolveRepeats(args, {}, args.due_date) || {}),
       };
     }
     validateClientInput("Task", input);
@@ -296,7 +356,9 @@ const createTask = {
     );
     push(ctx, "upsert", created);
     const where = parent ? ` under ${quote(parent.title)}` : "";
-    logActivity(ctx, "create_task", `Added ${quote(created.title)}${where}${when(created)}.`, {
+    const repeatWords = describeRecurrence(created);
+    const repeating = repeatWords ? `, repeating ${repeatWords}` : "";
+    logActivity(ctx, "create_task", `Added ${quote(created.title)}${where}${when(created)}${repeating}.`, {
       kind: "create_task",
       task_id: created.id,
       updated_date: created.updated_date,
@@ -305,7 +367,7 @@ const createTask = {
       ? ` for ${speakDay(created.due_date, todayIn(ctx.timeZone))}${created.task_time ? ` at ${speakTime(created.task_time)}` : ""}`
       : "";
     return {
-      text: `Added ${quote(created.title)}${where}${when(created)} (id ${created.id}).`,
+      text: `Added ${quote(created.title)}${where}${when(created)}${repeating} (id ${created.id}).`,
       data: {
         id: created.id,
         title: created.title,
@@ -313,7 +375,7 @@ const createTask = {
         time: created.task_time || null,
         end_time: created.task_end_time || null,
         parent_task_id: parent?.id || null,
-        spoken: `Added ${created.title}${spokenWhen}.`,
+        spoken: `Added ${created.title}${spokenWhen}${repeating}.`,
       },
     };
   },
@@ -324,8 +386,8 @@ const updateTask = {
   name: "update_task",
   title: "Change a task",
   description:
-    "Change a task's title, date, time, priority, tags, description or reminder. A new time keeps the task's length unless end_time is given; " +
-    "clear_time makes it all-day. Moving a repeating task moves its next date. Can't change items from connected calendars.",
+    "Change a task's title, date, time, priority, tags, description, reminder or how it repeats. A new time keeps the task's length unless end_time is given; " +
+    "clear_time makes it all-day; repeats \"none\" stops it repeating. Moving a repeating task moves its next date. Can't change items from connected calendars.",
   inputSchema: {
     type: "object",
     properties: {
@@ -340,6 +402,7 @@ const updateTask = {
       remove_tags: { ...TAG_LIST, description: "Tags to remove." },
       description: { type: "string", maxLength: 20_000, description: `Replaces the description. Plain text, at most ${TASK_DESCRIPTION_WORDS} words.` },
       reminder: REMINDER,
+      ...REPEAT_FIELDS,
     },
     required: ["task_id"],
     additionalProperties: false,
@@ -350,7 +413,7 @@ const updateTask = {
     const task = getOwnTask(ctx, args.task_id);
     assertEditable(ctx, task);
     const subtask = Boolean(task.parent_id);
-    if (Object.keys(args).length === 1) throw new ToolError("Say what to change: title, due_date, time, priority, tags, description or reminder.");
+    if (Object.keys(args).length === 1) throw new ToolError("Say what to change: title, due_date, time, priority, tags, description, reminder or repeats.");
     if (subtask) {
       const extra = Object.keys(args).filter((k) => k !== "task_id" && k !== "clear_time" && !SUBTASK_FIELDS.has(k));
       if (extra.length) throw new ToolError(`Subtasks only have a title, due_date, time and description, not ${extra.join(", ")}.`);
@@ -408,6 +471,16 @@ const updateTask = {
       if ((kind === "before" && !timed) || (kind === "at" && timed)) {
         patch.reminder = "";
         changes.push("reminder back to the default");
+      }
+    }
+
+    const repeats = resolveRepeats(args, task, patch.due_date ?? task.due_date);
+    if (repeats) {
+      const changed = Object.entries(repeats).some(([key, value]) => JSON.stringify(value) !== JSON.stringify(task[key] ?? (Array.isArray(value) ? [] : "")));
+      if (changed) {
+        Object.assign(patch, repeats);
+        const words = describeRecurrence(repeats);
+        changes.push(words ? `repeats ${words}` : "no longer repeats");
       }
     }
 
@@ -631,7 +704,7 @@ const deleteTask = {
 const createNote = {
   name: "create_note",
   title: "Add a note",
-  description: `Add a note from plain text (one paragraph per line, at most ${NOTE_WORDS} words). Existing notes can't be edited from here.`,
+  description: `Add a note from plain text (one paragraph per line, at most ${NOTE_WORDS} words).`,
   inputSchema: {
     type: "object",
     properties: {
@@ -664,5 +737,198 @@ const createNote = {
   },
 };
 
+/**
+ * A note's body as a rich-text document: its saved JSON, or its plain
+ * text laid out as the editor would open it.
+ * @param {any} note
+ */
+function noteDoc(note) {
+  if (note.content_json) {
+    try {
+      const parsed = JSON.parse(note.content_json);
+      if (parsed && parsed.type === "doc") return parsed;
+    } catch {
+      // Fall through to the plain text.
+    }
+  }
+  return note.content_text ? plainTextToDoc(note.content_text) : { type: "doc", content: [] };
+}
+
+/**
+ * Replace `find` inside the document's text, one run of text at a time, so
+ * formatting and note↔task links around it are kept. Returns how many.
+ * @param {any} node
+ * @param {string} find
+ * @param {string} replacement
+ */
+function replaceInDoc(node, find, replacement) {
+  let count = 0;
+  if (!Array.isArray(node.content)) return 0;
+  for (const child of node.content) {
+    if (child.type === "text" && typeof child.text === "string" && child.text.includes(find)) {
+      const parts = child.text.split(find);
+      count += parts.length - 1;
+      child.text = parts.join(replacement);
+    } else {
+      count += replaceInDoc(child, find, replacement);
+    }
+  }
+  // ProseMirror has no empty text nodes; a run replaced with nothing goes.
+  node.content = node.content.filter((/** @type {any} */ child) => child.type !== "text" || child.text);
+  return count;
+}
+
+/**
+ * @param {any} node
+ */
+function countTaskLinks(node) {
+  let count = 0;
+  for (const child of node.content || []) {
+    if ((child.marks || []).some((/** @type {any} */ m) => m.type === "taskLink")) count += 1;
+    count += countTaskLinks(child);
+  }
+  return count;
+}
+
+/** @type {Tool} */
+const updateNote = {
+  name: "update_note",
+  title: "Change a note",
+  description:
+    "Change a note (read it first with get_note): its title, tags or pinning; add text at the end (append_text); " +
+    "swap words inside it (find and replace_with, which keeps its formatting and links to tasks); or replace all of its text " +
+    "(replace_all_text, which drops its formatting and task links). Every change can be undone in Zephyrly.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      note_id: { type: "string", maxLength: 200, description: "The note's id." },
+      title: { type: "string", maxLength: 200, "x-allow-empty": true, description: "New title (empty for untitled)." },
+      add_tags: { ...TAG_LIST, description: "Tags to add, without #." },
+      remove_tags: { ...TAG_LIST, description: "Tags to remove." },
+      pinned: { type: "boolean", description: "Pin it to the top, or unpin it." },
+      append_text: { type: "string", maxLength: 100_000, description: "Plain text to add at the end, one paragraph per line." },
+      find: { type: "string", maxLength: 2000, description: "Exact text to look for; every match is replaced." },
+      replace_with: { type: "string", maxLength: 20_000, "x-allow-empty": true, description: "What find becomes (empty to delete it)." },
+      replace_all_text: { type: "string", maxLength: 100_000, description: "New text for the whole note, one paragraph per line." },
+    },
+    required: ["note_id"],
+    additionalProperties: false,
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+  write: true,
+  handler(ctx, args) {
+    const note = getOwnNote(ctx, args.note_id);
+    if (Object.keys(args).length === 1) {
+      throw new ToolError("Say what to change: title, tags, pinned, append_text, find and replace_with, or replace_all_text.");
+    }
+    if ((args.find != null) !== (args.replace_with != null)) throw new ToolError(`"find" and "replace_with" go together.`);
+    if (args.replace_all_text != null && (args.append_text != null || args.find != null)) {
+      throw new ToolError(`"replace_all_text" replaces everything, so use it on its own, without append_text or find.`);
+    }
+
+    /** @type {Record<string, any>} */
+    const patch = {};
+    /** @type {string[]} */
+    const changes = [];
+    if (args.title != null && args.title !== (note.title || "")) {
+      patch.title = args.title;
+      changes.push(args.title ? `title to ${quote(args.title)}` : "no title");
+    }
+    if (args.add_tags || args.remove_tags) {
+      const removing = new Set(cleanTags(args.remove_tags).map(lower));
+      const next = cleanTags([...(note.tags || []), ...cleanTags(args.add_tags)]).filter((t) => !removing.has(lower(t)));
+      if (JSON.stringify(next) !== JSON.stringify(note.tags || [])) {
+        patch.tags = next;
+        changes.push(`tags ${next.length ? next.map((t) => `#${t}`).join(" ") : "none"}`);
+      }
+    }
+    if (args.pinned != null && args.pinned !== Boolean(note.pinned)) {
+      patch.pinned = args.pinned;
+      changes.push(args.pinned ? "pinned" : "unpinned");
+    }
+
+    if (args.replace_all_text != null || args.find != null || args.append_text != null) {
+      let doc = noteDoc(note);
+      if (args.replace_all_text != null) {
+        const links = countTaskLinks(doc);
+        doc = plainTextToDoc(args.replace_all_text);
+        changes.push(`replaced all its text${links ? `, removing ${links} link${links === 1 ? "" : "s"} to tasks` : ""}`);
+      }
+      if (args.find != null) {
+        const found = replaceInDoc(doc, args.find, args.replace_with);
+        if (!found) {
+          throw new ToolError(
+            `Couldn't find "${args.find}" in the note. It has to match exactly, within one stretch of text: a change of formatting splits it.`
+          );
+        }
+        changes.push(`replaced "${args.find}"${found > 1 ? ` (${found} times)` : ""}`);
+      }
+      if (args.append_text != null) {
+        doc.content = [...(doc.content || []), ...plainTextToDoc(args.append_text).content];
+        changes.push("added text at the end");
+      }
+      const text = docToText(doc);
+      if (countWords(text) > NOTE_WORDS) throw new ToolError(`A note can be at most ${NOTE_WORDS} words.`);
+      patch.content_json = text ? JSON.stringify(doc) : "";
+      patch.content_text = text;
+    }
+
+    const name = note.title ? quote(note.title) : "the untitled note";
+    if (!changes.length) return { text: `Nothing to change: ${name} already looks like that (id ${note.id}).`, data: { id: note.id, changed: false } };
+    validateClientInput("Note", patch);
+    spendWrite(ctx);
+    /** @type {Record<string, any>} */
+    const before = {};
+    for (const key of Object.keys(patch)) before[key] = note[key] ?? (key === "tags" ? [] : key === "pinned" ? false : "");
+    const updated = inTransaction(ctx.db, () =>
+      updateEntityRecord(ctx.db, { entityName: "Note", appId: ctx.appId, user: ctx.user, id: note.id, input: patch })
+    );
+    const summary = `Changed the note ${name}: ${changes.join("; ")}.`;
+    logActivity(ctx, "update_note", summary, { kind: "update_note", note_id: note.id, before, updated_date: updated.updated_date });
+    return { text: `${summary} (id ${note.id})`, data: { id: note.id, changed: true, changes } };
+  },
+};
+
+/** @type {Tool} */
+const deleteNote = {
+  name: "delete_note",
+  title: "Delete a note",
+  description: "Move a note to Recently Deleted, where the person can restore it for a week.",
+  inputSchema: {
+    type: "object",
+    properties: { note_id: { type: "string", maxLength: 200, description: "The note's id." } },
+    required: ["note_id"],
+    additionalProperties: false,
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+  write: true,
+  handler(ctx, args) {
+    const note = getOwnNote(ctx, args.note_id);
+    // The Notes page's own snapshot (src/pages/Notes.jsx).
+    const record = {
+      note_id: note.id,
+      title: note.title || "",
+      content_json: note.content_json || "",
+      content_text: note.content_text || "",
+      pinned: Boolean(note.pinned),
+      tags: note.tags || [],
+      priority_id: note.priority_id || "",
+    };
+    validateClientInput("DeletedNote", record);
+    spendWrite(ctx);
+    const deleted = inTransaction(ctx.db, () => {
+      const saved = createEntityRecord(ctx.db, { entityName: "DeletedNote", appId: ctx.appId, user: ctx.user, input: record, config: ctx.config });
+      deleteEntityRecord(ctx.db, { entityName: "Note", appId: ctx.appId, user: ctx.user, id: note.id, config: ctx.config });
+      return saved;
+    });
+    const summary = `Moved the note ${note.title ? quote(note.title) : "(untitled)"} to Recently Deleted.`;
+    logActivity(ctx, "delete_note", summary, { kind: "delete_note", deleted_id: deleted.id });
+    return {
+      text: `${summary} The person can restore it from there for ${ctx.config.deletedTaskRetentionDays} days.`,
+      data: { id: note.id, deleted: true, recently_deleted_id: deleted.id },
+    };
+  },
+};
+
 /** @type {Tool[]} */
-export const WRITE_TOOLS = [createTask, updateTask, completeTask, deleteTask, createNote];
+export const WRITE_TOOLS = [createTask, updateTask, completeTask, deleteTask, createNote, updateNote, deleteNote];

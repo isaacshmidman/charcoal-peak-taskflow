@@ -51,8 +51,10 @@ export function validateArgs(schema, args) {
   const out = {};
   for (const [key, spec] of Object.entries(properties)) {
     const value = record[key];
-    if (value == null || value === "") continue;
-    out[key] = checkValue(key, spec, value);
+    // An empty string means "not given", unless the schema marks it as a
+    // real value (x-allow-empty: replacing a word with nothing).
+    if (value == null || (value === "" && !spec["x-allow-empty"])) continue;
+    out[key] = value === "" ? "" : checkValue(key, spec, value);
   }
   for (const key of schema.required || []) {
     if (out[key] == null || (Array.isArray(out[key]) && out[key].length === 0)) throw new ToolError(`"${key}" is required.`);

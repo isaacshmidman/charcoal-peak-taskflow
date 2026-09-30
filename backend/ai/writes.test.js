@@ -376,3 +376,130 @@ describe("the activity log and Undo", () => {
     expect(() => get(data.id, "Note")).toThrow(/not found/);
   });
 });
+
+describe("repeating tasks", () => {
+  it("makes a new task repeat the way the task form stores it", async () => {
+    const weekly = await run("create_task", { title: "Gym", due_date: "2026-10-05", repeats: "weekly", repeat_until: "2026-12-21" });
+    expect(get(weekly.data.id)).toMatchObject({ task_type: "recurring", recurrence: "weekly", recurrence_days: [], recurrence_end_date: "2026-12-21" });
+    expect(weekly.text).toContain("repeating every week until 2026-12-21");
+
+    const custom = await run("create_task", { title: "Piano", due_date: "2026-10-05", repeats: "custom_days", repeat_days: ["thursday", "monday", "monday"] });
+    expect(get(custom.data.id)).toMatchObject({ task_type: "recurring", recurrence: "custom_days", recurrence_days: [1, 4], recurrence_end_date: "" });
+    expect(custom.data.spoken).toContain("repeating every Monday and Thursday");
+  });
+
+  it("changes how a task repeats, and stops it, clearing what the form clears", async () => {
+    const t = task({ title: "Water plants", due_date: "2026-10-05" });
+    const made = await run("update_task", { task_id: t.id, repeats: "custom_days", repeat_days: ["saturday"] });
+    expect(made.text).toContain("repeats every Saturday");
+    // Only the days: it stays custom_days.
+    await run("update_task", { task_id: t.id, repeat_days: ["tuesday", "saturday"] });
+    expect(get(t.id)).toMatchObject({ recurrence: "custom_days", recurrence_days: [2, 6] });
+    // Only the end: the rest stays.
+    await run("update_task", { task_id: t.id, repeat_until: "2026-11-30" });
+    expect(get(t.id)).toMatchObject({ recurrence: "custom_days", recurrence_days: [2, 6], recurrence_end_date: "2026-11-30" });
+    await run("update_task", { task_id: t.id, repeat_until: "never" });
+    expect(get(t.id).recurrence_end_date).toBe("");
+
+    const stopped = await run("update_task", { task_id: t.id, repeats: "none" });
+    expect(stopped.text).toContain("no longer repeats");
+    expect(get(t.id)).toMatchObject({ task_type: "one_time", recurrence: "none", recurrence_days: [], recurrence_end_date: "" });
+  });
+
+  it("refuses what the form wouldn't allow", async () => {
+    const parent = task({ title: "Trip", due_date: "2026-10-05" });
+    const sub = task({ title: "Pack", parent_id: parent.id });
+    await expect(run("update_task", { task_id: sub.id, repeats: "daily" })).rejects.toThrow(/Subtasks only have/);
+    await expect(run("create_task", { title: "x", due_date: "2026-10-05", repeats: "custom_days" })).rejects.toThrow(/needs "repeat_days"/);
+    await expect(run("create_task", { title: "x", due_date: "2026-10-05", repeats: "weekly", repeat_days: ["monday"] })).rejects.toThrow(/only applies with repeats "custom_days"/);
+    await expect(run("create_task", { title: "x", due_date: "2026-10-05", repeats: "weekly", repeat_until: "2026-10-01" })).rejects.toThrow(/can't be before the due date/);
+    await expect(run("create_task", { title: "x", due_date: "2026-10-05", repeats: "weekly", repeat_until: "soon" })).rejects.toThrow(/or "never"/);
+    await expect(run("update_task", { task_id: parent.id, repeat_until: "2026-12-01" })).rejects.toThrow(/only apply to a task that repeats/);
+    await expect(run("create_task", { title: "x", due_date: "2026-10-05", repeats: "fortnightly" })).rejects.toThrow(/must be one of/);
+  });
+
+  it("undo puts the old repeat back", async () => {
+    const t = task({ title: "Standup", due_date: "2026-10-05", task_type: "recurring", recurrence: "weekdays" });
+    await run("update_task", { task_id: t.id, repeats: "none" });
+    undoLatest();
+    expect(get(t.id)).toMatchObject({ task_type: "recurring", recurrence: "weekdays" });
+  });
+});
+
+describe("editing notes", () => {
+  const LINKED = (taskId) =>
+    JSON.stringify({
+      type: "doc",
+      content: [
+        { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "Trip plan" }] },
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "First " },
+            { type: "text", text: "call the plumber", marks: [{ type: "taskLink", attrs: { taskId } }] },
+            { type: "text", text: " then pack the bag", marks: [{ type: "bold" }] },
+          ],
+        },
+      ],
+    });
+  const note = (input) => createEntityRecord(db, { entityName: "Note", appId: APP_ID, user: ME, input, config });
+
+  it("swaps words inside the note, keeping headings, bold and the link to a task", async () => {
+    const n = note({ title: "Trip", content_json: LINKED("task_x"), content_text: "Trip plan\n\nFirst call the plumber then pack the bag" });
+    const { text } = await run("update_note", { note_id: n.id, find: "plumber", replace_with: "electrician" });
+    expect(text).toContain('replaced "plumber"');
+    const saved = get(n.id, "Note");
+    const doc = JSON.parse(saved.content_json);
+    expect(doc.content[0].type).toBe("heading");
+    expect(doc.content[1].content[1]).toEqual({ type: "text", text: "call the electrician", marks: [{ type: "taskLink", attrs: { taskId: "task_x" } }] });
+    expect(doc.content[1].content[2].marks).toEqual([{ type: "bold" }]);
+    expect(saved.content_text).toBe("Trip plan\n\nFirst call the electrician then pack the bag");
+  });
+
+  it("can delete words with an empty replacement, and says when the words aren't there", async () => {
+    const n = note({ content_text: "Buy milk and eggs" });
+    await run("update_note", { note_id: n.id, find: " and eggs", replace_with: "" });
+    expect(get(n.id, "Note").content_text).toBe("Buy milk");
+    await expect(run("update_note", { note_id: n.id, find: "bread", replace_with: "x" })).rejects.toThrow(/Couldn't find "bread"/);
+    await expect(run("update_note", { note_id: n.id, find: "milk" })).rejects.toThrow(/go together/);
+  });
+
+  it("adds text at the end without touching what's there", async () => {
+    const n = note({ title: "Trip", content_json: LINKED("task_y"), content_text: "Trip plan\n\nFirst call the plumber then pack the bag" });
+    await run("update_note", { note_id: n.id, append_text: "Book the train\nCharge the camera" });
+    const doc = JSON.parse(get(n.id, "Note").content_json);
+    expect(doc.content).toHaveLength(4);
+    expect(doc.content[1].content[1].marks[0].type).toBe("taskLink");
+    expect(get(n.id, "Note").content_text).toBe("Trip plan\n\nFirst call the plumber then pack the bag\n\nBook the train\n\nCharge the camera");
+  });
+
+  it("replacing all the text says how many task links go with it", async () => {
+    const n = note({ title: "Trip", content_json: LINKED("task_z"), content_text: "x" });
+    const { text } = await run("update_note", { note_id: n.id, replace_all_text: "Cancelled." });
+    expect(text).toContain("replaced all its text, removing 1 link to tasks");
+    expect(get(n.id, "Note")).toMatchObject({ content_text: "Cancelled." });
+    await expect(run("update_note", { note_id: n.id, replace_all_text: "a", append_text: "b" })).rejects.toThrow(/use it on its own/);
+  });
+
+  it("changes the title, tags and pinning, and undo gives the whole note back", async () => {
+    const n = note({ title: "Ideas", content_text: "One", tags: ["work"] });
+    await run("update_note", { note_id: n.id, title: "", add_tags: ["later"], remove_tags: ["work"], pinned: true, append_text: "Two" });
+    expect(get(n.id, "Note")).toMatchObject({ title: "", tags: ["later"], pinned: true, content_text: "One\n\nTwo" });
+    undoLatest();
+    expect(get(n.id, "Note")).toMatchObject({ title: "Ideas", tags: ["work"], pinned: false, content_text: "One", content_json: "" });
+  });
+
+  it("delete_note moves it to Recently Deleted with the app's snapshot", async () => {
+    const n = note({ title: "Old", content_text: "gone soon", tags: ["x"], pinned: true });
+    const { data } = await run("delete_note", { note_id: n.id });
+    expect(() => get(n.id, "Note")).toThrow(/not found/);
+    expect(get(data.recently_deleted_id, "DeletedNote")).toMatchObject({ note_id: n.id, title: "Old", content_text: "gone soon", tags: ["x"], pinned: true });
+    expect(listActivity(db, { appId: APP_ID, userId: ME.id })[0].undo).toBe("recently_deleted");
+  });
+
+  it("won't touch someone else's note", async () => {
+    const theirs = createEntityRecord(db, { entityName: "Note", appId: APP_ID, user: { id: "other", email: "o@example.com" }, input: { content_text: "private" }, config });
+    await expect(run("update_note", { note_id: theirs.id, append_text: "hi" })).rejects.toThrow(`No note with id "${theirs.id}".`);
+    await expect(run("delete_note", { note_id: theirs.id })).rejects.toThrow(/No note with id/);
+  });
+});

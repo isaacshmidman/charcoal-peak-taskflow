@@ -108,6 +108,15 @@ export function getOwnTask(ctx, id) {
 }
 
 /**
+ * @param {ToolContext} ctx
+ * @param {string} id
+ * @returns {any}
+ */
+export function getOwnNote(ctx, id) {
+  return asToolError(() => getEntityRecord(ctx.db, { entityName: "Note", appId: ctx.appId, user: ctx.user, id }), `No note with id "${id}".`);
+}
+
+/**
  * @param {any} db
  * @param {any} config
  * @param {{ grant: any, user: any }} found  from requireAiGrant

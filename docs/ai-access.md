@@ -15,10 +15,18 @@ change an AI app made, with Undo.
 ## What an AI app can and can't do
 
 It can read your agenda, search tasks and notes, and read a task or note in
-full. With changes allowed, it can also add tasks and subtasks, change a
-task's title, date, time, priority, tags, description or reminder, mark
-tasks done (a repeating task moves on, as in the app), move a task to
-Recently Deleted, and add notes.
+full. With changes allowed, it can also:
+
+- add tasks and subtasks, and change a task's title, date, time, priority,
+  tags, description, reminder, or how it repeats (the same choices as the
+  task form: daily, weekdays, chosen days, weekly, every two weeks, monthly,
+  quarterly or yearly, with an optional last day), or stop it repeating;
+- mark tasks done (a repeating task moves on, as in the app);
+- move a task or a note to Recently Deleted;
+- add notes, and change them: title, tags, pinning, text added at the end,
+  words swapped inside (keeping formatting and links to tasks), or all of
+  the text replaced (which drops formatting and task links, and says how
+  many links went).
 
 Whatever the AI app is told, Zephyrly itself never lets it:
 
