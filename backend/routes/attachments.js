@@ -33,6 +33,7 @@ import {
   MAX_FILE_BYTES,
 } from "../attachments.js";
 import { log } from "../log.js";
+import { purgeExpiredDeletedTasks } from "../store.js";
 
 const require = createRequire(import.meta.url);
 /** @type {any} */
@@ -84,6 +85,9 @@ export async function handleAttachmentsRoute(request, response, { config, db, ur
     segments.length === 5
   ) {
     const user = requireAuthenticatedUser(db, config, request, appId);
+    // Recently Deleted's timer first, so files that have run out of time
+    // there aren't counted.
+    purgeExpiredDeletedTasks(db, appId, config);
     sendJson(response, 200, getStorageOverview(db, { appId, user }));
     return true;
   }

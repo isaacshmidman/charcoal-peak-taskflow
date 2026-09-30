@@ -70,6 +70,7 @@ export function createE2EApiClient() {
   // Notes arrived after this mock; state saved by an older run won't have them.
   backend.state.notes ||= [];
   backend.state.deletedNotes ||= [];
+  backend.state.attachments ||= [];
   const createEntityStore = (key, createCounter, updateCounter, deleteCounter) => ({
     async list(sort) {
       return clone(sortRecords(backend.state[key], sort));
@@ -116,11 +117,54 @@ export function createE2EApiClient() {
     },
   });
 
+  // Files, as the server keeps them (backend/attachments.js): a deleted
+  // task's are held — on no task, still counted — until a Task create
+  // names it in restores_task_id, or it leaves Recently Deleted.
+  const attachments = () => backend.state.attachments;
+  const liveFiles = (taskId) => attachments().filter((a) => a.task_id === taskId && !a.task_deleted_at);
+  const taskStore = createEntityStore("tasks", "taskCreates", "taskUpdates", "taskDeletes");
+  const deletedTaskStore = createEntityStore("deletedTasks", "deletedTaskCreates", "deletedTaskUpdates", "deletedTaskDeletes");
+  const idsOfDeletedTask = (record) => [record?.task_id, ...(record?.subtasks || []).map((s) => s?.id)].filter(Boolean).map(String);
+  const Task = {
+    ...taskStore,
+    async create(data) {
+      const { restores_task_id: restores, ...fields } = data;
+      const created = await taskStore.create(fields);
+      const held = attachments().filter((a) => a.task_deleted_at && restores && a.task_id === String(restores));
+      if (!held.length) return created;
+      held.forEach((a) => Object.assign(a, { task_id: created.id, task_deleted_at: null }));
+      const stored = backend.state.tasks.find((t) => t.id === created.id);
+      stored.attachment_count = liveFiles(created.id).length;
+      persistBackend(backend);
+      return clone(stored);
+    },
+    async delete(id) {
+      const ids = [String(id), ...backend.state.tasks.filter((t) => String(t.parent_id) === String(id)).map((t) => String(t.id))];
+      const now = new Date().toISOString();
+      attachments().forEach((a) => {
+        if (!a.task_deleted_at && ids.includes(a.task_id)) a.task_deleted_at = now;
+      });
+      return taskStore.delete(id);
+    },
+  };
+  const DeletedTask = {
+    ...deletedTaskStore,
+    async delete(id) {
+      const record = backend.state.deletedTasks.find((r) => String(r.id) === String(id));
+      const result = await deletedTaskStore.delete(id);
+      const stillThere = new Set(backend.state.deletedTasks.flatMap(idsOfDeletedTask));
+      const gone = idsOfDeletedTask(record).filter((taskId) => !stillThere.has(taskId));
+      backend.state.attachments = attachments().filter((a) => !(a.task_deleted_at && gone.includes(a.task_id)));
+      persistBackend(backend);
+      return result;
+    },
+  };
+
   return {
     entities: {
-      Task: createEntityStore("tasks", "taskCreates", "taskUpdates", "taskDeletes"),
+      Task,
       Priority: createEntityStore("priorities", null, null, null),
-      DeletedTask: createEntityStore("deletedTasks", "deletedTaskCreates", "deletedTaskUpdates", "deletedTaskDeletes"),
+      DeletedTask,
       SavedTag: createEntityStore("savedTags", "savedTagCreates", null, null),
       Note: createEntityStore("notes", null, null, null),
       DeletedNote: createEntityStore("deletedNotes", null, null, null),
@@ -250,12 +294,12 @@ export function createE2EApiClient() {
       },
     },
     attachments: {
-      // E2E mock keeps attachments in-memory only; no real file uploads
-      // happen here. Returning empty lists keeps the UI usable in tests
-      // without exercising the file pipeline (which is covered by real
-      // backend tests on the server side).
-      async list(_taskId) {
-        return [];
+      // E2E mock: no real file uploads happen here (the file pipeline is
+      // covered by the backend tests). Files seeded into state.attachments
+      // list on their task and count in storage, held and released the way
+      // the server does it (Task and DeletedTask above).
+      async list(taskId) {
+        return clone(liveFiles(taskId));
       },
       async upload(_taskId, _file, opts) {
         if (opts && typeof opts.onProgress === "function") opts.onProgress(100);
@@ -268,7 +312,30 @@ export function createE2EApiClient() {
         return `#mock-attachment-${id}`;
       },
       async usage() {
-        return { used_bytes: 0, max_bytes: 1_000_000_000, biggest_tasks: [] };
+        const lines = new Map();
+        for (const file of attachments()) {
+          const item = file.task_deleted_at
+            ? backend.state.deletedTasks.find((r) => idsOfDeletedTask(r).includes(file.task_id))
+            : null;
+          const task = backend.state.tasks.find((t) => t.id === file.task_id);
+          const key = item ? `deleted:${item.id}` : `task:${file.task_id}`;
+          const line = lines.get(key) || {
+            task_id: item ? item.task_id : file.task_id,
+            task_title: (item ? item.title : task?.title) || "(deleted task)",
+            total_bytes: 0,
+            file_count: 0,
+            in_recently_deleted: Boolean(item),
+          };
+          line.total_bytes += file.size_bytes || 0;
+          line.file_count += 1;
+          lines.set(key, line);
+        }
+        const biggest = [...lines.values()].sort((a, b) => b.total_bytes - a.total_bytes);
+        return {
+          used_bytes: biggest.reduce((sum, line) => sum + line.total_bytes, 0),
+          max_bytes: 1_000_000_000,
+          biggest_tasks: biggest.slice(0, 10),
+        };
       },
       async search(_q) {
         return [];

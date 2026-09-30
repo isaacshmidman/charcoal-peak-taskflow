@@ -24,13 +24,15 @@ Whatever the AI app is told, Zephyrly itself never lets it:
 
 - change anything from a connected Google or Apple calendar — that would
   move or rewrite the real event;
-- delete anything for good (subtasks, and tasks with attached files, can't
-  be deleted by an AI app because deleting those is permanent);
+- delete anything for good (a task it deletes goes to Recently Deleted
+  with its files, and it can't delete a subtask, because deleting one is
+  permanent);
 - see another person's tasks;
 - make more than 100 changes an hour, or 120 requests a minute.
 
 Every change is logged. Undo in Settings reverses it unless the task was
-edited again since, in which case it says so and leaves your edit alone.
+edited again since (files attached to a task it added count), in which
+case it says so and leaves your edit alone.
 Deleted tasks are restored from Recently Deleted.
 
 ## Apps that sign in

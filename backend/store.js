@@ -2,7 +2,14 @@
 import { randomUUID } from "node:crypto";
 import { HttpError } from "./http.js";
 import { backendConfig, getDeletedTaskRetentionMs } from "./config.js";
-import { deleteAttachmentsForTask } from "./attachments.js";
+import {
+  deleteAttachmentsForTasks,
+  holdAttachmentsForTasks,
+  purgeHeldAttachments,
+  purgeStaleHeldAttachments,
+  releaseHeldAttachments,
+  taskIdsOfDeletedTask,
+} from "./attachments.js";
 import { ARRAY_LIMITS, DEFAULT_FIELD_MAX_CHARS, FIELD_MAX_CHARS } from "./limits.js";
 
 const ENTITY_DEFINITIONS = {
@@ -651,11 +658,34 @@ function updateRow(db, table, id, patch, whereClause, params) {
   );
 }
 
-export function purgeExpiredDeletedTasks(db, appId) {
-  db.prepare("DELETE FROM deleted_tasks WHERE app_id = ? AND expires_at <= ?").run(
-    appId,
-    new Date().toISOString()
-  );
+/**
+ * Recently Deleted's timer: expired items go, and the files held for them
+ * with them (attachments.js), as do held files no item stands for once
+ * they've been held as long as an item would have been.
+ *
+ * @param {any} db
+ * @param {string} appId
+ * @param {any} [config]
+ */
+export function purgeExpiredDeletedTasks(db, appId, config = backendConfig) {
+  const now = new Date().toISOString();
+  const expired = db
+    .prepare("SELECT task_id, subtasks_json, created_by_id, created_by FROM deleted_tasks WHERE app_id = ? AND expires_at <= ?")
+    .all(appId, now);
+  if (expired.length) {
+    db.prepare("DELETE FROM deleted_tasks WHERE app_id = ? AND expires_at <= ?").run(appId, now);
+    for (const record of expired) {
+      purgeHeldAttachments(db, config, {
+        appId,
+        owner: { id: record.created_by_id || "", email: record.created_by || "" },
+        taskIds: taskIdsOfDeletedTask(record),
+      });
+    }
+  }
+  const retentionMs = getDeletedTaskRetentionMs(config);
+  if (Number.isFinite(retentionMs)) {
+    purgeStaleHeldAttachments(db, config, { appId, heldBefore: new Date(Date.now() - retentionMs).toISOString() });
+  }
 }
 
 export function purgeExpiredDeletedNotes(db, appId) {
@@ -674,12 +704,12 @@ function listRowsForEntity(db, entityName, appId, user) {
     .all(appId, ...scope.params(user));
 }
 
-export function listEntityRecords(db, { entityName, appId, user, sort, skip = 0, limit, fields, query }) {
+export function listEntityRecords(db, { entityName, appId, user, sort, skip = 0, limit, fields, query, config = backendConfig }) {
   if (entityName === "User") {
     return [pickFields(hydrateRecord("User", user), fields)];
   }
   if (entityName === "DeletedTask") {
-    purgeExpiredDeletedTasks(db, appId);
+    purgeExpiredDeletedTasks(db, appId, config);
   }
   if (entityName === "DeletedNote") {
     purgeExpiredDeletedNotes(db, appId);
@@ -694,13 +724,13 @@ export function listEntityRecords(db, { entityName, appId, user, sort, skip = 0,
   return sliced.map((record) => pickFields(record, fields));
 }
 
-export function getEntityRecord(db, { entityName, appId, user, id }) {
+export function getEntityRecord(db, { entityName, appId, user, id, config = backendConfig }) {
   if (entityName === "User" && id === "me") {
     return hydrateRecord("User", user);
   }
 
   if (entityName === "DeletedTask") {
-    purgeExpiredDeletedTasks(db, appId);
+    purgeExpiredDeletedTasks(db, appId, config);
   }
   if (entityName === "DeletedNote") {
     purgeExpiredDeletedNotes(db, appId);
@@ -720,14 +750,30 @@ export function getEntityRecord(db, { entityName, appId, user, id }) {
   return hydrateRecord(entityName, row);
 }
 
-export function createEntityRecord(db, { entityName, appId, user, input, config, allowSystemFields = false }) {
+/**
+ * `restoresTaskId`: a Task being restored names the deleted task it
+ * brings back (from Recently Deleted, or an Undo), and the files held for
+ * that task move onto it. A task that comes back under its old id — a
+ * restore from an export — gets its held files back the same way.
+ */
+export function createEntityRecord(db, { entityName, appId, user, input, config, allowSystemFields = false, restoresTaskId = "" }) {
   const definition = definitionFor(entityName);
   if (!definition) throw new HttpError(404, `Unknown entity: ${entityName}`, "unknown_entity");
   validateEntityInput(entityName, input, { mode: "create" });
 
   const row = buildInsertRow(entityName, input, { appId, user, config, allowSystemFields });
   insertRow(db, definition.table, row);
-  return hydrateRecord(entityName, row);
+  const record = hydrateRecord(entityName, row);
+  if (entityName === "Task" && record) {
+    const files = releaseHeldAttachments(db, {
+      appId,
+      userId: user?.id || "",
+      fromTaskIds: [restoresTaskId, row.id],
+      toTaskId: row.id,
+    });
+    if (files) record.attachment_count = files;
+  }
+  return record;
 }
 
 export function importEntityRecord(db, { entityName, appId, user, input, config }) {
@@ -748,40 +794,56 @@ export function importEntityRecord(db, { entityName, appId, user, input, config 
   });
 }
 
-export function updateEntityRecord(db, { entityName, appId, user, id, input }) {
+export function updateEntityRecord(db, { entityName, appId, user, id, input, config = backendConfig }) {
   const definition = definitionFor(entityName);
   if (!definition) throw new HttpError(404, `Unknown entity: ${entityName}`, "unknown_entity");
   validateEntityInput(entityName, input, { mode: "update" });
-  getEntityRecord(db, { entityName, appId, user, id });
+  getEntityRecord(db, { entityName, appId, user, id, config });
 
   const scope = authWhereClause(entityName);
   const patch = buildUpdateRow(entityName, input);
   updateRow(db, definition.table, id, patch, ` AND app_id = ?${scope.clause}`, [appId, ...scope.params(user)]);
-  return getEntityRecord(db, { entityName, appId, user, id });
+  return getEntityRecord(db, { entityName, appId, user, id, config });
 }
 
-export function deleteEntityRecord(db, { entityName, appId, user, id }) {
+/**
+ * A Task goes with its subtasks, and their files with them: held for
+ * Recently Deleted with `holdFiles` — the app's delete, which moves the
+ * task there — and otherwise removed for good (calendar sync, an AI
+ * app's Undo). A DeletedTask leaving Recently Deleted takes whatever is
+ * still held for it: nothing, when it was restored, since restoring moved
+ * its files onto the restored task.
+ */
+export function deleteEntityRecord(db, { entityName, appId, user, id, config = backendConfig, holdFiles = false }) {
   const definition = definitionFor(entityName);
   if (!definition) throw new HttpError(404, `Unknown entity: ${entityName}`, "unknown_entity");
-  getEntityRecord(db, { entityName, appId, user, id });
+  const existing = getEntityRecord(db, { entityName, appId, user, id, config });
   const scope = authWhereClause(entityName);
+  const subtaskIds =
+    entityName === "Task"
+      ? db
+          .prepare(`SELECT id FROM ${definition.table} WHERE parent_id = ? AND app_id = ?${scope.clause}`)
+          .all(id, appId, ...scope.params(user))
+          .map((row) => String(row.id))
+      : [];
   db.prepare(`DELETE FROM ${definition.table} WHERE id = ? AND app_id = ?${scope.clause}`).run(
     id,
     appId,
     ...scope.params(user)
   );
 
-  // Cascade: when deleting a Task, also remove its subtasks and the
-  // associated file attachments (both DB rows and on-disk files).
-  // NB: This runs for permanent deletes only; soft-delete goes through
-  // a separate path that keeps attachments around for the restore.
   if (entityName === "Task") {
     db.prepare(`DELETE FROM ${definition.table} WHERE parent_id = ? AND app_id = ?${scope.clause}`).run(
       id,
       appId,
       ...scope.params(user)
     );
-    deleteAttachmentsForTask(db, backendConfig, { appId, taskId: id });
+    const taskIds = [id, ...subtaskIds];
+    if (holdFiles) holdAttachmentsForTasks(db, { appId, taskIds });
+    else deleteAttachmentsForTasks(db, config, { appId, taskIds });
+  }
+  if (entityName === "DeletedTask") {
+    purgeHeldAttachments(db, config, { appId, owner: user, taskIds: taskIdsOfDeletedTask(existing) });
   }
 
   return { success: true };

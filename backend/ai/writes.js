@@ -5,8 +5,8 @@
  * the AI app has been told:
  *   - nothing from a connected calendar is changed, subtasks included:
  *     editing it here would change the real event
- *   - nothing is deleted for good: deletes go to Recently Deleted, and
- *     subtasks and tasks with files (whose delete is permanent) are refused
+ *   - nothing is deleted for good: deletes go to Recently Deleted, files
+ *     and all, and subtasks (whose delete is permanent) are refused
  *   - every change passes the same checks as the app's own saves, echoes to
  *     calendars the same way (enqueueTaskPush), and is logged for Undo
  *   - at most WRITES_PER_HOUR changes an hour per connection
@@ -553,8 +553,8 @@ const deleteTask = {
   name: "delete_task",
   title: "Delete a task",
   description:
-    "Move a task, with its subtasks, to Recently Deleted, where the person can restore it for a week. " +
-    "Refused for subtasks and for tasks with attached files, because deleting those is permanent. Can't delete items from connected calendars.",
+    "Move a task, with its subtasks and attached files, to Recently Deleted, where the person can restore it for a week. " +
+    "Refused for subtasks, because deleting a subtask is permanent. Can't delete items from connected calendars.",
   inputSchema: {
     type: "object",
     properties: { task_id: { type: "string", maxLength: 200, description: "The task's id." } },
@@ -570,12 +570,11 @@ const deleteTask = {
       throw new ToolError("Deleting a subtask is permanent in Zephyrly, so AI apps can't. Mark it done instead, or the person can delete it in the app.");
     }
     const subtasks = loadTasks(ctx).filter((t) => t.parent_id === task.id);
-    const files = ctx.db
-      .prepare(`SELECT COUNT(*) AS n FROM task_attachments WHERE app_id = ? AND user_id = ? AND task_id IN (${[task, ...subtasks].map(() => "?").join(", ")})`)
-      .get(ctx.appId, ctx.user.id, task.id, ...subtasks.map((s) => s.id));
-    if (Number(files?.n || 0) > 0) {
-      throw new ToolError(`${quote(task.title)} has attached files, and deleting a task removes its files for good. The person can delete it in the app if they mean to.`);
-    }
+    const files = Number(
+      ctx.db
+        .prepare(`SELECT COUNT(*) AS n FROM task_attachments WHERE app_id = ? AND user_id = ? AND task_deleted_at IS NULL AND task_id IN (${[task, ...subtasks].map(() => "?").join(", ")})`)
+        .get(ctx.appId, ctx.user.id, task.id, ...subtasks.map((s) => s.id))?.n || 0
+    );
     const priority = loadPriorities(ctx).find((p) => p.id === task.priority_id);
     // useDeletedTasks.recordDeletion's snapshot. Retention is the server's
     // setting; the app uses the same number unless changed on that device.
@@ -612,16 +611,17 @@ const deleteTask = {
     spendWrite(ctx);
     const deleted = inTransaction(ctx.db, () => {
       const saved = createEntityRecord(ctx.db, { entityName: "DeletedTask", appId: ctx.appId, user: ctx.user, input: record, config: ctx.config });
-      // Removes the subtasks with it.
-      deleteEntityRecord(ctx.db, { entityName: "Task", appId: ctx.appId, user: ctx.user, id: task.id });
+      // Removes the subtasks with it, and holds the files for a restore.
+      deleteEntityRecord(ctx.db, { entityName: "Task", appId: ctx.appId, user: ctx.user, id: task.id, config: ctx.config, holdFiles: true });
       return saved;
     });
     for (const gone of [task, ...subtasks]) push(ctx, "delete", gone);
     const withSubtasks = subtasks.length ? ` and its ${subtasks.length} subtask${subtasks.length === 1 ? "" : "s"}` : "";
     const summary = `Moved ${quote(task.title)}${withSubtasks} to Recently Deleted.`;
     logActivity(ctx, "delete_task", summary, { kind: "delete_task", deleted_id: deleted.id });
+    const withFiles = files ? `, with its ${files === 1 ? "file" : `${files} files`},` : "";
     return {
-      text: `${summary} The person can restore it from there for ${ctx.config.deletedTaskRetentionDays} days.`,
+      text: `${summary} The person can restore it${withFiles} from there for ${ctx.config.deletedTaskRetentionDays} days.`,
       data: { id: task.id, deleted: true, recently_deleted_id: deleted.id },
     };
   },

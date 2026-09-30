@@ -33,6 +33,8 @@ export interface TaskRecord {
   tags?: string[];
   completed_at?: string;
   order?: number | null;
+  /** Files on the task, kept by the server (backend/attachments.js). */
+  attachment_count?: number;
   created_date?: string;
   updated_date?: string;
 }
@@ -73,6 +75,8 @@ export interface DeletedTaskRecord {
 
 export interface TaskCreateInput extends Omit<TaskRecord, "id" | "created_date" | "updated_date"> {
   title: string;
+  /** A restore names the deleted task it brings back; its files come back on the new task. */
+  restores_task_id?: string;
 }
 
 export interface DeleteSnapshot {

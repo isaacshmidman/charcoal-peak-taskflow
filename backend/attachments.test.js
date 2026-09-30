@@ -1,22 +1,25 @@
 // @ts-nocheck
 /* @vitest-environment node */
-import { mkdtempSync, rmSync, readFileSync, existsSync } from "node:fs";
+import { mkdtempSync, rmSync, readFileSync, existsSync, promises as fsPromises } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import sharp from "sharp";
 import { createDatabase } from "./db.js";
 import {
   createAttachment,
   deleteAttachment,
-  deleteAttachmentsForTask,
+  deleteAttachmentsForTasks,
   getAttachment,
+  holdAttachmentsForTasks,
+  releaseHeldAttachments,
   getStorageOverview,
   getUserStorageBytes,
   listAttachmentsForTask,
   MAX_FILE_BYTES,
   MAX_TOTAL_BYTES_PER_USER,
 } from "./attachments.js";
+import { createEntityRecord, deleteEntityRecord } from "./store.js";
 
 let tempDir = "";
 let db;
@@ -168,7 +171,7 @@ describe("attachments", () => {
     expect(getUserStorageBytes(db, { appId: APP_ID, userId: USER.id })).toBe(300);
   });
 
-  it("cascade: deleteAttachmentsForTask wipes rows AND files", async () => {
+  it("cascade: deleteAttachmentsForTasks wipes rows AND files", async () => {
     const file = {
       filename: "doc.pdf",
       mimeType: "application/pdf",
@@ -178,10 +181,66 @@ describe("attachments", () => {
     const { absolutePath } = getAttachment(db, config, { appId: APP_ID, user: USER, id: created.id });
     expect(existsSync(absolutePath)).toBe(true);
 
-    deleteAttachmentsForTask(db, config, { appId: APP_ID, taskId: TASK_ID });
+    deleteAttachmentsForTasks(db, config, { appId: APP_ID, taskIds: [TASK_ID] });
 
     expect(existsSync(absolutePath)).toBe(false);
     expect(listAttachmentsForTask(db, { appId: APP_ID, user: USER, taskId: TASK_ID })).toHaveLength(0);
+  });
+
+  it("a task deleted for good (calendar sync) takes its subtasks' files with its own — none are left behind", async () => {
+    const sub = createEntityRecord(db, { entityName: "Task", appId: APP_ID, user: USER, input: { title: "Sub", parent_id: TASK_ID }, config });
+    const file = (name) => ({ filename: name, mimeType: "application/pdf", data: Buffer.from(name) });
+    const paths = [];
+    for (const [taskId, name] of [[TASK_ID, "own.pdf"], [sub.id, "sub.pdf"]]) {
+      const created = await createAttachment(db, config, { appId: APP_ID, user: USER, taskId, file: file(name) });
+      paths.push(getAttachment(db, config, { appId: APP_ID, user: USER, id: created.id }).absolutePath);
+    }
+
+    deleteEntityRecord(db, { entityName: "Task", appId: APP_ID, user: USER, id: TASK_ID, config });
+
+    expect(paths.map((path) => existsSync(path))).toEqual([false, false]);
+    expect(db.prepare("SELECT COUNT(*) AS n FROM task_attachments").get().n).toBe(0);
+    expect(getUserStorageBytes(db, { appId: APP_ID, userId: USER.id })).toBe(0);
+  });
+
+  it("a file still uploading when its task is deleted is held with it, not left on a task that's gone", async () => {
+    const write = fsPromises.writeFile;
+    vi.spyOn(fsPromises, "writeFile").mockImplementationOnce(async (...args) => {
+      // The task goes into Recently Deleted while the bytes are being written.
+      db.prepare("DELETE FROM tasks WHERE id = ?").run(TASK_ID);
+      holdAttachmentsForTasks(db, { appId: APP_ID, taskIds: [TASK_ID] });
+      return write(...args);
+    });
+    const created = await createAttachment(db, config, {
+      appId: APP_ID, user: USER, taskId: TASK_ID, file: { filename: "late.pdf", mimeType: "application/pdf", data: Buffer.from("late") },
+    });
+    vi.restoreAllMocks();
+
+    expect(db.prepare("SELECT task_deleted_at FROM task_attachments WHERE id = ?").get(created.id).task_deleted_at).toBeTruthy();
+    // So restoring the task brings it back like the rest.
+    seedTask(db, { id: "task-restored" });
+    expect(releaseHeldAttachments(db, { appId: APP_ID, userId: USER.id, fromTaskIds: [TASK_ID], toTaskId: "task-restored" })).toBe(1);
+    expect(listAttachmentsForTask(db, { appId: APP_ID, user: USER, taskId: "task-restored" }).map((a) => a.filename)).toEqual(["late.pdf"]);
+  });
+
+  it("removing a task's files never takes another task's out of a shared folder", async () => {
+    const file = (name) => ({ filename: name, mimeType: "application/pdf", data: Buffer.from(name) });
+    // A file restored onto another task keeps the path it was stored under.
+    const moved = await createAttachment(db, config, { appId: APP_ID, user: USER, taskId: TASK_ID, file: file("moved.pdf") });
+    db.prepare("DELETE FROM tasks WHERE id = ?").run(TASK_ID);
+    holdAttachmentsForTasks(db, { appId: APP_ID, taskIds: [TASK_ID] });
+    seedTask(db, { id: "task-copy" });
+    releaseHeldAttachments(db, { appId: APP_ID, userId: USER.id, fromTaskIds: [TASK_ID], toTaskId: "task-copy" });
+    // The original comes back under its old id (a restore from an export) with a file of its own, in the same folder.
+    seedTask(db, { id: TASK_ID });
+    const own = await createAttachment(db, config, { appId: APP_ID, user: USER, taskId: TASK_ID, file: file("own.pdf") });
+    const movedPath = getAttachment(db, config, { appId: APP_ID, user: USER, id: moved.id }).absolutePath;
+    const ownPath = getAttachment(db, config, { appId: APP_ID, user: USER, id: own.id }).absolutePath;
+
+    deleteAttachmentsForTasks(db, config, { appId: APP_ID, taskIds: ["task-copy"] });
+
+    expect(existsSync(movedPath)).toBe(false);
+    expect(readFileSync(ownPath, "utf8")).toBe("own.pdf");
   });
 
   it("generates a thumbnail for valid PNGs and serves it on ?thumb=1", async () => {

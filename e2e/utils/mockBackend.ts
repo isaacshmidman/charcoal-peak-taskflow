@@ -10,6 +10,8 @@ export interface MockState {
   savedTags?: EntityRecord[];
   notes?: EntityRecord[];
   deletedNotes?: EntityRecord[];
+  /** Task files: { id, task_id, filename, mime_type, size_bytes, is_image, task_deleted_at? } */
+  attachments?: EntityRecord[];
   aiGrants?: EntityRecord[];
   aiActivity?: EntityRecord[];
   aiConnectRequests?: Record<string, EntityRecord>;
@@ -24,6 +26,7 @@ export interface MockController {
     savedTags: EntityRecord[];
     notes: EntityRecord[];
     deletedNotes: EntityRecord[];
+    attachments: EntityRecord[];
     currentUser: EntityRecord | null;
   }>;
   getMeta: () => Promise<{
@@ -77,6 +80,7 @@ export async function installMockBackend(page: Page, initialState: MockState = {
             savedTags: state.savedTags ?? [],
             notes: state.notes ?? [],
             deletedNotes: state.deletedNotes ?? [],
+            attachments: state.attachments ?? [],
             aiGrants: state.aiGrants ?? [],
             aiActivity: state.aiActivity ?? [],
             aiConnectRequests: state.aiConnectRequests ?? {},

@@ -18,6 +18,10 @@
  *   types, the per-file and per-task caps, and the storage quota all
  *   apply.
  *
+ * Items in Recently Deleted come back there, with the files held for them
+ * (attachments.js), so restoring one from Recently Deleted brings its
+ * files back too.
+ *
  * Not restored: events and tasks from connected calendars (calendar sync
  * brings those back; restoring them would duplicate them), notification
  * settings and calendar connections (those stay as they are now).
@@ -26,7 +30,7 @@ import { promises as fsp } from "node:fs";
 import { HttpError } from "./http.js";
 import { withTransaction } from "./db.js";
 import { createEntityRecord, entityFieldNames, validateClientInput } from "./store.js";
-import { createAttachment, MAX_FILE_BYTES } from "./attachments.js";
+import { createAttachment, MAX_FILE_BYTES, taskIdsOfDeletedTask } from "./attachments.js";
 import { EXPORT_FORMAT, EXPORT_VERSION } from "./export.js";
 import { openZip, ZipError } from "./unzip.js";
 import { repairLatin1Filename } from "./lib/filename-encoding.js";
@@ -298,6 +302,9 @@ export async function restoreExport(db, config, { appId, user, data, readFile, n
   const priorityIds = new Map();
   /** @type {Map<string, string>} */
   const taskIds = new Map();
+  /** A task in Recently Deleted (not live here) → when it was deleted: its files are restored held for it. */
+  /** @type {Map<string, string>} */
+  const heldTaskIds = new Map();
 
   withTransaction(db, () => {
     // Priorities and tags are matched by name.
@@ -416,6 +423,12 @@ export async function restoreExport(db, config, { appId, user, data, readFile, n
         skipped.alreadyHere += 1;
       } else if (restoreRecord("DeletedTask", "deleted_tasks", record, { priority_id: priorityFor(record.priority_id) })) {
         added.recentlyDeleted += 1;
+      } else {
+        continue;
+      }
+      // Its files wait with it. A task that's live here already keeps its own.
+      for (const id of taskIdsOfDeletedTask(record)) {
+        if (!liveTasks.has(id) && !taskIds.has(id)) heldTaskIds.set(id, validDate(record.deleted_at) || nowIso);
       }
     }
     for (const record of input.deletedNotes) {
@@ -441,12 +454,17 @@ export async function restoreExport(db, config, { appId, user, data, readFile, n
   const skipFile = (/** @type {string} */ reason) => fileSkips.set(reason, (fileSkips.get(reason) || 0) + 1);
   let filesNotInUpload = 0;
   let filesAlreadyHere = 0;
+  // A file held for Recently Deleted only matches a held one, and a task's
+  // file only a live one.
   const alreadyAttached = db.prepare(
-    `SELECT 1 FROM task_attachments WHERE app_id = ? AND user_id = ? AND task_id = ? AND filename = ? AND size_bytes = ?`
+    `SELECT 1 FROM task_attachments
+     WHERE app_id = ? AND user_id = ? AND task_id = ? AND filename = ? AND size_bytes = ? AND (task_deleted_at IS NOT NULL) = ?`
   );
   for (const attachment of input.attachments) {
     if (typeof attachment.file !== "string" || !attachment.file) continue; // missing when exported
-    const taskId = taskIds.get(String(attachment.task_id));
+    const liveTaskId = taskIds.get(String(attachment.task_id));
+    const heldSince = liveTaskId ? null : heldTaskIds.get(String(attachment.task_id)) || null;
+    const taskId = liveTaskId || (heldSince ? String(attachment.task_id) : "");
     if (!taskId) {
       skipFile("their task isn't here");
       continue;
@@ -456,7 +474,7 @@ export async function restoreExport(db, config, { appId, user, data, readFile, n
     // name; the boot repair has already fixed the stored copy, so match
     // (and restore) under the real one.
     const filename = repairLatin1Filename(given) ?? given;
-    if (alreadyAttached.get(appId, user.id, taskId, filename, Number(attachment.size_bytes) || 0)) {
+    if (alreadyAttached.get(appId, user.id, taskId, filename, Number(attachment.size_bytes) || 0, heldSince ? 1 : 0)) {
       filesAlreadyHere += 1;
       continue;
     }
@@ -475,6 +493,7 @@ export async function restoreExport(db, config, { appId, user, data, readFile, n
         user,
         taskId,
         file: { filename, mimeType: safeMimeType(attachment.mime_type), data: bytes },
+        taskDeletedAt: heldSince,
       });
       added.files += 1;
     } catch (error) {

@@ -711,3 +711,82 @@ test("a deleted task comes back from Recently Deleted with its end time, reminde
   await expect.poll(async () => (await api.getState()).tasks.find((t) => t.title === "Full task"))
     .toMatchObject({ task_time: "2:00PM", task_end_time: "3:30PM", reminder: "before:60", description_json: richDoc });
 });
+
+test("a deleted task keeps its files in Recently Deleted, still counted, and they come back when it's restored", async ({ page }) => {
+  const api = await installMockBackend(page, {
+    tasks: [
+      recurringTask({ id: "trip", title: "Plan the trip", task_type: "one_time", recurrence: "none", attachment_count: 1 }),
+      recurringTask({ id: "other", title: "Other task", task_type: "one_time", recurrence: "none", attachment_count: 1 }),
+    ],
+    priorities: [defaultPriority],
+    attachments: [
+      { id: "att-pass", task_id: "trip", filename: "Boarding pass.pdf", mime_type: "application/pdf", size_bytes: 180_000, is_image: false, has_thumb: false },
+      { id: "att-other", task_id: "other", filename: "Other.pdf", mime_type: "application/pdf", size_bytes: 20_000, is_image: false, has_thumb: false },
+    ],
+  });
+  const storageLine = async (title: string) => {
+    await page.goto("/Settings");
+    await page.getByText("Search attachments and check storage").click();
+    return page.getByRole("listitem").filter({ hasText: title });
+  };
+
+  await page.goto("/Today");
+  await taskCardByTitle(page, "Plan the trip").click();
+  await expect(page.getByText("Boarding pass.pdf")).toBeVisible();
+  await page.getByTestId("task-form-delete").click();
+  await expect.poll(async () => (await api.getState()).tasks.map((t) => t.title)).toEqual(["Other task"]);
+
+  // Held with the task in Recently Deleted: still counted, and marked where it is.
+  const held = await storageLine("Plan the trip");
+  await expect(held).toContainText("1 file · in Recently Deleted");
+  await expect(held).toContainText("180.0 KB");
+  await expect(page.getByRole("listitem").filter({ hasText: "Other task" })).not.toContainText("Recently Deleted");
+
+  await page.goto("/RecentlyDeleted");
+  await page.getByRole("button", { name: "Restore" }).click();
+  await expect.poll(async () => (await api.getState()).tasks.find((t) => t.title === "Plan the trip")?.attachment_count).toBe(1);
+
+  await page.goto("/Today");
+  const restored = taskCardByTitle(page, "Plan the trip");
+  await expect(restored.getByTitle("1 attachment")).toBeVisible();
+  await restored.click();
+  await expect(page.getByText("Boarding pass.pdf")).toBeVisible();
+
+  const back = await storageLine("Plan the trip");
+  await expect(back).toContainText("1 file");
+  await expect(back).not.toContainText("Recently Deleted");
+});
+
+test("undoing a delete brings the task back with its files", async ({ page }) => {
+  await installMockBackend(page, {
+    tasks: [
+      recurringTask({ id: "tax", title: "Taxes", task_type: "one_time", recurrence: "none", attachment_count: 1 }),
+      recurringTask({ id: "tax-step", title: "Find the W-2", parent_id: "tax", task_type: "one_time", recurrence: "none", attachment_count: 1 }),
+    ],
+    priorities: [defaultPriority],
+    attachments: [
+      { id: "att-return", task_id: "tax", filename: "Return.pdf", mime_type: "application/pdf", size_bytes: 50_000, is_image: false, has_thumb: false },
+      { id: "att-w2", task_id: "tax-step", filename: "W-2.pdf", mime_type: "application/pdf", size_bytes: 30_000, is_image: false, has_thumb: false },
+    ],
+  });
+
+  await page.goto("/Today");
+  await taskCardByTitle(page, "Taxes").click();
+  await page.getByTestId("task-form-delete").click();
+  await expect(taskCardByTitle(page, "Taxes")).toHaveCount(0);
+  await page.getByTestId("delete-toast-undo").click();
+
+  // The paperclip is there at once, not after the next refetch.
+  const card = taskCardByTitle(page, "Taxes");
+  await expect(card.getByTitle("1 attachment")).toBeVisible();
+  await card.click();
+  await expect(page.getByText("Return.pdf")).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  await page.goto("/Settings");
+  await page.getByText("Search attachments and check storage").click();
+  await expect(page.getByRole("listitem").filter({ hasText: "Taxes" })).toContainText("1 file");
+  // The subtask came back with its own file too.
+  await expect(page.getByRole("listitem").filter({ hasText: "Find the W-2" })).toContainText("1 file");
+  await expect(page.getByRole("listitem").filter({ hasText: "in Recently Deleted" })).toHaveCount(0);
+});

@@ -10,6 +10,7 @@ import { log } from "./log.js";
 import { purgeExpiredAuthRecords } from "./auth.js";
 import { purgeExpiredAiRecords } from "./ai/grants.js";
 import { purgeExpiredOAuthRecords } from "./ai/oauth.js";
+import { purgeExpiredDeletedTasks } from "./store.js";
 import { startSyncLoop } from "./sync.js";
 import { startNotificationLoop } from "./notifications.js";
 import { handleAuthRoute } from "./routes/auth.js";
@@ -200,6 +201,13 @@ export function createRequestHandler(config = backendConfig, db = getDatabase(co
         purgeExpiredAuthRecords(db);
         purgeExpiredAiRecords(db);
         purgeExpiredOAuthRecords(db);
+        // Recently Deleted runs out on time, with its files, whether or not
+        // anyone opens it. Housekeeping: never what decides health.
+        try {
+          purgeExpiredDeletedTasks(db, config.appId, config);
+        } catch (error) {
+          log.warn(`[health] Recently Deleted purge failed: ${error instanceof Error ? error.message : error}`);
+        }
         sendJson(response, 200, { ok: true, app_id: config.appId });
         return;
       }

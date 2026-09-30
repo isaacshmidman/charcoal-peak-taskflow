@@ -18,7 +18,7 @@ import { useOfflineEntityMutation } from "@/hooks/useOfflineEntityMutation";
 import { showDeleteToast } from "@/components/tasks/DeleteToast";
 import NotePreview from "@/components/notes/NotePreview";
 import { excludeExternalEvents, taskMatchesSearch } from "@/lib/task-filters";
-import { formatDeleteLabel } from "@/hooks/useDeleteWithUndo";
+import { formatDeleteLabel, restoring } from "@/hooks/useDeleteWithUndo";
 import {
   Dialog,
   DialogContent,
@@ -172,6 +172,8 @@ export default function RecentlyDeleted({ onBack } = {}) {
       reminder: record.reminder || "",
       tags: record.tags,
       completed_at: record.completed_at,
+      // Its files are waiting on the server; naming the task brings them back on this one.
+      ...restoring(record.task_id),
     };
     const created = await createTask(taskData);
     // Restore subtasks
@@ -185,6 +187,7 @@ export default function RecentlyDeleted({ onBack } = {}) {
           completed_at: sub.completed_at,
           task_type: "one_time",
           parent_id: created.id,
+          ...restoring(sub.id),
         });
       }
     }

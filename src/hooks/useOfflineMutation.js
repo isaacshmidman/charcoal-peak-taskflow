@@ -61,7 +61,10 @@ export function useOfflineMutation() {
       try {
         const result = await apiClient.entities.Task.create(data);
         if (deferInsert) applyToCache((current) => [result, ...current]);
-        else applyToCache((current) => current.map(t => t.id === optimisticId ? { ...t, id: result.id } : t));
+        else applyToCache((current) => current.map(t => t.id === optimisticId
+          // A restored task can come back with its files; the paperclip shows at once.
+          ? { ...t, id: result.id, ...(result.attachment_count ? { attachment_count: result.attachment_count } : {}) }
+          : t));
         return result;
       } catch (error) {
         if (isRecoverableConnectionError(error)) {
