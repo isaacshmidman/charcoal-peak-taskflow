@@ -295,18 +295,20 @@ const getNote = {
 const listPrioritiesAndTags = {
   name: "list_priorities_and_tags",
   title: "Priorities and tags",
-  description: "The person's priorities (most urgent first) and the tags they use, for filtering and for labelling tasks.",
+  description: "The person's priorities (most urgent first, with colours), every tag in use on tasks and notes, and which tags are saved.",
   inputSchema: { type: "object", properties: {}, additionalProperties: false },
   annotations: { readOnlyHint: true, openWorldHint: false },
   write: false,
   handler(ctx) {
     const priorities = loadPriorities(ctx);
-    const saved = listRecords(ctx, "SavedTag").map((t) => t.name);
-    const used = loadTasks(ctx).flatMap((t) => t.tags || []);
+    const saved = listRecords(ctx, "SavedTag").map((t) => String(t.name));
+    const used = [...loadTasks(ctx), ...listRecords(ctx, "Note")].flatMap((t) => t.tags || []);
     const tags = [...new Set([...saved, ...used].map((t) => String(t)))].sort((a, b) => a.localeCompare(b));
     return {
-      text: `Priorities, most urgent first: ${priorities.map((p) => p.name).join(", ") || "none"}.\nTags: ${tags.map((t) => `#${t}`).join(" ") || "none"}.`,
-      data: { priorities: priorities.map((p) => ({ id: p.id, name: p.name })), tags },
+      text:
+        `Priorities, most urgent first: ${priorities.map((p) => `${p.name} (${p.color})`).join(", ") || "none"}.\n` +
+        `Tags: ${tags.map((t) => `#${t}`).join(" ") || "none"}.\nSaved tags (offered when tagging): ${saved.map((t) => `#${t}`).join(" ") || "none"}.`,
+      data: { priorities: priorities.map((p) => ({ id: p.id, name: p.name, color: p.color })), tags, saved_tags: saved },
     };
   },
 };

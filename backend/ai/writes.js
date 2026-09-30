@@ -22,10 +22,11 @@ import { createEntityRecord, deleteEntityRecord, updateEntityRecord, validateCli
 import { enqueueTaskPush } from "../push.js";
 import { MAX_BEFORE_MINUTES, parseReminder } from "../reminders.js";
 import { getNextRecurringDueDate } from "../lib/recurrence.js";
+import { PRIORITY_COLORS } from "../priority-color.js";
 import { countWords, docToText, plainTextToDoc } from "../lib/plain-text-doc.js";
 import { ToolError, isRealDate } from "./args.js";
 import { logActivity } from "./activity.js";
-import { DATE, findPriority, getOwnNote, getOwnTask, loadPriorities, loadTasks, lower } from "./context.js";
+import { DATE, findPriority, getOwnNote, getOwnTask, listRecords, loadPriorities, loadTasks, lower } from "./context.js";
 import { WRITES_PER_HOUR, takeSlot } from "./rate-limit.js";
 import { dayLabel, defaultEndTime, describeRecurrence, describeReminder, formatTime, fromCalendar, isFromCalendar, normalizeTime, speakDay, speakTime, timeMinutes, todayIn } from "./view.js";
 
@@ -621,6 +622,65 @@ const completeTask = {
   },
 };
 
+/**
+ * Move a top-level task, its subtasks and their files to Recently Deleted,
+ * the way the app deletes (useDeletedTasks.recordDeletion's snapshot).
+ * @param {ToolContext} ctx
+ * @param {any} task
+ */
+function moveTaskToRecentlyDeleted(ctx, task) {
+  const subtasks = loadTasks(ctx).filter((t) => t.parent_id === task.id);
+  const files = Number(
+    ctx.db
+      .prepare(`SELECT COUNT(*) AS n FROM task_attachments WHERE app_id = ? AND user_id = ? AND task_deleted_at IS NULL AND task_id IN (${[task, ...subtasks].map(() => "?").join(", ")})`)
+      .get(ctx.appId, ctx.user.id, task.id, ...subtasks.map((s) => s.id))?.n || 0
+  );
+  const priority = loadPriorities(ctx).find((p) => p.id === task.priority_id);
+  // useDeletedTasks.recordDeletion's snapshot. Retention is the server's
+  // setting; the app uses the same number unless changed on that device.
+  const record = {
+    task_id: task.id,
+    title: task.title,
+    description: task.description || "",
+    description_json: task.description_json || "",
+    priority_id: task.priority_id || "",
+    priority_color: priority?.color || "",
+    status: task.status || "todo",
+    task_type: task.task_type || "one_time",
+    recurrence: task.recurrence || "none",
+    recurrence_days: task.recurrence_days || [],
+    recurrence_end_date: task.recurrence_end_date || "",
+    due_date: task.due_date || "",
+    task_time: task.task_time || "",
+    task_end_time: task.task_end_time || "",
+    reminder: task.reminder || "",
+    tags: task.tags || [],
+    completed_at: task.completed_at || "",
+    deleted_at: new Date().toISOString(),
+    was_completed: task.status === "done",
+    subtasks: subtasks.map((s) => ({
+      id: s.id,
+      title: s.title,
+      status: s.status || "todo",
+      due_date: s.due_date || "",
+      task_time: s.task_time || "",
+      completed_at: s.completed_at || "",
+    })),
+  };
+  validateClientInput("DeletedTask", record);
+  spendWrite(ctx);
+  const deleted = inTransaction(ctx.db, () => {
+    const saved = createEntityRecord(ctx.db, { entityName: "DeletedTask", appId: ctx.appId, user: ctx.user, input: record, config: ctx.config });
+    // Removes the subtasks with it, and holds the files for a restore.
+    deleteEntityRecord(ctx.db, { entityName: "Task", appId: ctx.appId, user: ctx.user, id: task.id, config: ctx.config, holdFiles: true });
+    return saved;
+  });
+  for (const gone of [task, ...subtasks]) push(ctx, "delete", gone);
+  const withSubtasks = subtasks.length ? ` and its ${subtasks.length} subtask${subtasks.length === 1 ? "" : "s"}` : "";
+  const summary = `Moved ${quote(task.title)}${withSubtasks} to Recently Deleted.`;
+  return { deleted, summary, files };
+}
+
 /** @type {Tool} */
 const deleteTask = {
   name: "delete_task",
@@ -642,55 +702,7 @@ const deleteTask = {
     if (task.parent_id) {
       throw new ToolError("Deleting a subtask is permanent in Zephyrly, so AI apps can't. Mark it done instead, or the person can delete it in the app.");
     }
-    const subtasks = loadTasks(ctx).filter((t) => t.parent_id === task.id);
-    const files = Number(
-      ctx.db
-        .prepare(`SELECT COUNT(*) AS n FROM task_attachments WHERE app_id = ? AND user_id = ? AND task_deleted_at IS NULL AND task_id IN (${[task, ...subtasks].map(() => "?").join(", ")})`)
-        .get(ctx.appId, ctx.user.id, task.id, ...subtasks.map((s) => s.id))?.n || 0
-    );
-    const priority = loadPriorities(ctx).find((p) => p.id === task.priority_id);
-    // useDeletedTasks.recordDeletion's snapshot. Retention is the server's
-    // setting; the app uses the same number unless changed on that device.
-    const record = {
-      task_id: task.id,
-      title: task.title,
-      description: task.description || "",
-      description_json: task.description_json || "",
-      priority_id: task.priority_id || "",
-      priority_color: priority?.color || "",
-      status: task.status || "todo",
-      task_type: task.task_type || "one_time",
-      recurrence: task.recurrence || "none",
-      recurrence_days: task.recurrence_days || [],
-      recurrence_end_date: task.recurrence_end_date || "",
-      due_date: task.due_date || "",
-      task_time: task.task_time || "",
-      task_end_time: task.task_end_time || "",
-      reminder: task.reminder || "",
-      tags: task.tags || [],
-      completed_at: task.completed_at || "",
-      deleted_at: new Date().toISOString(),
-      was_completed: task.status === "done",
-      subtasks: subtasks.map((s) => ({
-        id: s.id,
-        title: s.title,
-        status: s.status || "todo",
-        due_date: s.due_date || "",
-        task_time: s.task_time || "",
-        completed_at: s.completed_at || "",
-      })),
-    };
-    validateClientInput("DeletedTask", record);
-    spendWrite(ctx);
-    const deleted = inTransaction(ctx.db, () => {
-      const saved = createEntityRecord(ctx.db, { entityName: "DeletedTask", appId: ctx.appId, user: ctx.user, input: record, config: ctx.config });
-      // Removes the subtasks with it, and holds the files for a restore.
-      deleteEntityRecord(ctx.db, { entityName: "Task", appId: ctx.appId, user: ctx.user, id: task.id, config: ctx.config, holdFiles: true });
-      return saved;
-    });
-    for (const gone of [task, ...subtasks]) push(ctx, "delete", gone);
-    const withSubtasks = subtasks.length ? ` and its ${subtasks.length} subtask${subtasks.length === 1 ? "" : "s"}` : "";
-    const summary = `Moved ${quote(task.title)}${withSubtasks} to Recently Deleted.`;
+    const { deleted, summary, files } = moveTaskToRecentlyDeleted(ctx, task);
     logActivity(ctx, "delete_task", summary, { kind: "delete_task", deleted_id: deleted.id });
     const withFiles = files ? `, with its ${files === 1 ? "file" : `${files} files`},` : "";
     return {
@@ -930,5 +942,247 @@ const deleteNote = {
   },
 };
 
+/** @type {Tool} */
+const skipOccurrence = {
+  name: "skip_occurrence",
+  title: "Skip this time",
+  description:
+    "Skip the next time a repeating task comes round without marking it done: it moves on to the time after. " +
+    "If that was its last time, it goes to Recently Deleted, as in the app.",
+  inputSchema: {
+    type: "object",
+    properties: { task_id: { type: "string", maxLength: 200, description: "The repeating task's id." } },
+    required: ["task_id"],
+    additionalProperties: false,
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+  write: true,
+  handler(ctx, args) {
+    const task = getOwnTask(ctx, args.task_id);
+    assertEditable(ctx, task);
+    if (task.parent_id || !task.recurrence || task.recurrence === "none") {
+      throw new ToolError(`${quote(task.title)} doesn't repeat. Move it with update_task, or finish it with complete_task.`);
+    }
+    // skipRecurringTask in the app: on to the next date, or deleted.
+    const next = getNextRecurringDueDate(task);
+    if (!next) {
+      const { deleted, summary, files } = moveTaskToRecentlyDeleted(ctx, task);
+      logActivity(ctx, "skip_occurrence", `Skipped ${quote(task.title)}'s last time. ${summary}`, { kind: "delete_task", deleted_id: deleted.id });
+      return {
+        text: `That was ${quote(task.title)}'s last time, so it moved to Recently Deleted${files ? " with its files" : ""}.`,
+        data: { id: task.id, deleted: true, recently_deleted_id: deleted.id },
+      };
+    }
+    const nextDate = localYmd(next);
+    const patch = { due_date: nextDate, status: "todo", completed_at: "" };
+    spendWrite(ctx);
+    const updated = inTransaction(ctx.db, () => updateEntityRecord(ctx.db, { entityName: "Task", appId: ctx.appId, user: ctx.user, id: task.id, input: patch }));
+    push(ctx, "upsert", updated);
+    const summary = `Skipped ${quote(task.title)} this time; it comes round again on ${dayLabel(nextDate)}.`;
+    logActivity(ctx, "skip_occurrence", summary, {
+      kind: "update_task",
+      task_id: task.id,
+      before: { due_date: task.due_date || "", status: task.status || "todo", completed_at: task.completed_at || "" },
+      updated_date: updated.updated_date,
+    });
+    return { text: `${summary} (id ${task.id})`, data: { id: task.id, next_date: nextDate } };
+  },
+};
+
+const PRIORITY_FIELDS = ["name", "color", "order"];
+/** @param {any} p */
+const priorityFields = (p) => Object.fromEntries(PRIORITY_FIELDS.map((k) => [k, p[k]]));
+
+/** @type {Tool} */
+const editPriorities = {
+  name: "edit_priorities",
+  title: "Change priorities",
+  description:
+    "Change the person's priorities (the list in Settings, most urgent first): add one, rename or recolour one, move one " +
+    "to a new position, or delete one. Deleting leaves its tasks and notes with no priority label. Every change can be undone.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      action: { type: "string", enum: ["add", "rename", "recolor", "move", "delete"] },
+      priority: { type: "string", maxLength: 200, description: "The priority to change, by name or id (not for add)." },
+      name: { type: "string", maxLength: 200, description: "For add and rename: the name." },
+      color: { type: "string", enum: PRIORITY_COLORS, description: 'For add and recolor. "slate" is grey; "_alt" colours are deeper shades. Add defaults to slate.' },
+      position: { type: "integer", minimum: 1, maximum: 50, description: "For move: the new place, 1 being most urgent." },
+    },
+    required: ["action"],
+    additionalProperties: false,
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+  write: true,
+  handler(ctx, args) {
+    const priorities = loadPriorities(ctx);
+    const scope = { appId: ctx.appId, user: ctx.user };
+    const named = (/** @type {string} */ wanted) => priorityNamed(priorities, wanted);
+    const nameTaken = (/** @type {string} */ name, /** @type {string} */ exceptId = "") =>
+      priorities.some((p) => p.id !== exceptId && lower(p.name) === lower(name));
+    const need = (/** @type {string} */ key) => {
+      if (args[key] == null) throw new ToolError(`"${key}" is needed to ${args.action} a priority.`);
+      return args[key];
+    };
+
+    /** @type {{ id: string, before: any, after_updated_date: string | null }[]} */
+    const rows = [];
+    let summary = "";
+    if (args.action === "add") {
+      const name = need("name");
+      if (nameTaken(name)) throw new ToolError(`There's already a priority called "${name}".`);
+      const input = { name, color: args.color || "slate", order: priorities.length ? Math.max(...priorities.map((p) => Number(p.order) || 0)) + 1 : 0 };
+      validateClientInput("Priority", input);
+      spendWrite(ctx);
+      const created = inTransaction(ctx.db, () => createEntityRecord(ctx.db, { entityName: "Priority", ...scope, input, config: ctx.config }));
+      rows.push({ id: created.id, before: null, after_updated_date: String(created.updated_date) });
+      summary = `Added the priority ${quote(name)}, least urgent.`;
+    } else if (args.action === "rename" || args.action === "recolor") {
+      const target = named(need("priority"));
+      const patch = args.action === "rename" ? { name: need("name") } : { color: need("color") };
+      if (patch.name && nameTaken(patch.name, target.id)) throw new ToolError(`There's already a priority called "${patch.name}".`);
+      validateClientInput("Priority", patch);
+      spendWrite(ctx);
+      const updated = inTransaction(ctx.db, () => updateEntityRecord(ctx.db, { entityName: "Priority", ...scope, id: target.id, input: patch }));
+      rows.push({ id: target.id, before: priorityFields(target), after_updated_date: String(updated.updated_date) });
+      summary = patch.name ? `Renamed the priority ${quote(target.name)} to ${quote(patch.name)}.` : `Made the priority ${quote(target.name)} ${patch.color}.`;
+    } else if (args.action === "move") {
+      const target = named(need("priority"));
+      const position = Math.min(need("position"), priorities.length);
+      const reordered = priorities.filter((p) => p.id !== target.id);
+      reordered.splice(position - 1, 0, target);
+      spendWrite(ctx);
+      // Settings renumbers the whole list on a move; so does this.
+      inTransaction(ctx.db, () => {
+        reordered.forEach((p, i) => {
+          if (p.order === i) return;
+          const updated = updateEntityRecord(ctx.db, { entityName: "Priority", ...scope, id: p.id, input: { order: i } });
+          rows.push({ id: p.id, before: { order: p.order }, after_updated_date: String(updated.updated_date) });
+        });
+      });
+      summary = `Moved the priority ${quote(target.name)} to place ${position}.`;
+    } else {
+      const target = named(need("priority"));
+      spendWrite(ctx);
+      inTransaction(ctx.db, () => deleteEntityRecord(ctx.db, { entityName: "Priority", ...scope, id: target.id, config: ctx.config }));
+      rows.push({ id: target.id, before: priorityFields(target), after_updated_date: null });
+      summary = `Deleted the priority ${quote(target.name)}; its tasks and notes now have none.`;
+    }
+    logActivity(ctx, "edit_priorities", summary, rows.length ? { kind: "rows", entity: "Priority", rows } : null);
+    const now = loadPriorities(ctx).map((p) => p.name);
+    return { text: `${summary} The priorities, most urgent first: ${now.join(", ") || "none"}.`, data: { priorities: now } };
+  },
+};
+
+/** @type {Tool} */
+const editTags = {
+  name: "edit_tags",
+  title: "Change tags",
+  description:
+    "Add a tag to the person's saved tags, remove one from the saved list (tasks and notes keep it), or rename a tag " +
+    "everywhere: on every task and note that has it (not calendar items) and in the saved list. Every change can be undone.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      action: { type: "string", enum: ["add", "remove", "rename"] },
+      tag: { type: "string", maxLength: 100, description: "The tag, without #." },
+      new_name: { type: "string", maxLength: 100, description: "For rename: the new name, without #." },
+    },
+    required: ["action", "tag"],
+    additionalProperties: false,
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+  write: true,
+  handler(ctx, args) {
+    const tag = cleanTags([args.tag])[0];
+    if (!tag) throw new ToolError('"tag" is required.');
+    const scope = { appId: ctx.appId, user: ctx.user };
+    const saved = listRecords(ctx, "SavedTag");
+    const savedRow = saved.find((t) => lower(t.name) === lower(tag));
+
+    if (args.action === "add") {
+      if (savedRow) return { text: `#${savedRow.name} is already a saved tag.`, data: { changed: false } };
+      validateClientInput("SavedTag", { name: tag });
+      spendWrite(ctx);
+      const created = inTransaction(ctx.db, () => createEntityRecord(ctx.db, { entityName: "SavedTag", ...scope, input: { name: tag }, config: ctx.config }));
+      logActivity(ctx, "edit_tags", `Saved the tag #${tag}.`, { kind: "rows", entity: "SavedTag", rows: [{ id: created.id, before: null, after_updated_date: String(created.updated_date) }] });
+      return { text: `Saved the tag #${tag}.`, data: { changed: true } };
+    }
+    if (args.action === "remove") {
+      if (!savedRow) throw new ToolError(`#${tag} isn't a saved tag. Saved tags are: ${saved.map((t) => `#${t.name}`).join(" ") || "none"}.`);
+      spendWrite(ctx);
+      inTransaction(ctx.db, () => deleteEntityRecord(ctx.db, { entityName: "SavedTag", ...scope, id: savedRow.id, config: ctx.config }));
+      logActivity(ctx, "edit_tags", `Removed #${savedRow.name} from the saved tags.`, {
+        kind: "rows",
+        entity: "SavedTag",
+        rows: [{ id: savedRow.id, before: { name: savedRow.name }, after_updated_date: null }],
+      });
+      return { text: `Removed #${savedRow.name} from the saved tags. Tasks and notes that have it keep it.`, data: { changed: true } };
+    }
+
+    // Rename everywhere.
+    const newName = cleanTags([args.new_name || ""])[0];
+    if (!newName) throw new ToolError('"new_name" is needed to rename a tag.');
+    if (newName === tag) return { text: "That's already its name.", data: { changed: false } };
+    const renamed = (/** @type {string[]} */ tags) => cleanTags((tags || []).map((t) => (lower(t) === lower(tag) ? newName : t)));
+    const tasks = loadTasks(ctx).filter((t) => !isFromCalendar(t) && (t.tags || []).some((/** @type {string} */ x) => lower(x) === lower(tag)));
+    const notes = listRecords(ctx, "Note").filter((n) => (n.tags || []).some((/** @type {string} */ x) => lower(x) === lower(tag)));
+    if (!tasks.length && !notes.length && !savedRow) throw new ToolError(`Nothing has the tag #${tag}.`);
+    spendWrite(ctx);
+    /** @type {{ id: string, before: any, after_updated_date: string }[]} */
+    const taskRows = [];
+    /** @type {{ id: string, before: any, after_updated_date: string }[]} */
+    const noteRows = [];
+    /** @type {any[]} */
+    const pushed = [];
+    let savedChange = null;
+    inTransaction(ctx.db, () => {
+      for (const t of tasks) {
+        const updated = updateEntityRecord(ctx.db, { entityName: "Task", ...scope, id: t.id, input: { tags: renamed(t.tags) } });
+        taskRows.push({ id: t.id, before: { tags: t.tags }, after_updated_date: String(updated.updated_date) });
+        pushed.push(updated);
+      }
+      for (const n of notes) {
+        const updated = updateEntityRecord(ctx.db, { entityName: "Note", ...scope, id: n.id, input: { tags: renamed(n.tags) } });
+        noteRows.push({ id: n.id, before: { tags: n.tags }, after_updated_date: String(updated.updated_date) });
+      }
+      if (savedRow) {
+        const clash = saved.find((x) => x.id !== savedRow.id && lower(x.name) === lower(newName));
+        if (clash) {
+          deleteEntityRecord(ctx.db, { entityName: "SavedTag", ...scope, id: savedRow.id, config: ctx.config });
+          savedChange = { id: savedRow.id, before: { name: savedRow.name }, after_updated_date: null };
+        } else {
+          const updated = updateEntityRecord(ctx.db, { entityName: "SavedTag", ...scope, id: savedRow.id, input: { name: newName } });
+          savedChange = { id: savedRow.id, before: { name: savedRow.name }, after_updated_date: String(updated.updated_date) };
+        }
+      }
+    });
+    for (const t of pushed) push(ctx, "upsert", t);
+    const counts = [tasks.length && `${tasks.length} task${tasks.length === 1 ? "" : "s"}`, notes.length && `${notes.length} note${notes.length === 1 ? "" : "s"}`].filter(Boolean);
+    const summary = `Renamed #${tag} to #${newName}${counts.length ? ` on ${counts.join(" and ")}` : ""}${savedRow ? " and in the saved tags" : ""}.`;
+    // One log entry, one Undo, for the whole rename.
+    logActivity(ctx, "edit_tags", summary, {
+      kind: "many",
+      parts: [
+        { kind: "rows", entity: "Task", rows: taskRows },
+        { kind: "rows", entity: "Note", rows: noteRows },
+        ...(savedChange ? [{ kind: "rows", entity: "SavedTag", rows: [savedChange] }] : []),
+      ],
+    });
+    return { text: summary, data: { tasks: tasks.length, notes: notes.length, saved_tag: Boolean(savedRow) } };
+  },
+};
+
 /** @type {Tool[]} */
-export const WRITE_TOOLS = [createTask, updateTask, completeTask, deleteTask, createNote, updateNote, deleteNote];
+export const WRITE_TOOLS = [
+  createTask,
+  updateTask,
+  completeTask,
+  skipOccurrence,
+  deleteTask,
+  createNote,
+  updateNote,
+  deleteNote,
+  editPriorities,
+  editTags,
+];

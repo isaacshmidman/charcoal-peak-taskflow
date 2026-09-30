@@ -12,7 +12,7 @@
 import { randomUUID } from "node:crypto";
 import { HttpError } from "../http.js";
 import { withTransaction } from "../db.js";
-import { deleteEntityRecord, getEntityRecord, updateEntityRecord } from "../store.js";
+import { deleteEntityRecord, getEntityRecord, importEntityRecord, updateEntityRecord } from "../store.js";
 import { enqueueTaskPush } from "../push.js";
 
 const DEFAULT_LIST_LIMIT = 50;
@@ -164,6 +164,43 @@ export function undoActivity(db, config, { appId, user, activityId }) {
       pushes.push({ op: "upsert", taskSnapshot: updateEntityRecord(db, { entityName: "Task", ...scope, id: series.id, input: undo.before }) });
       for (const s of subtasks) {
         pushes.push({ op: "upsert", taskSnapshot: updateEntityRecord(db, { entityName: "Task", ...scope, id: s.id, input: s.before }) });
+      }
+    } else if (undo.kind === "rows" || undo.kind === "many") {
+      // Rows of one or several kinds (a tag renamed on tasks, notes and the
+      // saved list is one change): each is put back as it was — removed if
+      // the AI app made it, re-created (same id) if it removed it, else
+      // given its old fields — unless any has changed since. All are
+      // checked before any is touched.
+      const parts = undo.kind === "many" ? undo.parts : [undo];
+      const loaded = parts.map((/** @type {any} */ part) => ({
+        ...part,
+        rows: part.rows.map((/** @type {any} */ r) => ({ ...r, record: current(part.entity, r.id) })),
+      }));
+      for (const part of loaded) {
+        for (const r of part.rows) {
+          if (r.record && r.after_updated_date) unchangedSince(r.record, r.after_updated_date);
+          if (!r.record && r.after_updated_date) {
+            throw new HttpError(409, "Something it changed has been deleted since, so this can't be undone automatically.", "changed_since");
+          }
+        }
+      }
+      for (const part of loaded) {
+        for (const r of part.rows) {
+          if (r.before === null) {
+            if (r.record) deleteEntityRecord(db, { entityName: part.entity, ...scope, id: r.id, config });
+          } else if (r.record) {
+            const updated = updateEntityRecord(db, { entityName: part.entity, ...scope, id: r.id, input: r.before });
+            if (part.entity === "Task") pushes.push({ op: "upsert", taskSnapshot: updated });
+          } else {
+            // importEntityRecord replaces any row with that id, whoever owns
+            // it; only ever re-create an id nobody holds.
+            const table = { Priority: "priorities", SavedTag: "saved_tags" }[/** @type {string} */ (part.entity)];
+            if (!table || db.prepare(`SELECT 1 FROM ${table} WHERE id = ? AND app_id = ?`).get(r.id, appId)) {
+              throw new HttpError(409, "That can't be put back automatically.", "changed_since");
+            }
+            importEntityRecord(db, { entityName: part.entity, ...scope, input: { ...r.before, id: r.id }, config });
+          }
+        }
       }
     } else if (undo.kind === "update_note") {
       const note = current("Note", undo.note_id);

@@ -74,6 +74,9 @@ const COLOR_TO_GOOGLE_ID = {
  *
  * @type {Record<string, string>}
  */
+/** Every colour a priority can have, as Settings offers them. */
+export const PRIORITY_COLORS = Object.keys(COLOR_TO_GOOGLE_ID);
+
 const COLOR_TO_HEX = {
   red: "#f87171",         // red-400
   orange: "#fb923c",      // orange-400

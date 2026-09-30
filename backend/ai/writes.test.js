@@ -503,3 +503,126 @@ describe("editing notes", () => {
     await expect(run("delete_note", { note_id: theirs.id })).rejects.toThrow(/No note with id/);
   });
 });
+
+describe("skip_occurrence", () => {
+  it("moves a repeating task on without marking it done, and undo brings it back", async () => {
+    const t = task({ title: "Gym", due_date: "2026-10-05", task_type: "recurring", recurrence: "weekdays" });
+    const { text, data } = await run("skip_occurrence", { task_id: t.id });
+    // Monday 5 Oct → Tuesday 6 Oct; nothing kept as done, unlike complete_task.
+    expect(data.next_date).toBe("2026-10-06");
+    expect(get(t.id)).toMatchObject({ due_date: "2026-10-06", status: "todo" });
+    expect(tasks()).toHaveLength(1);
+    expect(text).toContain("comes round again on Tue 6 Oct");
+    undoLatest();
+    expect(get(t.id).due_date).toBe("2026-10-05");
+  });
+
+  it("skipping the last time sends the task to Recently Deleted, as the app does", async () => {
+    const t = task({ title: "Course", due_date: "2026-10-05", task_type: "recurring", recurrence: "weekly", recurrence_end_date: "2026-10-10" });
+    const { data } = await run("skip_occurrence", { task_id: t.id });
+    expect(exists(t.id)).toBe(false);
+    expect(get(data.recently_deleted_id, "DeletedTask").task_id).toBe(t.id);
+    expect(listActivity(db, { appId: APP_ID, userId: ME.id })[0].undo).toBe("recently_deleted");
+  });
+
+  it("refuses tasks that don't repeat", async () => {
+    const t = task({ title: "Once", due_date: "2026-10-05" });
+    await expect(run("skip_occurrence", { task_id: t.id })).rejects.toThrow(/doesn't repeat/);
+  });
+});
+
+describe("edit_priorities", () => {
+  const names = () => priorities().map((p) => p.name);
+
+  it("adds one at the bottom, renames, recolours and moves, each undoable", async () => {
+    await run("edit_priorities", { action: "add", name: "Someday", color: "violet" });
+    expect(names()).toEqual(["Urgent", "High", "Normal", "Low", "Someday"]);
+    expect(priority("Someday").color).toBe("violet");
+
+    await run("edit_priorities", { action: "rename", priority: "someday", name: "Maybe later" });
+    await run("edit_priorities", { action: "recolor", priority: "Maybe later", color: "teal" });
+    expect(priority("Maybe later").color).toBe("teal");
+
+    const moved = await run("edit_priorities", { action: "move", priority: "Maybe later", position: 2 });
+    expect(names()).toEqual(["Urgent", "Maybe later", "High", "Normal", "Low"]);
+    expect(moved.text).toContain("most urgent first: Urgent, Maybe later, High, Normal, Low");
+    undoLatest();
+    expect(names()).toEqual(["Urgent", "High", "Normal", "Low", "Maybe later"]);
+  });
+
+  it("deleting leaves tasks without a priority, and undo puts it back under the same id", async () => {
+    const high = priority("High");
+    const t = task({ title: "Report", due_date: "2026-10-05", priority_id: high.id });
+    await run("edit_priorities", { action: "delete", priority: "High" });
+    expect(names()).toEqual(["Urgent", "Normal", "Low"]);
+    const before = await run("get_task", { task_id: t.id });
+    expect(before.data.priority).toBeNull();
+    undoLatest();
+    expect(priority("High")).toMatchObject({ id: high.id, color: high.color, order: high.order });
+    expect((await run("get_task", { task_id: t.id })).data.priority).toBe("High");
+  });
+
+  it("refuses duplicates, missing names and unknown priorities", async () => {
+    await expect(run("edit_priorities", { action: "add", name: "urgent" })).rejects.toThrow(/already a priority called/);
+    await expect(run("edit_priorities", { action: "add" })).rejects.toThrow(/"name" is needed/);
+    await expect(run("edit_priorities", { action: "delete", priority: "Critical" })).rejects.toThrow(/Urgent, High, Normal, Low/);
+    await expect(run("edit_priorities", { action: "recolor", priority: "Low", color: "gold" })).rejects.toThrow(/must be one of/);
+  });
+});
+
+describe("edit_tags", () => {
+  const savedNames = () => listEntityRecords(db, { entityName: "SavedTag", appId: APP_ID, user: ME }).map((t) => t.name).sort();
+  const note = (input) => createEntityRecord(db, { entityName: "Note", appId: APP_ID, user: ME, input, config });
+
+  it("adds and removes saved tags; removing leaves the tag on tasks", async () => {
+    const t = task({ title: "Revise", due_date: "2026-10-05", tags: ["school"] });
+    await run("edit_tags", { action: "add", tag: "#School" });
+    expect(savedNames()).toEqual(["School"]);
+    expect((await run("edit_tags", { action: "add", tag: "school" })).text).toContain("already a saved tag");
+    await run("edit_tags", { action: "remove", tag: "school" });
+    expect(savedNames()).toEqual([]);
+    expect(get(t.id).tags).toEqual(["school"]);
+    undoLatest();
+    expect(savedNames()).toEqual(["School"]);
+  });
+
+  it("renames a tag on every task and note and in the saved list — not on calendar items — and one Undo reverts it all", async () => {
+    await run("edit_tags", { action: "add", tag: "Calc" });
+    const a = task({ title: "HW 1", due_date: "2026-10-05", tags: ["Calc", "math"] });
+    const b = task({ title: "HW 2", due_date: "2026-10-06", tags: ["calc"] });
+    const cal = task({ title: "Calc class", due_date: "2026-10-05", tags: ["Calc"], source_provider: "google", source_kind: "event" });
+    const n = note({ title: "Formulas", content_text: "x", tags: ["Calc"] });
+    enqueueTaskPush.mockClear();
+
+    const { text } = await run("edit_tags", { action: "rename", tag: "calc", new_name: "Calculus" });
+    expect(text).toBe("Renamed #calc to #Calculus on 2 tasks and 1 note and in the saved tags.");
+    expect(get(a.id).tags).toEqual(["Calculus", "math"]);
+    expect(get(b.id).tags).toEqual(["Calculus"]);
+    expect(get(cal.id).tags).toEqual(["Calc"]);
+    expect(get(n.id, "Note").tags).toEqual(["Calculus"]);
+    expect(savedNames()).toEqual(["Calculus"]);
+    expect(enqueueTaskPush).toHaveBeenCalledTimes(2);
+    expect(listActivity(db, { appId: APP_ID, userId: ME.id })).toHaveLength(2);
+
+    undoLatest();
+    expect(get(a.id).tags).toEqual(["Calc", "math"]);
+    expect(get(b.id).tags).toEqual(["calc"]);
+    expect(get(n.id, "Note").tags).toEqual(["Calc"]);
+    expect(savedNames()).toEqual(["Calc"]);
+  });
+
+  it("merges into a tag that already exists instead of doubling it", async () => {
+    const t = task({ title: "Both", due_date: "2026-10-05", tags: ["hw", "homework"] });
+    await run("edit_tags", { action: "rename", tag: "hw", new_name: "homework" });
+    expect(get(t.id).tags).toEqual(["homework"]);
+  });
+
+  it("an undo is refused if anything it would revert was edited since", async () => {
+    const t = task({ title: "HW", due_date: "2026-10-05", tags: ["calc"] });
+    await run("edit_tags", { action: "rename", tag: "calc", new_name: "Calculus" });
+    await tick();
+    updateEntityRecord(db, { entityName: "Task", appId: APP_ID, user: ME, id: t.id, input: { title: "HW (edited)" } });
+    expect(() => undoLatest()).toThrow(/has been changed since/);
+    expect(get(t.id).tags).toEqual(["Calculus"]);
+  });
+});
