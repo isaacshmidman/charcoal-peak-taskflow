@@ -42,6 +42,8 @@ import { loadFromCache, saveToCache } from "@/lib/offlineCache";
  *   scheduleDefaults: {
  *     get: () => Promise<Record<string, any>>,
  *     set: (defaults: Record<string, any>) => Promise<Record<string, any>>,
+ *     getSimilarTasks: () => Promise<"ask" | "merge" | "keep">,
+ *     setSimilarTasks: (choice: "ask" | "merge" | "keep") => Promise<"ask" | "merge" | "keep">,
  *   },
  *   notifications: {
  *     getSettings: () => Promise<any>,
@@ -105,6 +107,7 @@ const INTEGRATIONS_CACHE_KEY = "integrations";
 const INTEGRATION_CALENDARS_CACHE_KEY = "integrationCalendars";
 const NOTIFICATION_SETTINGS_CACHE_KEY = "notificationSettings";
 const SCHEDULE_DEFAULTS_CACHE_KEY = "scheduleDefaults";
+const SCHEDULE_SIMILAR_CACHE_KEY = "scheduleSimilarTasks";
 const ENTITY_CACHE_KEYS = {
   Task: "tasks",
   Priority: "priorities",
@@ -527,6 +530,28 @@ const liveApiClient = {
       });
       saveToCache(SCHEDULE_DEFAULTS_CACHE_KEY, result.defaults || {});
       return result.defaults || {};
+    },
+    // What to do with a slot like a task already on the day it's added to.
+    async getSimilarTasks() {
+      try {
+        const result = await apiRequest(`/apps/${appConfig.appId}/schedule-defaults`);
+        saveToCache(SCHEDULE_SIMILAR_CACHE_KEY, result.similar_tasks || "ask");
+        return result.similar_tasks || "ask";
+      } catch (error) {
+        if (isRecoverableReadError(error)) {
+          const cached = loadFromCache(SCHEDULE_SIMILAR_CACHE_KEY);
+          if (cached) return cached;
+        }
+        throw error;
+      }
+    },
+    async setSimilarTasks(choice) {
+      const result = await apiRequest(`/apps/${appConfig.appId}/schedule-defaults`, {
+        method: "PUT",
+        body: { similar_tasks: choice },
+      });
+      saveToCache(SCHEDULE_SIMILAR_CACHE_KEY, result.similar_tasks || "ask");
+      return result.similar_tasks || "ask";
     },
   },
   notifications: {

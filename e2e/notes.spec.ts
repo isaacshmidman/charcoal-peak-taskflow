@@ -341,7 +341,7 @@ test("Add to calendar turns filled slots into tasks on the day chosen, once, and
   await expect(page.getByRole("checkbox", { name: "Add Gym" })).toHaveAttribute("aria-checked", "true");
   await page.getByRole("checkbox", { name: "Add Gym" }).click();
   await page.getByTestId("add-to-calendar-confirm").click();
-  await expect(page.getByTestId("delete-toast")).toContainText("Added 1 task to");
+  await expect(page.getByTestId("delete-toast")).toContainText("Added 1 task on");
   await expect.poll(added).toEqual(["Breakfast 7:00AM-8:00AM"]);
 
   // Opened again for the same day: Breakfast is already there.
@@ -355,4 +355,61 @@ test("Add to calendar turns filled slots into tasks on the day chosen, once, and
   // The newest toast (the one before may still be fading out).
   await page.getByTestId("delete-toast-undo").last().click();
   await expect.poll(added).toEqual(["Breakfast 7:00AM-8:00AM"]);
+});
+
+test("adding a schedule asks before merging a slot into a task that looks the same, and can stop asking", async ({ page }) => {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const day = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`;
+  const gymTask = {
+    id: "task-gym", title: "go to the gym tmr", due_date: day, task_time: "", task_end_time: "", status: "todo",
+    task_type: "one_time", recurrence: "none", priority_id: "priority-1", tags: [], parent_id: null,
+    created_date: new Date().toISOString(), updated_date: new Date().toISOString(),
+  };
+  const api = await installMockBackend(page, { tasks: [gymTask], priorities: [defaultPriority], notes: [note({ id: "plan", title: "Plan" })] });
+  const onDay = async () =>
+    (await api.getState()).tasks.filter((t: any) => t.due_date === day).map((t: any) => `${t.title} ${t.task_time || "-"}-${t.task_end_time || "-"}`).sort();
+
+  await page.goto("/Notes");
+  await page.getByRole("switch", { name: "Schedule builder" }).click();
+  await page.getByRole("textbox", { name: "What’s happening 9:00 AM – 10:00 AM" }).fill("Gym");
+  await page.getByRole("textbox", { name: "What’s happening 12:00 PM – 1:00 PM" }).fill("Lunch");
+
+  await page.getByRole("button", { name: "Add to calendar" }).click();
+  await page.getByRole("button", { name: "Tomorrow" }).click();
+  await page.getByTestId("add-to-calendar-confirm").click();
+
+  // The prompt: Gym looks like "go to the gym tmr"; merging is the default.
+  const prompt = page.getByTestId("similar-prompt");
+  await expect(prompt.getByTestId("similar-match")).toHaveCount(1);
+  await expect(prompt.getByTestId("similar-match")).toContainText("looks like “go to the gym tmr” · no time");
+  await expect(prompt.getByTestId("similar-match")).toContainText("“go to the gym tmr” moves to 9:00 AM – 10:00 AM; no new task.");
+  await expect(page.getByTestId("similar-confirm")).toHaveText("Add 1 task · merge 1");
+  await page.getByTestId("similar-confirm").click();
+  await expect.poll(onDay).toEqual(["Lunch 12:00PM-1:00PM", "go to the gym tmr 9:00AM-10:00AM"]);
+  await page.getByTestId("delete-toast-undo").last().click();
+  await expect.poll(onDay).toEqual(["go to the gym tmr ---"]);
+
+  // Again, with "Don't ask again": it says what will happen, and does it next time without asking.
+  await page.getByRole("button", { name: "Add to calendar" }).click();
+  await page.getByRole("button", { name: "Tomorrow" }).click();
+  await page.getByTestId("add-to-calendar-confirm").click();
+  await page.getByRole("checkbox", { name: "Don’t ask again" }).click();
+  await expect(page.getByTestId("dont-ask-note")).toContainText("merged without asking");
+  await page.getByTestId("similar-confirm").click();
+  await expect.poll(async () => ((await api.getState()) as any).scheduleSimilarTasks).toBe("merge");
+  await page.getByTestId("delete-toast-undo").last().click();
+  await expect.poll(onDay).toEqual(["go to the gym tmr ---"]);
+
+  await page.getByRole("button", { name: "Add to calendar" }).click();
+  await page.getByRole("button", { name: "Tomorrow" }).click();
+  await expect(page.getByTestId("add-to-calendar-confirm")).toHaveText(/^Add 1 task · merge 1 on /);
+  await page.getByTestId("add-to-calendar-confirm").click();
+  await expect(page.getByTestId("similar-prompt")).toHaveCount(0);
+  await expect.poll(onDay).toEqual(["Lunch 12:00PM-1:00PM", "go to the gym tmr 9:00AM-10:00AM"]);
+
+  // Back to asking, from the bottom of the panel.
+  await page.getByRole("button", { name: "Add to calendar" }).click();
+  await page.getByTestId("similar-ask").click();
+  await expect.poll(async () => ((await api.getState()) as any).scheduleSimilarTasks).toBe("ask");
 });

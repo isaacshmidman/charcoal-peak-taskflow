@@ -49,7 +49,11 @@ PDFs or images). With changes allowed, it can also:
   change is refused, and nothing in that call is made;
 - add a schedule to the calendar on a day you name, as the Add to
   calendar button does: each slot with something in it becomes a task at
-  its times; ones already on that day are left out;
+  its times; ones already on that day are left out. A slot that looks like
+  a task you already have that day (the same words, leaving out little
+  ones like "the", "at", "tmr") can be merged into it — the task moves to
+  the slot's time. If you've asked to be asked, it asks you (through the
+  AI app) before merging or adding;
 - add, rename, recolour, reorder or delete priorities, and add, remove or
   rename saved tags (a rename changes every task and note that has it);
 - save text as a file attached to a task (.txt, .md or .csv, up to 1 MB).

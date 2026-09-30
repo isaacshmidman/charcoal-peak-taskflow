@@ -904,9 +904,9 @@ describe("schedules", () => {
 
     const first = await run("add_schedule_to_calendar", { note_id: data.id, date: "2026-10-03", slots: ["7:30AM", "11pm"] });
     expect(onDay()).toEqual(["Breakfast 7:30AM-8:00AM", "Read 11:00PM-11:59PM"]);
-    expect(first.text).toContain("Added 2 tasks from “Saturday” to Sat 3 Oct:");
+    expect(first.text).toContain("From “Saturday” on Sat 3 Oct:\n- added 7:30AM–8:00AM “Breakfast”");
     const firstEntry = listActivity(db, { appId: APP_ID, userId: ME.id })[0];
-    expect(firstEntry.summary).toBe("Added 2 tasks from the schedule “Saturday” to Sat 3 Oct.");
+    expect(firstEntry.summary).toBe("Added 2 tasks from the schedule “Saturday” on Sat 3 Oct.");
     expect(tasks().find((t) => t.title === "Breakfast")).toMatchObject({ status: "todo", priority_id: priority("Normal").id, reminder: "" });
     expect(enqueueTaskPush).toHaveBeenCalledTimes(2);
 
@@ -920,6 +920,44 @@ describe("schedules", () => {
     expect(onDay()).toEqual(["Breakfast 7:30AM-8:00AM", "Read 11:00PM-11:59PM"]);
     undoActivity(db, config, { appId: APP_ID, user: ME, activityId: firstEntry.id });
     expect(onDay()).toEqual([]);
+  });
+
+  it("asks before merging into a task that looks the same, then merges, keeps both, or remembers; Undo puts a merge back", async () => {
+    const { getSimilarTasksChoice } = await import("../schedule-defaults.js");
+    const { data } = await run("create_note", {
+      title: "Friday",
+      schedule: { fill: [{ start: "7am", end: "8am", text: "Gym" }, { start: "12pm", end: "1pm", text: "Lunch" }, { start: "6pm", end: "7pm", text: "Standup" }] },
+    });
+    const gym = task({ title: "go to the gym tmr", due_date: "2026-10-09" });
+    task({ title: "Daily standup", due_date: "2026-10-09", recurrence: "daily" });
+    const onDay = () => tasks().filter((t) => t.due_date === "2026-10-09").map((t) => `${t.title} ${t.task_time || "-"}`).sort();
+
+    // The person's choice is to be asked: nothing yet, and the look-alikes come back.
+    const asked = await run("add_schedule_to_calendar", { note_id: data.id, date: "2026-10-09" });
+    expect(asked.data.needs_choice).toBe(true);
+    expect(asked.data.look_alike.map((m) => [m.slot.text, m.task.title, m.can_merge])).toEqual([
+      ["Gym", "go to the gym tmr", true],
+      ["Standup", "Daily standup", false],
+    ]);
+    expect(asked.text).toContain("“Gym” (7:00AM–8:00AM) looks like “go to the gym tmr” (no time");
+    expect(onDay()).toEqual(["Daily standup -", "go to the gym tmr -"]);
+
+    // Merge: the gym task moves to the slot's time; the repeating standup's slot is left out.
+    const merged = await run("add_schedule_to_calendar", { note_id: data.id, date: "2026-10-09", similar_tasks: "merge" });
+    expect(onDay()).toEqual(["Daily standup -", "Lunch 12:00PM", "go to the gym tmr 7:00AM"]);
+    expect(get(gym.id)).toMatchObject({ task_time: "7:00AM", task_end_time: "8:00AM" });
+    expect(merged.data.left_out).toEqual(["Standup"]);
+    expect(merged.text).toContain("- merged: “go to the gym tmr” now 7:00AM–8:00AM");
+    expect(getSimilarTasksChoice(db, { appId: APP_ID, userId: ME.id })).toBe("ask");
+
+    undoLatest();
+    expect(get(gym.id)).toMatchObject({ task_time: "", task_end_time: "" });
+    expect(onDay()).toEqual(["Daily standup -", "go to the gym tmr -"]);
+
+    // Keep both, remembered: from now on it doesn't ask.
+    await run("add_schedule_to_calendar", { note_id: data.id, date: "2026-10-09", similar_tasks: "keep", remember_choice: true });
+    expect(getSimilarTasksChoice(db, { appId: APP_ID, userId: ME.id })).toBe("keep");
+    expect(onDay()).toEqual(["Daily standup -", "Gym 7:00AM", "Lunch 12:00PM", "Standup 6:00PM", "go to the gym tmr -"]);
   });
 
   it("add_schedule_to_calendar says what's wrong instead of guessing", async () => {

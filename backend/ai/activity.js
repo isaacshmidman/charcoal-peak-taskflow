@@ -141,18 +141,27 @@ export function undoActivity(db, config, { appId, user, activityId }) {
         pushes.push({ op: "delete", taskSnapshot: task });
       }
     } else if (undo.kind === "create_tasks") {
-      // Several tasks added in one go (a schedule added to the calendar):
-      // all checked before any is removed, so it's all or nothing.
+      // Several tasks added in one go (a schedule added to the calendar),
+      // and any it merged into tasks already there: all checked before any
+      // is touched, so it's all or nothing.
       const tasks = undo.tasks
         .map((/** @type {any} */ t) => ({ ...t, record: current("Task", t.task_id) }))
         .filter((/** @type {any} */ t) => t.record);
+      const merged = (undo.merged || []).map((/** @type {any} */ m) => ({ ...m, record: current("Task", m.task_id) }));
       for (const t of tasks) {
         unchangedSince(t.record, t.updated_date);
         noFilesSince(t.record);
       }
+      for (const m of merged) {
+        if (!m.record) throw new HttpError(409, "A task it merged into has been deleted since, so this can't be undone automatically.", "changed_since");
+        unchangedSince(m.record, m.updated_date);
+      }
       for (const t of tasks) {
         deleteEntityRecord(db, { entityName: "Task", ...scope, id: t.record.id, config });
         pushes.push({ op: "delete", taskSnapshot: t.record });
+      }
+      for (const m of merged) {
+        pushes.push({ op: "upsert", taskSnapshot: updateEntityRecord(db, { entityName: "Task", ...scope, id: m.task_id, input: m.before }) });
       }
     } else if (undo.kind === "update_task") {
       const task = current("Task", undo.task_id);

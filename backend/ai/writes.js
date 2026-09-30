@@ -28,7 +28,8 @@ import { isAllowedHref, markdownToDoc } from "../lib/markdown-doc.js";
 import { applyBlockChanges, applyMarks, findText, linkTextToTask, markChanges } from "./note-format.js";
 import { alreadyOnCalendar, describeChange, isFilled, parseClock, parseSchedule, scheduleFromDefaults, slotsAsTasks } from "../lib/schedule.js";
 import { PIN_ARGS, SCHEDULE_CHANGES, applyScheduleChanges, newScheduleWith, pinnedData, pinnedLine, pinsAfter, scheduleData, scheduleText } from "./schedules.js";
-import { getScheduleDefaults, setScheduleDefaults } from "../schedule-defaults.js";
+import { getScheduleDefaults, getSimilarTasksChoice, setScheduleDefaults, setSimilarTasksChoice } from "../schedule-defaults.js";
+import { findSimilarTasks } from "../lib/similar-tasks.js";
 import { ToolError, isRealDate } from "./args.js";
 import { logActivity } from "./activity.js";
 import { DATE, findPriority, getOwnNote, getOwnTask, listRecords, loadPriorities, loadTasks, lower } from "./context.js";
@@ -1460,7 +1461,10 @@ const addScheduleToCalendar = {
     "Add a note's schedule to the calendar on a day: each slot with something in it becomes a task at its times, as the app's Add to calendar button does, " +
     "so it shows on the person's calendar and reaches a connected Google or Apple calendar like any task. " +
     "A slot already on that day (same title and times) is left out, so adding twice doesn't double it. " +
-    "The tasks get the task form's defaults (the middle priority, the account's reminder). One Undo in Zephyrly takes them all back.",
+    "A slot that only looks like a task already on that day (the same words, leaving out little ones like the, at, tmr) can be merged into it: " +
+    "the task keeps everything and moves to the slot's time, and no second task is added. " +
+    "Tasks from a connected calendar and repeating tasks are never merged; those slots are left out when merging. " +
+    "The tasks get the task form's defaults (the middle priority, the account's reminder). One Undo in Zephyrly takes it all back.",
   inputSchema: {
     type: "object",
     properties: {
@@ -1471,6 +1475,17 @@ const addScheduleToCalendar = {
         maxItems: 200,
         items: { type: "string", maxLength: 20 },
         description: "Only these slots, by their start times (like 7:00AM). Leave out for every slot with something in it.",
+      },
+      similar_tasks: {
+        type: "string",
+        enum: ["merge", "keep"],
+        description:
+          "What to do with slots that look like a task already on that day: merge them into it, or keep both. " +
+          "Leave out to follow the person's choice in the app; when that's to be asked, nothing is added and the look-alikes come back, so ask the person and call again.",
+      },
+      remember_choice: {
+        type: "boolean",
+        description: "Also make similar_tasks the person's choice from now on, like the app's \"Don't ask again\".",
       },
     },
     required: ["note_id", "date"],
@@ -1497,16 +1512,46 @@ const addScheduleToCalendar = {
     const wanted = slotsAsTasks(schedule, args.date, only);
     if (!wanted.length) throw new ToolError("Nothing to add: no slot in that schedule has anything in it yet.");
     const existing = loadTasks(ctx);
-    const toAdd = wanted.filter((task) => !alreadyOnCalendar(existing, task));
+    const fresh = wanted.filter((task) => !alreadyOnCalendar(existing, task));
     const skipped = wanted.filter((task) => alreadyOnCalendar(existing, task)).map((task) => task.title);
     const day = dayLabel(args.date);
     const name = note.title ? quote(note.title) : "the untitled note";
-    if (!toAdd.length) {
+    if (!fresh.length) {
       return {
         text: `Everything from ${name} is already on ${day}, so nothing was added.`,
-        data: { date: args.date, added: [], already_there: skipped },
+        data: { date: args.date, added: [], merged: [], already_there: skipped },
       };
     }
+    const preference = getSimilarTasksChoice(ctx.db, { appId: ctx.appId, userId: ctx.user.id });
+    const mode = args.similar_tasks || (preference === "ask" ? null : preference);
+    const matches = mode === "keep" ? [] : findSimilarTasks(fresh, existing);
+    const lookAlike = matches.map((match) => {
+      const slot = fresh.find((task) => task.slotId === match.slotId);
+      return {
+        slot: { start: slot?.task_time, end: slot?.task_end_time, text: slot?.title },
+        task: { id: match.task.id, title: match.task.title, time: match.task.task_time || null, end_time: match.task.task_end_time || null },
+        can_merge: match.canMerge,
+        ...(match.why ? { why_not: match.why === "calendar" ? "from a connected calendar" : "repeats" } : {}),
+      };
+    });
+    if (matches.length && !mode) {
+      const lines = lookAlike.map(
+        (m) =>
+          `- ${quote(String(m.slot.text))} (${m.slot.start}–${m.slot.end}) looks like ${quote(String(m.task.title))} (${m.task.time ? `${m.task.time}${m.task.end_time ? `–${m.task.end_time}` : ""}` : "no time"}, id ${m.task.id})` +
+          (m.can_merge ? "" : ` — can't be merged: it's ${m.why_not}`)
+      );
+      return {
+        text:
+          `Nothing added yet: ${lookAlike.length === 1 ? "a slot looks" : "some slots look"} like tasks already on ${day}, and the person wants to be asked.\n${lines.join("\n")}\n` +
+          'Ask them whether to merge (the task moves to the slot\'s time, no new task) or keep both, then call again with similar_tasks "merge" or "keep".',
+        data: { date: args.date, added: [], merged: [], look_alike: lookAlike, needs_choice: true },
+      };
+    }
+    const mergeBySlot = new Map(mode === "merge" ? matches.map((match) => [match.slotId, match]) : []);
+    // Merging into a calendar event or a repeating task isn't done: those slots are left out.
+    const leftOut = fresh.filter((task) => mergeBySlot.get(task.slotId) && !mergeBySlot.get(task.slotId)?.canMerge).map((task) => task.title);
+    const merges = fresh.filter((task) => mergeBySlot.get(task.slotId)?.canMerge);
+    const toAdd = fresh.filter((task) => !mergeBySlot.has(task.slotId));
     // The task form's default: the middle priority by order.
     const priorities = loadPriorities(ctx);
     const priority = priorities[Math.floor(priorities.length / 2)] || null;
@@ -1522,25 +1567,59 @@ const addScheduleToCalendar = {
       description_json: "",
     }));
     for (const input of inputs) validateClientInput("Task", input);
+    if (args.remember_choice && args.similar_tasks) setSimilarTasksChoice(ctx.db, { appId: ctx.appId, userId: ctx.user.id, choice: args.similar_tasks });
+    if (!inputs.length && !merges.length) {
+      return {
+        text: `Nothing added: ${leftOut.map(quote).join(", ")} can't be merged into what's already on ${day}.`,
+        data: { date: args.date, added: [], merged: [], already_there: skipped, left_out: leftOut },
+      };
+    }
     spendWrite(ctx);
-    const created = inTransaction(ctx.db, () =>
-      inputs.map((input) => createEntityRecord(ctx.db, { entityName: "Task", appId: ctx.appId, user: ctx.user, input, config: ctx.config }))
-    );
+    /** @type {Array<{ task: any, before: { task_time: string, task_end_time: string } }>} */
+    const merged = [];
+    const created = inTransaction(ctx.db, () => {
+      for (const slot of merges) {
+        const match = /** @type {any} */ (mergeBySlot.get(slot.slotId));
+        const task = getOwnTask(ctx, match.task.id);
+        assertEditable(ctx, task);
+        const before = { task_time: task.task_time || "", task_end_time: task.task_end_time || "" };
+        const updated = updateEntityRecord(ctx.db, {
+          entityName: "Task",
+          appId: ctx.appId,
+          user: ctx.user,
+          id: task.id,
+          input: { task_time: slot.task_time, task_end_time: slot.task_end_time },
+        });
+        merged.push({ task: updated, before });
+      }
+      return inputs.map((input) => createEntityRecord(ctx.db, { entityName: "Task", appId: ctx.appId, user: ctx.user, input, config: ctx.config }));
+    });
+    for (const { task } of merged) push(ctx, "upsert", task);
     for (const task of created) push(ctx, "upsert", task);
     const count = `${created.length} task${created.length === 1 ? "" : "s"}`;
-    logActivity(ctx, "add_schedule_to_calendar", `Added ${count} from the schedule ${name} to ${day}.`, {
+    const said = [created.length && `added ${count}`, merged.length && `merged ${merged.length} into ${merged.length === 1 ? "a task" : "tasks"} already there`]
+      .filter(Boolean)
+      .join(" and ");
+    logActivity(ctx, "add_schedule_to_calendar", `${said[0].toUpperCase()}${said.slice(1)} from the schedule ${name} on ${day}.`, {
       kind: "create_tasks",
       tasks: created.map((task) => ({ task_id: task.id, updated_date: task.updated_date })),
+      merged: merged.map(({ task, before }) => ({ task_id: task.id, before, updated_date: task.updated_date })),
     });
-    const lines = created.map((task) => `- ${task.task_time}–${task.task_end_time} ${quote(task.title)} (id ${task.id})`);
+    const lines = [
+      ...created.map((task) => `- added ${task.task_time}–${task.task_end_time} ${quote(task.title)} (id ${task.id})`),
+      ...merged.map(({ task }) => `- merged: ${quote(task.title)} now ${task.task_time}–${task.task_end_time} (id ${task.id})`),
+    ];
     return {
       text:
-        `Added ${count} from ${name} to ${day}:\n${lines.join("\n")}` +
-        (skipped.length ? `\nAlready on ${day}, so left out: ${skipped.map(quote).join(", ")}.` : ""),
+        `From ${name} on ${day}:\n${lines.join("\n")}` +
+        (skipped.length ? `\nAlready on ${day}, so left out: ${skipped.map(quote).join(", ")}.` : "") +
+        (leftOut.length ? `\nLeft out, since what they look like can't be merged: ${leftOut.map(quote).join(", ")}.` : ""),
       data: {
         date: args.date,
         added: created.map((task) => ({ id: task.id, title: task.title, time: task.task_time, end_time: task.task_end_time })),
+        merged: merged.map(({ task, before }) => ({ id: task.id, title: task.title, time: task.task_time, end_time: task.task_end_time, was: before })),
         already_there: skipped,
+        left_out: leftOut,
       },
     };
   },

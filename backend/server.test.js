@@ -476,7 +476,7 @@ describe("pinned schedule settings", () => {
     const token = await login("pins@example.com");
     const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
     const none = await invoke("/api/apps/test-app/schedule-defaults", { headers });
-    expect(none.body).toEqual({ defaults: {} });
+    expect(none.body).toEqual({ defaults: {}, similar_tasks: "ask" });
 
     const saved = await invoke("/api/apps/test-app/schedule-defaults", {
       method: "PUT",
@@ -484,7 +484,14 @@ describe("pinned schedule settings", () => {
       body: { defaults: { dayStart: 420, gap: 5, cascade: "sideways", slot: 3, now: false, html: "<b>" } },
     });
     expect(saved.statusCode).toBe(200);
-    expect(saved.body).toEqual({ defaults: { dayStart: 420, gap: 5, now: false } });
+    expect(saved.body).toEqual({ defaults: { dayStart: 420, gap: 5, now: false }, similar_tasks: "ask" });
+
+    // What to do with a slot like a task already on the day: changed on its
+    // own, without touching the pins; anything unknown is "ask".
+    const merge = await invoke("/api/apps/test-app/schedule-defaults", { method: "PUT", headers, body: { similar_tasks: "merge" } });
+    expect(merge.body).toEqual({ defaults: { dayStart: 420, gap: 5, now: false }, similar_tasks: "merge" });
+    const junk = await invoke("/api/apps/test-app/schedule-defaults", { method: "PUT", headers, body: { similar_tasks: "explode" } });
+    expect(junk.body.similar_tasks).toBe("ask");
     expect((await invoke("/api/apps/test-app/schedule-defaults", { headers })).body.defaults).toEqual({ dayStart: 420, gap: 5, now: false });
 
     // Someone else's are their own.

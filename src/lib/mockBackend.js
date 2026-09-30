@@ -251,6 +251,15 @@ export function createE2EApiClient() {
         persistBackend(backend);
         return clone(state.scheduleDefaults);
       },
+      async getSimilarTasks() {
+        return /** @type {any} */ (backend.state).scheduleSimilarTasks || "ask";
+      },
+      async setSimilarTasks(choice) {
+        const state = /** @type {any} */ (backend.state);
+        state.scheduleSimilarTasks = choice === "merge" || choice === "keep" ? choice : "ask";
+        persistBackend(backend);
+        return state.scheduleSimilarTasks;
+      },
     },
     notifications: {
       async getSettings() {
