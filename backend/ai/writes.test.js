@@ -698,3 +698,55 @@ describe("notes in Markdown", () => {
   });
 });
 
+
+describe("format_note and make_task_from_note", () => {
+  const note = (input) => createEntityRecord(db, { entityName: "Note", appId: APP_ID, user: ME, input, config });
+  const markdownOf = async (id) => (await run("get_note", { note_id: id })).data.markdown;
+
+  it("formats text like the toolbar, and one Undo puts the note back", async () => {
+    const n = note({ title: "Trip", content_text: "Plan\n\ncall the plumber\n\nbuy milk" });
+    await run("format_note", { note_id: n.id, text: "Plan", block: "heading1" });
+    await run("format_note", { note_id: n.id, text: "the plumber", add: ["bold", "highlight:green"] });
+    await run("format_note", { note_id: n.id, text: "buy milk", list: "checklist", checked: true });
+    expect(await markdownOf(n.id)).toBe("# Plan\n\ncall **the plumber**\n\n- [x] buy milk");
+    const line = JSON.parse(get(n.id, "Note").content_json).content.find((b) => (b.content || []).some((c) => c.text === "call "));
+    const highlighted = line.content[1];
+    expect(highlighted.marks).toEqual(expect.arrayContaining([{ type: "highlight", attrs: { color: "#bbf7d0" } }]));
+    expect(listActivity(db, { appId: APP_ID, userId: ME.id })[0].summary).toBe('Formatted "buy milk" in the note “Trip”: checklist list, ticked.');
+    undoLatest();
+    expect(await markdownOf(n.id)).toBe("# Plan\n\ncall **the plumber**\n\nbuy milk");
+  });
+
+  it("says what's wrong instead of guessing", async () => {
+    const n = note({ content_text: "hello" });
+    await expect(run("format_note", { note_id: n.id, text: "goodbye", add: ["bold"] })).rejects.toThrow(/Couldn't find "goodbye"/);
+    await expect(run("format_note", { note_id: n.id, text: "hello" })).rejects.toThrow(/Say what to do/);
+    await expect(run("format_note", { note_id: n.id, text: "hello", add: ["highlight:yellow"] })).rejects.toThrow(/reserved/);
+    expect(get(n.id, "Note").content_json).toBe("");
+  });
+
+  it("makes a task from note text, due today by default, and links the text to it", async () => {
+    const { todayIn, dayLabel } = await import("./view.js");
+    const n = note({ title: "Chores", content_text: "Remember to call the plumber soon" });
+    const { data, text } = await run("make_task_from_note", { note_id: n.id, text: "call the plumber", time: "9am", priority: "High" });
+    expect(get(data.id)).toMatchObject({ title: "call the plumber", due_date: todayIn("America/New_York"), task_time: "9:00AM", priority_id: priority("High").id });
+    expect(await markdownOf(n.id)).toBe(`Remember to [call the plumber](zephyrly-task:${data.id}) soon`);
+    expect(text).toBe(`Added “call the plumber” on ${dayLabel(todayIn("America/New_York"))}, 9:00AM–10:00AM, from the note “Chores”, and linked the text to it (task id ${data.id}).`);
+    // Two log entries: the task (Undo deletes it) and the link (Undo unlinks).
+    expect(listActivity(db, { appId: APP_ID, userId: ME.id }).map((a) => a.tool)).toEqual(["make_task_from_note", "create_task"]);
+    const [linkEntry, taskEntry] = listActivity(db, { appId: APP_ID, userId: ME.id });
+    undoActivity(db, config, { appId: APP_ID, user: ME, activityId: linkEntry.id });
+    undoActivity(db, config, { appId: APP_ID, user: ME, activityId: taskEntry.id });
+    expect(await markdownOf(n.id)).toBe("Remember to call the plumber soon");
+    expect(() => get(data.id)).toThrow(/not found/);
+  });
+
+  it("makes nothing when the text isn't there or is already linked", async () => {
+    const n = note({ content_text: "call the plumber" });
+    await expect(run("make_task_from_note", { note_id: n.id, text: "fix the sink" })).rejects.toThrow(/Couldn't find/);
+    await run("make_task_from_note", { note_id: n.id, text: "call the plumber", title: "Plumber", due_date: "2026-10-09" });
+    const before = tasks().length;
+    await expect(run("make_task_from_note", { note_id: n.id, text: "plumber" })).rejects.toThrow(/already linked to a task/);
+    expect(tasks()).toHaveLength(before);
+  });
+});

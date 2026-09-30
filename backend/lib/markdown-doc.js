@@ -24,7 +24,7 @@ export const TASK_LINK_SCHEME = "zephyrly-task:";
  * https or mailto.
  * @param {string} href
  */
-function isAllowedHref(href) {
+export function isAllowedHref(href) {
   try {
     const url = new URL(href);
     return url.protocol === "http:" || url.protocol === "https:" || url.protocol === "mailto:";
@@ -268,8 +268,17 @@ function blockMarkdown(node, indent) {
       return [`${indent}${"#".repeat(node.attrs?.level || 1)} ${inlineMarkdown(children)}`];
     case "paragraph":
       return [`${indent}${inlineMarkdown(children)}`];
-    case "blockquote":
-      return children.flatMap((/** @type {any} */ c) => blockMarkdown(c, "")).map((/** @type {string} */ line) => `${indent}> ${line}`);
+    case "blockquote": {
+      // Blocks inside a quote are separated by a quoted blank line, or
+      // they'd read back as one paragraph.
+      /** @type {string[]} */
+      const lines = [];
+      children.forEach((/** @type {any} */ c, /** @type {number} */ i) => {
+        if (i > 0) lines.push(">");
+        for (const line of blockMarkdown(c, "")) lines.push(line ? `> ${line}` : ">");
+      });
+      return lines.map((line) => `${indent}${line}`);
+    }
     case "codeBlock":
       return [`${indent}\`\`\`${node.attrs?.language || ""}`, ...children.map((/** @type {any} */ c) => c.text || "").join("").split("\n").map((l) => `${indent}${l}`), `${indent}\`\`\``];
     case "horizontalRule":
@@ -307,7 +316,8 @@ function blockMarkdown(node, indent) {
  */
 export function docToMarkdown(doc) {
   const LISTS = new Set(["bulletList", "orderedList", "taskList"]);
-  const nodes = doc?.content || [];
+  // Empty lines are only spacing, and Markdown has no way to hold them.
+  const nodes = (doc?.content || []).filter((/** @type {any} */ n) => !(n.type === "paragraph" && !n.content?.length));
   return nodes
     .map((/** @type {any} */ node, /** @type {number} */ i) => {
       const afterList = LISTS.has(node.type) && i > 0 && LISTS.has(nodes[i - 1].type);

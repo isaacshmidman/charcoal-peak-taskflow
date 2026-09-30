@@ -59,4 +59,10 @@ describe("Markdown ⇄ note documents", () => {
     expect(md).toBe("2 \\* 3 \\[not a link\\] \\~x\\~");
     expect(markdownToDoc(md).content[0].content.map((n) => n.text).join("")).toBe("2 * 3 [not a link] ~x~");
   });
+
+  it("keeps paragraphs inside a quote apart", () => {
+    const doc = markdownToDoc("> one\n>\n> two");
+    expect(doc.content[0].content.map((n) => n.type)).toEqual(["paragraph", "paragraph"]);
+    expect(docToMarkdown(doc)).toBe("> one\n>\n> two");
+  });
 });

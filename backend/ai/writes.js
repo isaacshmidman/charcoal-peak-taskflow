@@ -24,12 +24,13 @@ import { MAX_BEFORE_MINUTES, parseReminder } from "../reminders.js";
 import { getNextRecurringDueDate } from "../lib/recurrence.js";
 import { PRIORITY_COLORS } from "../priority-color.js";
 import { countWords, docToText, plainTextToDoc, storedDoc } from "../lib/plain-text-doc.js";
-import { markdownToDoc } from "../lib/markdown-doc.js";
+import { isAllowedHref, markdownToDoc } from "../lib/markdown-doc.js";
+import { applyBlockChanges, applyMarks, findText, linkTextToTask, markChanges } from "./note-format.js";
 import { ToolError, isRealDate } from "./args.js";
 import { logActivity } from "./activity.js";
 import { DATE, findPriority, getOwnNote, getOwnTask, listRecords, loadPriorities, loadTasks, lower } from "./context.js";
 import { WRITES_PER_HOUR, takeSlot } from "./rate-limit.js";
-import { dayLabel, defaultEndTime, describeRecurrence, describeReminder, formatTime, fromCalendar, isFromCalendar, normalizeTime, speakDay, speakTime, timeMinutes, todayIn } from "./view.js";
+import { clip, dayLabel, defaultEndTime, describeRecurrence, describeReminder, formatTime, fromCalendar, isFromCalendar, normalizeTime, speakDay, speakTime, timeMinutes, todayIn } from "./view.js";
 
 /** The task editor's limit (richtext/content.js WORD_LIMIT). */
 const TASK_DESCRIPTION_WORDS = 500;
@@ -1211,6 +1212,138 @@ const editTags = {
   },
 };
 
+/**
+ * Save a changed note body, logged for Undo like update_note.
+ * @param {ToolContext} ctx
+ * @param {any} note
+ * @param {any} doc
+ * @param {string} tool
+ * @param {string} summary
+ */
+function saveNoteDoc(ctx, note, doc, tool, summary) {
+  const text = docToText(doc);
+  const patch = { content_json: text ? JSON.stringify(doc) : "", content_text: text };
+  validateClientInput("Note", patch);
+  const before = { content_json: note.content_json || "", content_text: note.content_text || "" };
+  const updated = inTransaction(ctx.db, () =>
+    updateEntityRecord(ctx.db, { entityName: "Note", appId: ctx.appId, user: ctx.user, id: note.id, input: patch })
+  );
+  logActivity(ctx, tool, summary, { kind: "update_note", note_id: note.id, before, updated_date: updated.updated_date });
+}
+
+/** @type {Tool} */
+const formatNote = {
+  name: "format_note",
+  title: "Format text in a note",
+  description:
+    "Format text in a note the way the editor's toolbar does. Name the exact text (read the note with get_note first); it's found " +
+    "within one line or paragraph, across existing formatting. add/remove: bold, italic, underline, strike, code, " +
+    "highlight:<purple|green|blue|pink|orange>, color:<red|orange|amber|green|teal|blue|indigo|violet|pink|slate>, " +
+    "font:<Arial|Helvetica|Georgia|Times New Roman|Courier New|Verdana|Trebuchet MS|Garamond|System UI|Monospace>, link:<https://…>; " +
+    'remove "all" clears formatting as the toolbar does (links to tasks are kept). block, list, checked and indent change the line(s) holding the text. ' +
+    "Every change can be undone.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      note_id: { type: "string", maxLength: 200, description: "The note's id." },
+      text: { type: "string", maxLength: 2000, description: "The exact text to format." },
+      all: { type: "boolean", description: "Every place the text appears, not just the first. Defaults to false." },
+      add: { type: "array", maxItems: 10, items: { type: "string", maxLength: 300 }, description: 'e.g. ["bold", "highlight:green"].' },
+      remove: { type: "array", maxItems: 10, items: { type: "string", maxLength: 40 }, description: 'e.g. ["italic"], or ["all"].' },
+      block: { type: "string", enum: ["paragraph", "heading1", "heading2", "heading3", "quote", "code_block"], description: "Make the line(s) this style." },
+      list: {
+        type: "string",
+        enum: ["bullet", "circle", "dash", "numbers", "letters", "roman", "checklist", "none"],
+        description: 'Put the line(s) in a list of this kind, change the list they\'re in, or "none" to take them out.',
+      },
+      checked: { type: "boolean", description: "Tick (true) or untick (false) the checklist line(s)." },
+      indent: { type: "integer", minimum: 0, maximum: 8, description: "Indent level for lines not in a list, 0–8." },
+    },
+    required: ["note_id", "text"],
+    additionalProperties: false,
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  write: true,
+  handler(ctx, args) {
+    const note = getOwnNote(ctx, args.note_id);
+    const clearing = (args.remove || []).some((/** @type {string} */ r) => r.trim().toLowerCase() === "all");
+    const block = args.block ?? (clearing ? "paragraph" : undefined);
+    if (!args.add?.length && !args.remove?.length && !block && !args.list && args.checked == null && args.indent == null) {
+      throw new ToolError("Say what to do: add, remove, block, list, checked or indent.");
+    }
+    const doc = noteDoc(note);
+    const hits = findText(doc, args.text, { all: Boolean(args.all) });
+    if (!hits.length) {
+      throw new ToolError(`Couldn't find "${args.text}" in the note. Name text exactly as it appears within one line or paragraph (get_note shows it).`);
+    }
+    applyMarks(hits, markChanges(args.add || [], args.remove || [], isAllowedHref));
+    applyBlockChanges(doc, args.text, { all: Boolean(args.all), block, list: args.list, checked: args.checked, indent: args.indent });
+    const text = docToText(doc);
+    if (countWords(text) > NOTE_WORDS) throw new ToolError(`A note can be at most ${NOTE_WORDS} words.`);
+
+    const done = [
+      ...(args.add || []),
+      ...(args.remove || []).map((/** @type {string} */ r) => (r.trim().toLowerCase() === "all" ? "cleared formatting" : `no ${r}`)),
+      ...(args.block && !clearing ? [args.block.replace(/(\d)$/, " $1").replace("_", " ")] : []),
+      ...(args.list ? [args.list === "none" ? "out of the list" : `${args.list} list`] : []),
+      ...(args.checked != null ? [args.checked ? "ticked" : "unticked"] : []),
+      ...(args.indent != null ? [`indent ${args.indent}`] : []),
+    ];
+    const where = hits.length > 1 ? ` (${hits.length} places)` : "";
+    const name = note.title ? quote(note.title) : "the untitled note";
+    const summary = `Formatted "${clip(args.text, 60)}"${where} in the note ${name}: ${done.join(", ")}.`;
+    spendWrite(ctx);
+    saveNoteDoc(ctx, note, doc, "format_note", summary);
+    return { text: `${summary} (id ${note.id})`, data: { id: note.id, places: hits.length } };
+  },
+};
+
+/** The task fields make_task_from_note shares with create_task. */
+const MAKE_TASK_FIELDS = ["due_date", "time", "end_time", "priority", "tags", "description", "reminder", "repeats", "repeat_days", "repeat_until"];
+
+/** @type {Tool} */
+const makeTaskFromNote = {
+  name: "make_task_from_note",
+  title: "Make a task from note text",
+  description:
+    "Make a task from text in a note and link that text to it, as the note editor's Make task does: the text is highlighted " +
+    "and follows the task (struck through once done). The title is the text unless title is given; due_date defaults to today, " +
+    "like the app's form; everything create_task takes can be set.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      note_id: { type: "string", maxLength: 200, description: "The note's id." },
+      text: { type: "string", maxLength: 2000, description: "The exact text in the note to turn into a task." },
+      title: { ...TITLE, description: "The task's title, if not the text itself." },
+      ...Object.fromEntries(MAKE_TASK_FIELDS.map((key) => [key, createTask.inputSchema.properties[key]])),
+    },
+    required: ["note_id", "text"],
+    additionalProperties: false,
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  write: true,
+  async handler(ctx, args) {
+    const note = getOwnNote(ctx, args.note_id);
+    const doc = noteDoc(note);
+    // Check the text can be linked before any task exists.
+    if (!linkTextToTask(structuredClone(doc), args.text, "check")) {
+      throw new ToolError(`Couldn't find "${args.text}" in the note. Name text exactly as it appears within one line or paragraph (get_note shows it).`);
+    }
+    /** @type {Record<string, any>} */
+    const taskArgs = { title: args.title || args.text.replace(/\s+/g, " ").trim(), due_date: args.due_date || todayIn(ctx.timeZone) };
+    for (const key of MAKE_TASK_FIELDS) if (args[key] != null && key !== "due_date") taskArgs[key] = args[key];
+    const made = await createTask.handler(ctx, taskArgs);
+    linkTextToTask(doc, args.text, made.data.id);
+    const name = note.title ? quote(note.title) : "the untitled note";
+    spendWrite(ctx);
+    saveNoteDoc(ctx, note, doc, "make_task_from_note", `Linked "${clip(args.text, 60)}" in the note ${name} to the task ${quote(made.data.title)}.`);
+    return {
+      text: `${made.text.replace(/ \(id [^)]+\)/, "").replace(/\.$/, "")}, from the note ${name}, and linked the text to it (task id ${made.data.id}).`,
+      data: { ...made.data, note_id: note.id },
+    };
+  },
+};
+
 /** @type {Tool[]} */
 export const WRITE_TOOLS = [
   createTask,
@@ -1220,6 +1353,8 @@ export const WRITE_TOOLS = [
   deleteTask,
   createNote,
   updateNote,
+  formatNote,
+  makeTaskFromNote,
   deleteNote,
   editPriorities,
   editTags,

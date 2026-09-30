@@ -14,34 +14,50 @@ change an AI app made, with Undo.
 
 ## What an AI app can and can't do
 
-It can read your agenda, search tasks and notes, and read a task or note in
-full. With changes allowed, it can also:
+It can read your agenda, search tasks and notes, read a task or note in
+full (notes come as Markdown, so headings, lists, checklists and links to
+tasks come across), see a task's files, and read text files (txt, md, csv
+and the like; never PDFs or images). With changes allowed, it can also:
 
 - add tasks and subtasks, and change a task's title, date, time, priority,
   tags, description, reminder, or how it repeats (the same choices as the
   task form: daily, weekdays, chosen days, weekly, every two weeks, monthly,
   quarterly or yearly, with an optional last day), or stop it repeating;
-- mark tasks done (a repeating task moves on, as in the app);
+- mark tasks done (a repeating task moves on, as in the app), or skip the
+  next time a repeating task comes round;
 - move a task or a note to Recently Deleted;
-- add notes, and change them: title, tags, pinning, text added at the end,
-  words swapped inside (keeping formatting and links to tasks), or all of
-  the text replaced (which drops formatting and task links, and says how
-  many links went).
+- add notes, written in Markdown, and change them: title, tags, pinning,
+  text added at the end, words swapped inside (keeping formatting and links
+  to tasks), or all of the text replaced (which drops formatting and task
+  links, and says how many links went);
+- format text in a note as the toolbar does: bold, italic, underline,
+  strikethrough, code, highlight and text colours, fonts, links, headings,
+  quotes, code blocks, every list style, checklists ticked or not, and
+  indents. Clearing formatting keeps links to tasks, as the toolbar does;
+- make a task from text in a note, linking the text to it, as the note
+  editor's Make task does;
+- add, rename, recolour, reorder or delete priorities, and add, remove or
+  rename saved tags (a rename changes every task and note that has it);
+- save text as a file attached to a task (.txt, .md or .csv, up to 1 MB).
 
 Whatever the AI app is told, Zephyrly itself never lets it:
 
 - change anything from a connected Google or Apple calendar — that would
   move or rewrite the real event;
 - delete anything for good (a task it deletes goes to Recently Deleted
-  with its files, and it can't delete a subtask, because deleting one is
-  permanent);
+  with its files, and it can't delete a subtask or a file, because those
+  deletes are permanent);
 - see another person's tasks;
 - make more than 100 changes an hour, or 120 requests a minute.
 
-Every change is logged. Undo in Settings reverses it unless the task was
-edited again since (files attached to a task it added count), in which
-case it says so and leaves your edit alone.
-Deleted tasks are restored from Recently Deleted.
+Every change is logged. Undo in Settings reverses it unless what it
+changed was edited again since (files attached to a task it added count),
+in which case it says so and leaves your edit alone. Making a task from a
+note logs two entries, the task and the link in the note; undo both to put
+things back as they were. Deleted tasks and notes are restored from Recently Deleted.
+
+Anything new Zephyrly learns to do gets an AI tool too, with the same
+rules.
 
 ## Apps that sign in
 
