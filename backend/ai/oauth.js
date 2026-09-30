@@ -327,7 +327,9 @@ export function decideRequest(db, config, { id, user, approve, canWrite, timeZon
     db.prepare(`DELETE FROM oauth_requests WHERE id = ?`).run(request.id);
     return { redirect_to: withParams(request.redirect_uri, { error: "access_denied", state: request.state, iss }) };
   }
-  if (!aiAccessAllowed(user)) throw new HttpError(403, "AI apps aren't available on this account.", "ai_not_allowed");
+  if (!aiAccessAllowed(db, config.appId, user)) {
+    throw new HttpError(402, "Connecting AI apps is part of Zephyrly Plus.", "plus_required", { feature: "aiApps" });
+  }
   const client = getClient(db, request.client_id);
 
   // Signing the same app in again updates its one connection rather than

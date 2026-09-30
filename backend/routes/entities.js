@@ -16,6 +16,7 @@ import {
 } from "../store.js";
 import { enqueueTaskPush } from "../push.js";
 import { MAX_ENTITY_BODY_BYTES } from "../limits.js";
+import { assertScheduleAllowed, scheduleWithinPlan } from "../plans.js";
 
 /**
  * @param {import("node:http").IncomingMessage} request
@@ -65,6 +66,11 @@ export async function handleEntitiesRoute(request, response, { config, db, url, 
   if (request.method === "POST" && entityName && !entityId) {
     const body = (await readJsonBody(request, { maxBytes: MAX_ENTITY_BODY_BYTES })) || {};
     validateClientInput(entityName, body);
+    // A note brought back keeps its schedule, switched off if Basic's one
+    // at a time is taken (backend/plans.js).
+    if (entityName === "Note" && Object.hasOwn(body, "schedule_json")) {
+      body.schedule_json = scheduleWithinPlan(db, { appId, userId: user.id }, body.schedule_json);
+    }
     const created = createEntityRecord(db, {
       entityName,
       appId,
@@ -85,6 +91,10 @@ export async function handleEntitiesRoute(request, response, { config, db, url, 
   if (request.method === "PUT" && entityName && entityId) {
     const body = (await readJsonBody(request, { maxBytes: MAX_ENTITY_BODY_BYTES })) || {};
     validateClientInput(entityName, body);
+    // Switching a second schedule on is Plus (backend/plans.js).
+    if (entityName === "Note" && Object.hasOwn(body, "schedule_json")) {
+      assertScheduleAllowed(db, { appId, userId: user.id }, entityId, body.schedule_json);
+    }
     const updated = updateEntityRecord(db, { entityName, appId, user, id: entityId, input: body, config });
     if (entityName === "Task") {
       enqueueTaskPush(db, config, { op: "upsert", appId, taskSnapshot: updated });

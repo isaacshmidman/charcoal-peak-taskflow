@@ -17,6 +17,7 @@ import { createRequestHandler as makeHandler } from "./server.js";
 import { getRequestIpAddress } from "./auth.js";
 import { inlineScriptHashes, policyFor } from "./security-headers.js";
 import { deviceLabel } from "./sessions.js";
+import { grantPlus, revokePlus } from "./plans.js";
 import { createHash as hashOf } from "node:crypto";
 
 let tempDir = "";
@@ -122,7 +123,13 @@ async function invoke(path, init = {}) {
   return response.asJson();
 }
 
-async function login(email) {
+/**
+ * Signs in (making the account if it's new). Test accounts have Plus, as
+ * everyone had when it launched, unless the test is about Basic.
+ * @param {string} email
+ * @param {{ basic?: boolean }} [opts]
+ */
+async function login(email, { basic = false } = {}) {
   const result = await invoke("/api/apps/test-app/auth/login", {
     method: "POST",
     headers: {
@@ -136,6 +143,7 @@ async function login(email) {
 
   expect(result.statusCode).toBe(200);
   expect(result.body.access_token).toBeTruthy();
+  if (!basic) grantPlus(db, { appId: "test-app", userId: result.body.user.id, source: "gift" });
   return result.body.access_token;
 }
 
@@ -542,6 +550,95 @@ describe("account safety", () => {
     expect(policy).toContain("frame-ancestors 'none'");
     expect(policy).toContain("object-src 'none'");
     expect(inlineScriptHashes('<script src="/a.js"></script><script>x()</script>')).toHaveLength(1);
+  });
+});
+
+describe("Zephyrly Plus", () => {
+  const api = (token) => async (method, path, body) =>
+    invoke(`/api/apps/test-app${path}`, { method, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body });
+  const scheduleOn = JSON.stringify(newSchedule());
+
+  it("Basic: the whole app, but not calendar sync or AI apps, and one schedule at a time", async () => {
+    const basic = api(await login("basic@example.com", { basic: true }));
+    const status = await basic("GET", "/billing");
+    expect(status.body).toMatchObject({
+      plan: "basic",
+      limits: { storage_bytes: 500_000_000, active_schedules: 1, calendar_sync: false, ai_apps: false },
+    });
+
+    const refusal = (result, feature) => {
+      expect(result.statusCode).toBe(402);
+      expect(result.body).toMatchObject({ code: "plus_required", feature });
+    };
+    refusal(await basic("POST", "/ai/tokens", { label: "Claude", can_write: false, time_zone: "UTC" }), "aiApps");
+    refusal(await basic("GET", "/integrations/google/connect"), "calendarSync");
+    refusal(await basic("POST", "/integrations/apple/connect", { email: "a@icloud.com", password: "x" }), "calendarSync");
+
+    // One schedule on at a time: a second is refused until the first is off.
+    const first = (await basic("POST", "/entities/Note", { title: "Mon" })).body;
+    const second = (await basic("POST", "/entities/Note", { title: "Tue" })).body;
+    expect((await basic("PUT", `/entities/Note/${first.id}`, { schedule_json: scheduleOn })).statusCode).toBe(200);
+    // Editing the one that's on is fine.
+    expect((await basic("PUT", `/entities/Note/${first.id}`, { schedule_json: scheduleOn, title: "Monday" })).statusCode).toBe(200);
+    refusal(await basic("PUT", `/entities/Note/${second.id}`, { schedule_json: scheduleOn }), "activeSchedules");
+    const off = JSON.stringify({ ...JSON.parse(scheduleOn), enabled: false });
+    expect((await basic("PUT", `/entities/Note/${first.id}`, { schedule_json: off })).statusCode).toBe(200);
+    expect((await basic("PUT", `/entities/Note/${second.id}`, { schedule_json: scheduleOn })).statusCode).toBe(200);
+
+    // A note brought back (Recently Deleted, Undo) keeps its schedule, switched off.
+    const restored = (await basic("POST", "/entities/Note", { title: "Wed", schedule_json: scheduleOn })).body;
+    expect(JSON.parse(restored.schedule_json).enabled).toBe(false);
+  });
+
+  it("Plus: all of it, and a refund takes it away again", async () => {
+    const token = await login("plus@example.com");
+    const plus = api(token);
+    expect((await plus("GET", "/billing")).body).toMatchObject({ plan: "plus", source: "gift", limits: { active_schedules: null, calendar_sync: true, ai_apps: true } });
+    const made = await plus("POST", "/ai/tokens", { label: "Claude", can_write: false, time_zone: "UTC" });
+    expect(made.statusCode).toBe(201);
+    const notes = await Promise.all(["A", "B"].map(async (title) => (await plus("POST", "/entities/Note", { title })).body));
+    for (const n of notes) expect((await plus("PUT", `/entities/Note/${n.id}`, { schedule_json: scheduleOn })).statusCode).toBe(200);
+
+    const me = (await plus("GET", "/entities/User/me")).body;
+    revokePlus(db, { appId: "test-app", userId: me.id, reason: "refund" });
+    expect((await plus("GET", "/billing")).body.plan).toBe("basic");
+    // The AI connection stays listed but stops working.
+    const mcp = await invoke("/api/mcp", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${made.body.token}`, "Content-Type": "application/json" },
+      body: { jsonrpc: "2.0", id: 1, method: "tools/list" },
+    });
+    expect(mcp.statusCode).toBe(401);
+  });
+
+  it("everyone already here when Plus launched gets it once, as a founding member; later sign-ups start on Basic", () => {
+    const dir = mkdtempSync(join(tmpdir(), "taskflow-founding-"));
+    const cfg = { ...config, dbFile: join(dir, "t.sqlite") };
+    try {
+      // A database from before Plus: accounts, and no launch yet.
+      let fresh = createDatabase(cfg);
+      const addUser = (id) =>
+        fresh
+          .prepare(`INSERT INTO users (id, app_id, full_name, email, role, auth_provider, preferences_json, created_date, updated_date) VALUES (?, 'test-app', '', ?, 'user', 'google', '{}', ?, ?)`)
+          .run(id, `${id}@example.com`, new Date().toISOString(), new Date().toISOString());
+      addUser("user_early_1");
+      addUser("user_early_2");
+      fresh.prepare(`DELETE FROM app_flags WHERE name = 'plus_founding_members'`).run();
+      fresh.close();
+
+      fresh = createDatabase(cfg); // the first boot with Plus
+      addUser("user_late");
+      fresh.close();
+      fresh = createDatabase(cfg); // and a later one
+      const rows = fresh.prepare(`SELECT user_id, source FROM entitlements ORDER BY user_id`).all();
+      expect(rows.map((r) => [r.user_id, r.source])).toEqual([
+        ["user_early_1", "founding"],
+        ["user_early_2", "founding"],
+      ]);
+      fresh.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

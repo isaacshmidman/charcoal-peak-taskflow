@@ -1,4 +1,5 @@
 // @ts-check
+import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -395,6 +396,39 @@ export function createDatabase(config = backendConfig) {
     );
     CREATE INDEX IF NOT EXISTS idx_ai_activity_user ON ai_activity(app_id, user_id, created_date);
 
+    -- Zephyrly Plus (backend/plans.js): one row per account that has it.
+    -- Written only by a payment Stripe confirmed, the owner's gift script,
+    -- or the launch grant below; never by an API route.
+    CREATE TABLE IF NOT EXISTS entitlements (
+      id TEXT PRIMARY KEY,
+      app_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      plan TEXT NOT NULL,                -- 'plus'
+      source TEXT NOT NULL,              -- 'stripe' | 'gift' | 'founding'
+      stripe_session_id TEXT,
+      stripe_payment_intent TEXT,
+      amount_total INTEGER,              -- in the smallest unit (cents)
+      currency TEXT,
+      granted_at TEXT NOT NULL,
+      revoked_at TEXT,
+      revoked_reason TEXT                -- 'refund' | 'dispute' | 'owner'
+    );
+    CREATE INDEX IF NOT EXISTS idx_entitlements_user ON entitlements(app_id, user_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_entitlements_session ON entitlements(stripe_session_id) WHERE stripe_session_id IS NOT NULL;
+
+    -- Stripe events already handled, so a replayed or repeated one does nothing twice.
+    CREATE TABLE IF NOT EXISTS billing_events (
+      id TEXT PRIMARY KEY,               -- Stripe's event id
+      type TEXT NOT NULL,
+      received_at TEXT NOT NULL
+    );
+
+    -- One-time things done at boot.
+    CREATE TABLE IF NOT EXISTS app_flags (
+      name TEXT PRIMARY KEY,
+      set_at TEXT NOT NULL
+    );
+
     -- "Sign in with Zephyrly" (backend/ai/oauth.js). Apps register
     -- themselves (RFC 7591); only public clients using PKCE, so no secrets.
     CREATE TABLE IF NOT EXISTS oauth_clients (
@@ -746,8 +780,26 @@ export function createDatabase(config = backendConfig) {
     // Column already exists — ignore
   }
 
+  grantFoundingMembersOnce(db);
   ensureAppSettings(db, config);
   return db;
+}
+
+/**
+ * Plus launched with everyone already using Zephyrly as a founding member
+ * (Isaac's call, 2026-09-30): the first boot with Plus gives it to every
+ * account there is, once. Accounts made after that start on Basic.
+ * @param {DatabaseSync} db
+ */
+function grantFoundingMembersOnce(db) {
+  if (db.prepare(`SELECT 1 FROM app_flags WHERE name = 'plus_founding_members'`).get()) return;
+  const now = new Date().toISOString();
+  withTransaction(db, () => {
+    const users = db.prepare(`SELECT id, app_id FROM users`).all();
+    const insert = db.prepare(`INSERT INTO entitlements (id, app_id, user_id, plan, source, granted_at) VALUES (?, ?, ?, 'plus', 'founding', ?)`);
+    for (const user of users) insert.run(`ent_${randomUUID()}`, user.app_id, user.id, now);
+    db.prepare(`INSERT INTO app_flags (name, set_at) VALUES ('plus_founding_members', ?)`).run(now);
+  });
 }
 
 /**

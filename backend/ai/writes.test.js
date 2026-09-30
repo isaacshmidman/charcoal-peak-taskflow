@@ -4,6 +4,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { grantPlus } from "../plans.js";
 
 vi.mock("../push.js", () => ({ enqueueTaskPush: vi.fn() }));
 
@@ -32,6 +33,8 @@ function seedUser(user) {
      VALUES (?, ?, '', ?, 'user', 'local', '{}', ?, ?)`
   ).run(user.id, APP_ID, user.email, now, now);
   ensureDefaultPrioritiesForUser(db, { appId: APP_ID, user, config });
+  // Test accounts have Plus (AI apps are Plus; see backend/plans.js).
+  grantPlus(db, { appId: APP_ID, userId: user.id, source: "gift" });
 }
 
 const priorities = () => listEntityRecords(db, { entityName: "Priority", appId: APP_ID, user: ME, sort: "order" });
@@ -958,6 +961,18 @@ describe("schedules", () => {
     await run("add_schedule_to_calendar", { note_id: data.id, date: "2026-10-09", similar_tasks: "keep", remember_choice: true });
     expect(getSimilarTasksChoice(db, { appId: APP_ID, userId: ME.id })).toBe("keep");
     expect(onDay()).toEqual(["Daily standup -", "Gym 7:00AM", "Lunch 12:00PM", "Standup 6:00PM", "go to the gym tmr -"]);
+  });
+
+  it("on Basic, a second schedule at once is refused in words the AI app can pass on", async () => {
+    const { revokePlus } = await import("../plans.js");
+    revokePlus(db, { appId: APP_ID, userId: ME.id, reason: "owner" });
+    const { data } = await run("create_note", { title: "One", schedule: {} });
+    await expect(run("create_note", { title: "Two", schedule: {} })).rejects.toThrow("Basic has one schedule at a time.");
+    const plain = note({ title: "Three" });
+    await expect(run("edit_schedule", { note_id: plain.id, on: true })).rejects.toThrow("Switch the other one off first");
+    await run("edit_schedule", { note_id: data.id, on: false });
+    await run("edit_schedule", { note_id: plain.id, on: true });
+    expect(JSON.parse(get(plain.id, "Note").schedule_json).enabled).toBe(true);
   });
 
   it("add_schedule_to_calendar says what's wrong instead of guessing", async () => {

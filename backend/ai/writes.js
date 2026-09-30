@@ -30,6 +30,8 @@ import { alreadyOnCalendar, describeChange, isFilled, parseClock, parseSchedule,
 import { PIN_ARGS, SCHEDULE_CHANGES, applyScheduleChanges, newScheduleWith, pinnedData, pinnedLine, pinsAfter, scheduleData, scheduleText } from "./schedules.js";
 import { getScheduleDefaults, getSimilarTasksChoice, setScheduleDefaults, setSimilarTasksChoice } from "../schedule-defaults.js";
 import { findSimilarTasks } from "../lib/similar-tasks.js";
+import { assertScheduleAllowed } from "../plans.js";
+import { HttpError } from "../http.js";
 import { ToolError, isRealDate } from "./args.js";
 import { logActivity } from "./activity.js";
 import { DATE, findPriority, getOwnNote, getOwnTask, listRecords, loadPriorities, loadTasks, lower } from "./context.js";
@@ -751,6 +753,19 @@ function notePriorityId(ctx, wanted) {
   return priorityNamed(loadPriorities(ctx), wanted).id;
 }
 
+/**
+ * A plan limit, said to the AI app as a refusal it can pass on.
+ * @param {() => void} check
+ */
+function planGate(check) {
+  try {
+    check();
+  } catch (error) {
+    if (error instanceof HttpError && error.code === "plus_required") throw new ToolError(error.message);
+    throw error;
+  }
+}
+
 /** @type {Tool} */
 const createNote = {
   name: "create_note",
@@ -785,6 +800,8 @@ const createNote = {
     const schedule = args.schedule
       ? newScheduleWith(getScheduleDefaults(ctx.db, { appId: ctx.appId, userId: ctx.user.id }), args.schedule).schedule
       : null;
+    // Basic has one schedule at a time (backend/plans.js).
+    if (schedule) planGate(() => assertScheduleAllowed(ctx.db, { appId: ctx.appId, userId: ctx.user.id }, null, JSON.stringify(schedule)));
     const doc = docFromAiText(ctx, args.text || "", args.format);
     const text = docToText(doc);
     if (countWords(text) > NOTE_WORDS) throw new ToolError(`A note can be at most ${NOTE_WORDS} words.`);
@@ -1434,6 +1451,7 @@ const editSchedule = {
     if (json === (note.schedule_json || "") && !pinsChanged) return reply(`Nothing changed in the schedule of ${name}.`);
     const patch = { schedule_json: json };
     validateClientInput("Note", patch);
+    planGate(() => assertScheduleAllowed(ctx.db, { appId: ctx.appId, userId: ctx.user.id }, note.id, json));
     spendWrite(ctx);
     const updated = inTransaction(ctx.db, () => {
       if (pinsChanged) setScheduleDefaults(ctx.db, { appId: ctx.appId, userId: ctx.user.id, defaults: pins });

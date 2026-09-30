@@ -19,6 +19,7 @@ import { handleIntegrationsRoute } from "./routes/integrations.js";
 import { handleNotificationsRoute } from "./routes/notifications.js";
 import { handleScheduleDefaultsRoute } from "./routes/schedule-defaults.js";
 import { handleSessionsRoute } from "./routes/sessions.js";
+import { handleBillingRoute } from "./routes/billing.js";
 import { handleAttachmentsRoute } from "./routes/attachments.js";
 import { handleEntitiesRoute } from "./routes/entities.js";
 import { handleExportRoute } from "./routes/export.js";
@@ -248,6 +249,7 @@ export function createRequestHandler(config = backendConfig, db = getDatabase(co
       if (await handleNotificationsRoute(request, response, ctx)) return;
       if (await handleScheduleDefaultsRoute(request, response, ctx)) return;
       if (await handleSessionsRoute(request, response, ctx)) return;
+      if (await handleBillingRoute(request, response, ctx)) return;
       // Attachments before entities so /tasks/:id/attachments wins over
       // the generic /tasks/:id PUT/DELETE dispatch in entities.
       if (await handleAttachmentsRoute(request, response, ctx)) return;

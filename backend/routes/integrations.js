@@ -9,6 +9,7 @@
  * completeGoogleConnect against the oauth_states row's user_id).
  */
 import { HttpError, readJsonBody, redirect, sameOriginUrl, sendJson } from "../http.js";
+import { requirePlus } from "../plans.js";
 import { requireAuthenticatedUser } from "../auth.js";
 import {
   completeGoogleConnect,
@@ -62,6 +63,7 @@ export async function handleIntegrationsRoute(request, response, { config, db, u
     if (!state || !code) {
       throw new HttpError(400, "Missing state or code.", "invalid_callback");
     }
+    requirePlus(db, { appId, userId: user.id }, "calendarSync");
     const { redirectTo } = await completeGoogleConnect(db, config, { user, state, code });
     const redirectUrl = new URL(sameOriginUrl(redirectTo, config.publicAppUrl, "/Settings"));
     if (!redirectUrl.hash) redirectUrl.hash = "calendar-integrations";
@@ -71,6 +73,9 @@ export async function handleIntegrationsRoute(request, response, { config, db, u
 
   // All other integration routes require an authenticated user.
   const user = requireAuthenticatedUser(db, config, request, appId);
+  // Connecting and syncing a calendar is Plus; listing, changing and
+  // disconnecting what's already there never is.
+  const needsPlus = () => requirePlus(db, { appId, userId: user.id }, "calendarSync");
 
   // GET /api/apps/:appId/integrations
   if (request.method === "GET" && segments.length === 4) {
@@ -86,6 +91,7 @@ export async function handleIntegrationsRoute(request, response, { config, db, u
     segments[4] === "google" &&
     segments[5] === "connect"
   ) {
+    needsPlus();
     const fromUrl = sameOriginUrl(url.searchParams.get("from_url"), config.publicAppUrl, "/Settings");
     const { authUrl } = startGoogleConnect(db, config, { user, appId, fromUrl });
     const wantsJson = (request.headers.accept || "").includes("application/json");
@@ -103,6 +109,7 @@ export async function handleIntegrationsRoute(request, response, { config, db, u
     segments[4] === "apple" &&
     segments[5] === "connect"
   ) {
+    needsPlus();
     const body = (await readJsonBody(request)) || {};
     const email = String(body.email || "").trim();
     const password = String(body.password || "");
@@ -120,6 +127,7 @@ export async function handleIntegrationsRoute(request, response, { config, db, u
 
   // POST /api/apps/:appId/integrations/:id/sync
   if (request.method === "POST" && segments[4] && segments[5] === "sync") {
+    needsPlus();
     const row = getIntegrationForUser(db, { appId, userId: user.id, id: segments[4] });
     if (!row) throw new HttpError(404, "Integration not found.", "not_found");
     await syncIntegration(db, config, row);

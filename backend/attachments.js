@@ -45,6 +45,7 @@ import { log } from "./log.js";
 import { dirname, join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { HttpError } from "./http.js";
+import { limitsOf } from "./plans.js";
 
 // @types/node in this repo doesn't expose `unlinkSync`/`rmdirSync` from
 // the default export; pull them off the namespace via an `any` cast.
@@ -58,7 +59,7 @@ const rmdirSyncSafe = /** @type {(path: string) => void} */ (fsAny.rmdirSync);
 //   UI does the same conversion.
 export const MAX_FILE_BYTES = 25 * 1_000_000;            // 25 MB per file
 export const MAX_ATTACHMENTS_PER_TASK = 10;
-export const MAX_TOTAL_BYTES_PER_USER = 1_000_000_000;   // 1 GB
+// Storage per account is the plan's (backend/plans.js): 500 MB on Basic, 1 GB on Plus.
 
 const BLOCKED_EXTENSIONS = new Set([
   "exe", "bat", "cmd", "com", "scr", "msi", "app", "dmg", "sh", "ps1",
@@ -445,11 +446,13 @@ export async function createAttachment(db, config, { appId, user, taskId, file: 
   }
 
   const usedBytes = getUserStorageBytes(db, { appId, userId: user.id });
-  if (usedBytes + size > MAX_TOTAL_BYTES_PER_USER) {
+  const maxBytes = limitsOf(db, { appId, userId: user.id }).storageBytes;
+  if (usedBytes + size > maxBytes) {
     throw new HttpError(
       413,
-      `This file would exceed your ${Math.round(MAX_TOTAL_BYTES_PER_USER / 1_000_000)} MB storage quota.`,
-      "quota_exceeded"
+      `This file would go over your ${Math.round(maxBytes / 1_000_000)} MB of storage.`,
+      "quota_exceeded",
+      { max_bytes: maxBytes }
     );
   }
 
@@ -809,7 +812,7 @@ export function getStorageOverview(db, { appId, user, limit = 10 }) {
   }
   return {
     used_bytes: usedBytes,
-    max_bytes: MAX_TOTAL_BYTES_PER_USER,
+    max_bytes: limitsOf(db, { appId, userId: user.id }).storageBytes,
     biggest_tasks: [...lines.values()].sort((a, b) => b.total_bytes - a.total_bytes).slice(0, limit),
   };
 }

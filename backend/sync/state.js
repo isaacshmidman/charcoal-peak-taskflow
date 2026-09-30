@@ -12,6 +12,7 @@
  *   initialTimeoutHandle — the boot-time one-shot timer.
  */
 import { log } from "../log.js";
+import { limitsOf } from "../plans.js";
 import { syncIntegration } from "./coordinator.js";
 
 // Ensure we don't run two sync cycles for the same integration simultaneously.
@@ -72,6 +73,9 @@ async function runAllDueSyncs(db, config) {
     .all();
   for (const row of rows) {
     if (inFlight.has(row.id)) continue;
+    // Calendar sync is Plus: an account without it (a refund) keeps its
+    // connection, and the calendar simply isn't synced until it has Plus.
+    if (!limitsOf(db, { appId: row.app_id, userId: row.user_id }).calendarSync) continue;
     inFlight.add(row.id);
     try {
       await syncIntegration(db, config, row);

@@ -9,6 +9,7 @@
  * Secrets are random and shown once; only their sha256 is stored.
  */
 import { randomUUID } from "node:crypto";
+import { limitsOf, requirePlus } from "../plans.js";
 import { HttpError } from "../http.js";
 import { buildUserPayload, createOpaqueToken, sha256 } from "../auth.js";
 import { sanitizeTimeZone } from "../notifications.js";
@@ -23,12 +24,13 @@ const LAST_USED_RESOLUTION_MS = 60 * 1000;
 const TOKEN_PREFIXES = /** @type {const} */ ({ personal: "zeph_pat_", access: "zeph_at_", refresh: "zeph_rt_" });
 
 /**
- * The one place AI access can be switched off per user — for example if
- * it becomes part of a paid plan. Everyone has it for now.
- * @param {{ id: string }} _user
+ * AI apps are Zephyrly Plus (backend/plans.js). The one place that decides.
+ * @param {any} db
+ * @param {string} appId
+ * @param {{ id: string }} user
  */
-export function aiAccessAllowed(_user) {
-  return true;
+export function aiAccessAllowed(db, appId, user) {
+  return limitsOf(db, { appId, userId: user.id }).aiApps;
 }
 
 /**
@@ -102,7 +104,7 @@ export function issueToken(db, { grantId, kind, ttlMs = null }) {
  * @param {{ appId: string, user: { id: string }, label: unknown, canWrite: unknown, timeZone?: unknown }} input
  */
 export function createPersonalToken(db, { appId, user, label, canWrite, timeZone }) {
-  if (!aiAccessAllowed(user)) throw new HttpError(403, "AI apps aren't available on this account.", "ai_not_allowed");
+  requirePlus(db, { appId, userId: user.id }, "aiApps");
   const active = db
     .prepare(`SELECT COUNT(*) AS n FROM ai_grants WHERE app_id = ? AND user_id = ? AND kind = 'token' AND revoked_at IS NULL`)
     .get(appId, user.id);
@@ -148,7 +150,8 @@ export function findGrantForToken(db, appId, token) {
   const userRow = db.prepare(`SELECT * FROM users WHERE id = ? AND app_id = ?`).get(row.user_id, appId);
   if (!userRow) return null;
   const user = buildUserPayload(userRow);
-  if (!user || !aiAccessAllowed(user)) return null;
+  // Without Plus (a refund) the connection stays listed but doesn't work.
+  if (!user || !aiAccessAllowed(db, appId, user)) return null;
   return { grant: row, user };
 }
 

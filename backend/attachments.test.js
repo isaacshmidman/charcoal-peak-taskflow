@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync, readFileSync, existsSync, promises as fsPromises }
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { LIMITS } from "./plans.js";
 import sharp from "sharp";
 import { createDatabase } from "./db.js";
 import {
@@ -17,7 +18,6 @@ import {
   getUserStorageBytes,
   listAttachmentsForTask,
   MAX_FILE_BYTES,
-  MAX_TOTAL_BYTES_PER_USER,
 } from "./attachments.js";
 import { createEntityRecord, deleteEntityRecord } from "./store.js";
 
@@ -299,7 +299,8 @@ describe("attachments", () => {
 
     const usage = getStorageOverview(db, { appId: APP_ID, user: USER });
     expect(usage.used_bytes).toBe(3500);
-    expect(usage.max_bytes).toBe(MAX_TOTAL_BYTES_PER_USER);
+    // A Basic account's room (backend/plans.js).
+    expect(usage.max_bytes).toBe(LIMITS.basic.storageBytes);
     expect(usage.biggest_tasks).toHaveLength(2);
     expect(usage.biggest_tasks[0].task_id).toBe(TASK_ID);
     expect(usage.biggest_tasks[0].total_bytes).toBe(3000);
