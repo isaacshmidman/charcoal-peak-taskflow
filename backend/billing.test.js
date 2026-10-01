@@ -6,8 +6,8 @@ import { join } from "node:path";
 import { createHmac } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDatabase } from "./db.js";
-import { planOf } from "./plans.js";
-import { applyPaidSession, handleStripeEvent, verifyWebhook } from "./billing.js";
+import { planOf, revokePlus } from "./plans.js";
+import { STRIPE_API_VERSION, applyPaidSession, handleStripeEvent, startCheckout, taxAddedAtCheckout, verifyWebhook } from "./billing.js";
 
 const SECRET = "whsec_test_secret";
 const config = { appId: "test-app", appName: "Test", deletedTaskRetentionDays: 7, publicAppUrl: "https://zephyrly.app", stripeSecretKey: "rk_test_x", stripeWebhookSecret: SECRET, stripePriceId: "price_plus" };
@@ -99,6 +99,70 @@ describe("granting Plus for a payment", () => {
       stripe_payment_intent: "pi_123",
     });
   });
+
+  it("a promotion code for the whole price counts; nothing to pay on a price that isn't zero doesn't", () => {
+    expect(applyPaidSession(db, config, paidSession({ payment_status: "no_payment_required", amount_total: 900 }))).toEqual({ granted: false, why: "not paid yet" });
+    expect(planOf(db, who("user_buyer"))).toBe("basic");
+    expect(applyPaidSession(db, config, paidSession({ payment_status: "no_payment_required", amount_total: 0, payment_intent: null })).granted).toBe(true);
+    expect(planOf(db, who("user_buyer"))).toBe("plus");
+  });
+
+  it("a session whose Plus was taken back can't bring it back", () => {
+    applyPaidSession(db, config, paidSession());
+    revokePlus(db, { ...who("user_buyer"), reason: "owner" });
+    expect(applyPaidSession(db, config, paidSession())).toEqual({ granted: false, why: "taken back" });
+    expect(planOf(db, who("user_buyer"))).toBe("basic");
+    // A new purchase is a new session, and counts.
+    expect(applyPaidSession(db, config, paidSession({ id: "cs_test_second_purchase", payment_intent: "pi_456" })).granted).toBe(true);
+  });
+});
+
+describe("starting Checkout", () => {
+  let sent;
+  const reply = { url: "https://checkout.stripe.com/c/pay/cs_test_new" };
+  beforeEach(() => {
+    sent = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
+      sent.push({ url: String(url), headers: init.headers, body: new URLSearchParams(init.body) });
+      return new Response(JSON.stringify({ id: "cs_test_new", ...reply }), { status: 200 });
+    });
+  });
+  const start = (extra = {}) => startCheckout(db, { ...config, ...extra }, { appId: "test-app", user: { id: "user_buyer", email: "buyer@example.com" } });
+  const keys = (body) => [...body.keys()].filter((k) => /^(automatic_tax|invoice_creation|managed_payments)/.test(k));
+
+  it("pins the API version and adds tax or invoices only when the server is set to", async () => {
+    await start();
+    expect(sent[0].headers["Stripe-Version"]).toBe(STRIPE_API_VERSION);
+    expect(keys(sent[0].body)).toEqual([]);
+
+    await start({ stripeTax: "automatic", stripeInvoices: true });
+    expect(sent[1].body.get("automatic_tax[enabled]")).toBe("true");
+    expect(sent[1].body.get("invoice_creation[enabled]")).toBe("true");
+
+    // Managed Payments works both out itself, and refuses sessions that ask.
+    await start({ stripeTax: "managed", stripeInvoices: true });
+    expect(keys(sent[2].body)).toEqual(["managed_payments[enabled]"]);
+    expect(sent[2].body.get("managed_payments[enabled]")).toBe("true");
+    // Still our price, for this account.
+    expect(sent[2].body.get("line_items[0][price]")).toBe("price_plus");
+    expect(sent[2].body.get("client_reference_id")).toBe("user_buyer");
+  });
+
+  it("only ever sends the buyer to a Stripe page", async () => {
+    reply.url = "https://checkout.stripe.com.example.net/c/pay/cs_test_new";
+    await expect(start()).rejects.toMatchObject({ status: 502 });
+    reply.url = "https://checkout.stripe.com/c/pay/cs_test_new";
+    await expect(start()).resolves.toEqual({ url: reply.url });
+  });
+
+  it("says tax may be added unless the price includes it", () => {
+    const price = (taxBehavior) => ({ taxBehavior });
+    expect(taxAddedAtCheckout({ ...config, stripeTax: "off" }, price("exclusive"))).toBe(false);
+    expect(taxAddedAtCheckout({ ...config, stripeTax: "automatic" }, price("exclusive"))).toBe(true);
+    expect(taxAddedAtCheckout({ ...config, stripeTax: "managed" }, price("unspecified"))).toBe(true);
+    expect(taxAddedAtCheckout({ ...config, stripeTax: "managed" }, price("inclusive"))).toBe(false);
+    expect(taxAddedAtCheckout({ ...config, stripeTax: "managed" }, null)).toBe(false);
+  });
 });
 
 describe("Stripe events", () => {
@@ -138,6 +202,24 @@ describe("Stripe events", () => {
     // A dispute won after a refund doesn't bring it back.
     await handleStripeEvent(db, config, { id: "evt_won2", type: "charge.dispute.closed", data: { object: { status: "won", payment_intent: "pi_123" } } });
     expect(planOf(db, who("user_buyer"))).toBe("basic");
+  });
+
+  it("Stripe can tell of a refund or chargeback before the purchase: it still doesn't count", async () => {
+    stripeSays(paidSession());
+    const completed = { id: "evt_late", type: "checkout.session.completed", data: { object: { id: "cs_test_a1b2c3d4e5f6g7h8" } } };
+    await handleStripeEvent(db, config, { id: "evt_early_refund", type: "charge.refunded", data: { object: { refunded: true, payment_intent: "pi_123" } } });
+    await handleStripeEvent(db, config, completed);
+    expect(planOf(db, who("user_buyer"))).toBe("basic");
+    // Coming back from Checkout doesn't get round it either.
+    expect(applyPaidSession(db, config, paidSession(), { expectUserId: "user_buyer" })).toEqual({ granted: false, why: "refunded or disputed" });
+  });
+
+  it("a chargeback heard of first holds Plus back until the dispute is won", async () => {
+    await handleStripeEvent(db, config, { id: "evt_early_dispute", type: "charge.dispute.created", data: { object: { payment_intent: "pi_123" } } });
+    expect(applyPaidSession(db, config, paidSession()).granted).toBe(false);
+    await handleStripeEvent(db, config, { id: "evt_won_first", type: "charge.dispute.closed", data: { object: { status: "won", payment_intent: "pi_123" } } });
+    expect(applyPaidSession(db, config, paidSession()).granted).toBe(true);
+    expect(planOf(db, who("user_buyer"))).toBe("plus");
   });
 
   it("a founding member's or a gift's Plus isn't touched by someone else's payment events", async () => {

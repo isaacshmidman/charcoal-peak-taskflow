@@ -648,7 +648,7 @@ describe("Zephyrly Plus", () => {
     it("Checkout is for this account at the server's price, whatever the app sends", async () => {
       const token = await login("buyer@example.com", { basic: true });
       const buyer = api(token);
-      expect((await buyer("GET", "/billing")).body.buy).toEqual({ available: true, price: { amount: 900, currency: "usd", label: "$9" } });
+      expect((await buyer("GET", "/billing")).body.buy).toEqual({ available: true, price: { amount: 900, currency: "usd", label: "$9", tax_added: false } });
       const started = await buyer("POST", "/billing/checkout", { price: "price_free", amount: 1, client_reference_id: "someone_else" });
       expect(started.statusCode).toBe(200);
       expect(started.body.url).toBe("https://checkout.stripe.com/c/pay/cs_test_new1234567890");

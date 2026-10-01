@@ -8,12 +8,12 @@ import { installMockBackend } from "./utils/mockBackend";
  */
 
 const defaultPriority = { id: "priority-1", name: "Medium", order: 1, color: "slate" };
-const basic = (buyable = true) => ({
+const basic = (buyable = true, taxAdded = false) => ({
   plan: "basic",
   source: null,
   since: null,
   limits: { storage_bytes: 500_000_000, active_schedules: 1, calendar_sync: false, ai_apps: false },
-  buy: buyable ? { available: true, price: { amount: 900, currency: "usd", label: "$9" } } : { available: false, price: null },
+  buy: buyable ? { available: true, price: { amount: 900, currency: "usd", label: "$9", tax_added: taxAdded } } : { available: false, price: null },
 });
 const note = (id: string, title: string, overrides: Record<string, any> = {}) => ({
   id, title, content_json: "", content_text: "", tags: [], pinned: false, priority_id: "",
@@ -39,6 +39,8 @@ test("Basic can buy Plus on Stripe's page, and coming back confirms it", async (
   await openPlus(page);
   await expect(page.getByTestId("plus-plan")).toHaveText("You're on Basic");
   await expect(page.getByTestId("plus-section")).toContainText("It isn’t refundable");
+  // $9 is the whole price here: no word of tax.
+  await expect(page.getByTestId("plus-tax-note")).toHaveCount(0);
   await page.getByTestId("plus-buy").click();
   await expect(page).toHaveURL(/^https:\/\/checkout\.stripe\.com\//);
 
@@ -47,6 +49,13 @@ test("Basic can buy Plus on Stripe's page, and coming back confirms it", async (
   await expect(page.getByTestId("plus-notice")).toHaveText("Welcome to Zephyrly Plus. Thank you!");
   await expect(page.getByTestId("plus-plan")).toHaveText("You have Zephyrly Plus");
   await expect(page).toHaveURL(/\/Settings#plus$/);
+});
+
+test("when tax may go on top of the price, Basic is told before paying", async ({ page }) => {
+  await installMockBackend(page, { tasks: [], priorities: [defaultPriority], billing: basic(true, true) });
+  await openPlus(page);
+  await expect(page.getByTestId("plus-buy")).toHaveText("Get Plus — $9 once");
+  await expect(page.getByTestId("plus-tax-note")).toHaveText("Sales tax or VAT may be added at checkout, depending on where you live.");
 });
 
 test("cancelling at Stripe changes nothing, and says so", async ({ page }) => {

@@ -16,22 +16,32 @@
  *   signed-in account's id, set when the server made it. Email is never
  *   used to match a payment to an account.
  * - A full refund or a chargeback takes Plus back; a dispute that's won
- *   gives it back.
+ *   gives it back. Stripe doesn't promise to send events in order, so a
+ *   refund heard of before the purchase still stops it counting.
+ * - Tax (STRIPE_TAX) and invoices (STRIPE_INVOICES) are Stripe's to work
+ *   out at checkout; they change what the buyer pays, never what's checked.
  *
  * Plain fetch against Stripe's API: no SDK, so nothing more to trust.
  */
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { HttpError } from "./http.js";
+import { isStripeCheckoutUrl } from "./lib/stripe-url.js";
 import { log } from "./log.js";
-import { grantPlus, plusOf, restorePlus, revokePlus } from "./plans.js";
+import { grantPlus, holdPayment, paymentOnHold, plusOf, restorePlus, revokePlus } from "./plans.js";
 
 const STRIPE_API = "https://api.stripe.com/v1";
+/**
+ * The API version these requests are written for, so changing the
+ * account's default in Stripe's dashboard can't change them. Managed
+ * Payments needs this one or later.
+ */
+export const STRIPE_API_VERSION = "2025-03-31.basil";
 /** How old a signed webhook may be, in seconds. */
 export const WEBHOOK_TOLERANCE_SECONDS = 300;
 const SESSION_ID = /^cs_(test|live)_[A-Za-z0-9]{10,200}$/;
 
 /**
- * @typedef {{ stripeSecretKey?: string, stripeWebhookSecret?: string, stripePriceId?: string, publicAppUrl: string, appId: string }} BillingConfig
+ * @typedef {{ stripeSecretKey?: string, stripeWebhookSecret?: string, stripePriceId?: string, stripeTax?: "off" | "automatic" | "managed", stripeInvoices?: boolean, publicAppUrl: string, appId: string }} BillingConfig
  */
 
 /**
@@ -72,6 +82,7 @@ async function stripe(config, method, path, params) {
     method,
     headers: {
       Authorization: `Bearer ${config.stripeSecretKey}`,
+      "Stripe-Version": STRIPE_API_VERSION,
       ...(body ? { "Content-Type": "application/x-www-form-urlencoded" } : {}),
     },
     body,
@@ -85,7 +96,7 @@ async function stripe(config, method, path, params) {
   return data;
 }
 
-/** @type {{ at: number, price: { amount: number, currency: string, label: string } | null }} */
+/** @type {{ at: number, price: { amount: number, currency: string, label: string, taxBehavior: string } | null }} */
 let priceCache = { at: 0, price: null };
 
 /**
@@ -101,11 +112,35 @@ export async function plusPrice(config) {
     const amount = Number(price.unit_amount);
     const currency = String(price.currency || "usd");
     const label = new Intl.NumberFormat("en-US", { style: "currency", currency: currency.toUpperCase(), minimumFractionDigits: amount % 100 ? 2 : 0 }).format(amount / 100);
-    priceCache = { at: Date.now(), price: { amount, currency, label } };
+    priceCache = { at: Date.now(), price: { amount, currency, label, taxBehavior: String(price.tax_behavior || "unspecified") } };
     return priceCache.price;
   } catch {
     return null;
   }
+}
+
+/**
+ * Whether tax may be added on top of the price at checkout. With tax on,
+ * only a price marked "inclusive" in Stripe is the whole amount.
+ * @param {BillingConfig} config
+ * @param {{ taxBehavior: string } | null} price
+ */
+export function taxAddedAtCheckout(config, price) {
+  return Boolean(price) && (config.stripeTax || "off") !== "off" && price?.taxBehavior !== "inclusive";
+}
+
+/**
+ * What the server's tax and invoice settings add to a Checkout session.
+ * Managed Payments works out tax and sends invoices itself, and refuses
+ * sessions that ask for either.
+ * @param {BillingConfig} config
+ */
+export function checkoutExtras(config) {
+  if (config.stripeTax === "managed") return { managed_payments: { enabled: true } };
+  return {
+    ...(config.stripeTax === "automatic" ? { automatic_tax: { enabled: true } } : {}),
+    ...(config.stripeInvoices ? { invoice_creation: { enabled: true, invoice_data: { description: "Zephyrly Plus, for as long as the account exists." } } } : {}),
+  };
 }
 
 /** For tests. */
@@ -142,8 +177,9 @@ export async function startCheckout(db, config, { appId, user }) {
       },
     },
     allow_promotion_codes: true,
+    ...checkoutExtras(config),
   });
-  if (typeof session.url !== "string" || !session.url.startsWith("https://checkout.stripe.com/")) {
+  if (!isStripeCheckoutUrl(session.url)) {
     throw new HttpError(502, "The payment service didn't answer. Please try again in a moment.", "billing_unavailable");
   }
   return { url: session.url };
@@ -161,7 +197,10 @@ export async function startCheckout(db, config, { appId, user }) {
 export function applyPaidSession(db, config, session, { expectUserId } = {}) {
   const userId = String(session?.client_reference_id || "");
   if (session?.mode !== "payment") return { granted: false, why: "not a payment" };
-  if (session.payment_status !== "paid") return { granted: false, why: "not paid yet" };
+  // A promotion code for the whole price leaves nothing to pay; Stripe then
+  // says so instead of "paid". Only a code made in our Stripe can do that.
+  const settled = session.payment_status === "paid" || (session.payment_status === "no_payment_required" && Number(session.amount_total) === 0);
+  if (!settled) return { granted: false, why: "not paid yet" };
   if (session.metadata?.app_id && session.metadata.app_id !== config.appId) return { granted: false, why: "another app" };
   if (!userId || (expectUserId && userId !== expectUserId)) return { granted: false, why: "another account" };
   const items = session.line_items?.data || [];
@@ -170,12 +209,20 @@ export function applyPaidSession(db, config, session, { expectUserId } = {}) {
   }
   const user = db.prepare(`SELECT id FROM users WHERE id = ? AND app_id = ?`).get(userId, config.appId);
   if (!user) return { granted: false, why: "no such account" };
+  // A session buys Plus once: if that Plus was taken back, it stays taken back.
+  if (db.prepare(`SELECT revoked_at FROM entitlements WHERE stripe_session_id = ?`).get(String(session.id))?.revoked_at) {
+    return { granted: false, why: "taken back" };
+  }
+  const paymentIntent = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id;
+  // Stripe doesn't promise event order: a refund or chargeback can be heard
+  // of before the purchase is.
+  if (paymentOnHold(db, paymentIntent)) return { granted: false, why: "refunded or disputed" };
   grantPlus(db, {
     appId: config.appId,
     userId,
     source: "stripe",
     stripeSessionId: String(session.id),
-    stripePaymentIntent: typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id,
+    stripePaymentIntent: paymentIntent,
     amountTotal: Number(session.amount_total),
     currency: String(session.currency || ""),
   });
@@ -259,6 +306,7 @@ export async function handleStripeEvent(db, config, event) {
     case "charge.refunded": {
       // Only a full refund takes Plus back.
       if (object.refunded === true && object.payment_intent) {
+        holdPayment(db, { stripePaymentIntent: String(object.payment_intent), reason: "refund" });
         const n = revokePlus(db, { stripePaymentIntent: String(object.payment_intent), reason: "refund" });
         if (n) log.info(`[billing] Plus taken back after a refund (${object.payment_intent}).`);
       }
@@ -266,6 +314,7 @@ export async function handleStripeEvent(db, config, event) {
     }
     case "charge.dispute.created": {
       if (object.payment_intent) {
+        holdPayment(db, { stripePaymentIntent: String(object.payment_intent), reason: "dispute" });
         const n = revokePlus(db, { stripePaymentIntent: String(object.payment_intent), reason: "dispute" });
         if (n) log.info(`[billing] Plus paused for a chargeback (${object.payment_intent}).`);
       }

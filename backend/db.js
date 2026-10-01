@@ -423,6 +423,16 @@ export function createDatabase(config = backendConfig) {
       received_at TEXT NOT NULL
     );
 
+    -- Payments Stripe says were refunded or disputed, remembered by payment so
+    -- a refund notice that arrives BEFORE the purchase notice (Stripe doesn't
+    -- promise event order) still stops Plus being granted for that payment.
+    CREATE TABLE IF NOT EXISTS payment_holds (
+      stripe_payment_intent TEXT NOT NULL,
+      reason TEXT NOT NULL,              -- 'refund' | 'dispute'
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (stripe_payment_intent, reason)
+    );
+
     -- One-time things done at boot.
     CREATE TABLE IF NOT EXISTS app_flags (
       name TEXT PRIMARY KEY,

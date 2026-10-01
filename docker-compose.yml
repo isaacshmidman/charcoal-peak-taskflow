@@ -33,6 +33,8 @@ services:
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
       - STRIPE_PRICE_ID=${STRIPE_PRICE_ID:-}
+      - STRIPE_TAX=${STRIPE_TAX:-off}
+      - STRIPE_INVOICES=${STRIPE_INVOICES:-off}
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/api/health').then(r=>{if(!r.ok)throw 1})"]
       interval: 30s

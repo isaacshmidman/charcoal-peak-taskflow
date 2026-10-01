@@ -36,7 +36,9 @@ with Plus for free, for good. Accounts made after that start on Basic.
   app's prompts are just courtesy; a modified app gets refused, not the
   feature.
 - **Refunds and chargebacks:** a full refund or a chargeback takes Plus
-  back automatically. A dispute you win gives it back.
+  back automatically. A dispute you win gives it back. Stripe doesn't
+  promise to send events in order, so a refund that arrives before the
+  purchase still stops that purchase counting.
 
 ## Setting up Stripe
 
@@ -84,8 +86,61 @@ Stripe dashboard), then again in live mode.
    Stripe's test card `4242 4242 4242 4242` (any future date, any CVC).
    You should come back to "Welcome to Zephyrly Plus". In Stripe →
    Webhooks, the endpoint should show the events delivered with 200.
-7. **Going live:** repeat steps 1–4 in live mode and swap the three values
+7. **Receipts and public details:** Settings → Business → Customer emails →
+   turn on **Successful payments** and **Refunds**. Receipts are free. Fill
+   in Settings → Business → Public details too: receipts must show a legal
+   name, a support email and a privacy policy link.
+8. **Tax:** decide which way (next section) before going live.
+9. **Going live:** repeat steps 1–4 in live mode (products are separate
+   there, so give the live one its tax code and tax behavior too) and swap the three values
    in `.env` for the live ones, then `docker compose up -d --build`.
+
+## Tax, receipts and invoices
+
+Not legal or tax advice. Selling Plus can mean owing sales tax in some US
+states, and VAT or GST in other countries. Some places, like the EU and
+the UK, tax digital sales to their residents from the very first sale.
+`STRIPE_TAX` in `.env` picks who handles that:
+
+| `STRIPE_TAX` | Who's the seller | What Stripe does | Extra cost per $9 sale |
+|---|---|---|---|
+| `off` (default) | You | Nothing. Any tax owed is yours to sort out. | — |
+| `automatic` (Stripe Tax) | You | Works out the tax and adds it at checkout wherever you've **registered**. It also warns you when sales somewhere get near the point where you'd have to register. You register and file returns yourself. | 0.5% (about 5¢), only where you're registered |
+| `managed` (Managed Payments) | Stripe, through Link | Works out, collects, files and pays the tax in 80+ countries. It also handles fraud and chargebacks and answers buyers' payment questions. | 3.5% (about 32¢) |
+
+The normal card fee comes first either way: 2.9% + 30¢, about 56¢ of $9.
+
+**What `managed` means in practice.** Stripe has to approve the account,
+under Settings → Managed Payments, where you also accept its terms.
+Buyers' card statements say `LINK.COM* …`. Stripe can refund a buyer
+within 60 days, and applies cooling-off rights where the law requires,
+whatever Zephyrly's no-refund line says. When that happens, Zephyrly takes
+Plus back automatically.
+
+**Setting either one up:**
+
+1. Give the product a tax code: Products → Zephyrly Plus → Edit → Product
+   tax code: *Software as a service (SaaS) – personal use*
+   (`txcd_10103000`). Managed Payments refuses products without an
+   eligible code.
+2. Decide whether $9 includes tax. On the price, set tax behavior to
+   **inclusive** so $9 is exactly what everyone pays, and you keep less
+   where tax applies. With **exclusive**, tax goes on top and the app tells
+   buyers it may be added. Managed Payments adds it on top if you set
+   neither.
+3. For `automatic` only: Settings → Tax → add your head office address,
+   and add registrations as you get them.
+4. Add `STRIPE_TAX=automatic` or `STRIPE_TAX=managed` to `.env`, rebuild,
+   and do a test-mode purchase with a few different billing addresses.
+
+**Invoices.** `STRIPE_INVOICES=on` makes Stripe email a paid invoice
+(a PDF) after each purchase, for buyers who need one. It costs 0.4%, about
+4¢ a sale. With `managed`, Stripe sends receipts and invoices itself and
+this setting is ignored.
+
+If Checkout stops opening after you change either setting, the server log
+says why in Stripe's words, for example a permission the restricted key
+lacks. Add exactly that permission to the key.
 
 With any of the three values missing, buying is switched off: the app
 says "Plus can't be bought here yet", and nothing else changes.
@@ -101,7 +156,9 @@ docker compose exec taskflow node backend/scripts/plus.mjs list
 ```
 
 Discount codes also work: create a promotion code in Stripe (Products →
-Coupons); Checkout has a box for it.
+Coupons); Checkout has a box for it. A 100%-off code works too, but
+anyone who learns it gets Plus free, so set a redemption limit on it.
+For one person, `plus.mjs grant` is simpler.
 
 ## If something looks wrong
 
