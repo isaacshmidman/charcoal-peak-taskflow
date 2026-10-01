@@ -38,7 +38,7 @@ test("Basic can buy Plus on Stripe's page, and coming back confirms it", async (
   await page.route("https://checkout.stripe.com/**", (route) => route.fulfill({ status: 200, contentType: "text/html", body: "<h1>Stripe Checkout</h1>" }));
   await openPlus(page);
   await expect(page.getByTestId("plus-plan")).toHaveText("You're on Basic");
-  await expect(page.getByTestId("plus-section")).toContainText("It isn’t refundable");
+  await expect(page.getByTestId("plus-section")).toContainText("It isn't refundable");
   // $9 is the whole price here: no word of tax.
   await expect(page.getByTestId("plus-tax-note")).toHaveCount(0);
   await page.getByTestId("plus-buy").click();
@@ -48,13 +48,16 @@ test("Basic can buy Plus on Stripe's page, and coming back confirms it", async (
   await page.goto("/Settings?plus=done&session_id=cs_test_paid_123");
   await expect(page.getByTestId("plus-notice")).toHaveText("Welcome to Zephyrly Plus. Thank you!");
   await expect(page.getByTestId("plus-plan")).toHaveText("You have Zephyrly Plus");
+  // …and stays so: the plan asked for as the page opened doesn't land on top.
+  await page.waitForTimeout(1500);
+  await expect(page.getByTestId("plus-plan")).toHaveText("You have Zephyrly Plus");
   await expect(page).toHaveURL(/\/Settings#plus$/);
 });
 
 test("when tax may go on top of the price, Basic is told before paying", async ({ page }) => {
   await installMockBackend(page, { tasks: [], priorities: [defaultPriority], billing: basic(true, true) });
   await openPlus(page);
-  await expect(page.getByTestId("plus-buy")).toHaveText("Get Plus — $9 once");
+  await expect(page.getByTestId("plus-buy")).toHaveText("Get Plus: $9 once");
   await expect(page.getByTestId("plus-tax-note")).toHaveText("Sales tax or VAT may be added at checkout, depending on where you live.");
 });
 
@@ -68,7 +71,7 @@ test("cancelling at Stripe changes nothing, and says so", async ({ page }) => {
 test("with buying not set up, Basic is told so instead of shown a button", async ({ page }) => {
   await installMockBackend(page, { tasks: [], priorities: [defaultPriority], billing: basic(false) });
   await openPlus(page);
-  await expect(page.getByText("Plus can’t be bought here yet.")).toBeVisible();
+  await expect(page.getByText("Plus can't be bought here yet.")).toBeVisible();
   await expect(page.getByTestId("plus-buy")).toHaveCount(0);
 });
 

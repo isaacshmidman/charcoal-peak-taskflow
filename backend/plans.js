@@ -4,7 +4,7 @@
  * decides what Basic and Plus allow; every gate on the server asks here.
  *
  *   Basic (free) — the whole app: tasks, notes, reminders, one schedule at
- *     a time, 500 MB of files, Recently Deleted, export and restore.
+ *     a time, 500 MB of files, Recently deleted, export and restore.
  *   Plus ($9 once, for the life of the account) — Google and Apple
  *     Calendar sync, AI apps (Claude, ChatGPT, Gemini, local models,
  *     Siri), any number of schedules at once, 1 GB of files.

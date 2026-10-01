@@ -12,7 +12,7 @@ no refunds.
 | Room for files | 500 MB | 1 GB |
 | Google and Apple Calendar sync | — | ✓ |
 | AI apps: Claude, ChatGPT, Gemini, local models, Siri | — | ✓ |
-| Recently Deleted, export and restore | ✓ | ✓ |
+| Recently deleted, export and restore | ✓ | ✓ |
 
 Everyone who had an account when Plus launched is a **founding member**,
 with Plus for free, for good. Accounts made after that start on Basic.
@@ -46,10 +46,11 @@ You need a Stripe account in the name of someone 18 or older (a parent
 can own it). Do everything first in **test mode** (the toggle in the
 Stripe dashboard), then again in live mode.
 
-**Already done in the "Zephyrly sandbox"** (2026-09-30, through Claude's
-Stripe connector): the product and price from step 1 and the webhook from
-step 4. In live mode, do them again (or connect the live account to
-Claude and ask).
+**Already done in the "Zephyrly sandbox"** (made 2026-09-30, checked
+2026-11-17, through Claude's Stripe connector): the product and price from
+step 1 and the webhook from step 4, enabled, with the five events. The
+connector reaches only the sandbox; in live mode, do them again by hand,
+or connect the live account to Claude and ask.
 
 1. **Product:** Products → Add product, with id `zephyrly_plus` if the
    form offers one. Name it "Zephyrly Plus", product tax code *Software as
@@ -107,11 +108,17 @@ Claude and ask).
    Stripe's test card `4242 4242 4242 4242` (any future date, any CVC).
    You should come back to "Welcome to Zephyrly Plus". In Stripe →
    Webhooks, the endpoint should show the events delivered with 200.
+   **While test-mode keys are on the real server, anyone can get Plus with
+   that test card.** Do the test purchase, then go live (step 9) straight
+   away, or take the three values out of `.env` again until you do. The
+   test account you used keeps the Plus it got; take it back with the
+   script under "Gifting Plus, or taking it back" if you like.
 7. **Receipts and public details:** Settings → Business → Customer emails →
    turn on **Successful payments** and **Refunds**. Receipts are free. Fill
    in Settings → Business → Public details too: receipts must show a legal
    name, a support email and a privacy policy link.
-8. **Tax:** decide which way (next section) before going live.
+8. **Tax:** off, chosen 2026-11-17: leave `STRIPE_TAX` out of `.env`. The
+   next section says what that means and how to change it later.
 9. **Going live:** repeat steps 1–4 in live mode (products are separate
    there, so give the live one its tax code and tax behavior too) and swap the three values
    in `.env` for the live ones, then `docker compose up -d --build`.

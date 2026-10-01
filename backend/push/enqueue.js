@@ -18,6 +18,7 @@ import { log } from "../log.js";
 import { pushOneGoogle } from "./google.js";
 import { pushOneApple } from "./apple.js";
 import { duePushes, failPush, hasCalendarToPushTo, holdPush, isSignInRefusal, rememberPush, settlePush } from "./outbox.js";
+import { limitsOf } from "../plans.js";
 
 /** @typedef {import("node:sqlite").DatabaseSync} DB */
 
@@ -47,6 +48,10 @@ export function enqueueTaskPush(db, config, payload) {
   const taskId = payload.taskSnapshot.id;
   // Nobody to tell: most people have no calendar connected.
   if (!hasCalendarToPushTo(db, payload.appId, payload.taskSnapshot.created_by_id)) return;
+  // Calendar sync is Plus. An account that no longer has it (a refund)
+  // keeps its connection, and nothing goes either way until Plus is back:
+  // sync stops reading the calendar too (sync/state.js).
+  if (!calendarSyncAllowed(db, payload.appId, payload.taskSnapshot.created_by_id)) return;
   // Written down first, so it survives a failed call or a restart. If the
   // note itself can't be written, the change still goes out the old way:
   // saving a task must never fail over this.
@@ -107,6 +112,11 @@ export function retryDuePushes(db, config) {
  * @param {{ op: "upsert" | "delete", appId: string, taskSnapshot: any, token?: string, retry?: boolean }} payload
  */
 async function runPush(db, config, { op, appId, taskSnapshot, token, retry = false }) {
+  // Lost Plus while this waited: not sent (see enqueueTaskPush).
+  if (!calendarSyncAllowed(db, appId, taskSnapshot.created_by_id)) {
+    settlePush(db, taskSnapshot.id, token);
+    return;
+  }
   const integrations = /** @type {any[]} */ (
     db
       .prepare(
@@ -201,4 +211,15 @@ async function pushOne(db, config, { op, integration, taskSnapshot, retry }) {
     return;
   }
   await pushOneGoogle(db, config, { op, integration, taskSnapshot, retry });
+}
+
+/**
+ * Whether this account's changes may go to its calendars (Plus).
+ * @param {DB} db
+ * @param {string} appId
+ * @param {string | undefined} userId
+ */
+function calendarSyncAllowed(db, appId, userId) {
+  if (!userId) return false;
+  return Boolean(limitsOf(db, { appId, userId }).calendarSync);
 }

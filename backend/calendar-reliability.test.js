@@ -21,6 +21,7 @@ import { RETRY_DELAYS_MS, failPush, releaseHeldPushes, rememberPush } from "./pu
 import { disconnectIntegration } from "./integrations/disconnect.js";
 import { inboundUpdateFor } from "./sync/shared.js";
 import { syncIntegration } from "./sync.js";
+import { grantPlus } from "./plans.js";
 
 const APP = "test-app";
 const GCAL = "primary@example.com";
@@ -168,6 +169,8 @@ beforeEach(() => {
   db.prepare(
     `INSERT INTO users (id, app_id, email, role, auth_provider, created_date, updated_date) VALUES ('user_1', ?, 'isaac@example.com', 'admin', 'local', ?, ?)`
   ).run(APP, iso(), iso());
+  // Calendar sync is Plus.
+  grantPlus(db, { appId: APP, userId: "user_1", source: "gift" });
 });
 
 afterEach(async () => {
@@ -570,6 +573,25 @@ describe("a change on its way to a calendar", () => {
 
     expect(outbox()).toEqual([]);
     expect(listIntegrationsForUser(db, { appId: APP, userId: "user_1" })[0].held_changes).toBe(0);
+  });
+
+  it("sends nothing, and keeps nothing, for an account that no longer has Plus", async () => {
+    const { id } = seedIntegration("google");
+    const sent = [];
+    google({ onWrite: (method) => { sent.push(method); return json({ id: "ev_x", etag: "e1" }); } });
+    // Queued while it had Plus, then a refund before it went out.
+    const queued = insertTask("task_noplus1");
+    rememberPush(db, { op: "upsert", appId: APP, taskSnapshot: queued });
+    db.prepare(`UPDATE push_outbox SET next_attempt_at = ?`).run(new Date(Date.now() - 1000).toISOString());
+    db.prepare(`UPDATE entitlements SET revoked_at = ? WHERE user_id = 'user_1'`).run(iso());
+
+    enqueueTaskPush(db, config, { op: "upsert", appId: APP, taskSnapshot: insertTask("task_noplus2") });
+    retryDuePushes(db, config);
+    await settle();
+
+    expect(sent).toEqual([]);
+    expect(outbox()).toEqual([]);
+    expect(listIntegrationsForUser(db, { appId: APP, userId: "user_1" })[0]).toMatchObject({ id });
   });
 
   it("writes nothing down for someone with no calendar connected", () => {

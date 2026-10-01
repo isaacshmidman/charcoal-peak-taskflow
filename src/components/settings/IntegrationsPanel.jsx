@@ -24,6 +24,7 @@ function ConnectedRow({
   onDisconnect,
   onConfigure,
   onReconnect,
+  canReconnect = true,
   isDisconnecting,
   showDefaultControl,
   onMakeDefault,
@@ -33,7 +34,8 @@ function ConnectedRow({
   const notices = integrationNotices(integration);
   // The calendar wants signing in to again. Reconnecting in place keeps
   // which event is which task and sends what was changed here meanwhile.
-  const needsReconnect = notices.some((notice) => notice.kind === "reconnect");
+  // Not offered without Plus: connecting is Plus, and the prompt above says so.
+  const needsReconnect = canReconnect && notices.some((notice) => notice.kind === "reconnect");
   return (
     <div className="px-4 py-3">
       <div className="flex items-center gap-2">
@@ -224,13 +226,14 @@ export default function IntegrationsPanel() {
         <div className="flex items-center gap-2 px-1 text-xs text-ink-500 dark:text-ink-400">
           <Loader2 className="w-3 h-3 animate-spin" /> Loading…
         </div>
-      ) : (
+      ) : !googleRow && !appleRow && isBasic ? null : (
         <div className="ds-list">
           {googleRow ? (
             <ConnectedRow
               integration={googleRow}
               onConfigure={setConfiguring}
               onReconnect={handleConnect}
+              canReconnect={!isBasic}
               onDisconnect={handleDisconnect}
               isDisconnecting={disconnecting && pendingDisconnectId === googleRow.id}
               showDefaultControl={showDefaultControl}
@@ -251,6 +254,7 @@ export default function IntegrationsPanel() {
               integration={appleRow}
               onConfigure={setConfiguring}
               onReconnect={handleConnect}
+              canReconnect={!isBasic}
               onDisconnect={handleDisconnect}
               isDisconnecting={disconnecting && pendingDisconnectId === appleRow.id}
               showDefaultControl={showDefaultControl}

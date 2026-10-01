@@ -143,8 +143,6 @@ export const backendConfig = {
   vapidPublicKey: process.env.TASKFLOW_VAPID_PUBLIC_KEY || "",
   vapidPrivateKey: process.env.TASKFLOW_VAPID_PRIVATE_KEY || "",
   vapidSubject: deriveVapidSubject(),
-  // Where people reach a person: shown on the Terms and Privacy pages.
-  supportEmail: deriveSupportEmail(),
   // Buying Zephyrly Plus (backend/billing.js). All three, or buying is off.
   // Use a restricted key: Checkout Sessions write + read, Prices read.
   stripeSecretKey: process.env.STRIPE_SECRET_KEY || "",
@@ -161,19 +159,6 @@ export const backendConfig = {
   // the same address in Stripe's public details.
   supportEmail: deriveSupportEmail(),
 };
-
-/** TASKFLOW_SUPPORT_EMAIL, else support@ the app's own domain (none on localhost). */
-function deriveSupportEmail() {
-  const explicit = String(process.env.TASKFLOW_SUPPORT_EMAIL || "").trim();
-  if (explicit) return explicit;
-  try {
-    const { hostname } = new URL(String(process.env.TASKFLOW_PUBLIC_APP_URL || ""));
-    if (hostname.includes(".") && !/^[\d.]+$/.test(hostname) && !hostname.endsWith(".localhost")) return `support@${hostname}`;
-  } catch {
-    // No public URL: no address.
-  }
-  return "";
-}
 
 /**
  * TASKFLOW_SUPPORT_EMAIL, else support@ the app's own domain (none on localhost).

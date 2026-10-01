@@ -18,9 +18,9 @@ export default function PlusPrompt({ feature, detail, className }) {
       className={cn("flex items-start gap-3 rounded-xl border border-border-hairline bg-surface-card px-4 py-3", className)}
       data-testid="plus-prompt"
     >
-      <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" />
+      <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-ink-400 dark:text-ink-500" />
       <div className="min-w-0 flex-1 space-y-2">
-        <p className="text-sm text-slate-700 dark:text-slate-200">
+        <p className="text-sm text-ink-700 dark:text-ink-200">
           <span className="font-medium">{feature}</span> is part of Zephyrly Plus.
           {detail ? ` ${detail}` : ""}
         </p>

@@ -9,18 +9,18 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { Check, Minus, Sparkles } from "lucide-react";
+import { Check, Loader2, Minus, Sparkles } from "lucide-react";
 import { apiClient } from "@/api/apiClient";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { BILLING_KEY, useBilling } from "@/hooks/useBilling";
 import { isStripeCheckoutUrl } from "@/lib/stripe-url";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { SettingsSection, settingsHint } from "./parts";
 
 const FEATURES = [
-  ["Tasks, notes, reminders, calendar view", true, true],
-  ["Recently Deleted, export and restore", true, true],
+  ["Tasks, notes, reminders, Home and the calendar", true, true],
+  ["Recently deleted, export and restore", true, true],
   ["Schedules", "One at a time", "As many as you like"],
   ["Room for files", "500 MB", "1 GB"],
   ["Google and Apple Calendar sync", false, true],
@@ -30,9 +30,9 @@ const FEATURES = [
 const dateLabel = (iso) => new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" });
 
 function Cell({ value }) {
-  if (value === true) return <Check className="mx-auto h-4 w-4 text-slate-900 dark:text-slate-100" aria-label="Included" />;
-  if (value === false) return <Minus className="mx-auto h-4 w-4 text-slate-300 dark:text-slate-600" aria-label="Not included" />;
-  return <span className="text-xs text-slate-600 dark:text-slate-300">{value}</span>;
+  if (value === true) return <Check className="mx-auto h-4 w-4 text-ink-900 dark:text-ink-100" aria-label="Included" />;
+  if (value === false) return <Minus className="mx-auto h-4 w-4 text-ink-300 dark:text-ink-600" aria-label="Not included" />;
+  return <span className="text-xs text-ink-600 dark:text-ink-300">{value}</span>;
 }
 
 export default function PlusSection() {
@@ -63,6 +63,9 @@ export default function PlusSection() {
     const confirm = async () => {
       try {
         const status = await apiClient.billing.confirm(sessionId);
+        // The plan asked for when this page opened may still be on its way,
+        // read before the payment counted: it must not land on top of this.
+        await queryClient.cancelQueries({ queryKey: BILLING_KEY });
         queryClient.setQueryData(BILLING_KEY, status);
         if (status.plan === "plus") {
           setNotice({ tone: "good", text: "Welcome to Zephyrly Plus. Thank you!" });
@@ -97,90 +100,105 @@ export default function PlusSection() {
   const price = billing?.buy?.price?.label;
 
   return (
-    <div className="space-y-5" data-testid="plus-section">
-      <Card className="space-y-2 px-4 py-4">
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100" data-testid="plus-plan">
-            {isPlus ? "You have Zephyrly Plus" : "You're on Basic"}
-          </p>
+    <div className="space-y-8" data-testid="plus-section">
+      <SettingsSection label="Your plan">
+        <div className="ds-list">
+          <div className="flex items-start gap-3 px-4 py-3.5">
+            {isPlus ? (
+              // Sun means done: this account has it.
+              <span aria-hidden className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sun-400 text-ink-950">
+                <Check className="h-3 w-3" strokeWidth={3} />
+              </span>
+            ) : (
+              <Sparkles aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-ink-400 dark:text-ink-500" />
+            )}
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-ink-900 dark:text-ink-100" data-testid="plus-plan">
+                {isPlus ? "You have Zephyrly Plus" : "You're on Basic"}
+              </p>
+              <p className="mt-0.5 text-xs leading-5 text-ink-500 dark:text-ink-400">
+                {isPlus
+                  ? source === "founding"
+                    ? `A founding member${billing?.since ? `, since ${dateLabel(billing.since)}` : ""}: Plus is yours for as long as this account exists. Thank you for being here early.`
+                    : source === "gift"
+                      ? `A gift${billing?.since ? `, since ${dateLabel(billing.since)}` : ""}: Plus is yours for as long as this account exists.`
+                      : `Bought${billing?.since ? ` on ${dateLabel(billing.since)}` : ""}: Plus is yours for as long as this account exists.`
+                  : "The whole app, free. Plus connects it to your calendars and AI apps, with more room."}
+              </p>
+            </div>
+          </div>
         </div>
-        <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">
-          {isPlus
-            ? source === "founding"
-              ? `A founding member${billing?.since ? `, since ${dateLabel(billing.since)}` : ""}: Plus is yours for as long as this account exists. Thank you for being here early.`
-              : source === "gift"
-                ? `A gift${billing?.since ? `, since ${dateLabel(billing.since)}` : ""}: Plus is yours for as long as this account exists.`
-                : `Bought${billing?.since ? ` on ${dateLabel(billing.since)}` : ""}: Plus is yours for as long as this account exists.`
-            : "The whole app, free. Plus connects it to your calendars and AI apps, with more room."}
-        </p>
-      </Card>
+      </SettingsSection>
 
       {notice && (
         <p
-          role="status"
+          role={notice.tone === "bad" ? "alert" : "status"}
           data-testid="plus-notice"
           className={cn(
-            "rounded-lg border px-3 py-2 text-xs",
-            notice.tone === "good" && "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-[#0d1f17] dark:text-emerald-200",
-            notice.tone === "bad" && "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-[#2a1116] dark:text-red-200",
-            notice.tone === "info" && "border-border-hairline bg-slate-50 text-slate-600 dark:bg-[#161616] dark:text-slate-300"
+            "flex items-start gap-2 px-1 text-sm leading-5",
+            notice.tone === "good" && "font-medium text-ink-900 dark:text-ink-100",
+            notice.tone === "bad" && "text-red-600 dark:text-red-300",
+            notice.tone === "info" && "text-ink-600 dark:text-ink-300"
           )}
         >
-          {notice.text}
+          {notice.tone === "good" && (
+            <span aria-hidden className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-sun-400 text-ink-950">
+              <Check className="h-2.5 w-2.5" strokeWidth={3} />
+            </span>
+          )}
+          {notice.tone === "info" && busyNotice(notice.text) && <Loader2 aria-hidden className="mt-0.5 h-4 w-4 shrink-0 animate-spin" />}
+          <span>{notice.text}</span>
         </p>
       )}
 
-      <Card className="overflow-hidden">
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-border-hairline text-xs text-slate-500 dark:text-slate-400">
-              <th className="px-4 py-2 font-medium" />
-              <th className="w-24 px-2 py-2 text-center font-medium">Basic</th>
-              <th className="w-28 px-2 py-2 text-center font-medium">Plus</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-[#303030]">
-            {FEATURES.map(([name, basic, plus]) => (
-              <tr key={name}>
-                <td className="px-4 py-2.5 text-slate-700 dark:text-slate-200">{name}</td>
-                <td className="px-2 py-2.5 text-center">
-                  <Cell value={basic} />
-                </td>
-                <td className="px-2 py-2.5 text-center">
-                  <Cell value={plus} />
-                </td>
+      <SettingsSection label="What each includes">
+        <div className="ds-list">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-border-hairline text-xs text-ink-500 dark:text-ink-400">
+                <th className="px-4 py-2 font-medium">
+                  <span className="sr-only">Feature</span>
+                </th>
+                <th className="w-[5.5rem] px-2 py-2 text-center font-medium sm:w-24">Basic</th>
+                <th className="w-24 px-2 py-2 text-center font-medium sm:w-28">Plus</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
+            </thead>
+            <tbody className="divide-y divide-border-hairline">
+              {FEATURES.map(([name, basic, plus]) => (
+                <tr key={name}>
+                  <td className="px-4 py-2.5 text-ink-700 dark:text-ink-200">{name}</td>
+                  <td className="px-2 py-2.5 text-center">
+                    <Cell value={basic} />
+                  </td>
+                  <td className="px-2 py-2.5 text-center">
+                    <Cell value={plus} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </SettingsSection>
 
       {!isPlus && (
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           {!online ? (
-            <p className="text-xs text-slate-500 dark:text-slate-400">Buying Plus needs a connection.</p>
+            <p className={settingsHint}>Buying Plus needs a connection.</p>
           ) : billing?.buy?.available ? (
-            <Button
-              type="button"
-              onClick={buy}
-              disabled={busy}
-              data-testid="plus-buy"
-              className="h-10 w-full bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
-            >
-              {busy ? "Opening Stripe…" : `Get Plus — ${price} once`}
+            <Button type="button" onClick={buy} disabled={busy} data-testid="plus-buy" className="h-10 w-full">
+              {busy ? "Opening Stripe…" : `Get Plus: ${price} once`}
             </Button>
           ) : (
-            <p className="text-xs text-slate-500 dark:text-slate-400">Plus can’t be bought here yet.</p>
+            <p className={settingsHint}>Plus can&apos;t be bought here yet.</p>
           )}
           {billing?.buy?.available && billing.buy.price?.tax_added && (
-            <p className="text-xs text-slate-500 dark:text-slate-400" data-testid="plus-tax-note">
+            <p className={settingsHint} data-testid="plus-tax-note">
               Sales tax or VAT may be added at checkout, depending on where you live.
             </p>
           )}
-          <p className="text-[11px] leading-snug text-slate-400 dark:text-slate-500">
-            One payment, for as long as this account exists. It isn’t refundable. You pay on Stripe’s secure page; Zephyrly
-            never sees your card. See the{" "}
+          <p className={settingsHint}>
+            One payment, for as long as this account exists. It isn&apos;t refundable. You pay on Stripe&apos;s secure page;
+            Zephyrly never sees your card. See the{" "}
             <Link to="/terms" className="underline underline-offset-2">
               Terms
             </Link>
@@ -190,4 +208,9 @@ export default function PlusSection() {
       )}
     </div>
   );
+}
+
+/** The one message that means "still waiting on Stripe". */
+function busyNotice(text) {
+  return /^Confirming/.test(text);
 }

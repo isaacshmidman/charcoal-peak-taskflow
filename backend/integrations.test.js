@@ -21,6 +21,7 @@ import {
 import { backfillGoogleEventMetadata } from "./google-metadata-backfill.js";
 import { enqueueTaskPush, taskToEventBody, waitForPushIdle } from "./push.js";
 import { mapGoogleEventToTaskInput, syncIntegration } from "./sync.js";
+import { grantPlus } from "./plans.js";
 
 let tempDir = "";
 let config;
@@ -64,6 +65,8 @@ function seedUser() {
     `INSERT INTO users (id, app_id, email, role, auth_provider, created_date, updated_date)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
   ).run("user_1", "test-app", "isaac@example.com", "admin", "local", now, now);
+  // Calendar sync is Plus.
+  grantPlus(db, { appId: "test-app", userId: "user_1", source: "gift" });
 }
 
 function seedAppleIntegration({ integrationId = "intg_apple", calendarId = "https://caldav.example.com/cal/1/" } = {}) {
