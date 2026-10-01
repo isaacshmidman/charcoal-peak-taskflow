@@ -120,11 +120,47 @@ export function revokePlus(db, { appId, userId, stripePaymentIntent, reason }) {
 }
 
 /**
+ * Remember that a payment was refunded or disputed, so Plus isn't granted
+ * for it later if its purchase notice turns up after the refund's.
+ * @param {any} db
+ * @param {{ stripePaymentIntent: string, reason: "refund" | "dispute" }} input
+ */
+export function holdPayment(db, { stripePaymentIntent, reason }) {
+  db.prepare(`INSERT OR IGNORE INTO payment_holds (stripe_payment_intent, reason, created_at) VALUES (?, ?, ?)`).run(
+    stripePaymentIntent,
+    reason,
+    new Date().toISOString()
+  );
+}
+
+/**
+ * A dispute the seller won: that hold lifts. A refund's never does.
+ * @param {any} db
+ * @param {{ stripePaymentIntent: string }} input
+ */
+export function releaseDisputeHold(db, { stripePaymentIntent }) {
+  db.prepare(`DELETE FROM payment_holds WHERE stripe_payment_intent = ? AND reason = 'dispute'`).run(stripePaymentIntent);
+}
+
+/**
+ * Whether a payment is refunded or disputed.
+ * @param {any} db
+ * @param {string | undefined} stripePaymentIntent
+ */
+export function paymentOnHold(db, stripePaymentIntent) {
+  if (!stripePaymentIntent) return false;
+  return Boolean(db.prepare(`SELECT 1 FROM payment_holds WHERE stripe_payment_intent = ?`).get(stripePaymentIntent));
+}
+
+/**
  * Give Plus back after a dispute the seller won.
  * @param {any} db
  * @param {{ stripePaymentIntent: string }} input
  */
 export function restorePlus(db, { stripePaymentIntent }) {
+  releaseDisputeHold(db, { stripePaymentIntent });
+  // Not if the payment was also refunded.
+  if (paymentOnHold(db, stripePaymentIntent)) return 0;
   return db
     .prepare(`UPDATE entitlements SET revoked_at = NULL, revoked_reason = NULL WHERE stripe_payment_intent = ? AND revoked_reason = 'dispute'`)
     .run(stripePaymentIntent).changes;

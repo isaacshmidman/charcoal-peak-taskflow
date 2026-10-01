@@ -150,6 +150,13 @@ export const backendConfig = {
   stripeSecretKey: process.env.STRIPE_SECRET_KEY || "",
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
   stripePriceId: process.env.STRIPE_PRICE_ID || "",
+  // Tax at checkout (docs/plus.md): "off", "automatic" (Stripe Tax: you're
+  // the seller and file the returns) or "managed" (Managed Payments: Stripe
+  // is the seller of record and files them).
+  stripeTax: stripeTaxMode(process.env.STRIPE_TAX),
+  // "on": Stripe emails a paid invoice after each purchase. Managed Payments
+  // always does, so it's ignored there.
+  stripeInvoices: process.env.STRIPE_INVOICES === "on",
 };
 
 /**
@@ -167,6 +174,17 @@ export function deriveSupportEmail(env = process.env) {
     // No public URL: no address.
   }
   return "";
+}
+
+/**
+ * @param {string | undefined} value
+ * @returns {"off" | "automatic" | "managed"}
+ */
+function stripeTaxMode(value) {
+  const mode = String(value || "off").trim().toLowerCase();
+  if (mode === "automatic" || mode === "managed") return mode;
+  if (mode !== "off") console.warn(`[config] STRIPE_TAX="${value}" isn't off, automatic or managed; tax stays off.`);
+  return "off";
 }
 
 export function getGoogleCalendarRedirectUrl(config = backendConfig) {

@@ -10,7 +10,7 @@
 import { HttpError, readBodyText, readJsonBody, sendJson } from "../http.js";
 import { requireAuthenticatedUser } from "../auth.js";
 import { LIMITS, plusOf } from "../plans.js";
-import { billingEnabled, confirmCheckout, handleStripeEvent, plusPrice, startCheckout, verifyWebhook } from "../billing.js";
+import { billingEnabled, confirmCheckout, handleStripeEvent, plusPrice, startCheckout, taxAddedAtCheckout, verifyWebhook } from "../billing.js";
 import { takeSlot } from "../ai/rate-limit.js";
 
 /** Stripe's events are small; this is far above any of them. */
@@ -35,7 +35,10 @@ export async function billingStatus(db, config, who) {
       calendar_sync: limits.calendarSync,
       ai_apps: limits.aiApps,
     },
-    buy: { available: !plus && billingEnabled(config) && Boolean(price), price: price ? { amount: price.amount, currency: price.currency, label: price.label } : null },
+    buy: {
+      available: !plus && billingEnabled(config) && Boolean(price),
+      price: price ? { amount: price.amount, currency: price.currency, label: price.label, tax_added: taxAddedAtCheckout(config, price) } : null,
+    },
   };
 }
 

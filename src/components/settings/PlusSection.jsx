@@ -13,6 +13,7 @@ import { Check, Minus, Sparkles } from "lucide-react";
 import { apiClient } from "@/api/apiClient";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { BILLING_KEY, useBilling } from "@/hooks/useBilling";
+import { isStripeCheckoutUrl } from "@/lib/stripe-url";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -83,7 +84,7 @@ export default function PlusSection() {
     try {
       const { url } = await apiClient.billing.checkout();
       // Only ever off to Stripe's own page.
-      if (typeof url !== "string" || !url.startsWith("https://checkout.stripe.com/")) throw new Error("bad url");
+      if (!isStripeCheckoutUrl(url)) throw new Error("bad url");
       window.location.assign(url);
     } catch (error) {
       setBusy(false);
@@ -171,6 +172,11 @@ export default function PlusSection() {
             </Button>
           ) : (
             <p className="text-xs text-slate-500 dark:text-slate-400">Plus can’t be bought here yet.</p>
+          )}
+          {billing?.buy?.available && billing.buy.price?.tax_added && (
+            <p className="text-xs text-slate-500 dark:text-slate-400" data-testid="plus-tax-note">
+              Sales tax or VAT may be added at checkout, depending on where you live.
+            </p>
           )}
           <p className="text-[11px] leading-snug text-slate-400 dark:text-slate-500">
             One payment, for as long as this account exists. It isn’t refundable. You pay on Stripe’s secure page; Zephyrly
