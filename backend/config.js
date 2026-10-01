@@ -143,7 +143,23 @@ export const backendConfig = {
   // "on": Stripe emails a paid invoice after each purchase. Managed Payments
   // always does, so it's ignored there.
   stripeInvoices: process.env.STRIPE_INVOICES === "on",
+  // Where people reach a person: shown on the Terms and Privacy pages. Put
+  // the same address in Stripe's public details.
+  supportEmail: deriveSupportEmail(),
 };
+
+/** TASKFLOW_SUPPORT_EMAIL, else support@ the app's own domain (none on localhost). */
+function deriveSupportEmail() {
+  const explicit = String(process.env.TASKFLOW_SUPPORT_EMAIL || "").trim();
+  if (explicit) return explicit;
+  try {
+    const { hostname } = new URL(String(process.env.TASKFLOW_PUBLIC_APP_URL || ""));
+    if (hostname.includes(".") && !/^[\d.]+$/.test(hostname) && !hostname.endsWith(".localhost")) return `support@${hostname}`;
+  } catch {
+    // No public URL: no address.
+  }
+  return "";
+}
 
 /**
  * @param {string | undefined} value

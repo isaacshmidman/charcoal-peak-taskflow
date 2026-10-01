@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { KeyRound, Mail } from "lucide-react";
 import { apiClient } from "@/api/apiClient";
 import { useAuth } from "@/lib/AuthContext";
@@ -214,6 +214,16 @@ export default function Login() {
                   : "Google sign-in is currently disabled on this backend. Contact the administrator for access."}
           </p>
         </div>
+
+        <p className="mt-5 text-center text-xs text-slate-400 dark:text-slate-500">
+          <Link to="/terms" className="underline underline-offset-2 hover:text-slate-600 dark:hover:text-slate-300">
+            Terms
+          </Link>
+          {" · "}
+          <Link to="/privacy" className="underline underline-offset-2 hover:text-slate-600 dark:hover:text-slate-300">
+            Privacy
+          </Link>
+        </p>
       </div>
     </div>
   );
