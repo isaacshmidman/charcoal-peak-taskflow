@@ -7,7 +7,7 @@
  * grants nothing (backend/billing.js).
  */
 import { useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Check, Minus, Sparkles } from "lucide-react";
 import { apiClient } from "@/api/apiClient";
@@ -180,7 +180,11 @@ export default function PlusSection() {
           )}
           <p className="text-[11px] leading-snug text-slate-400 dark:text-slate-500">
             One payment, for as long as this account exists. It isn’t refundable. You pay on Stripe’s secure page; Zephyrly
-            never sees your card.
+            never sees your card. See the{" "}
+            <Link to="/terms" className="underline underline-offset-2">
+              Terms
+            </Link>
+            .
           </p>
         </div>
       )}

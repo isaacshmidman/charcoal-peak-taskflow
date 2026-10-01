@@ -670,6 +670,7 @@ describe("Zephyrly Plus", () => {
       expect(sent.get("mode")).toBe("payment");
       expect(sent.get("consent_collection[terms_of_service]")).toBe("required");
       expect(sent.get("custom_text[terms_of_service_acceptance][message]")).toContain("isn't refundable");
+      expect(sent.get("custom_text[terms_of_service_acceptance][message]")).toContain("[Terms of Service](http://127.0.0.1:4173/terms)");
       expect(sent.get("success_url")).toBe("http://127.0.0.1:4173/Settings?plus=done&session_id={CHECKOUT_SESSION_ID}");
     });
 

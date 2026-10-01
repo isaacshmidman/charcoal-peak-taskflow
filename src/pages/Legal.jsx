@@ -1,7 +1,8 @@
 /**
  * @file Terms of Service (/terms) and Privacy Policy (/privacy). Public:
  * readable signed out, because they're linked from outside the app (the
- * sign-in screen, and Stripe's public business details). The contact address
+ * sign-in screen, Stripe's Checkout, which links to the Terms, and
+ * Stripe's receipts and public business details). The contact address
  * comes from the server (TASKFLOW_SUPPORT_EMAIL, else support@ the app's
  * domain).
  *
@@ -13,7 +14,7 @@ import { Link } from "react-router-dom";
 import Logo from "@/components/Logo";
 import { useAuth } from "@/lib/AuthContext";
 
-const UPDATED = "8 October 2026";
+const UPDATED = "17 November 2026";
 
 function Contact() {
   const { appPublicSettings } = useAuth();
@@ -92,12 +93,21 @@ export function TermsPage() {
       </section>
 
       <section>
-        <h2>Paying for Zephyrly</h2>
+        <h2>Basic and Plus</h2>
         <p>
-          Zephyrly is free to use today. If a paid upgrade is offered, its price is shown before you pay, and payment is handled
-          by Stripe; Zephyrly never sees or stores your card details. A purchase isn&apos;t refundable, except where the law
-          where you live says otherwise. If a payment is refunded or reversed, for example through a chargeback, what it bought
-          is removed from the account.
+          Basic is free. Zephyrly Plus is a single payment, shown before you pay: currently $9 US. Plus belongs to the Zephyrly
+          account that bought it, for as long as that account exists and Zephyrly runs. It can&apos;t be moved to another
+          account. Founding members, who had an account when Plus launched, have Plus free on the same terms. What each plan
+          includes is listed in Settings → Zephyrly Plus, and features may improve or change over time.
+        </p>
+      </section>
+
+      <section>
+        <h2>Payments and refunds</h2>
+        <p>
+          Payments are handled by Stripe; Zephyrly never sees or stores your card details. Plus starts as soon as your payment
+          goes through and isn&apos;t refundable, except where the law where you live says otherwise. If a payment is refunded or
+          reversed, for example through a chargeback, Plus is removed from the account.
         </p>
       </section>
 
@@ -188,8 +198,8 @@ export function PrivacyPage() {
             <strong>Email you send us:</strong> your address and what you wrote, kept so we can answer.
           </li>
           <li>
-            <strong>Purchases, if you make one:</strong> Stripe&apos;s reference for the payment, the amount, currency and date.
-            Never your card details; Stripe keeps those.
+            <strong>Plus purchases, if you make one:</strong> Stripe&apos;s reference for the payment, the amount, currency and
+            date. Never your card details; Stripe keeps those.
           </li>
           <li>
             <strong>On your device:</strong> a sign-in cookie, and the app&apos;s offline copy of your data in your browser&apos;s
@@ -217,7 +227,7 @@ export function PrivacyPage() {
             <strong>Apple</strong> for iCloud Calendar, if you connect it.
           </li>
           <li>
-            <strong>Stripe</strong>, if you buy a paid upgrade (
+            <strong>Stripe</strong>, if you buy Plus (
             <a href="https://stripe.com/privacy" className="underline underline-offset-2">
               Stripe&apos;s privacy policy
             </a>
@@ -252,7 +262,7 @@ export function PrivacyPage() {
             Things you delete wait in Recently deleted for {days} days, then they&apos;re gone.
           </li>
           <li>Sign-in records: until you sign out or the sign-in expires.</li>
-          <li>Payment records, if you buy something: as long as tax and accounting rules require.</li>
+          <li>Payment records, if you buy Plus: as long as tax and accounting rules require.</li>
         </ul>
       </section>
 

@@ -173,7 +173,8 @@ export async function startCheckout(db, config, { appId, user }) {
     consent_collection: { terms_of_service: "required" },
     custom_text: {
       terms_of_service_acceptance: {
-        message: "Zephyrly Plus is a one-time purchase for this Zephyrly account, for as long as the account exists. It isn't refundable, and I want it to start right away.",
+        // Stripe turns the Markdown link into a link to our own Terms.
+        message: `Zephyrly Plus is a one-time purchase for this Zephyrly account, for as long as the account exists. It isn't refundable, and I want it to start right away. I agree to the [Terms of Service](${new URL("/terms", config.publicAppUrl)}).`,
       },
     },
     allow_promotion_codes: true,

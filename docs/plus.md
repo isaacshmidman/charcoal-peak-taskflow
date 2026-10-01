@@ -46,12 +46,30 @@ You need a Stripe account in the name of someone 18 or older (a parent
 can own it). Do everything first in **test mode** (the toggle in the
 Stripe dashboard), then again in live mode.
 
-1. **Product:** Products → Add product. Name it "Zephyrly Plus" and give
-   it a **one-time** price of **$9.00 USD**. Copy the price's id
-   (`price_…`).
-2. **Terms:** Settings → Public details → add a Terms of service URL.
-   Checkout requires buyers to accept the no-refund line, and Stripe
-   needs a terms URL to show that checkbox.
+**Already done in the "Zephyrly sandbox"** (2026-09-30, through Claude's
+Stripe connector): the product and price from step 1 and the webhook from
+step 4. In live mode, do them again (or connect the live account to
+Claude and ask).
+
+1. **Product:** Products → Add product, with id `zephyrly_plus` if the
+   form offers one. Name it "Zephyrly Plus", product tax code *Software as
+   a service (SaaS) – personal use*, and give it a **one-time** price of
+   **$9.00 USD** with tax **included**. Copy the price's id (`price_…`).
+   The sandbox one is `price_1ULYK6EYFgf9Lg8SHfVso33o`.
+   A subscription price can be added to the same product later, but the
+   app only sells the one-time one.
+2. **Public details:** Settings → Business → Public details:
+   - Terms of service URL: `https://zephyrly.app/terms`
+   - Privacy policy URL: `https://zephyrly.app/privacy`
+   - Support email: the one the app shows on those pages
+     (`TASKFLOW_SUPPORT_EMAIL` in `.env`, else `support@zephyrly.app`).
+     For `support@zephyrly.app` to reach you, turn on Cloudflare → your
+     zephyrly.app zone → Email → Email Routing, and forward it to your
+     inbox.
+
+   Checkout requires buyers to accept the no-refund line, and in live
+   mode Stripe won't show that checkbox without a Terms URL. The
+   checkbox links to the Terms page.
 3. **Restricted key:** Developers → API keys → Create restricted key, named
    "Zephyrly server". Give it these permissions and nothing else:
    - Checkout Sessions: **Write** (write includes read)
@@ -61,10 +79,13 @@ Stripe dashboard), then again in live mode.
    leaks: it can't move money or see customers.
 4. **Webhook:** Developers → Webhooks → Add endpoint.
    - URL: `https://zephyrly.app/api/billing/stripe/webhook`
+   - API version: `2025-03-31.basil` (what the server is written for)
    - Events: `checkout.session.completed`,
      `checkout.session.async_payment_succeeded`, `charge.refunded`,
      `charge.dispute.created`, `charge.dispute.closed`
-   - Copy its signing secret (`whsec_…`).
+   - Copy its signing secret (`whsec_…`). For the sandbox endpoint, roll
+     it first (⋯ → Roll secret, expire now): its first secret passed
+     through Claude's tool output when Claude made it.
 5. **On the Zima box**, add the three values to `.env` next to
    `docker-compose.yml`, and make the file readable only by you:
 
