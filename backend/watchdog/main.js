@@ -15,7 +15,7 @@
  *
  * Cost while the site is up: one small request a minute.
  */
-import { appendFileSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { uptime } from "node:os";
 import { classify, decide, nextIncident, NEVER_REBOOTED, NO_INCIDENT } from "./decide.js";
 import { CHECK_COMMAND, createDockerClient, REBOOT_COMMAND } from "./docker.js";
@@ -71,6 +71,7 @@ export function readConfig(env) {
     internetUrls: (env.WATCHDOG_INTERNET_URLS || "https://1.1.1.1/cdn-cgi/trace,https://www.google.com/generate_204")
       .split(",").map((url) => url.trim()).filter(Boolean),
     tunnelService: env.WATCHDOG_TUNNEL_SERVICE || "cloudflared",
+    appService: env.WATCHDOG_APP_SERVICE || "taskflow",
     stateDir: env.WATCHDOG_STATE_DIR || "/state",
     dockerSocket: env.WATCHDOG_DOCKER_SOCKET || "/var/run/docker.sock",
     intervalMs: atLeast(env.WATCHDOG_INTERVAL_SECONDS, 60, 30) * 1000,
@@ -162,6 +163,9 @@ export function createLog(dir, now) {
   };
 }
 
+/** Container states that mean "a person stopped this", not "it crashed". */
+const STOPPED_ON_PURPOSE = ["exited", "created", "paused"];
+
 const VERDICT_TEXT = {
   ok: "The site is up.",
   tunnel_down: "Cloudflare reports the tunnel is disconnected, while the box is online and the app is healthy here.",
@@ -179,7 +183,7 @@ const VERDICT_TEXT = {
  *     internet: () => Promise<boolean>,
  *     evidence: () => Record<string, string>,
  *   },
- *   docker: Pick<ReturnType<typeof createDockerClient>, "findService" | "tailLogs" | "restart" | "runOnHost">,
+ *   docker: Pick<ReturnType<typeof createDockerClient>, "findService" | "isHealthy" | "tailLogs" | "restart" | "runOnHost">,
  *   store: ReturnType<typeof createStore>,
  *   log: (message: string) => void,
  *   clock: { mono: () => number, wall: () => number, uptimeMs: () => number },
@@ -218,6 +222,16 @@ export function createWatchdog({ config, probes, docker, store, log, clock, host
       // box would help either: stay at this step. Said once per incident.
       if (lastNote !== "no-tunnel") log(`${why} But ${problem}, so nothing was done.`);
       lastNote = "no-tunnel";
+      return;
+    }
+    if (STOPPED_ON_PURPOSE.includes(tunnel.state)) {
+      // Docker restarts a crashed tunnel by itself (restart: always), so a
+      // stopped one was stopped by a person. Leave it — and since nothing
+      // was tried, the box isn't restarted over it either.
+      if (lastNote !== "tunnel-stopped") {
+        log(`${why} But the tunnel container (${tunnel.name}) has been stopped, not crashed (state: ${tunnel.state}), so it's being left alone. To bring it back: docker compose start ${config.tunnelService}`);
+      }
+      lastNote = "tunnel-stopped";
       return;
     }
     log(`${why} Network: ${summarize(probes.evidence())}.`);
@@ -270,7 +284,19 @@ export function createWatchdog({ config, probes, docker, store, log, clock, host
     async tick() {
       try {
         const site = await probes.site();
-        const localApp = site.kind === "ok" ? null : await probes.local();
+        let localApp = site.kind === "ok" ? null : await probes.local();
+        // Not answering from the box isn't the same as down: if Docker's
+        // networking is what broke, the app is fine inside its container
+        // and simply can't be reached. Docker's own health check knows.
+        let onlyInsideContainer = false;
+        if (localApp === false && host) {
+          try {
+            onlyInsideContainer = await docker.isHealthy(host.project, config.appService);
+          } catch {
+            // Docker can't say; it stays "not answering".
+          }
+          if (onlyInsideContainer) localApp = true;
+        }
         const internet = site.kind === "unreachable" ? await probes.internet() : null;
         const verdict = classify({ site, localApp, internet });
         incident = nextIncident(incident, verdict, clock.mono());
@@ -278,7 +304,8 @@ export function createWatchdog({ config, probes, docker, store, log, clock, host
         if (verdict !== lastVerdict) {
           const detail = site.kind === "ok" ? "" : ` (${site.kind === "http" ? `HTTP ${site.status}` : site.kind}${"detail" in site && site.detail ? `, ${site.detail}` : ""})`;
           const network = verdict === "ok" ? "" : ` Network: ${summarize(probes.evidence())}.`;
-          log(`${VERDICT_TEXT[verdict]}${detail}${network}`);
+          const inside = onlyInsideContainer ? " The app is healthy inside its container but doesn't answer from the box itself, which points at Docker's networking." : "";
+          log(`${VERDICT_TEXT[verdict]}${detail}${inside}${network}`);
           lastVerdict = verdict;
           lastNote = "";
           lastHeartbeat = clock.mono();
@@ -330,6 +357,15 @@ function readOrNull(path) {
     return readFileSync(path, "utf8");
   } catch {
     return null;
+  }
+}
+
+/** @param {string} dir @returns {string[]} */
+function namesIn(dir) {
+  try {
+    return readdirSync(dir);
+  } catch {
+    return [];
   }
 }
 
@@ -393,7 +429,7 @@ async function main() {
       site: () => probeSite(config.siteUrl),
       local: () => probeLocal(config.localUrl),
       internet: () => probeInternet(config.internetUrls),
-      evidence: () => networkEvidence(readOrNull),
+      evidence: () => networkEvidence(readOrNull, namesIn),
     },
     docker,
     store: createStore(config.stateDir, clock.wall),

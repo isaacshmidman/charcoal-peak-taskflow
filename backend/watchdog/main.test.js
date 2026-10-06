@@ -21,8 +21,10 @@ const DEPLOYING = { site: { kind: "http", status: 502 }, local: false };
 /**
  * A watchdog wired to stand-ins, with a clock the test moves. `world` is
  * what the probes see; change it and call run(minutes).
+ *
+ * @param {any} [options]
  */
-function setup({ env = {}, saved = null, host = { image: "sha256:img", project: "taskflow" }, saveWorks = true, tunnel = { id: "tunnel1", name: "taskflow-cloudflared-1", state: "running" }, restartFails = false, uptimeMs = 2 * 24 * HOUR } = {}) {
+function setup({ env = {}, saved = null, host = { image: "sha256:img", project: "taskflow" }, saveWorks = true, tunnel = { id: "tunnel1", name: "taskflow-cloudflared-1", state: "running" }, restartFails = false, uptimeMs = 2 * 24 * HOUR, appHealthyInDocker = false } = {}) {
   let minute = 0;
   /** @type {any} */
   let world = UP;
@@ -43,6 +45,13 @@ function setup({ env = {}, saved = null, host = { image: "sha256:img", project: 
     },
     docker: {
       findService: async () => tunnel,
+      // Docker's own health check for the app, asked only when the app
+      // doesn't answer from the box.
+      isHealthy: async (project, service) => {
+        expect([project, service]).toEqual(["taskflow", "taskflow"]);
+        if (appHealthyInDocker instanceof Error) throw appHealthyInDocker;
+        return appHealthyInDocker;
+      },
       tailLogs: async () => ["ERR Connection terminated", "INF Retrying connection in up to 1m4s"],
       restart: async (id) => {
         actions.push(`${minute}: restart ${id}`);
@@ -172,6 +181,45 @@ describe("things it must leave alone", () => {
     expect(t.actions).toEqual(["5: restart tunnel1"]);
     await t.run(5); // now up 30+ minutes, still down
     expect(t.actions.at(-1)).toContain("host systemctl reboot");
+  });
+});
+
+describe("when Docker's networking is what broke", () => {
+  it("an app that's healthy inside its container but unreachable from the box still counts as healthy — and the log says what that points at", async () => {
+    const t = setup({ appHealthyInDocker: true });
+    t.set(APP_DOWN); // tunnel error, and no answer on the box's own port
+    await t.run(20);
+    expect(t.actions.map((a) => a.replace(/ \(recorded.*/, ""))).toEqual(["5: restart tunnel1", "15: host systemctl reboot"]);
+    expect(t.log[0]).toContain("0: Cloudflare reports the tunnel is disconnected, while the box is online and the app is healthy here.");
+    expect(t.log[0]).toContain("The app is healthy inside its container but doesn't answer from the box itself, which points at Docker's networking.");
+  });
+
+  it("if Docker can't say whether the app is healthy, it's treated as not answering — and nothing is done", async () => {
+    const t = setup({ appHealthyInDocker: new Error("Docker didn't answer within 20s") });
+    t.set(APP_DOWN);
+    await t.run(60);
+    expect(t.actions).toEqual([]);
+  });
+});
+
+describe("a tunnel someone stopped on purpose", () => {
+  for (const state of ["exited", "created", "paused"]) {
+    it(`is left alone when it's "${state}" — not started again, and the box isn't restarted over it`, async () => {
+      const t = setup({ tunnel: { id: "tunnel1", name: "taskflow-cloudflared-1", state } });
+      t.set(TUNNEL_DOWN);
+      await t.run(180);
+      expect(t.actions).toEqual([]);
+      const said = t.log.filter((line) => line.includes("has been stopped, not crashed"));
+      expect(said).toHaveLength(1);
+      expect(said[0]).toContain(`(state: ${state}), so it's being left alone. To bring it back: docker compose start cloudflared`);
+    });
+  }
+
+  it("a tunnel that keeps crashing (Docker is already restarting it) is handled like a running one", async () => {
+    const t = setup({ tunnel: { id: "tunnel1", name: "taskflow-cloudflared-1", state: "restarting" } });
+    t.set(TUNNEL_DOWN);
+    await t.run(20);
+    expect(t.actions.map((a) => a.replace(/ \(recorded.*/, ""))).toEqual(["5: restart tunnel1", "15: host systemctl reboot"]);
   });
 });
 

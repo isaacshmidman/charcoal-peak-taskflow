@@ -52,7 +52,8 @@ services:
   # online and the app is healthy: restarts the cloudflared container. If
   # that hasn't helped 10 minutes later: restarts the box (a clean
   # `systemctl reboot`), at most once every 6 hours and never twice for
-  # the same outage. Does nothing when the home internet is out.
+  # the same outage. Does nothing when the home internet is out, the app
+  # itself is down, or cloudflared was stopped on purpose.
   #
   # Start it once:   docker compose up -d --build watchdog
   # What it saw:     /DATA/AppData/taskflow/watchdog/watchdog.log
@@ -79,9 +80,12 @@ services:
       - WATCHDOG_LOCAL_URL=http://127.0.0.1:${WEBUI_PORT:-8787}/api/health
       - WATCHDOG_ALLOW_BOX_RESTART=${WATCHDOG_ALLOW_BOX_RESTART:-true}
       - WATCHDOG_DRY_RUN=${WATCHDOG_DRY_RUN:-false}
-    # Hard ceilings, so it can never get in the way of anything else.
+    # So it can never get in the way of anything else: a memory ceiling,
+    # and an eighth of a normal container's CPU priority (it yields to
+    # everything). Priority rather than a hard CPU cap, because Docker
+    # refuses to start a container with a cap on kernels that lack it.
     mem_limit: 128m
-    cpus: 0.2
+    cpu_shares: 128
     pids_limit: 64
     stop_grace_period: 5s
     logging:

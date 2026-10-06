@@ -52,7 +52,12 @@ beforeAll(async () => {
       }
       if (req.method === "GET" && url.pathname.endsWith("/json")) {
         const found = containers.find((c) => c.Id === id);
-        return found ? send(200, { Image: found.ImageID, Config: { Labels: found.Labels } }) : send(404, { message: `No such container: ${id}` });
+        if (!found) return send(404, { message: `No such container: ${id}` });
+        return send(200, {
+          Image: found.ImageID,
+          Config: { Labels: found.Labels },
+          State: { Running: found.State === "running", ...(found.Health ? { Health: { Status: found.Health } } : {}) },
+        });
       }
       if (req.method === "GET" && url.pathname.endsWith("/logs")) {
         return send(200, Buffer.concat([frame(2, "2026-10-06T00:01:00Z ERR Connection terminated error=\"timeout\"\n"), frame(2, "2026-10-06T00:01:05Z INF Retrying connection in up to 1m4s\n")]));
@@ -103,6 +108,21 @@ describe("docker client", () => {
     containers.push({ ...containers[1], Id: "tunnel2" });
     expect(await docker().findService("taskflow", "cloudflared")).toBeNull();
     expect(await docker().findService("nope", "cloudflared")).toBeNull();
+  });
+
+  it("reports Docker's own health verdict for the app — healthy means running and passing its check", async () => {
+    const app = containers.find((c) => c.Id === "app1");
+    expect(await docker().isHealthy("taskflow", "taskflow"), "no health check at all").toBe(false);
+    app.Health = "healthy";
+    expect(await docker().isHealthy("taskflow", "taskflow")).toBe(true);
+    for (const status of ["starting", "unhealthy"]) {
+      app.Health = status;
+      expect(await docker().isHealthy("taskflow", "taskflow"), status).toBe(false);
+    }
+    app.Health = "healthy";
+    app.State = "exited";
+    expect(await docker().isHealthy("taskflow", "taskflow"), "stopped, with a stale healthy").toBe(false);
+    expect(await docker().isHealthy("taskflow", "nope")).toBe(false);
   });
 
   it("reads the tunnel's last log lines", async () => {

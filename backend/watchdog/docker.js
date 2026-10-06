@@ -104,6 +104,20 @@ export function createDockerClient({ socketPath = "/var/run/docker.sock", timeou
   const listByLabels = (labels) =>
     json("GET", `/containers/json?all=1&filters=${encodeURIComponent(JSON.stringify({ label: labels }))}`);
 
+  /**
+   * The one container of a compose service in this project, or null if
+   * there are none or several.
+   *
+   * @param {string} project
+   * @param {string} service
+   * @returns {Promise<{ id: string, name: string, state: string } | null>}
+   */
+  const findService = async (project, service) => {
+    const found = await listByLabels([`com.docker.compose.project=${project}`, `com.docker.compose.service=${service}`]);
+    if (found.length !== 1) return null;
+    return { id: found[0].Id, name: String(found[0].Names?.[0] || found[0].Id).replace(/^\//, ""), state: String(found[0].State || "") };
+  };
+
   return {
     /**
      * This container: the image it runs (reused for the host helper, so
@@ -133,17 +147,21 @@ export function createDockerClient({ socketPath = "/var/run/docker.sock", timeou
       return image && project ? { image, project } : null;
     },
 
+    findService,
+
     /**
-     * The tunnel container of this compose project, if there is exactly one.
+     * Docker's own verdict on a service: its container is running and
+     * passing the health check that runs *inside* it. That stays true
+     * even when the box can't reach the container over Docker's network.
      *
      * @param {string} project
      * @param {string} service
-     * @returns {Promise<{ id: string, name: string, state: string } | null>}
      */
-    async findService(project, service) {
-      const found = await listByLabels([`com.docker.compose.project=${project}`, `com.docker.compose.service=${service}`]);
-      if (found.length !== 1) return null;
-      return { id: found[0].Id, name: String(found[0].Names?.[0] || found[0].Id).replace(/^\//, ""), state: String(found[0].State || "") };
+    async isHealthy(project, service) {
+      const container = await findService(project, service);
+      if (!container) return false;
+      const info = await json("GET", `/containers/${container.id}/json`);
+      return info?.State?.Running === true && info?.State?.Health?.Status === "healthy";
     },
 
     /**

@@ -120,6 +120,17 @@ describe("networkEvidence", () => {
     });
   });
 
+  it("says whether Docker's own networks are up", () => {
+    const names = ["lo", "eth0", "docker0", "virbr0", "br-d31bade2042e", "veth8fd8d0e"];
+    const evidence = networkEvidence(
+      read({ "/sys/class/net/docker0/operstate": "down\n", "/sys/class/net/br-d31bade2042e/operstate": "up\n" }),
+      (dir) => (dir === "/sys/class/net" ? names : [])
+    );
+    expect(evidence.docker).toBe("br-d31bade2042e up, docker0 down");
+    // Still reported when the box has no route at all.
+    expect(networkEvidence(() => null, () => ["docker0"])).toEqual({ route: "no default route", docker: "docker0 ?" });
+  });
+
   it("says so when there's no route or the router isn't answering", () => {
     expect(networkEvidence(read({ "/proc/net/route": "Iface\tDestination\tGateway\n" }))).toEqual({ route: "no default route" });
     expect(networkEvidence(() => null)).toEqual({ route: "no default route" });

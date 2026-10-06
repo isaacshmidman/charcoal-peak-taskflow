@@ -144,9 +144,10 @@ export async function probeInternet(urls, { timeoutMs = 6_000 } = {}) {
  * what the kernel already publishes; nothing is sent anywhere.
  *
  * @param {(path: string) => string | null} read  file contents, or null if unreadable
+ * @param {(dir: string) => string[]} [list]  names in a directory
  * @returns {Record<string, string>}
  */
-export function networkEvidence(read) {
+export function networkEvidence(read, list = () => []) {
   /** @type {Record<string, string>} */
   const evidence = {};
   /** @param {string} path */
@@ -167,5 +168,8 @@ export function networkEvidence(read) {
     const arp = (read("/proc/net/arp") ?? "").split("\n").map((line) => line.trim().split(/\s+/)).find((cols) => cols[0] === gateway);
     evidence.router = arp ? (arp[2] === "0x2" ? "answering" : `not answering (flags ${arp[2]})`) : "not in the neighbour table";
   }
+  // The networks Docker gives the containers.
+  const bridges = list("/sys/class/net").filter((name) => /^(docker\d+|br-[0-9a-f]+)$/.test(name)).sort();
+  if (bridges.length) evidence.docker = bridges.map((name) => `${name} ${value(`/sys/class/net/${name}/operstate`)}`).join(", ");
   return evidence;
 }
