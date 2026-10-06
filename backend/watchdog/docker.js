@@ -110,12 +110,20 @@ export function createDockerClient({ socketPath = "/var/run/docker.sock", timeou
    *
    * @param {string} project
    * @param {string} service
-   * @returns {Promise<{ id: string, name: string, state: string } | null>}
+   * @returns {Promise<{ id: string, name: string, state: string, createdAt: number } | null>}
+   *   `createdAt` is when the container was created, in ms (NaN if Docker didn't say)
    */
   const findService = async (project, service) => {
     const found = await listByLabels([`com.docker.compose.project=${project}`, `com.docker.compose.service=${service}`]);
     if (found.length !== 1) return null;
-    return { id: found[0].Id, name: String(found[0].Names?.[0] || found[0].Id).replace(/^\//, ""), state: String(found[0].State || "") };
+    const created = Number(found[0].Created);
+    return {
+      id: found[0].Id,
+      name: String(found[0].Names?.[0] || found[0].Id).replace(/^\//, ""),
+      state: String(found[0].State || ""),
+      // Docker lists this in seconds.
+      createdAt: Number.isFinite(created) && created > 0 ? created * 1000 : Number.NaN,
+    };
   };
 
   return {

@@ -84,7 +84,7 @@ beforeEach(() => {
   waitExitCode = 0;
   containers = [
     { Id: SELF_ID, ImageID: "sha256:watchdogimage", State: "running", Names: ["/taskflow-watchdog-1"], Labels: { [WATCHDOG_LABEL]: "true", "com.docker.compose.project": "taskflow", "com.docker.compose.service": "watchdog" } },
-    { Id: "tunnel1", State: "running", Names: ["/taskflow-cloudflared-1"], Labels: { "com.docker.compose.project": "taskflow", "com.docker.compose.service": "cloudflared" } },
+    { Id: "tunnel1", State: "running", Created: 1791000000, Names: ["/taskflow-cloudflared-1"], Labels: { "com.docker.compose.project": "taskflow", "com.docker.compose.service": "cloudflared" } },
     // Someone else's tunnel on the same box: must never be touched.
     { Id: "other-tunnel", State: "running", Names: ["/blog-cloudflared-1"], Labels: { "com.docker.compose.project": "blog", "com.docker.compose.service": "cloudflared" } },
     { Id: "app1", State: "running", Names: ["/taskflow-taskflow-1"], Labels: { "com.docker.compose.project": "taskflow", "com.docker.compose.service": "taskflow" } },
@@ -104,7 +104,15 @@ describe("docker client", () => {
   });
 
   it("finds only this project's tunnel, and nothing if that's ambiguous or absent", async () => {
-    expect(await docker().findService("taskflow", "cloudflared")).toEqual({ id: "tunnel1", name: "taskflow-cloudflared-1", state: "running" });
+    expect(await docker().findService("taskflow", "cloudflared")).toEqual({
+      id: "tunnel1",
+      name: "taskflow-cloudflared-1",
+      state: "running",
+      createdAt: 1791000000 * 1000, // Docker says seconds
+    });
+    // When Docker doesn't say when it was created, that's reported as unknown, not as "long ago".
+    delete containers[1].Created;
+    expect((await docker().findService("taskflow", "cloudflared"))?.createdAt).toBeNaN();
     containers.push({ ...containers[1], Id: "tunnel2" });
     expect(await docker().findService("taskflow", "cloudflared")).toBeNull();
     expect(await docker().findService("nope", "cloudflared")).toBeNull();

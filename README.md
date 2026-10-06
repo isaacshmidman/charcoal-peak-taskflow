@@ -285,7 +285,7 @@ Cloudflare error 1033 means the tunnel isn't connected. The watchdog (`backend/w
 1. Cloudflare reports the tunnel down for **5 minutes**, while the box is online and the app is healthy → it restarts the `cloudflared` container.
 2. Still down **10 minutes later** → it restarts the box (a clean `systemctl reboot`).
 
-It restarts the box at most once every 6 hours, never within 30 minutes of startup, and never a second time for an outage a restart didn't fix. It does nothing when the home internet is out, when the app itself is down, during a deploy, or when the `cloudflared` container has been stopped on purpose (`docker compose stop cloudflared`) — though if you plan to keep the tunnel down for a while for another reason, pause the watchdog first. On startup it checks — without restarting anything — that it would be able to.
+It restarts the box at most once every 6 hours, never within 30 minutes of startup, never a second time for an outage a restart didn't fix, and never when the tunnel container was created or replaced around the time the outage began (that means someone is working on the tunnel). It does nothing when the home internet is out, when the app itself is down, during a deploy, or when the `cloudflared` container has been stopped on purpose (`docker compose stop cloudflared`) — though if you plan to keep the tunnel down for a while for another reason, pause the watchdog first. On startup it checks — without restarting anything — that it would be able to.
 
 - What it saw and did: `/DATA/AppData/taskflow/watchdog/watchdog.log` (or `docker compose logs watchdog`)
 - Pause it: `docker compose stop watchdog`

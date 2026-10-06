@@ -165,6 +165,13 @@ export function createLog(dir, now) {
 
 /** Container states that mean "a person stopped this", not "it crashed". */
 const STOPPED_ON_PURPOSE = ["exited", "created", "paused"];
+/**
+ * The box is only restarted for a tunnel that was already in place this
+ * long before the outage began. One created or replaced around the outage
+ * means someone is working on it — a new token, a changed setup — and a
+ * restart of the box would only get in their way.
+ */
+const TUNNEL_SETTLED_MS = 10 * MINUTE;
 
 const VERDICT_TEXT = {
   ok: "The site is up.",
@@ -209,7 +216,7 @@ export function createWatchdog({ config, probes, docker, store, log, clock, host
   const summarize = (evidence) => Object.entries(evidence).map(([key, value]) => `${key}: ${value}`).join("; ");
 
   async function restartTunnel(/** @type {string} */ why) {
-    /** @type {{ id: string, name: string, state: string } | null} */
+    /** @type {Awaited<ReturnType<Deps["docker"]["findService"]>>} */
     let tunnel = null;
     let problem = host ? `there's no single "${config.tunnelService}" container to restart` : "this watchdog couldn't identify itself through Docker";
     try {
@@ -254,7 +261,38 @@ export function createWatchdog({ config, probes, docker, store, log, clock, host
     incident = { ...incident, tunnelRestartedAt: clock.mono() };
   }
 
+  /**
+   * Reasons not to restart the box that only Docker can tell us, checked
+   * at the last moment. Null if there are none.
+   *
+   * @returns {Promise<string | null>}
+   */
+  async function lastMinuteObjection() {
+    if (!host) return "this watchdog couldn't identify itself through Docker";
+    let tunnel;
+    try {
+      tunnel = await docker.findService(host.project, config.tunnelService);
+    } catch (error) {
+      return `Docker couldn't be asked about the tunnel container (${/** @type {Error} */ (error).message})`;
+    }
+    if (!tunnel) return `there's no longer a single "${config.tunnelService}" container`;
+    if (STOPPED_ON_PURPOSE.includes(tunnel.state)) return "the tunnel container has since been stopped";
+    if (!(tunnel.createdAt <= /** @type {number} */ (incident.downSinceWall) - TUNNEL_SETTLED_MS)) {
+      return "the tunnel container was created or replaced around the time this outage began, which means someone is working on it";
+    }
+    return null;
+  }
+
   async function restartBox(/** @type {string} */ why) {
+    const objection = await lastMinuteObjection();
+    if (objection) {
+      // Remembered for the rest of this outage; the tunnel keeps being
+      // nudged every half hour instead.
+      incident = { ...incident, noReboot: objection };
+      lastNote = `Not restarting the box: ${objection}.`;
+      log(lastNote);
+      return;
+    }
     incident = { ...incident, rebootRequestedAt: clock.mono() };
     log(`${why} Network: ${summarize(probes.evidence())}.`);
     if (config.dryRun) {
@@ -299,7 +337,7 @@ export function createWatchdog({ config, probes, docker, store, log, clock, host
         }
         const internet = site.kind === "unreachable" ? await probes.internet() : null;
         const verdict = classify({ site, localApp, internet });
-        incident = nextIncident(incident, verdict, clock.mono());
+        incident = nextIncident(incident, verdict, clock.mono(), clock.wall());
 
         if (verdict !== lastVerdict) {
           const detail = site.kind === "ok" ? "" : ` (${site.kind === "http" ? `HTTP ${site.status}` : site.kind}${"detail" in site && site.detail ? `, ${site.detail}` : ""})`;

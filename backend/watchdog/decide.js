@@ -39,12 +39,17 @@
  * }} Rules
  *
  * Times in an Incident are from a steady clock (never jumps), so a
- * changed wall clock can't shorten or lengthen a wait.
+ * changed wall clock can't shorten or lengthen a wait. `downSinceWall` is
+ * the same moment as a date, for comparing with things Docker dates.
+ * `noReboot` is a reason, found while this outage was going on, why the
+ * box must not be restarted for it.
  *
  * @typedef {{
  *   downSince: number | null,
+ *   downSinceWall: number | null,
  *   tunnelRestartedAt: number | null,
  *   rebootRequestedAt: number | null,
+ *   noReboot: string | null,
  * }} Incident
  *
  * Kept on disk, because it has to survive the restart it describes.
@@ -55,7 +60,7 @@
  */
 
 /** @type {Incident} */
-export const NO_INCIDENT = Object.freeze({ downSince: null, tunnelRestartedAt: null, rebootRequestedAt: null });
+export const NO_INCIDENT = Object.freeze({ downSince: null, downSinceWall: null, tunnelRestartedAt: null, rebootRequestedAt: null, noReboot: null });
 
 /** @type {Saved} */
 export const NEVER_REBOOTED = Object.freeze({ lastRebootAt: null, recoveredSinceReboot: true });
@@ -78,11 +83,12 @@ export function classify({ site, localApp, internet }) {
  * @param {Incident} incident
  * @param {Verdict} verdict
  * @param {number} nowMono
+ * @param {number} nowWall
  * @returns {Incident}
  */
-export function nextIncident(incident, verdict, nowMono) {
+export function nextIncident(incident, verdict, nowMono, nowWall) {
   if (verdict !== "tunnel_down") return NO_INCIDENT;
-  return incident.downSince == null ? { ...NO_INCIDENT, downSince: nowMono } : incident;
+  return incident.downSince == null ? { ...NO_INCIDENT, downSince: nowMono, downSinceWall: nowWall } : incident;
 }
 
 /** @param {number} ms */
@@ -141,7 +147,7 @@ export function decide({ verdict, incident, saved, rules, nowMono, nowWall, upti
   const sinceRestart = nowMono - incident.tunnelRestartedAt;
   if (sinceRestart < rules.rebootAfterRestartMs) return { action: "none", why: "" };
 
-  const blocked = rebootBlock({ saved, rules, nowWall, uptimeMs });
+  const blocked = incident.noReboot ?? rebootBlock({ saved, rules, nowWall, uptimeMs });
   if (!blocked) {
     return {
       action: "reboot",

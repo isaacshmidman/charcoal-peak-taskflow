@@ -20,9 +20,10 @@ const at = (downMin, restartedMinAgo = null, extra = {}) =>
   decide({
     verdict: "tunnel_down",
     incident: {
+      ...NO_INCIDENT,
       downSince: 0,
+      downSinceWall: NOW - downMin * MIN,
       tunnelRestartedAt: restartedMinAgo == null ? null : (downMin - restartedMinAgo) * MIN,
-      rebootRequestedAt: null,
     },
     saved: NEVER_REBOOTED,
     rules,
@@ -51,11 +52,12 @@ describe("classify", () => {
 
 describe("nextIncident", () => {
   it("starts on the first tunnel_down and ends on anything else", () => {
-    const started = nextIncident(NO_INCIDENT, "tunnel_down", 1000);
-    expect(started).toEqual({ downSince: 1000, tunnelRestartedAt: null, rebootRequestedAt: null });
-    expect(nextIncident(started, "tunnel_down", 99_000)).toBe(started);
+    const started = nextIncident(NO_INCIDENT, "tunnel_down", 1000, NOW);
+    expect(started).toEqual({ downSince: 1000, downSinceWall: NOW, tunnelRestartedAt: null, rebootRequestedAt: null, noReboot: null });
+    // It keeps its start, however long it goes on.
+    expect(nextIncident(started, "tunnel_down", 99_000, NOW + 98_000)).toBe(started);
     for (const verdict of /** @type {const} */ (["ok", "offline", "app_down", "unclear"])) {
-      expect(nextIncident({ ...started, tunnelRestartedAt: 5000 }, verdict, 99_000)).toBe(NO_INCIDENT);
+      expect(nextIncident({ ...started, tunnelRestartedAt: 5000, noReboot: "x" }, verdict, 99_000, NOW)).toBe(NO_INCIDENT);
     }
   });
 });
@@ -89,10 +91,30 @@ describe("decide", () => {
     expect(retry.why).toContain("won't be restarted because restarting the box is switched off");
   });
 
+  it("a reason found during the outage rules the box restart out for the rest of it", () => {
+    const withReason = (downMin, restartedMinAgo) => {
+      const base = at(downMin, restartedMinAgo);
+      expect(base.action, "allowed without the reason").toBe(downMin - restartedMinAgo >= 5 && restartedMinAgo >= 10 ? "reboot" : base.action);
+      return decide({
+        verdict: "tunnel_down",
+        incident: { ...NO_INCIDENT, downSince: 0, downSinceWall: NOW - downMin * MIN, tunnelRestartedAt: (downMin - restartedMinAgo) * MIN, noReboot: "someone is working on the tunnel" },
+        saved: NEVER_REBOOTED,
+        rules,
+        nowMono: downMin * MIN,
+        nowWall: NOW,
+        uptimeMs: 2 * 24 * HOUR,
+      });
+    };
+    expect(withReason(15, 10)).toEqual({ action: "none", why: "Not restarting the box: someone is working on the tunnel." });
+    expect(withReason(200, 29).action).toBe("none");
+    // The tunnel is still nudged every half hour.
+    expect(withReason(200, 30).action).toBe("restart_tunnel");
+  });
+
   it("asks for a restart of the box once, not every minute", () => {
     const decision = decide({
       verdict: "tunnel_down",
-      incident: { downSince: 0, tunnelRestartedAt: 5 * MIN, rebootRequestedAt: 15 * MIN },
+      incident: { ...NO_INCIDENT, downSince: 0, downSinceWall: NOW - 16 * MIN, tunnelRestartedAt: 5 * MIN, rebootRequestedAt: 15 * MIN },
       saved: NEVER_REBOOTED,
       rules,
       nowMono: 16 * MIN,

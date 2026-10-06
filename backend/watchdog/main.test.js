@@ -12,6 +12,9 @@ const START = Date.parse("2026-10-06T00:14:00+01:00");
 const scratch = mkdtempSync(join(tmpdir(), "wd-main-"));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
+/** A tunnel container that has been in place for days. */
+const TUNNEL = { id: "tunnel1", name: "taskflow-cloudflared-1", state: "running", createdAt: START - 3 * 24 * HOUR };
+
 const UP = { site: { kind: "ok" } };
 const TUNNEL_DOWN = { site: { kind: "tunnel_error", detail: "Cloudflare error 1033" }, local: true };
 const OFFLINE = { site: { kind: "unreachable", detail: "ENETUNREACH" }, local: true, internet: false };
@@ -24,7 +27,7 @@ const DEPLOYING = { site: { kind: "http", status: 502 }, local: false };
  *
  * @param {any} [options]
  */
-function setup({ env = {}, saved = null, host = { image: "sha256:img", project: "taskflow" }, saveWorks = true, tunnel = { id: "tunnel1", name: "taskflow-cloudflared-1", state: "running" }, restartFails = false, uptimeMs = 2 * 24 * HOUR, appHealthyInDocker = false } = {}) {
+function setup({ env = {}, saved = null, host = { image: "sha256:img", project: "taskflow" }, saveWorks = true, tunnel = TUNNEL, restartFails = false, uptimeMs = 2 * 24 * HOUR, appHealthyInDocker = false } = {}) {
   let minute = 0;
   /** @type {any} */
   let world = UP;
@@ -34,6 +37,8 @@ function setup({ env = {}, saved = null, host = { image: "sha256:img", project: 
   const actions = [];
   /** @type {any} */
   let stored = saved;
+  /** @type {any} what Docker says about the tunnel container right now */
+  let tunnelNow = tunnel;
   const config = readConfig({ WATCHDOG_SITE_URL: "https://example.test/api/health", WATCHDOG_ALLOW_BOX_RESTART: "true", ...env });
   const watchdog = createWatchdog({
     config,
@@ -44,7 +49,10 @@ function setup({ env = {}, saved = null, host = { image: "sha256:img", project: 
       evidence: () => ({ route: "via 192.168.1.1 on eth0", forwarding: "ip_forward 1, eth0 1" }),
     },
     docker: {
-      findService: async () => tunnel,
+      findService: async () => {
+        if (tunnelNow instanceof Error) throw tunnelNow;
+        return tunnelNow;
+      },
       // Docker's own health check for the app, asked only when the app
       // doesn't answer from the box.
       isHealthy: async (project, service) => {
@@ -82,6 +90,7 @@ function setup({ env = {}, saved = null, host = { image: "sha256:img", project: 
     watchdog,
     stored: () => stored,
     set: (next) => { world = next; },
+    setTunnel: (next) => { tunnelNow = next; },
     /** Check once a minute for `minutes`, starting with a check right now. */
     async run(minutes) {
       for (let i = 0; i < minutes; i += 1) {
@@ -205,7 +214,7 @@ describe("when Docker's networking is what broke", () => {
 describe("a tunnel someone stopped on purpose", () => {
   for (const state of ["exited", "created", "paused"]) {
     it(`is left alone when it's "${state}" — not started again, and the box isn't restarted over it`, async () => {
-      const t = setup({ tunnel: { id: "tunnel1", name: "taskflow-cloudflared-1", state } });
+      const t = setup({ tunnel: { ...TUNNEL, state } });
       t.set(TUNNEL_DOWN);
       await t.run(180);
       expect(t.actions).toEqual([]);
@@ -216,10 +225,73 @@ describe("a tunnel someone stopped on purpose", () => {
   }
 
   it("a tunnel that keeps crashing (Docker is already restarting it) is handled like a running one", async () => {
-    const t = setup({ tunnel: { id: "tunnel1", name: "taskflow-cloudflared-1", state: "restarting" } });
+    const t = setup({ tunnel: { ...TUNNEL, state: "restarting" } });
     t.set(TUNNEL_DOWN);
     await t.run(20);
     expect(t.actions.map((a) => a.replace(/ \(recorded.*/, ""))).toEqual(["5: restart tunnel1", "15: host systemctl reboot"]);
+  });
+});
+
+describe("a tunnel someone is working on", () => {
+  // In these, the site goes down at minute 3.
+  const outageWith = async (tunnel, minutes = 60) => {
+    const t = setup({ tunnel });
+    await t.run(3);
+    t.set(TUNNEL_DOWN);
+    await t.run(minutes);
+    return t;
+  };
+
+  it("the box isn't restarted when the tunnel container was created just before the outage — it never worked", async () => {
+    const t = await outageWith({ ...TUNNEL, createdAt: START + 2 * MIN });
+    // The tunnel is restarted, and nudged again half an hour later; the box is left alone.
+    expect(t.actions).toEqual(["8: restart tunnel1", "38: restart tunnel1"]);
+    // Said once when decided, and again as the reason each time the tunnel is nudged.
+    const said = t.log.filter((line) => line.includes("someone is working on it"));
+    expect(said).toHaveLength(2);
+    expect(said[0]).toBe("18: Not restarting the box: the tunnel container was created or replaced around the time this outage began, which means someone is working on it.");
+    expect(said[1]).toContain("38: Still down after 35 minutes, and the box won't be restarted because the tunnel container was created or replaced around the time this outage began");
+    expect(t.stored()).toBeNull();
+  });
+
+  it("nor when it was replaced during the outage", async () => {
+    const t = setup();
+    await t.run(3);
+    t.set(TUNNEL_DOWN);
+    await t.run(10); // tunnel restarted at minute 8
+    t.setTunnel({ ...TUNNEL, id: "tunnel2", createdAt: START + 12 * MIN });
+    await t.run(60);
+    expect(t.actions.filter((a) => a.includes("host"))).toEqual([]);
+    // The new container is the one nudged from then on, every half hour.
+    expect(t.actions).toEqual(["8: restart tunnel1", "38: restart tunnel2", "68: restart tunnel2"]);
+  });
+
+  it("ten minutes in place before the outage is the line", async () => {
+    // Outage begins at minute 3.
+    const settled = await outageWith({ ...TUNNEL, createdAt: START + 3 * MIN - 10 * MIN }, 20);
+    expect(settled.actions.at(-1)).toContain("18: host systemctl reboot");
+    const tooNew = await outageWith({ ...TUNNEL, createdAt: START + 3 * MIN - 9 * MIN }, 20);
+    expect(tooNew.actions).toEqual(["8: restart tunnel1"]);
+  });
+
+  it("nor when its age can't be read, it has been stopped since, it's gone, or Docker can't say", async () => {
+    /** @type {Array<[any, string]>} */
+    const cases = [
+      [{ ...TUNNEL, createdAt: Number.NaN }, "created or replaced around the time"],
+      [{ ...TUNNEL, state: "exited" }, "the tunnel container has since been stopped"],
+      [null, 'there\'s no longer a single "cloudflared" container'],
+      [new Error("Docker didn't answer within 20s"), "Docker couldn't be asked about the tunnel container (Docker didn't answer within 20s)"],
+    ];
+    for (const [later, reason] of cases) {
+      const t = setup();
+      t.set(TUNNEL_DOWN);
+      await t.run(10); // tunnel restarted at minute 5, normally
+      t.setTunnel(later);
+      await t.run(20);
+      expect(t.actions, reason).toEqual(["5: restart tunnel1"]);
+      expect(t.log.filter((line) => line.startsWith("15: Not restarting the box:") && line.includes(reason)), reason).toHaveLength(1);
+      expect(t.stored(), reason).toBeNull();
+    }
   });
 });
 

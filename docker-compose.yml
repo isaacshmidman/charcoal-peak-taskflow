@@ -51,9 +51,11 @@ services:
   # If Cloudflare reports the tunnel down for 5 minutes while this box is
   # online and the app is healthy: restarts the cloudflared container. If
   # that hasn't helped 10 minutes later: restarts the box (a clean
-  # `systemctl reboot`), at most once every 6 hours and never twice for
-  # the same outage. Does nothing when the home internet is out, the app
-  # itself is down, or cloudflared was stopped on purpose.
+  # `systemctl reboot`), at most once every 6 hours, never twice for the
+  # same outage, and never over a cloudflared container that was created
+  # or replaced around the time the outage began. Does nothing when the
+  # home internet is out, the app itself is down, or cloudflared was
+  # stopped on purpose.
   #
   # Start it once:   docker compose up -d --build watchdog
   # What it saw:     /DATA/AppData/taskflow/watchdog/watchdog.log
