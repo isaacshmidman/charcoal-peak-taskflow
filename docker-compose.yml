@@ -45,3 +45,47 @@ services:
     depends_on:
       taskflow:
         condition: service_healthy
+
+  # Brings the site back by itself when the tunnel stays disconnected
+  # (backend/watchdog/main.js). Checks the public address once a minute.
+  # If Cloudflare reports the tunnel down for 5 minutes while this box is
+  # online and the app is healthy: restarts the cloudflared container. If
+  # that hasn't helped 10 minutes later: restarts the box (a clean
+  # `systemctl reboot`), at most once every 6 hours and never twice for
+  # the same outage. Does nothing when the home internet is out.
+  #
+  # Start it once:   docker compose up -d --build watchdog
+  # What it saw:     /DATA/AppData/taskflow/watchdog/watchdog.log
+  # Pause it:        docker compose stop watchdog
+  # Rehearse only:   WATCHDOG_DRY_RUN=true in .env (logs, never acts)
+  # Tunnel only:     WATCHDOG_ALLOW_BOX_RESTART=false in .env
+  watchdog:
+    build:
+      context: ./backend/watchdog
+    restart: always
+    # The host's own network, to see what the box itself can reach —
+    # separately from Docker's container networking, which may be the
+    # thing that's broken. It listens on nothing.
+    network_mode: host
+    labels:
+      - app.zephyrly.watchdog=true
+    volumes:
+      # To restart the tunnel container and, as the last resort, start
+      # the one-off helper that restarts the box.
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /DATA/AppData/taskflow/watchdog:/state
+    environment:
+      - WATCHDOG_SITE_URL=${TASKFLOW_PUBLIC_APP_URL:-https://zephyrly.app}/api/health
+      - WATCHDOG_LOCAL_URL=http://127.0.0.1:${WEBUI_PORT:-8787}/api/health
+      - WATCHDOG_ALLOW_BOX_RESTART=${WATCHDOG_ALLOW_BOX_RESTART:-true}
+      - WATCHDOG_DRY_RUN=${WATCHDOG_DRY_RUN:-false}
+    # Hard ceilings, so it can never get in the way of anything else.
+    mem_limit: 128m
+    cpus: 0.2
+    pids_limit: 64
+    stop_grace_period: 5s
+    logging:
+      driver: json-file
+      options:
+        max-size: "1m"
+        max-file: "2"

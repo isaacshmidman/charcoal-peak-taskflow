@@ -3,6 +3,7 @@ declare const process: {
   argv: string[];
   exitCode?: number;
   exit: (code?: number) => never;
+  on: (event: string, listener: (...args: any[]) => void) => void;
 };
 
 declare class Buffer extends Uint8Array {
@@ -15,6 +16,8 @@ declare class Buffer extends Uint8Array {
   writeUInt32LE(value: number, offset: number): number;
   readUInt16LE(offset: number): number;
   readUInt32LE(offset: number): number;
+  readUInt32BE(offset: number): number;
+  writeUInt32BE(value: number, offset: number): number;
   copy(target: Uint8Array, targetStart?: number): number;
   equals(other: Uint8Array): boolean;
   subarray(start?: number, end?: number): Buffer;

@@ -273,9 +273,26 @@ cp .env.production.example .env
 docker compose up -d --build
 ```
 
-This starts two containers:
+This starts three containers:
 - **taskflow** — your app (Node.js + SQLite)
 - **cloudflared** — Cloudflare Tunnel (routes zephyrly.app to the app)
+- **watchdog** — brings the site back by itself if the tunnel stays disconnected (see below)
+
+### Tunnel watchdog
+
+Cloudflare error 1033 means the tunnel isn't connected. The watchdog (`backend/watchdog/`) checks the public address once a minute, from the box itself:
+
+1. Cloudflare reports the tunnel down for **5 minutes**, while the box is online and the app is healthy → it restarts the `cloudflared` container.
+2. Still down **10 minutes later** → it restarts the box (a clean `systemctl reboot`).
+
+It restarts the box at most once every 6 hours, never within 30 minutes of startup, and never a second time for an outage a restart didn't fix. It does nothing when the home internet is out, when the app itself is down, or during a deploy. On startup it checks — without restarting anything — that it would be able to.
+
+- What it saw and did: `/DATA/AppData/taskflow/watchdog/watchdog.log` (or `docker compose logs watchdog`)
+- Pause it: `docker compose stop watchdog`
+- Rehearse without acting: `WATCHDOG_DRY_RUN=true` in `.env`
+- Never restart the box, only the tunnel: `WATCHDOG_ALLOW_BOX_RESTART=false` in `.env`
+
+It needs the Docker socket (to restart the tunnel and to start the one-off helper that restarts the box), which is root-level access to the machine; it accepts no connections and takes no input from the network beyond the status of its own health checks.
 
 ### Data Persistence
 
