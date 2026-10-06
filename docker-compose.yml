@@ -8,7 +8,12 @@ services:
     ports:
       - "${WEBUI_PORT:-8787}:8787"
     volumes:
-      - /DATA/AppData/taskflow/data:/app/backend/data
+      # The folder on this machine that holds the database and attachments:
+      # TASKFLOW_DATA_DIR in .env. There is deliberately no default. A wrong
+      # folder here starts the app on an empty database, which looks exactly
+      # like losing everything — so without the setting, every
+      # `docker compose` command stops with the message below instead.
+      - "${TASKFLOW_DATA_DIR:?Set TASKFLOW_DATA_DIR in .env to the folder that holds the app data - see .env.production.example}:/app/backend/data"
     environment:
       - NODE_ENV=production
       - TASKFLOW_APP_ID=${TASKFLOW_APP_ID:-69b71a4b57ba76a74090fc6e}

@@ -296,7 +296,11 @@ It needs the Docker socket (to restart the tunnel and to start the one-off helpe
 
 ### Data Persistence
 
-SQLite data is stored on the host at `/DATA/AppData/taskflow/data/` (ZimaOS convention) and mounted into the container. Data survives container rebuilds and restarts.
+The database and attachments are stored on the host in the folder set by `TASKFLOW_DATA_DIR` in `.env` (`/DATA/AppData/taskflow/data` is the ZimaOS convention; a folder on a storage drive works too) and mounted into the container. Data survives container rebuilds and restarts.
+
+`TASKFLOW_DATA_DIR` is required and has no default on purpose: pointed at the wrong folder, the app would start on an empty database, which looks exactly like losing everything. Without it, `docker compose` refuses to run and says so.
+
+A server set up before this setting existed has the folder as a hand edit in `docker-compose.yml` instead. `scripts/move-data-dir-to-env.sh` moves it into `.env` safely: it reads the folder the running app actually uses, checks the database is there, and puts everything back if anything doesn't match. It never restarts anything.
 
 ### Updating
 
@@ -320,4 +324,4 @@ docker compose exec taskflow node backend/import-base44-exports.js \
   --replace
 ```
 
-Copy CSV files into `/DATA/AppData/taskflow/data/` on the host first so the container can see them.
+Copy CSV files into your data folder (`TASKFLOW_DATA_DIR`) on the host first so the container can see them.
