@@ -143,6 +143,8 @@ beforeAll(() => {
     appName: "Taskflow Test",
     publicAppUrl: "http://127.0.0.1:4173",
     dbFile: join(tempDir, "taskflow.sqlite"),
+    // Empty until "the built app" below puts a page in it; never the real dist/.
+    distRoot: join(tempDir, "dist"),
     sessionCookieName: "taskflow_test_session",
     sessionTtlDays: 30,
     deletedTaskRetentionDays: 7,
@@ -672,6 +674,108 @@ describe("CORS", () => {
     expect(other.headers["Access-Control-Allow-Origin"]).toBeUndefined();
     expect(other.headers["Access-Control-Allow-Credentials"]).toBeUndefined();
     expect(other.headers.Vary).toBe("Origin");
+  });
+});
+
+describe("the built app, and the requests that never get it", () => {
+  const PAGE = '<!doctype html><html><head><title>Zephyrly</title></head><body><div id="root"></div></body></html>\n';
+  const SCRIPT = 'console.log("the app");\n';
+  const HTML = "text/html; charset=utf-8";
+  const JSON_TYPE = "application/json; charset=utf-8";
+
+  // A stand-in for `npm run build`: the page, one asset, and a dotfile that
+  // has no business being there. CI runs these tests before it builds, so the
+  // real dist/ can't be counted on.
+  beforeAll(() => {
+    mkdirSync(join(config.distRoot, "assets"), { recursive: true });
+    writeFileSync(join(config.distRoot, "index.html"), PAGE);
+    writeFileSync(join(config.distRoot, "assets", "app-4f3a9c.js"), SCRIPT);
+    writeFileSync(join(config.distRoot, ".DS_Store"), "left behind by Finder");
+  });
+
+  const get = async (path) => {
+    const { statusCode, headers, body } = await invokeRaw(path);
+    return { status: statusCode, type: headers["Content-Type"], cache: headers["Cache-Control"], text: body.toString("utf8") };
+  };
+  const expectThePage = async (path) => {
+    expect(await get(path), path).toEqual({ status: 200, type: HTML, cache: "no-store", text: PAGE });
+  };
+  /** The server's ordinary JSON 404, and none of the page. */
+  const expectNotFound = async (path) => {
+    const result = await get(path);
+    expect({ status: result.status, type: result.type }, path).toEqual({ status: 404, type: JSON_TYPE });
+    expect(JSON.parse(result.text), path).toEqual({ message: "Route not found.", code: "not_found" });
+    expect(result.text, path).not.toContain('<div id="root">');
+  };
+
+  it("serves the page for the app's own routes, and files that exist", async () => {
+    for (const path of ["/", "/Today", "/Settings", "/Notes", "/RecentlyDeleted", "/login", "/auth/callback", "/Calendar?task=abc"]) {
+      await expectThePage(path);
+    }
+    // The one route with a made-up part: the id is base64url, which can start
+    // with "-" or "_" but never with a dot.
+    await expectThePage("/connect/-_Zk3vQ9x0aB7cD1eF2gH3iJ4kL5mN6o");
+
+    expect(await get("/assets/app-4f3a9c.js")).toEqual({
+      status: 200,
+      type: "application/javascript; charset=utf-8",
+      cache: "public, max-age=31536000, immutable",
+      text: SCRIPT,
+    });
+    // A file that isn't there is a 404, as it always was — never the page.
+    await expectNotFound("/package.json");
+    await expectNotFound("/assets/app-000000.js");
+    await expectNotFound("/wp-admin/install.php");
+  });
+
+  it("never answers a dotfile or a Vite dev-server path with the page", async () => {
+    // What a scanner asked zephyrly.app for on 2026-10-06. None has a file
+    // extension, so each used to get the page and a 200.
+    for (const path of ["/.env", "/.npmrc", "/.git/config", "/.git/HEAD", "/.ssh/id_ed25519", "/@fs/src/.env", "/@fs/root/.env"]) {
+      await expectNotFound(path);
+    }
+    // The dot can be in any part of the path, and /@ covers all of Vite's.
+    for (const path of ["/a/.hidden", "/a/b/.git/config", "/.env/", "/..env", "/.../x", "/@vite/client", "/@id/x", "/@"]) {
+      await expectNotFound(path);
+    }
+    // A dot or an @ is the same character however the request spells it.
+    for (const path of ["/%2eenv", "/%2Egit/config", "/a/%2ehidden", "/%40fs/src/.env", "/%40vite/client"]) {
+      await expectNotFound(path);
+    }
+    // Not even when such a file is really in the folder.
+    const stray = await get("/.DS_Store");
+    expect(stray.status).toBe(404);
+    expect(stray.text).not.toContain("Finder");
+  });
+
+  it("still serves the page for any other path with no extension: that is what a route looks like", async () => {
+    // Scanners ask for these too, but nothing tells them apart from a page
+    // the app might have, so the server doesn't guess.
+    for (const path of ["/console", "/graphql", "/actuator", "/debug/pprof", "/wp-admin", "/wp-json"]) {
+      await expectThePage(path);
+    }
+    // A dot or an @ only counts at the start of a part (and an @ only in the first).
+    for (const path of ["/v1.2/notes", "/a.b/c", "/people/@isaac", "/a@b", "/login?next=%2F.env"]) {
+      await expectThePage(path);
+    }
+    // Broken percent-encoding is judged as written, not turned into an error.
+    await expectThePage("/%zz");
+    await expectThePage("/100%");
+  });
+
+  it("keeps /.well-known/ working exactly as before", async () => {
+    // The sign-in documents for AI apps are answered before static files are
+    // looked at, so the dot rule never sees them.
+    const metadata = await get("/.well-known/oauth-authorization-server");
+    expect({ status: metadata.status, type: metadata.type }).toEqual({ status: 200, type: JSON_TYPE });
+    expect(JSON.parse(metadata.text).issuer).toBe("http://127.0.0.1:4173");
+    const resource = await get("/.well-known/oauth-protected-resource");
+    expect(resource.status).toBe(200);
+    expect(JSON.parse(resource.text).resource).toBe("http://127.0.0.1:4173/api/mcp");
+
+    // Anything else there was a plain 404 before there was a dot rule, and still is.
+    await expectNotFound("/.well-known/openid-configuration");
+    await expectNotFound("/.well-known/security.txt");
   });
 });
 

@@ -109,6 +109,9 @@ export const backendConfig = {
     "http://127.0.0.1:5173",
   dbFile:
     process.env.TASKFLOW_DB_FILE || resolve(projectRoot, "backend", "data", "taskflow.sqlite"),
+  // The built app (`npm run build`): the one folder the server hands files
+  // out of. Tests point it at a folder of their own.
+  distRoot: resolve(projectRoot, "dist"),
   sessionCookieName: process.env.TASKFLOW_SESSION_COOKIE_NAME || "taskflow_session",
   sessionTtlDays: parseInteger(process.env.TASKFLOW_SESSION_TTL_DAYS, 30),
   deletedTaskRetentionDays: parseInteger(

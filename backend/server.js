@@ -3,7 +3,7 @@ import http from "node:http";
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { backendConfig, projectRoot } from "./config.js";
+import { backendConfig } from "./config.js";
 import { closeDatabase, getDatabase } from "./db.js";
 import { HttpError, getRequestUrl, publicOrigin, sendError, sendJson } from "./http.js";
 import { log } from "./log.js";
@@ -23,7 +23,6 @@ import { handleExportRoute } from "./routes/export.js";
 import { handleRestoreRoute } from "./routes/restore.js";
 import { handleAiRoute } from "./routes/ai.js";
 
-const distRoot = resolve(projectRoot, "dist");
 const CONTENT_TYPES = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
@@ -70,7 +69,32 @@ function ensureAppId(appId, config) {
   }
 }
 
-function resolveStaticFile(requestPathname) {
+// Paths that can never be a page of the app: any part that starts with a dot
+// (/.env, /.git/config, /a/.hidden), and anything under /@ (/@fs/…, /@vite/…
+// belong to Vite's dev server, which a build doesn't have). They have no file
+// extension, so each used to fall back to the app's page with a 200 — which a
+// vulnerability scanner records as a find, and keeps probing.
+//
+// This is not a list of what scanners ask for (/wp-admin, /graphql): a path
+// with no extension that the server doesn't know is exactly what one of the
+// app's own routes looks like, so those must keep getting the page.
+// /.well-known/ never comes through here; it is answered before static files.
+function canNeverBeAppRoute(pathname) {
+  let decoded = pathname;
+  try {
+    // %2e is a dot and %40 an @, however the request spelled them.
+    decoded = decodeURIComponent(pathname);
+  } catch {
+    // Not valid percent-encoding: judge the path as written.
+  }
+  const parts = parsePath(decoded);
+  if (parts[0]?.startsWith("@")) return true;
+  return parts.some((part) => part.startsWith("."));
+}
+
+function resolveStaticFile(requestPathname, distRoot) {
+  // Nothing in dist/ answers these: not the app's page, and not a file either.
+  if (canNeverBeAppRoute(requestPathname)) return null;
   // Strip leading slash; reject any traversal.
   const safe = requestPathname.replace(/^\/+/, "").replace(/\.\.\/?/g, "");
   if (!safe) {
@@ -190,7 +214,7 @@ export function createRequestHandler(config = backendConfig, db = getDatabase(co
 
       // Static assets — anything not under /api hits the dist/ fallback.
       if (!requestUrl.pathname.startsWith("/api")) {
-        const staticFile = resolveStaticFile(requestUrl.pathname);
+        const staticFile = resolveStaticFile(requestUrl.pathname, config.distRoot || backendConfig.distRoot);
         if (staticFile) {
           serveStaticFile(response, staticFile);
           return;
