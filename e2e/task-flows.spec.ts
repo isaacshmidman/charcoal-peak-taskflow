@@ -488,7 +488,7 @@ test("email sign-in and settings logout return to the login screen", async ({ pa
   expect(state.currentUser).toBeNull();
 });
 
-test("google sign-in starts with the local auth callback target", async ({ page }) => {
+test("google sign-in starts with the local auth callback target", async ({ page, baseURL }) => {
   const api = await installMockBackend(page, {
     tasks: [],
     priorities: [defaultPriority],
@@ -500,7 +500,7 @@ test("google sign-in starts with the local auth callback target", async ({ page 
 
   const meta = await api.getMeta();
   expect(meta.lastLoginProvider).toBe("google");
-  expect(meta.lastLoginFromUrl).toBe("http://127.0.0.1:4173/auth/callback?next=http%3A%2F%2F127.0.0.1%3A4173%2FToday");
+  expect(meta.lastLoginFromUrl).toBe(`${baseURL}/auth/callback?next=${encodeURIComponent(`${baseURL}/Today`)}`);
 });
 
 test("cancelling the new-task form creates nothing, and the create button is the only writer", async ({ page }) => {
