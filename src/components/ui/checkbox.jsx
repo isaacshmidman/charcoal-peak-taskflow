@@ -52,6 +52,10 @@ const Checkbox = React.forwardRef(function Checkbox(
       onClick={handleClick}
       className={cn(
         "shrink-0 border-2 flex items-center justify-center transition-all touch-manipulation",
+        // A click on the tick must land on the box itself: inside a <label>,
+        // a click on the tick made the label click the box a second time,
+        // so a ticked box could never be unticked.
+        "[&_svg]:pointer-events-none",
         "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
         "disabled:opacity-50 disabled:pointer-events-none",
         checked
