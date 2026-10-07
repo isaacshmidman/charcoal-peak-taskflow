@@ -199,6 +199,27 @@ const savedSchedule = async (api: Awaited<ReturnType<typeof installMockBackend>>
   return stored ? JSON.parse(stored) : null;
 };
 
+/**
+ * Do `cause` and wait for the toast to say `text`, watching from inside
+ * the page from before `cause` starts. A toast is only up for a few
+ * seconds, and looking for it from out here once `cause` has come back can
+ * be too late: when the machine holds the test runner up for longer than
+ * the toast lasts (a Mac short of memory did, for over 6 seconds, in the
+ * middle of a full run) it has come and gone unseen. The page can't miss
+ * its own toast. Still fails if the toast never says it.
+ */
+async function toastSays(page: Page, text: string, cause: () => Promise<unknown>) {
+  const said = page
+    .waitForFunction(
+      (wanted) => !!document.querySelector('[data-testid="delete-toast"]')?.textContent?.includes(wanted),
+      text,
+      { timeout: 10_000 }
+    )
+    .then(() => true, () => false);
+  await cause();
+  expect(await said, `the toast saying “${text}”`).toBe(true);
+}
+
 test("Schedule turns a note into the day by the hour, and typing a new end moves the slots after it", async ({ page }) => {
   const api = await installMockBackend(page, { tasks: [], priorities: [defaultPriority], notes: [note({ title: "Saturday" })] });
   await page.goto("/Notes");
@@ -210,12 +231,13 @@ test("Schedule turns a note into the day by the hour, and typing a new end moves
   expect(ranges.at(-1)).toBe("11:00 PM – 12:00 AM");
 
   // 7:00 – 8:00 AM: click the end's hour, type 07 then 30.
-  await page.getByRole("textbox", { name: "End of 7:00 AM – 8:00 AM, hour" }).click();
+  const endHour = page.getByRole("textbox", { name: "End of 7:00 AM – 8:00 AM, hour" });
+  await endHour.click();
+  await expect(endHour).toBeFocused();
   await page.keyboard.type("07");
   await expect(page.getByRole("alert")).toHaveText("The end has to be after the start (7:00 AM).");
-  await page.keyboard.type("30");
+  await toastSays(page, "Adjusted 16 other slots and added 1 empty slot.", () => page.keyboard.type("30"));
   await expect(page.getByRole("alert")).toHaveCount(0);
-  await expect(page.getByTestId("delete-toast")).toContainText("Adjusted 16 other slots and added 1 empty slot.");
   expect((await slotRanges(page)).slice(7, 10)).toEqual(["7:00 AM – 7:30 AM", "7:30 AM – 8:30 AM", "8:30 AM – 9:30 AM"]);
 
   await page.getByRole("textbox", { name: "What’s happening 7:00 AM – 7:30 AM" }).fill("Breakfast");
@@ -232,10 +254,18 @@ test("an end before its start is put back, with the reason", async ({ page }) =>
   await page.goto("/Notes");
   await page.getByRole("switch", { name: "Schedule builder" }).click();
 
-  await page.getByRole("textbox", { name: "End of 7:00 AM – 8:00 AM, hour" }).click();
+  const endHour = page.getByRole("textbox", { name: "End of 7:00 AM – 8:00 AM, hour" });
+  await endHour.click();
+  await expect(endHour).toBeFocused();
   await page.keyboard.type("6");
-  await page.getByTestId("note-title-input").click();
-  await expect(page.getByTestId("delete-toast")).toContainText("The end has to be after the start (7:00 AM).");
+  // The field has the 6 and says under it why 6:00 AM can't stand.
+  await expect(endHour).toHaveValue("6");
+  await expect(page.getByRole("alert")).toHaveText("The end has to be after the start (7:00 AM).");
+
+  // Leaving the field puts 8:00 back and gives the reason in a toast.
+  await toastSays(page, "The end has to be after the start (7:00 AM).", () => page.getByTestId("note-title-input").click());
+  await expect(endHour).toHaveValue("8");
+  await expect(page.getByRole("alert")).toHaveCount(0);
   expect((await slotRanges(page))[7]).toBe("7:00 AM – 8:00 AM");
 });
 
