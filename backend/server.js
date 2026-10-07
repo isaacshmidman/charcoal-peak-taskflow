@@ -8,7 +8,7 @@ import { closeDatabase, getDatabase } from "./db.js";
 import { HttpError, getRequestUrl, publicOrigin, sendError, sendJson } from "./http.js";
 import { log } from "./log.js";
 import { anyPasswordAllowed, purgeExpiredAuthRecords } from "./auth.js";
-import { contentSecurityPolicy, securityHeaders } from "./security-headers.js";
+import { contentSecurityPolicy, scriptNonce, securityHeaders } from "./security-headers.js";
 import { purgeExpiredAiRecords } from "./ai/grants.js";
 import { purgeExpiredOAuthRecords } from "./ai/oauth.js";
 import { purgeExpiredDeletedTasks } from "./store.js";
@@ -131,8 +131,9 @@ function serveStaticFile(response, filePath) {
     // consent page for AI apps especially must not be clickable through one.
     response.setHeader("X-Frame-Options", "DENY");
     // And the page may only run its own scripts, so an injected one can't
-    // read the sign-in token (see security-headers.js).
-    response.setHeader("Content-Security-Policy", contentSecurityPolicy(filePath));
+    // read the sign-in token (see security-headers.js). The nonce is for the
+    // one script Cloudflare adds on the way to the browser.
+    response.setHeader("Content-Security-Policy", contentSecurityPolicy(filePath, scriptNonce()));
   }
   response.writeHead(200);
   createReadStream(filePath).pipe(response);

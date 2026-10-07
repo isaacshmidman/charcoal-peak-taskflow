@@ -8,8 +8,12 @@
  * (plus the one small inline script in index.html that sets dark mode
  * before the app loads, allowed by its exact hash). Styles may be inline:
  * the note editor colours text with style attributes.
+ *
+ * One script reaches the browser that was never in the build: Cloudflare,
+ * which zephyrly.app sits behind, adds its check for bots to every page on
+ * the way. It is allowed by a nonce (see scriptNonce).
  */
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { readFileSync, statSync } from "node:fs";
 
 /**
@@ -41,13 +45,26 @@ export function inlineScriptHashes(html) {
 }
 
 /**
- * The policy for a page's HTML.
- * @param {string} html
+ * A value made new for one response and sent only in that response's policy.
+ * Cloudflare reads it there and puts it on the script it adds, which is how
+ * the browser knows to run that one. Without it the browser refuses the
+ * script and logs an error on every page. Nothing planted in a page can know
+ * the value, so it lets nothing else in.
  */
-export function policyFor(html) {
+export function scriptNonce() {
+  // Hex: nothing but letters and digits for whatever copies it into a tag.
+  return randomBytes(16).toString("hex");
+}
+
+/**
+ * The policy for a page whose inline scripts have these hashes.
+ * @param {string[]} hashes
+ * @param {string} nonce  this response's (see scriptNonce), or "" for none
+ */
+function policy(hashes, nonce) {
   return [
     "default-src 'self'",
-    ["script-src 'self'", ...inlineScriptHashes(html)].join(" "),
+    ["script-src 'self'", ...hashes, ...(nonce ? [`'nonce-${nonce}'`] : [])].join(" "),
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https://*.googleusercontent.com",
     "font-src 'self' data:",
@@ -61,19 +78,30 @@ export function policyFor(html) {
   ].join("; ");
 }
 
-/** @type {Map<string, { mtimeMs: number, policy: string }>} */
+/**
+ * The policy for a page's HTML.
+ * @param {string} html
+ * @param {string} [nonce]  this response's (see scriptNonce)
+ */
+export function policyFor(html, nonce = "") {
+  return policy(inlineScriptHashes(html), nonce);
+}
+
+/** @type {Map<string, { mtimeMs: number, hashes: string[] }>} */
 const cache = new Map();
 
 /**
- * The policy for an HTML file on disk, worked out again when it changes
- * (a new build).
+ * The policy for an HTML file on disk. Its script hashes are worked out
+ * again when the file changes (a new build); the nonce is the response's.
  * @param {string} filePath
+ * @param {string} [nonce]  this response's (see scriptNonce)
  */
-export function contentSecurityPolicy(filePath) {
+export function contentSecurityPolicy(filePath, nonce = "") {
   const { mtimeMs } = statSync(filePath);
-  const cached = cache.get(filePath);
-  if (cached && cached.mtimeMs === mtimeMs) return cached.policy;
-  const policy = policyFor(readFileSync(filePath, "utf8"));
-  cache.set(filePath, { mtimeMs, policy });
-  return policy;
+  let cached = cache.get(filePath);
+  if (!cached || cached.mtimeMs !== mtimeMs) {
+    cached = { mtimeMs, hashes: inlineScriptHashes(readFileSync(filePath, "utf8")) };
+    cache.set(filePath, cached);
+  }
+  return policy(cached.hashes, nonce);
 }

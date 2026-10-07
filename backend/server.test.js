@@ -899,10 +899,20 @@ describe("the built app, and the requests that never get it", () => {
   });
 
   it("sends the page with its script policy, and files and refusals with the basic protections", async () => {
+    const policyOf = async (path) => String((await invokeRaw(path)).headers["Content-Security-Policy"]);
+    // 16 random bytes, as hex.
+    const nonceIn = (policy) => /'nonce-([0-9a-f]{32})'/.exec(policy)?.[1];
+
     const page = await invokeRaw("/Today");
-    // No inline script in this page, so the only scripts it may run are the site's own files.
-    expect(page.headers["Content-Security-Policy"]).toBe(policyFor(PAGE));
-    expect(page.headers["Content-Security-Policy"]).toContain("script-src 'self';");
+    const policy = String(page.headers["Content-Security-Policy"]);
+    // No inline script in this page, so the only scripts it may run are the
+    // site's own files, and one added on the way that carries this response's
+    // nonce (Cloudflare's check for bots).
+    expect(nonceIn(policy)).toBeTruthy();
+    expect(policy).toBe(policyFor(PAGE, nonceIn(policy)));
+    expect(policy).toContain(`script-src 'self' 'nonce-${nonceIn(policy)}';`);
+    // The nonce is the response's own: the next one gets another.
+    expect(nonceIn(await policyOf("/Today"))).not.toBe(nonceIn(policy));
     expect(page.headers["X-Frame-Options"]).toBe("DENY");
     // nosniff is what stops a browser running a file as a script when it isn't one.
     for (const path of ["/Today", "/assets/app-4f3a9c.js", "/.env", "/package.json"]) {
@@ -917,9 +927,7 @@ describe("the built app, and the requests that never get it", () => {
     // Its own modified time, so this doesn't lean on two writes landing in different clock ticks.
     utimesSync(pageFile, new Date(), new Date(Date.now() + 60_000));
     try {
-      expect((await invokeRaw("/Today")).headers["Content-Security-Policy"]).toContain(
-        `script-src 'self' 'sha256-${hashOf("sha256").update(inline).digest("base64")}';`
-      );
+      expect(await policyOf("/Today")).toContain(`script-src 'self' 'sha256-${hashOf("sha256").update(inline).digest("base64")}' 'nonce-`);
     } finally {
       writeFileSync(pageFile, PAGE);
     }
