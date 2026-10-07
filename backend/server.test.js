@@ -6,7 +6,7 @@ import { validateHeaderValue } from "node:http";
 import { Readable } from "node:stream";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createHash, randomBytes } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
 import { closeDatabase, createDatabase } from "./db.js";
 import { readZip } from "./test-support/readZip.js";
 import { createRequestHandler } from "./server.js";
@@ -896,6 +896,33 @@ describe("the built app, and the requests that never get it", () => {
     // And "//" is a path too. Read as a host it was an error, so a 500.
     await expectThePage("//");
     await expectThePage("//[");
+  });
+
+  it("sends the page with its script policy, and files and refusals with the basic protections", async () => {
+    const page = await invokeRaw("/Today");
+    // No inline script in this page, so the only scripts it may run are the site's own files.
+    expect(page.headers["Content-Security-Policy"]).toBe(policyFor(PAGE));
+    expect(page.headers["Content-Security-Policy"]).toContain("script-src 'self';");
+    expect(page.headers["X-Frame-Options"]).toBe("DENY");
+    // nosniff is what stops a browser running a file as a script when it isn't one.
+    for (const path of ["/Today", "/assets/app-4f3a9c.js", "/.env", "/package.json"]) {
+      expect((await invokeRaw(path)).headers["X-Content-Type-Options"], path).toBe("nosniff");
+    }
+
+    // A new build whose page has an inline script: the policy is worked out
+    // again, and allows that script by its hash.
+    const inline = "document.documentElement.classList.add('dark')";
+    const pageFile = join(config.distRoot, "index.html");
+    writeFileSync(pageFile, PAGE.replace("</head>", `<script>${inline}</script></head>`));
+    // Its own modified time, so this doesn't lean on two writes landing in different clock ticks.
+    utimesSync(pageFile, new Date(), new Date(Date.now() + 60_000));
+    try {
+      expect((await invokeRaw("/Today")).headers["Content-Security-Policy"]).toContain(
+        `script-src 'self' 'sha256-${hashOf("sha256").update(inline).digest("base64")}';`
+      );
+    } finally {
+      writeFileSync(pageFile, PAGE);
+    }
   });
 
   it("never answers a dotfile or a Vite dev-server path with the page", async () => {
