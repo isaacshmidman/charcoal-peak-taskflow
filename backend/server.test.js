@@ -726,6 +726,12 @@ describe("the built app, and the requests that never get it", () => {
     await expectNotFound("/package.json");
     await expectNotFound("/assets/app-000000.js");
     await expectNotFound("/wp-admin/install.php");
+    // With two slashes in front it is the same missing file, not a host called
+    // "package.json" and the path "/".
+    await expectNotFound("//package.json");
+    // And "//" is a path too. Read as a host it was an error, so a 500.
+    await expectThePage("//");
+    await expectThePage("//[");
   });
 
   it("never answers a dotfile or a Vite dev-server path with the page", async () => {
@@ -740,6 +746,10 @@ describe("the built app, and the requests that never get it", () => {
     }
     // A dot or an @ is the same character however the request spells it.
     for (const path of ["/%2eenv", "/%2Egit/config", "/a/%2ehidden", "/%40fs/src/.env", "/%40vite/client"]) {
+      await expectNotFound(path);
+    }
+    // Nor with a second slash in front, which used to turn ".env" into a host.
+    for (const path of ["//.env", "//.git/config", "//@fs/src/.env", "/\\.env", "/.//.env"]) {
       await expectNotFound(path);
     }
     // Not even when such a file is really in the folder.

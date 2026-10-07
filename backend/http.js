@@ -198,10 +198,20 @@ export function redirect(response, location, headers = {}) {
 }
 
 /**
+ * The request line as a URL. Only its path and query mean anything; the
+ * host is a stand-in.
+ *
+ * A request line is a path, not a link, so it must not be resolved the way
+ * a browser resolves one: read like that, "//.env" is a host called ".env"
+ * with the path "/" (which gets the app's page), and "//" is no host at
+ * all (an error, so a 500). A line that starts with a slash is read as the
+ * path it is.
+ *
  * @param {import("node:http").IncomingMessage} request
  */
 export function getRequestUrl(request) {
-  return new URL(request.url || "/", "http://127.0.0.1");
+  const target = request.url || "/";
+  return target.startsWith("/") ? new URL(`http://127.0.0.1${target}`) : new URL(target, "http://127.0.0.1");
 }
 
 /**

@@ -1,7 +1,7 @@
 /* @vitest-environment node */
 import { Readable } from "node:stream";
 import { describe, expect, it } from "vitest";
-import { readJsonBody, sameOriginUrl } from "./http.js";
+import { getRequestUrl, readJsonBody, sameOriginUrl } from "./http.js";
 
 /** A request-shaped stream: chunks plus the headers readJsonBody reads. */
 function requestOf(chunks, headers = {}) {
@@ -71,5 +71,58 @@ describe("sameOriginUrl", () => {
   it("uses the fallback for missing or blank targets", () => {
     expect(sameOriginUrl(null, APP, "/Settings")).toBe("https://zephyrly.app/Settings");
     expect(sameOriginUrl("   ", APP)).toBe("https://zephyrly.app/");
+  });
+});
+
+describe("getRequestUrl", () => {
+  const urlOf = (line) => getRequestUrl(/** @type {any} */ ({ url: line }));
+  const read = (line) => {
+    const { pathname, search } = urlOf(line);
+    return pathname + search;
+  };
+
+  it("reads an ordinary request line exactly as it always did", () => {
+    // What it used to be, for every line: a link resolved against a stand-in host.
+    const before = (line) => new URL(line, "http://127.0.0.1").href;
+    for (const line of [
+      "/",
+      "/Today",
+      "/api/apps/x/entities/Task?sort=-due_date&limit=5",
+      "/auth/callback?next=%2FToday&email=a%40b.example",
+      "/a/../b/./c",
+      "/a//b",
+      "/.env",
+      "/%2eenv",
+      "/@fs/src/.env",
+      "/a\\b",
+      "/café?q=ü",
+      "/x;y=1?z#frag",
+      "/?",
+      "/%zz",
+      // The proxy form carries a host of its own; only the path counts.
+      "http://zephyrly.app/login?next=%2FToday",
+      "*",
+    ]) {
+      expect(urlOf(line).href, line).toBe(before(line));
+    }
+    expect(read("/a/../b/./c")).toBe("/b/c");
+    expect(read("http://zephyrly.app/login?next=%2FToday")).toBe("/login?next=%2FToday");
+    expect(read(undefined)).toBe("/");
+  });
+
+  it("reads a line that starts with two slashes as a path, not as a host", () => {
+    // Resolved like a link, each of these named a host and left "/", "/config"
+    // or "/api/health" as the path.
+    expect(read("//.env")).toBe("//.env");
+    expect(read("//.git/config")).toBe("//.git/config");
+    expect(read("//package.json?x=1")).toBe("//package.json?x=1");
+    expect(read("//evil.example/api/health")).toBe("//evil.example/api/health");
+    expect(read("/\\.env")).toBe("//.env");
+    for (const line of ["//.env", "//evil.example/api/health", "/\\.env"]) {
+      expect(urlOf(line).host, line).toBe("127.0.0.1");
+    }
+    // And these named no host at all, which was an error.
+    expect(read("//")).toBe("//");
+    expect(read("//[")).toBe("//[");
   });
 });
