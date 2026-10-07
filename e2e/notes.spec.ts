@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { installMockBackend } from "./utils/mockBackend";
+import { holdToast, toastSays } from "./utils/toast";
 
 /**
  * Notes, end to end. Until these existed, Notes was the one area of the
@@ -149,12 +150,14 @@ test("swiping a note away deletes it, and Undo brings it back", async ({ page })
   });
   await page.goto("/Notes");
 
+  const toast = await holdToast(page);
   await swipeAway(page, page.getByTestId("note-row-bye"));
   await expect(page.getByTestId("delete-toast")).toContainText("Note deleted");
   await expect.poll(async () => (await api.getState()).notes.map((n) => n.title)).toEqual(["Keep me"]);
   expect((await api.getState()).deletedNotes.map((n) => n.title)).toEqual(["Delete me"]);
 
   await page.getByTestId("delete-toast-undo").click();
+  await toast.release();
   await expect.poll(async () => (await api.getState()).notes.map((n) => n.title).sort()).toEqual(["Delete me", "Keep me"]);
   await expect.poll(async () => (await api.getState()).deletedNotes).toHaveLength(0);
 });
@@ -198,27 +201,6 @@ const savedSchedule = async (api: Awaited<ReturnType<typeof installMockBackend>>
   const stored = (await api.getState()).notes.find((n) => n.id === id)?.schedule_json;
   return stored ? JSON.parse(stored) : null;
 };
-
-/**
- * Do `cause` and wait for the toast to say `text`, watching from inside
- * the page from before `cause` starts. A toast is only up for a few
- * seconds, and looking for it from out here once `cause` has come back can
- * be too late: when the machine holds the test runner up for longer than
- * the toast lasts (a Mac short of memory did, for over 6 seconds, in the
- * middle of a full run) it has come and gone unseen. The page can't miss
- * its own toast. Still fails if the toast never says it.
- */
-async function toastSays(page: Page, text: string, cause: () => Promise<unknown>) {
-  const said = page
-    .waitForFunction(
-      (wanted) => !!document.querySelector('[data-testid="delete-toast"]')?.textContent?.includes(wanted),
-      text,
-      { timeout: 10_000 }
-    )
-    .then(() => true, () => false);
-  await cause();
-  expect(await said, `the toast saying “${text}”`).toBe(true);
-}
 
 test("Schedule turns a note into the day by the hour, and typing a new end moves the slots after it", async ({ page }) => {
   const api = await installMockBackend(page, { tasks: [], priorities: [defaultPriority], notes: [note({ title: "Saturday" })] });
@@ -370,8 +352,7 @@ test("Add to calendar turns filled slots into tasks on the day chosen, once, and
   await page.getByTestId("add-to-calendar-slots").getByText("Gym").click();
   await expect(page.getByRole("checkbox", { name: "Add Gym" })).toHaveAttribute("aria-checked", "true");
   await page.getByRole("checkbox", { name: "Add Gym" }).click();
-  await page.getByTestId("add-to-calendar-confirm").click();
-  await expect(page.getByTestId("delete-toast")).toContainText("Added 1 task on");
+  await toastSays(page, "Added 1 task on", () => page.getByTestId("add-to-calendar-confirm").click());
   await expect.poll(added).toEqual(["Breakfast 7:00AM-8:00AM"]);
 
   // Opened again for the same day: Breakfast is already there.
@@ -379,11 +360,13 @@ test("Add to calendar turns filled slots into tasks on the day chosen, once, and
   await page.getByRole("button", { name: "Tomorrow" }).click();
   await expect(page.getByTestId("add-to-calendar-slots")).toContainText("Already on this day");
   await expect(page.getByTestId("add-to-calendar-confirm")).toHaveText(/^Add 1 task to /);
+  const toast = await holdToast(page);
   await page.getByTestId("add-to-calendar-confirm").click();
   await expect.poll(added).toEqual(["Breakfast 7:00AM-8:00AM", "Gym 9:00AM-10:00AM"]);
 
   // The newest toast (the one before may still be fading out).
   await page.getByTestId("delete-toast-undo").last().click();
+  await toast.release();
   await expect.poll(added).toEqual(["Breakfast 7:00AM-8:00AM"]);
 });
 
@@ -415,9 +398,11 @@ test("adding a schedule asks before merging a slot into a task that looks the sa
   await expect(prompt.getByTestId("similar-match")).toContainText("looks like “go to the gym tmr” · no time");
   await expect(prompt.getByTestId("similar-match")).toContainText("“go to the gym tmr” moves to 9:00 AM – 10:00 AM; no new task.");
   await expect(page.getByTestId("similar-confirm")).toHaveText("Add 1 task · merge 1");
+  const mergedToast = await holdToast(page);
   await page.getByTestId("similar-confirm").click();
   await expect.poll(onDay).toEqual(["Lunch 12:00PM-1:00PM", "go to the gym tmr 9:00AM-10:00AM"]);
   await page.getByTestId("delete-toast-undo").last().click();
+  await mergedToast.release();
   await expect.poll(onDay).toEqual(["go to the gym tmr ---"]);
 
   // Again, with "Don't ask again": it says what will happen, and does it next time without asking.
@@ -426,9 +411,11 @@ test("adding a schedule asks before merging a slot into a task that looks the sa
   await page.getByTestId("add-to-calendar-confirm").click();
   await page.getByRole("checkbox", { name: "Don’t ask again" }).click();
   await expect(page.getByTestId("dont-ask-note")).toContainText("merged without asking");
+  const quietToast = await holdToast(page);
   await page.getByTestId("similar-confirm").click();
   await expect.poll(async () => ((await api.getState()) as any).scheduleSimilarTasks).toBe("merge");
   await page.getByTestId("delete-toast-undo").last().click();
+  await quietToast.release();
   await expect.poll(onDay).toEqual(["go to the gym tmr ---"]);
 
   await page.getByRole("button", { name: "Add to calendar" }).click();

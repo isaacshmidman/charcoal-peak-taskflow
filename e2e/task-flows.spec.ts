@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { installMockBackend } from "./utils/mockBackend";
+import { holdToast, toastSays } from "./utils/toast";
 
 const formatDateOffset = (offsetDays = 0) => {
   const date = new Date();
@@ -223,6 +224,7 @@ test("emptying completed moves only the deleted completed tasks into recently de
   await expect(page.getByText("Completed task two")).toBeVisible();
 
   await page.getByTitle("Delete all completed").click();
+  const toast = await holdToast(page);
   await page.getByRole("button", { name: "Delete all" }).click();
 
   await expect(page.getByText("Completed task one")).toHaveCount(0);
@@ -237,6 +239,7 @@ test("emptying completed moves only the deleted completed tasks into recently de
   expect(deletedState.deletedTasks.filter((record) => record.title === existingDeletedTitle)).toHaveLength(1);
 
   await page.getByTestId("delete-toast-undo").click();
+  await toast.release();
 
   const restoredState = await api.getState();
   expect(restoredState.tasks.map((task) => task.title)).toEqual(
@@ -292,12 +295,14 @@ test("delete all future reminders removes the series and undo restores it across
   await expect(card).toBeVisible();
 
   await swipeTaskCard(page, card);
+  const toast = await holdToast(page);
   await page.getByTestId("recurring-delete-all").click();
 
   await expect(card).toHaveCount(0);
   await expect(page.getByTestId("delete-toast")).toBeVisible();
 
   await page.getByTestId("delete-toast-undo").click();
+  await toast.release();
   await expect(taskCardByTitle(page, "Series task")).toBeVisible();
 
   await page.reload();
@@ -621,6 +626,7 @@ test("dragging a task in week view reschedules it, showing the time it will land
   await page.mouse.down();
   await page.mouse.move(colBox.x + colBox.width / 2, colBox.y + 14 * 44 + 6 + 4, { steps: 12 });
   await expect(page.getByTestId("calendar-drop-time")).toHaveText("2 PM – 3:30 PM");
+  const toast = await holdToast(page);
   await page.mouse.up();
 
   await expect.poll(async () => (await api.getState()).tasks.find((t) => t.id === "drag-me"))
@@ -629,6 +635,7 @@ test("dragging a task in week view reschedules it, showing the time it will land
   // The move can be undone from the toast, back to exactly where it was.
   await expect(page.getByTestId("delete-toast")).toContainText("Moved “Drag me” to");
   await page.getByTestId("delete-toast-undo").click();
+  await toast.release();
   await expect.poll(async () => (await api.getState()).tasks.find((t) => t.id === "drag-me"))
     .toMatchObject({ due_date: today, task_time: "9:00AM", task_end_time: "10:30AM" });
 
@@ -667,11 +674,10 @@ test("dragging an event's bottom edge changes when it ends, and nothing else", a
   await page.mouse.down();
   await page.mouse.move(x, y + 44, { steps: 8 }); // one hour later (44px/hour)
   await expect(page.getByTestId("calendar-resize-time")).toHaveText("9 AM – 11:30 AM");
-  await page.mouse.up();
+  await toastSays(page, "“Stretch me” now ends 11:30 AM", () => page.mouse.up());
 
   await expect.poll(async () => (await api.getState()).tasks.find((t) => t.id === "stretch"))
     .toMatchObject({ due_date: today, task_time: "9:00AM", task_end_time: "11:30AM" });
-  await expect(page.getByTestId("delete-toast")).toContainText("“Stretch me” now ends 11:30 AM");
   // Letting go neither opened the task nor started a new one.
   await expect(page.getByTestId("task-form-dialog")).toHaveCount(0);
   expect((await api.getState()).tasks).toHaveLength(1);
@@ -772,9 +778,11 @@ test("undoing a delete brings the task back with its files", async ({ page }) =>
 
   await page.goto("/Today");
   await taskCardByTitle(page, "Taxes").click();
+  const toast = await holdToast(page);
   await page.getByTestId("task-form-delete").click();
   await expect(taskCardByTitle(page, "Taxes")).toHaveCount(0);
   await page.getByTestId("delete-toast-undo").click();
+  await toast.release();
 
   // The paperclip is there at once, not after the next refetch.
   const card = taskCardByTitle(page, "Taxes");
