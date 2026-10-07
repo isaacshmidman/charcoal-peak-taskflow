@@ -55,8 +55,16 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const useEmbeddedApi = mode !== "e2e" && env.TASKFLOW_USE_EMBEDDED_BACKEND !== "0";
 
+  const shared = createViteConfig({ apiBaseUrl: env.VITE_API_BASE_URL || "", useEmbeddedApi });
+
   return {
-    ...createViteConfig({ apiBaseUrl: env.VITE_API_BASE_URL || "", useEmbeddedApi }),
+    ...shared,
+    // The e2e server serves the code as it was when the run started. It
+    // watches nothing and pushes nothing to the page: a file saved during
+    // a run (a backend file restarts this server, since the plugin above
+    // pulls the backend in; a source file hot-updates) used to reload
+    // every page a test had open, in the middle of the test.
+    server: mode === "e2e" ? { ...shared.server, watch: null, hmr: false } : shared.server,
     optimizeDeps: { force: true },
     build: {
       rollupOptions: {
