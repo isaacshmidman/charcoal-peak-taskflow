@@ -31,7 +31,7 @@
  * because it also exports NAV_OPTIONS, consumed by @/lib/navigation.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import {
   Bell,
   Calendar,
@@ -376,6 +376,16 @@ export default function Settings() {
           onClick={() => openSection("recentlyDeleted")}
         />
       </div>
+
+      <p className="mt-6 text-center text-xs text-slate-400 dark:text-slate-500" data-testid="settings-legal-links">
+        <Link to="/terms" className="underline underline-offset-2 hover:text-slate-600 dark:hover:text-slate-300">
+          Terms
+        </Link>
+        {" · "}
+        <Link to="/privacy" className="underline underline-offset-2 hover:text-slate-600 dark:hover:text-slate-300">
+          Privacy
+        </Link>
+      </p>
     </div>
   );
 }

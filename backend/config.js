@@ -134,7 +134,26 @@ export const backendConfig = {
   vapidPublicKey: process.env.TASKFLOW_VAPID_PUBLIC_KEY || "",
   vapidPrivateKey: process.env.TASKFLOW_VAPID_PRIVATE_KEY || "",
   vapidSubject: deriveVapidSubject(),
+  // Where people reach a person: shown on the Terms and Privacy pages.
+  supportEmail: deriveSupportEmail(),
 };
+
+/**
+ * TASKFLOW_SUPPORT_EMAIL, else support@ the app's own domain (none on localhost).
+ *
+ * @param {Record<string, string | undefined>} [env]
+ */
+export function deriveSupportEmail(env = process.env) {
+  const explicit = String(env.TASKFLOW_SUPPORT_EMAIL || "").trim();
+  if (explicit) return explicit;
+  try {
+    const { hostname } = new URL(String(env.TASKFLOW_PUBLIC_APP_URL || ""));
+    if (hostname.includes(".") && !/^[\d.]+$/.test(hostname) && !hostname.endsWith(".localhost")) return `support@${hostname}`;
+  } catch {
+    // No public URL: no address.
+  }
+  return "";
+}
 
 export function getGoogleCalendarRedirectUrl(config = backendConfig) {
   // Must match a redirect URI registered in Google Cloud Console. The callback

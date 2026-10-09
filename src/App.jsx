@@ -19,6 +19,10 @@ import Settings from "@/pages/Settings.jsx";
 import RecentlyDeleted from "@/pages/RecentlyDeleted.jsx";
 import Notes from "@/pages/Notes.jsx";
 import Connect from "@/pages/Connect.jsx";
+import { PrivacyPage, TermsPage } from "@/pages/Legal.jsx";
+
+/** Pages anyone can read, signed in or not (Stripe links to them). */
+const LEGAL_PATHS = new Set(["/terms", "/privacy"]);
 
 function DefaultRedirect() {
   const defaultNav = sanitizeNavRoute(localStorage.getItem("defaultNav"));
@@ -37,7 +41,8 @@ const AuthenticatedApp = () => {
     loadFromCache("publicSettings")
   );
   const isOffline = !navigator.onLine;
-  const isAuthRoute = location.pathname === "/login" || location.pathname === "/auth/callback";
+  const isLegalRoute = LEGAL_PATHS.has(location.pathname.toLowerCase());
+  const isAuthRoute = location.pathname === "/login" || location.pathname === "/auth/callback" || isLegalRoute;
 
   useEffect(() => {
     if (authError?.type === "auth_required" && !isOffline && !isAuthRoute) {
@@ -45,7 +50,7 @@ const AuthenticatedApp = () => {
     }
   }, [authError, isAuthRoute, isOffline, navigateToLogin]);
 
-  if ((isLoadingPublicSettings || isLoadingAuth) && !(isOffline && hasCachedData)) {
+  if ((isLoadingPublicSettings || isLoadingAuth) && !(isOffline && hasCachedData) && !isLegalRoute) {
     return (
       <div className="fixed inset-0 flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin" />
@@ -53,7 +58,7 @@ const AuthenticatedApp = () => {
     );
   }
 
-  if (authError) {
+  if (authError && !isLegalRoute) {
     if (authError.type === "auth_required" && !isOffline && !isAuthRoute) return null;
     if (authError.type !== "auth_required") {
       return (
@@ -77,6 +82,8 @@ const AuthenticatedApp = () => {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
+      <Route path="/terms" element={<TermsPage />} />
+      <Route path="/privacy" element={<PrivacyPage />} />
       {/* An AI app asking to connect ("Sign in with Zephyrly"); needs sign-in, outside the app's chrome. */}
       <Route path="/connect/:requestId" element={<Connect />} />
       <Route element={<Layout />}>

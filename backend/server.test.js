@@ -188,6 +188,8 @@ describe("taskflow backend contract", () => {
     expect(result.statusCode).toBe(200);
     expect(result.body.app_id).toBe("test-app");
     expect(result.body.name).toBe("Taskflow Test");
+    // The Terms and Privacy pages show it; none is configured here.
+    expect(result.body.support_email).toBe("");
   });
 
   it("supports login, me, logout, and seeded priorities", async () => {

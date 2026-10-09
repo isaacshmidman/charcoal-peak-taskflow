@@ -62,6 +62,8 @@ function getPublicSettings(config) {
       email_password: anyPasswordAllowed(config),
     },
     deleted_task_retention_days: config.deletedTaskRetentionDays,
+    // For the Terms and Privacy pages (src/pages/Legal.jsx).
+    support_email: config.supportEmail || "",
   };
 }
 

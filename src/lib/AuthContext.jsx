@@ -24,6 +24,8 @@ import { logger } from "@/lib/logger";
  *     google?: boolean,
  *     email_password?: boolean,
  *   },
+ *   support_email?: string,
+ *   deleted_task_retention_days?: number,
  * }} PublicSettings
  */
 /**
