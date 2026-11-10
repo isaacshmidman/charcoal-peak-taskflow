@@ -17,9 +17,9 @@ import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/api/apiClient";
 import { normalizeNotificationSettings } from "@/lib/notifications";
 import { parseTaskTime } from "@/lib/sort-helpers";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import TimeInput from "./TimeInput.jsx";
+import { Field } from "./parts.jsx";
 
 const TIMED_CHOICES = [
   { value: "before:0", label: "At start" },
@@ -89,11 +89,14 @@ export default function ReminderField({ form, setForm }) {
   };
 
   return (
-    <div data-testid="task-form-reminder">
-      <Label className="text-xs font-semibold text-ink-900 dark:text-ink-100 mb-1.5 block">Reminder</Label>
+    <Field
+      label="Reminder"
+      data-testid="task-form-reminder"
+      hint={!settings.enabled ? "Notifications are off, so nothing will be sent. Turn them on in Settings." : null}
+    >
       <div className="flex items-center gap-2">
         <Select value={selected} onValueChange={choose}>
-          <SelectTrigger className="h-9 flex-1" aria-label="Reminder">
+          <SelectTrigger className="min-w-0 flex-1" aria-label="Reminder">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -107,14 +110,9 @@ export default function ReminderField({ form, setForm }) {
           </SelectContent>
         </Select>
         {selected === "at" && (
-          <TimeInput value={atTime} onChange={(t) => setForm((f) => ({ ...f, reminder: `at:${t}` }))} />
+          <TimeInput label="Reminder time" value={atTime} onChange={(t) => setForm((f) => ({ ...f, reminder: `at:${t}` }))} />
         )}
       </div>
-      {!settings.enabled && (
-        <p className="mt-1 text-[11px] text-ink-400 dark:text-ink-500">
-          Notifications are off, so no reminders are sent. Turn them on in Settings → Notifications.
-        </p>
-      )}
-    </div>
+    </Field>
   );
 }

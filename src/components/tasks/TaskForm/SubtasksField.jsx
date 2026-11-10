@@ -1,16 +1,21 @@
 // @ts-nocheck
 /**
- * @file Subtasks block — input for new pending subtasks + chip list of
- * existing-server-saved subtasks (with toggle/edit/delete) + chip list
- * of pending-new subtasks. Only rendered when this form is NOT itself a
- * subtask form (i.e. `parentId` is falsy).
+ * @file The Subtasks row: a short checklist, then a box to add to it.
+ *
+ * Saved subtasks can be ticked, opened (click the title) and deleted.
+ * Ones typed into a form that hasn't been saved yet are listed the same
+ * way, minus the tick — they are created with the task. Only rendered
+ * when this form is NOT itself a subtask form (`parentId` is falsy).
  */
 import { useState } from "react";
+import { Check, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { CheckSquare, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const rowClass = "group/sub flex min-h-8 items-start gap-2.5 py-1";
+const removeClass =
+  "mt-0.5 shrink-0 rounded p-0.5 text-ink-300 transition-colors hover:text-red-600 focus-visible:text-red-600 dark:text-ink-600 dark:hover:text-red-400";
 
 export default function SubtasksField({
   form,
@@ -21,79 +26,111 @@ export default function SubtasksField({
   onDeleteSubtask,
   onEditSubtask,
 }) {
-  const [subtaskInput, setSubtaskInput] = useState("");
+  const [text, setText] = useState("");
+  const saved = task ? existingSubtasks : [];
+  const pending = form.subtask_titles || [];
 
-  const addSubtask = () => {
-    const val = subtaskInput.trim();
-    if (!val) return;
-    setForm({ ...form, subtask_titles: [...(form.subtask_titles || []), val] });
-    setSubtaskInput("");
+  const add = () => {
+    const title = text.trim();
+    if (!title) return;
+    setForm((f) => ({ ...f, subtask_titles: [...(f.subtask_titles || []), title] }));
+    setText("");
   };
-
-  const removeSubtask = (idx) => {
-    setForm({ ...form, subtask_titles: form.subtask_titles.filter((_, i) => i !== idx) });
-  };
+  const removePending = (index) =>
+    setForm((f) => ({ ...f, subtask_titles: (f.subtask_titles || []).filter((_, i) => i !== index) }));
 
   return (
     <div>
-      <Label className="text-xs font-semibold text-ink-900 dark:text-ink-100 mb-1.5 block">Subtasks</Label>
+      {(saved.length > 0 || pending.length > 0) && (
+        <ul className="mb-1.5" data-testid="task-form-subtasks">
+          {saved.map((sub) => {
+            const done = sub.status === "done";
+            return (
+              <li key={sub.id} className={rowClass}>
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={done}
+                  aria-label={done ? `Mark ${sub.title} not done` : `Mark ${sub.title} done`}
+                  onClick={() => onToggleSubtask?.(sub)}
+                  className={cn(
+                    "mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-[5px] border transition-colors",
+                    done
+                      ? "border-sun-400 bg-sun-400 text-ink-900"
+                      : "border-ink-400 hover:border-ink-600 dark:border-ink-500 dark:hover:border-ink-300"
+                  )}
+                >
+                  {done && <Check className="h-3 w-3" strokeWidth={3} />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onEditSubtask?.(sub)}
+                  title="Open subtask"
+                  className={cn(
+                    "min-w-0 flex-1 [overflow-wrap:anywhere] text-left text-sm leading-6 text-foreground hover:underline",
+                    done && "text-ink-400 line-through dark:text-ink-500"
+                  )}
+                >
+                  {sub.title}
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Delete subtask ${sub.title}`}
+                  onClick={() => onDeleteSubtask?.(sub)}
+                  className={removeClass}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </li>
+            );
+          })}
+          {pending.map((title, index) => (
+            <li key={`${index}:${title}`} className={rowClass}>
+              <span aria-hidden="true" className="mt-1 h-4 w-4 shrink-0 rounded-[5px] border border-dashed border-ink-300 dark:border-ink-600" />
+              <span className="min-w-0 flex-1 [overflow-wrap:anywhere] text-sm leading-6 text-foreground">{title}</span>
+              <button
+                type="button"
+                aria-label={`Remove subtask ${title}`}
+                onClick={() => removePending(index)}
+                className={removeClass}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
 
       <div className="flex gap-2">
         <Input
-          placeholder="Add a subtask..."
-          value={subtaskInput}
-          onChange={(e) => setSubtaskInput(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSubtask(); } }}
-          className=""
+          placeholder="Add a subtask"
+          aria-label="New subtask"
+          value={text}
+          enterKeyHint="done"
+          onChange={(e) => setText(e.target.value)}
+          // Leaving the box with something typed keeps it — otherwise
+          // pressing Create straight after typing would drop it.
+          onBlur={add}
+          onKeyDown={(e) => {
+            if (e.key !== "Enter" || e.nativeEvent?.isComposing) return;
+            // Enter here adds a subtask; it must never finish the form.
+            e.preventDefault();
+            e.stopPropagation();
+            add();
+          }}
+          className="sm:text-sm"
         />
-        <Button aria-label="Add subtask" type="button" size="sm" onClick={addSubtask} variant="outline" className="h-9 w-9 px-0 shrink-0">
-          <Plus className="w-4 h-4" />
+        <Button
+          type="button"
+          variant="outline"
+          aria-label="Add subtask"
+          disabled={!text.trim()}
+          onClick={add}
+          className="h-9 w-9 shrink-0 px-0"
+        >
+          <Plus className="h-4 w-4" />
         </Button>
       </div>
-
-      {/* Saved subtasks and not-yet-created ones share ONE wrap
-          container — two separate flex rows is what pushed a freshly
-          added chip onto its own line below the others. */}
-      {((task && existingSubtasks.length > 0) || (form.subtask_titles || []).length > 0) && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {task && existingSubtasks.map((sub) => (
-            <div key={sub.id} className="inline-flex items-center gap-1.5 bg-secondary text-secondary-foreground rounded-full px-2.5 py-0.5 text-xs font-semibold group">
-              <button aria-label={sub.status === "done" ? `Mark ${sub.title} not done` : `Mark ${sub.title} done`}
-                type="button"
-                onClick={() => onToggleSubtask && onToggleSubtask(sub)}
-                className={cn(
-                  "shrink-0 w-3.5 h-3.5 rounded border-2 flex items-center justify-center transition-all",
-                  sub.status === "done" ? "bg-primary border-primary text-primary-foreground" : "border-ink-400 dark:border-ink-500 hover:border-ink-600 dark:hover:border-ink-300 bg-white/80 dark:bg-night-sunken"
-                )}
-              >
-                {sub.status === "done" && <CheckSquare className="w-2 h-2" />}
-              </button>
-              <span
-                className={cn("cursor-pointer hover:text-ink-600 dark:hover:text-ink-300 break-words whitespace-normal max-w-full", sub.status === "done" && "line-through opacity-50")}
-                onClick={() => onEditSubtask && onEditSubtask(sub)}
-              >
-                {sub.title}
-              </span>
-              <button aria-label={`Delete subtask ${sub.title}`}
-                type="button"
-                onPointerDown={(e) => { e.preventDefault(); onDeleteSubtask && onDeleteSubtask(sub); }}
-                className="text-ink-400 dark:text-ink-500 hover:text-red-400 dark:hover:text-red-300 transition-colors"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </div>
-          ))}
-          {(form.subtask_titles || []).map((title, idx) => (
-            <div key={idx} className="inline-flex items-center gap-1.5 bg-secondary text-secondary-foreground rounded-full px-2.5 py-0.5 text-xs font-semibold group">
-              <div className="shrink-0 w-3.5 h-3.5 rounded border-2 border-ink-400" />
-              <span className="break-words whitespace-normal max-w-full">{title}</span>
-              <button aria-label={`Remove subtask ${title}`} type="button" onPointerDown={(e) => { e.preventDefault(); removeSubtask(idx); }} className="text-ink-400 dark:text-ink-500 hover:text-red-400 dark:hover:text-red-300 transition-colors">
-                <X className="w-3 h-3" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

@@ -31,7 +31,6 @@
  */
 import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Label } from "@/components/ui/label";
 import { Paperclip, Upload } from "lucide-react";
 import { apiClient } from "@/api/apiClient";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
@@ -258,10 +257,6 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
 
   return (
     <div className="min-w-0">
-      <Label className="text-xs font-semibold text-ink-900 dark:text-ink-100 mb-1.5 block">
-        Attachments
-      </Label>
-
       {/* Drop zone + file picker trigger */}
       {!readOnly && (
         <button
@@ -271,21 +266,22 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
           onDragOver={onDragOver}
           onDragLeave={() => setDragOver(false)}
           className={cn(
-            "w-full flex items-center justify-center gap-2 rounded-lg border border-dashed px-3 py-3 transition-colors text-xs font-medium",
+            "flex min-h-9 w-full items-center gap-2 rounded-lg border border-dashed px-3 py-1.5 text-left text-sm transition-colors",
+            "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ink-900/10 dark:focus-visible:ring-sun-400/20",
             dragOver
-              ? "border-ink-400 dark:border-ink-500 bg-ink-50 dark:bg-night-raised text-ink-900 dark:text-ink-100"
-              : "border-ink-200 dark:border-night-line-strong bg-white dark:bg-night-sunken text-ink-500 dark:text-ink-400 hover:border-ink-300 dark:hover:border-night-line-bold"
+              ? "border-ink-900 bg-selected text-ink-900 dark:border-sun-400 dark:text-ink-100"
+              : "border-border-strong text-ink-500 hover:border-ink-400 hover:text-ink-700 dark:text-ink-400 dark:hover:border-night-line-bold dark:hover:text-ink-200"
           )}
         >
           {dragOver ? (
             <>
-              <Upload className="w-4 h-4" />
+              <Upload className="h-4 w-4 shrink-0" />
               Drop to attach
             </>
           ) : (
             <>
-              <Paperclip className="w-4 h-4" />
-              Attach files or drop here
+              <Paperclip className="h-4 w-4 shrink-0" />
+              Add files, or drop them here
             </>
           )}
         </button>

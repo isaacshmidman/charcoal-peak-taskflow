@@ -1,39 +1,6 @@
 // @ts-nocheck
 /**
- * @file Pill-style toggle shared across the Settings panels. Mirrors
- * the "Set time" toggle in TaskForm/TimeFields.jsx so iOS-style
- * switches feel consistent across the whole app.
- *
- * @param {{
- *   checked: boolean,
- *   onChange: (next: boolean) => void,
- *   disabled?: boolean,
- *   label: string,          // what the switch turns on — its accessible name
- * }} props
+ * @file The Settings panels' name for the shared switch (ui/switch.jsx),
+ * kept so their imports don't all have to change.
  */
-import { cn } from "@/lib/utils";
-
-export default function SettingsToggle({ checked, onChange, disabled, label }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={cn(
-        "relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none shrink-0",
-        checked ? "bg-ink-900 dark:bg-sun-400" : "bg-ink-300 dark:bg-night-line-bold",
-        disabled && "opacity-40 cursor-not-allowed"
-      )}
-    >
-      <span
-        className={cn(
-          "inline-block h-4 w-4 transform rounded-full bg-white dark:bg-ink-950 transition-transform duration-200",
-          checked ? "translate-x-6" : "translate-x-1"
-        )}
-      />
-    </button>
-  );
-}
+export { Switch as default } from "@/components/ui/switch";

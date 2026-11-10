@@ -1,96 +1,82 @@
 // @ts-nocheck
 /**
- * @file Date picker + time toggle + start/end TimeInput row.
- * Owns the auto-bumping of `task_end_time` to start+60 when the user
- * hasn't manually touched it (via the shared `endTouchedRef`).
+ * @file The "when" of a task: a Date row and a Time row.
+ *
+ * Owns the auto-bumping of `task_end_time` to start+60 while the user
+ * hasn't chosen an end themselves (via the shared `endTouchedRef`).
+ *
+ * `withEnd={false}` is the subtask form: a start time only, and
+ * `task_end_time` is never written (a subtask record has no such field).
  */
-import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarIcon } from "lucide-react";
-import { format } from "date-fns/format";
-import { fromDateStr, toDateStr } from "@/lib/dates";
+import { Switch } from "@/components/ui/switch";
 import TimeInput, { defaultEndTime } from "./TimeInput.jsx";
+import { DateField, Field } from "./parts.jsx";
 
-export default function TimeFields({ form, setForm, endTouchedRef }) {
+export default function TimeFields({ form, setForm, endTouchedRef, withEnd = true, dateRequired = true, testidPrefix = "task-form" }) {
+  const timed = !!form.task_time;
+
+  const setTimed = (on) => {
+    if (endTouchedRef) endTouchedRef.current = false;
+    setForm((f) => ({
+      ...f,
+      task_time: on ? "9:00AM" : "",
+      ...(withEnd ? { task_end_time: on ? "10:00AM" : "" } : {}),
+    }));
+  };
+
   return (
-    <div className="space-y-2">
-      <div className="flex items-end gap-3">
-        <div className="flex-1">
-          <Label className="text-xs font-semibold text-ink-900 dark:text-ink-100 mb-1.5 block">Date</Label>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" data-testid="task-form-date-trigger" className="w-full justify-start h-9 text-sm font-normal">
-                <CalendarIcon className="w-4 h-4 mr-2 text-ink-400 dark:text-ink-500" />
-                {form.due_date ? format(fromDateStr(form.due_date), "PPP") : "No date"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={form.due_date ? fromDateStr(form.due_date) : undefined}
-                onSelect={(date) => { if (date) setForm({ ...form, due_date: toDateStr(date) }); }}
-                showOutsideDays fixedWeeks
-              />
-              {form.due_date && (
-                <div className="p-2 border-t">
-                  <Button type="button" variant="ghost" size="sm" data-testid="task-form-clear-date" className="w-full text-xs" onClick={() => setForm({ ...form, due_date: "", task_time: "" })}>
-                    Clear date
-                  </Button>
-                </div>
-              )}
-            </PopoverContent>
-          </Popover>
-        </div>
+    <>
+      <Field label="Date" hint={dateRequired && !form.due_date ? "Pick a date to save this task." : null}>
+        <DateField
+          value={form.due_date}
+          // Clearing the date clears the time with it — a time needs a day.
+          onChange={(next) =>
+            setForm((f) => (next ? { ...f, due_date: next } : { ...f, due_date: "", task_time: "" }))
+          }
+          clearLabel="Clear date"
+          testid={`${testidPrefix}-date-trigger`}
+          clearTestid={`${testidPrefix}-clear-date`}
+        />
+      </Field>
 
-        {form.due_date && (
-          <div className="flex flex-col items-center gap-1 pb-0.5">
-            <Label className="text-xs font-semibold text-ink-900 dark:text-ink-100">Set time</Label>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={!!form.task_time}
-              aria-label="Set time"
-              onClick={() => {
-                if (form.task_time) {
-                  endTouchedRef.current = false;
-                  setForm({ ...form, task_time: "", task_end_time: "" });
-                } else {
-                  endTouchedRef.current = false;
-                  setForm({ ...form, task_time: "9:00AM", task_end_time: "10:00AM" });
-                }
-              }}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${form.task_time ? "bg-ink-900 dark:bg-sun-400" : "bg-ink-300 dark:bg-night-line-bold"}`}
-            >
-              <span className={`inline-block h-4 w-4 transform rounded-full bg-white dark:bg-ink-950 transition-transform duration-200 ${form.task_time ? "translate-x-6" : "translate-x-1"}`} />
-            </button>
+      {form.due_date && (
+        <Field label="Time">
+          <div className="flex min-h-9 flex-wrap items-center gap-x-2.5 gap-y-2">
+            <Switch checked={timed} onChange={setTimed} label="Set time" />
+            {!timed && <span className="text-sm text-ink-400 dark:text-ink-500">All day</span>}
+            {timed && (
+              <div className="flex items-center gap-2">
+                <TimeInput
+                  label="Start time"
+                  value={form.task_time}
+                  onChange={(v) =>
+                    setForm((f) => ({
+                      ...f,
+                      task_time: v,
+                      ...(withEnd
+                        ? { task_end_time: endTouchedRef?.current ? f.task_end_time : defaultEndTime(v) }
+                        : {}),
+                    }))
+                  }
+                />
+                {withEnd && (
+                  <>
+                    <span className="text-sm text-ink-400 dark:text-ink-500">to</span>
+                    <TimeInput
+                      label="End time"
+                      value={form.task_end_time || defaultEndTime(form.task_time)}
+                      onChange={(v) => {
+                        if (endTouchedRef) endTouchedRef.current = true;
+                        setForm((f) => ({ ...f, task_end_time: v }));
+                      }}
+                    />
+                  </>
+                )}
+              </div>
+            )}
           </div>
-        )}
-      </div>
-
-      {form.due_date && form.task_time && (
-        <div className="flex items-center gap-2">
-          <TimeInput
-            value={form.task_time}
-            onChange={(v) => {
-              setForm((f) => ({
-                ...f,
-                task_time: v,
-                task_end_time: endTouchedRef.current ? f.task_end_time : defaultEndTime(v),
-              }));
-            }}
-          />
-          <span className="text-xs font-medium text-ink-500 dark:text-ink-400">to</span>
-          <TimeInput
-            value={form.task_end_time || defaultEndTime(form.task_time)}
-            onChange={(v) => {
-              endTouchedRef.current = true;
-              setForm((f) => ({ ...f, task_end_time: v }));
-            }}
-          />
-        </div>
+        </Field>
       )}
-    </div>
+    </>
   );
 }

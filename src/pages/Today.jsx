@@ -195,7 +195,7 @@ export default function Today() {
         )}
         <PageSearch open={showSearch} onOpenChange={setShowSearch} value={search} onChange={setSearch} />
         <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} page="today" />
-        <Button onClick={() => { setEditingTask(null); setAddSubtaskParent(null); setShowForm(true); }} className="bg-primary hover:bg-[var(--primary-hover)] text-primary-foreground h-9 gap-1.5">
+        <Button aria-label="New Task" onClick={() => { setEditingTask(null); setAddSubtaskParent(null); setShowForm(true); }} className="h-9 gap-1.5">
           <Plus className="w-4 h-4" />
           <span className="hidden sm:inline">New Task</span>
         </Button>

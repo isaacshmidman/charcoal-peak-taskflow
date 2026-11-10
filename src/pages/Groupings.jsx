@@ -252,7 +252,7 @@ export default function Groupings() {
       <PageHeader title="Groupings" sub={<>{topLevel.length} task{topLevel.length !== 1 ? "s" : ""}</>}>
         <PageSearch open={showSearch} onOpenChange={setShowSearch} value={search} onChange={setSearch} placeholder="Search title or tag..." />
         <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} page="groupings" />
-        <Button onClick={() => { setEditingTask(null); setAddSubtaskParent(null); setShowForm(true); }} className="bg-primary hover:bg-[var(--primary-hover)] text-primary-foreground h-9 gap-1.5">
+        <Button aria-label="New Task" onClick={() => { setEditingTask(null); setAddSubtaskParent(null); setShowForm(true); }} className="h-9 gap-1.5">
           <Plus className="w-4 h-4" />
           <span className="hidden sm:inline">New Task</span>
         </Button>
@@ -310,7 +310,6 @@ export default function Groupings() {
         onOpenChange={(o) => { setShowForm(o); if (!o) { setEditingTask(null); setAddSubtaskParent(null); } }}
         task={editingTask}
         parentId={addSubtaskParent?.id}
-        defaultDueDate=""
         existingSubtasks={editingTask ? (tasks.filter(t => t.parent_id === editingTask.id).sort((a, b) => (a.order ?? 999) - (b.order ?? 999))) : []}
         onToggleSubtask={(sub) => updateTask(sub.id, { status: sub.status === "done" ? "todo" : "done", completed_at: sub.status === "done" ? "" : new Date().toISOString() })}
         onDeleteSubtask={(sub) => deleteWithUndo(sub, { isSubtask: true })}

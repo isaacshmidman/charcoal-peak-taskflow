@@ -17,6 +17,7 @@
 import { Component, lazy, Suspense } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import TitleTokenInput from "@/components/tasks/QuickAdd/TitleTokenInput";
+import { formTitleClass } from "./parts.jsx";
 
 const RichDescriptionEditor = lazy(() => import("@/components/tasks/RichDescriptionEditor"));
 
@@ -53,6 +54,16 @@ function PlainDescriptionFallback({ form, setForm }) {
   );
 }
 
+/** The editor's outline while its code is still arriving — the same
+ * box, so nothing jumps when the real one takes its place. */
+export function EditorPlaceholder() {
+  return (
+    <div className="min-h-[5.5rem] rounded-lg border border-border-strong bg-surface-card px-3 py-2 text-sm text-ink-400 dark:bg-night-sunken dark:text-ink-500">
+      Add details (optional)
+    </div>
+  );
+}
+
 export default function TitleAndDescription({ form, setForm, task, priorities = [], savedTags = [], onTitleEnter, readOnly = false }) {
   // The editor hydrates ONCE at mount. Read its initial content straight
   // from the `task` prop (available on first render) rather than from
@@ -76,19 +87,15 @@ export default function TitleAndDescription({ form, setForm, task, priorities = 
         savedTags={savedTags}
         placeholder="What needs to be done?"
         testid="task-form-title"
+        inputClassName={formTitleClass}
         // Enter in the title finishes the task (already autosaved); the
         // description below keeps Enter as a paragraph break.
         onEnter={onTitleEnter}
       />
 
+      <div className="mt-2">
       <EditorLoadBoundary fallback={<PlainDescriptionFallback form={form} setForm={setForm} />}>
-        <Suspense
-          fallback={
-            <div className="h-20 rounded-md border border-ink-200 dark:border-night-line-strong bg-white dark:bg-night-sunken px-3 py-2 text-sm text-ink-400 dark:text-ink-500">
-              Loading editor…
-            </div>
-          }
-        >
+        <Suspense fallback={<EditorPlaceholder />}>
           <RichDescriptionEditor
             key={editorKey}
             valueJson={task?.description_json}
@@ -101,6 +108,7 @@ export default function TitleAndDescription({ form, setForm, task, priorities = 
           />
         </Suspense>
       </EditorLoadBoundary>
+      </div>
     </>
   );
 }

@@ -1,13 +1,15 @@
 // @ts-nocheck
 /**
- * @file Small reusable time-of-day dropdown used by TimeFields. Renders
- * a 15-min slot list and scrolls the currently-selected slot into view
- * when opened. Also exports `addMinutes` and `generateTimeSlots` so the
+ * @file Small reusable time-of-day dropdown. Renders a 15-min slot list
+ * and scrolls the currently-selected slot into view when opened. The
+ * list floats (a popover), so it is never cut off by the scrolling body
+ * of the form it sits in. Also exports `addMinutes` and `generateTimeSlots` so the
  * parent form can compute default end-times.
  */
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import { ChevronDown } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { useOutsideClick } from "@/hooks/useOutsideClick";
 import { parseTaskTime } from "@/lib/sort-helpers";
 
 // Generate all 15-min slots across a 24-hour day.
@@ -52,65 +54,76 @@ export function defaultEndTime(start) {
   return parsed + 60 >= 24 * 60 ? "11:59PM" : addMinutes(start, 60);
 }
 
+/** "9:00AM" → "9:00 AM", for reading. The stored value keeps no space. */
+export const spacedTime = (time) => String(time || "").replace(/\s*(AM|PM)$/i, " $1");
+
 /**
  * @param {{
  *   value: string,
  *   onChange: (value: string) => void,
- *   className?: string,    // wrapper className override (default: "relative w-36")
+ *   label?: string,             // accessible name, e.g. "Start time"
+ *   className?: string,         // wrapper/trigger width override (default: "w-[7.25rem]")
  *   triggerClassName?: string,  // button className override
  * }} props
  */
-export default function TimeInput({ value, onChange, className, triggerClassName }) {
+export default function TimeInput({ value, onChange, label = "Time", className, triggerClassName }) {
   const [open, setOpen] = useState(false);
-  const listRef = useRef(null);
   const selectedRef = useRef(null);
-  const containerRef = useRef(null);
-
-  useOutsideClick(containerRef, () => setOpen(false), open);
-
-  useEffect(() => {
-    if (open && selectedRef.current) {
-      selectedRef.current.scrollIntoView({ block: "center" });
-    }
-  }, [open]);
+  // A time that isn't on a quarter hour (typed elsewhere, or synced from a
+  // calendar) still has to appear in the list, or opening it would show
+  // nothing chosen.
+  const slots = value && !TIME_SLOTS.includes(value)
+    ? [...TIME_SLOTS, value].sort((a, b) => (parseTaskTime(a) ?? 0) - (parseTaskTime(b) ?? 0))
+    : TIME_SLOTS;
 
   return (
-    <div ref={containerRef} className={cn("relative", className || "w-36")}>
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className={cn(
-          "w-full flex items-center justify-between px-3 py-1.5 border border-border-strong rounded-lg bg-surface-card text-sm text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-night-high transition-colors",
-          triggerClassName
-        )}
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={label}
+          className={cn(
+            "flex h-9 items-center justify-between gap-2 rounded-lg border border-border-strong bg-surface-card px-3 text-sm tabular-nums text-foreground transition-[border-color,box-shadow] dark:bg-night-sunken",
+            "focus:outline-none focus-visible:border-ink-900 focus-visible:ring-[3px] focus-visible:ring-ink-900/10 dark:focus-visible:border-sun-400 dark:focus-visible:ring-sun-400/20",
+            "disabled:cursor-not-allowed disabled:opacity-50",
+            className || "w-[7.25rem]",
+            triggerClassName
+          )}
+        >
+          {spacedTime(value)}
+          <ChevronDown className={cn("h-4 w-4 shrink-0 text-ink-400 opacity-70 transition-transform dark:text-ink-500", open && "rotate-180")} />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        className="max-h-56 w-[var(--radix-popover-trigger-width)] min-w-[7.25rem] overflow-y-auto overscroll-contain rounded-lg p-1"
+        // Start at the chosen time rather than at midnight.
+        onOpenAutoFocus={(e) => {
+          e.preventDefault();
+          selectedRef.current?.scrollIntoView({ block: "center" });
+          selectedRef.current?.focus({ preventScroll: true });
+        }}
       >
-        {value}
-        <svg className={cn("w-3.5 h-3.5 text-ink-400 dark:text-ink-500 transition-transform", open && "rotate-180")} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-      </button>
-
-      {open && (
-        <div className="absolute z-50 mt-1 left-0 right-0 border border-border-strong rounded-lg overflow-hidden bg-surface-card shadow-md">
-          <div ref={listRef} className="max-h-48 overflow-y-auto">
-            {TIME_SLOTS.map((slot) => {
-              const isSelected = slot === value;
-              return (
-                <button
-                  key={slot}
-                  ref={isSelected ? selectedRef : null}
-                  type="button"
-                  onClick={() => { onChange(slot); setOpen(false); }}
-                  className={cn(
-                    "w-full text-left px-3 py-1.5 text-base md:text-sm transition-colors",
-                    isSelected ? "bg-primary text-primary-foreground font-medium" : "text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-night-high"
-                  )}
-                >
-                  {slot}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
+        {slots.map((slot) => {
+          const isSelected = slot === value;
+          return (
+            <button
+              key={slot}
+              ref={isSelected ? selectedRef : null}
+              type="button"
+              onClick={() => { onChange(slot); setOpen(false); }}
+              className={cn(
+                "block w-full rounded-md px-2 py-1.5 text-left text-sm tabular-nums outline-none transition-colors",
+                isSelected
+                  ? "bg-primary font-medium text-primary-foreground"
+                  : "text-foreground hover:bg-selected focus-visible:bg-selected"
+              )}
+            >
+              {spacedTime(slot)}
+            </button>
+          );
+        })}
+      </PopoverContent>
+    </Popover>
   );
 }

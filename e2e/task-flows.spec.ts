@@ -695,6 +695,103 @@ test("a task can have its own reminder", async ({ page }) => {
   await expect.poll(async () => (await api.getState()).tasks.find((t) => t.title === "Dentist")?.reminder).toBe("before:60");
 });
 
+test("the task form keeps what was typed: tags, a repeat, and a subtask left in its box", async ({ page }) => {
+  const api = await installMockBackend(page, {
+    tasks: [],
+    priorities: [defaultPriority],
+    savedTags: [{ id: "tg1", name: "errands" }],
+  });
+  await page.goto("/Today");
+  await page.getByRole("button", { name: "New Task" }).click();
+  // A new task opens with the caret already in its title.
+  await expect(page.getByTestId("task-form-title")).toBeFocused();
+  await page.keyboard.type("Water the plants");
+
+  // One question, one dropdown: picking a pattern makes the task repeat.
+  await page.getByRole("combobox", { name: "Repeat" }).click();
+  await page.getByRole("option", { name: "Every week", exact: true }).click();
+  await expect(page.getByRole("combobox", { name: "Ends" })).toBeVisible();
+
+  // Tags: pick a saved one from the list, type a new one.
+  const tagBox = page.getByLabel("Add a tag");
+  await tagBox.click();
+  await tagBox.pressSequentially("err");
+  await page.getByRole("button", { name: "errands", exact: true }).click();
+  await tagBox.pressSequentially("garden");
+  await page.keyboard.press("Enter");
+  // Enter in the tag box adds a tag — it must not finish the form.
+  await expect(page.getByTestId("task-form-dialog")).toBeVisible();
+
+  // A subtask typed but never "added" still counts when Create is pressed.
+  await page.getByLabel("New subtask").fill("Fill the can");
+  await page.getByTestId("task-form-submit").click();
+  await expect(page.getByTestId("task-form-dialog")).toBeHidden();
+
+  await expect.poll(async () => (await api.getState()).tasks.length).toBe(2);
+  const tasks = (await api.getState()).tasks;
+  const parent = tasks.find((t) => t.title === "Water the plants")!;
+  expect(parent).toMatchObject({ task_type: "recurring", recurrence: "weekly", tags: ["errands", "garden"] });
+  expect(tasks.find((t) => t.title === "Fill the can")).toMatchObject({ parent_id: parent.id });
+});
+
+test("a very long link in the task form wraps instead of making the form scroll sideways", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installMockBackend(page, { tasks: [], priorities: [defaultPriority] });
+  await page.goto("/Today");
+  await page.getByRole("button", { name: "New Task" }).click();
+
+  const long = `https://example.com/a/link/with/no/spaces/${"abcdefghij".repeat(30)}`;
+  const title = page.getByTestId("task-form-title");
+  await title.fill(long);
+  // The title wraps onto more lines and grows, rather than hiding most of
+  // itself in one line.
+  expect((await title.boundingBox())!.height).toBeGreaterThan(60);
+
+  await page.getByTestId("task-form-dialog").locator(".tiptap-prose").click();
+  await page.keyboard.insertText(long);
+  await page.getByLabel("Add a tag").fill(long.slice(0, 120));
+  await page.keyboard.press("Enter");
+  await page.getByLabel("New subtask").fill(long.slice(0, 160));
+  await page.keyboard.press("Enter");
+
+  const overflow = await page.getByTestId("form-body").evaluate((body) => {
+    const edge = body.getBoundingClientRect().right;
+    const past = [...body.querySelectorAll("*")].filter((el) => el.getBoundingClientRect().right > edge + 1);
+    return { sideways: body.scrollWidth - body.clientWidth, past: past.length };
+  });
+  expect(overflow).toEqual({ sideways: 0, past: 0 });
+});
+
+test("the date pop-up fills only the day you pick, and closes when you pick it", async ({ page }) => {
+  await installMockBackend(page, { tasks: [], priorities: [defaultPriority] });
+  await page.goto("/Today");
+  await page.getByRole("button", { name: "New Task" }).click();
+  const trigger = page.getByTestId("task-form-date-trigger");
+  await expect(trigger).toContainText("Today");
+
+  await trigger.click();
+  const filled = () =>
+    page.locator('[role="gridcell"]').evaluateAll((cells) =>
+      cells
+        .filter((cell) => {
+          const [r, g, b, a = "1"] = (getComputedStyle(cell).backgroundColor.match(/[\d.]+/g) || []);
+          return Number(a) > 0.5 && !(r === "255" && g === "255" && b === "255");
+        })
+        .map((cell) => cell.getAttribute("aria-selected"))
+    );
+  // Today is the picked day: one filled cell, and it is the selected one.
+  expect(await filled()).toEqual(["true"]);
+
+  await page.getByRole("button", { name: "Tomorrow" }).click();
+  await expect(trigger).toContainText("Tomorrow");
+  // Picking closed the pop-up.
+  await expect(page.locator('[role="gridcell"]')).toHaveCount(0);
+
+  await trigger.click();
+  // Tomorrow is filled; today is NOT (it used to be, in a second colour).
+  expect(await filled()).toEqual(["true"]);
+});
+
 test("a deleted task comes back from Recently Deleted with its end time, reminder and formatting", async ({ page }) => {
   const richDoc = JSON.stringify({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Bring card", marks: [{ type: "bold" }] }] }] });
   const api = await installMockBackend(page, {

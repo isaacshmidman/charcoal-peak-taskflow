@@ -1,12 +1,16 @@
 // @ts-nocheck
 /**
- * @file A form title <Input> that understands #tag / !priority tokens.
+ * @file A form's title box. It understands #tag / !priority tokens, and
+ * it WRAPS: a long title (or a pasted link) runs onto more lines and the
+ * box grows with it, instead of sliding sideways inside one line where
+ * most of it can't be read. It is still one line of meaning — a pasted
+ * line break becomes a space, and Enter finishes the form.
  * Wraps the useTitleTokens hook + the #/! TokenAutocomplete dropdown and
  * merges the chosen field back into the form. Shared by TaskForm and
  * SubtaskForm — each passes a `grammar` subset ({ tags, priority }).
  */
-import { useRef } from "react";
-import { Input } from "@/components/ui/input";
+import { useLayoutEffect, useRef } from "react";
+import { cn } from "@/lib/utils";
 import TokenAutocomplete from "./TokenAutocomplete";
 import { useTitleTokens } from "./useTitleTokens";
 
@@ -21,6 +25,7 @@ export default function TitleTokenInput({
   testid,
   autoFocus = false,
   onEnter,
+  inputClassName = "",
 }) {
   const inputRef = useRef(null);
   const value = form[titleKey] || "";
@@ -39,15 +44,36 @@ export default function TitleTokenInput({
 
   const tokens = useTitleTokens({ value, setValue, inputRef, priorities, savedTags, grammar, onApply });
 
+  // Grow to fit the words. (scrollHeight is 0 where there is no layout —
+  // the unit-test DOM — and the box then keeps its one-row height.)
+  useLayoutEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    if (el.scrollHeight > 0) el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
+
   return (
     <div className="relative z-30">
-      <Input
+      <textarea
         ref={inputRef}
+        rows={1}
         placeholder={placeholder}
+        aria-label="Title"
         value={value}
         autoFocus={autoFocus}
         data-testid={testid}
-        onChange={tokens.onChange}
+        data-title-input=""
+        enterKeyHint="done"
+        className={cn(
+          "block w-full resize-none overflow-hidden bg-transparent text-foreground outline-none [overflow-wrap:anywhere] placeholder:text-muted-foreground",
+          inputClassName
+        )}
+        onChange={(e) => {
+          // One line of meaning: a pasted line break becomes a space.
+          if (/[\r\n]/.test(e.target.value)) e.target.value = e.target.value.replace(/\s*[\r\n]+\s*/g, " ");
+          tokens.onChange(e);
+        }}
         onKeyUp={tokens.trackCaret}
         onClick={tokens.trackCaret}
         onKeyDown={(e) => {

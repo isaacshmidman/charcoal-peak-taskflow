@@ -29,6 +29,9 @@ Rules:
   of three things: *done* (a ticked box), *now* (today on a calendar), or,
   in the dark, *the main action* (the primary button). Selection is a quiet
   ink tint (`bg-selected`), not yellow.
+  In the small pop-up date picker, today is a sun *dot*, not a fill: the
+  fill there belongs to the day you picked, and two filled days in two
+  colours read as two selections.
 - **Yellow highlight inside a note still means "this is a task."** That rule
   is older than this system and unchanged.
 - **Red is for trouble only**: overdue, delete, errors.
@@ -79,6 +82,11 @@ follows. Inside `cn()`, write `text-[11px]` instead.
 | A card | `ui/Card`. |
 | A tick box | `ui/Checkbox` (pass `tone` for a priority-coloured ring). |
 | Buttons | `ui/Button`: `default` (ink in the light, sun in the dark), `outline`, `ghost`, `destructive`. Small square "add" buttons are `outline`. |
+| An on/off switch | `ui/Switch` (`checked`, `onChange`, `label`). |
+| A page's top | `components/PageHeader.jsx` — title, sub-line, actions; it stays put while the page scrolls. `PageSearch` is its search button. |
+| Two columns with a divider you can drag | `ui/TwoPane` (Notes, the calendar's day view). |
+| A form in a dialog | `tasks/TaskForm/parts.jsx`: `FormDialog` (quiet heading, a body that scrolls, a footer that stays), `Field` (one property per line: label left, control right), `DateField` (the date button and its pop-up). The task form and the subtask form are both built from these. |
+| Picking a date | `ui/Calendar`. The picked day is the only filled one; today is a small sun dot under its number. |
 | The logo | `components/Logo.jsx`. The PNG app icons are renders of `public/icon.svg`: `node scripts/render-icons.mjs`. |
 
 ## Dark mode

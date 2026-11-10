@@ -2,8 +2,12 @@
 /**
  * @file TaskForm dialog — owns form state, submit/delete handlers,
  * persistNewTags side-effect. Composes the sub-fields:
- *   TitleAndDescription, PriorityAndType, RecurrenceFields, TimeFields,
- *   TagsField, SubtasksField.
+ *   TitleAndDescription, TimeFields, RepeatFields, ReminderField,
+ *   PriorityField, TagsField, SubtasksField, AttachmentsField.
+ *
+ * The layout comes from ./parts.jsx: a big title, the description, then
+ * one row per property in the order people fill them in — when, how
+ * often, remind me, how important, then the extras.
  *
  * Form state (the ~14-key `form` object) stays in this file. Each
  * sub-field receives `form` + `setForm` plus whatever extras it needs.
@@ -17,14 +21,14 @@ import { isOnline } from "@/lib/offlineCache";
 import { SavedTagOffline } from "@/lib/offlineEntityRegistry";
 import { isRecoverableConnectionError } from "@/lib/network";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Lock, Trash2 } from "lucide-react";
 import { format } from "date-fns/format";
 import { defaultEndTime } from "./TimeInput.jsx";
 
 import TitleAndDescription from "./TitleAndDescription.jsx";
-import PriorityAndType from "./PriorityAndType.jsx";
-import RecurrenceFields from "./RecurrenceFields.jsx";
+import PriorityField from "./PriorityField.jsx";
+import RepeatFields from "./RepeatFields.jsx";
+import { Field, FormDialog } from "./parts.jsx";
 import TimeFields from "./TimeFields.jsx";
 import TagsField from "./TagsField.jsx";
 import SubtasksField from "./SubtasksField.jsx";
@@ -54,7 +58,6 @@ const defaultTask = {
 export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete, parentId, existingSubtasks = [], onToggleSubtask, onDeleteSubtask, onEditSubtask, defaultDueDate, defaultTaskTime, initialDraft }) {
   const [form, setForm] = useState(defaultTask);
   const [showEndDate, setShowEndDate] = useState(false);
-  const [dayError, setDayError] = useState(false);
   // Frozen at open: true when editing an existing task. Drives the button
   // label so it never flips to "Create Task" during the close animation
   // (when the parent nulls `task`, the dialog is still fading out).
@@ -120,7 +123,6 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
       setShowEndDate(false);
     }
     endTouchedRef.current = false;
-    setDayError(false);
     setPendingFiles([]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task, open, prioritiesKey]);
@@ -231,8 +233,18 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
     }
   };
 
+  const heading = isReadOnly
+    ? "View Event"
+    : isExternalEvent
+      ? "Edit Event"
+      : task
+        ? "Edit Task"
+        : parentId
+          ? "New Subtask"
+          : "New Task";
+
   return (
-    <Dialog
+    <FormDialog
       open={open}
       // Escape / X / outside-click DISCARD while creating — nothing was
       // written, so backing out is just closing. While editing they commit,
@@ -241,164 +253,133 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
         if (o) { onOpenChange(true); return; }
         if (isEditMode) commitAndClose(); else onOpenChange(false);
       }}
+      title={heading}
+      testid="task-form-dialog"
+      focusTitle={!task}
+      // Mod+Enter closes (the task is already autosaved) from anywhere
+      // in the form — including inside the rich-text description.
+      onKeyDown={(e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && !isReadOnly && canSubmit) {
+          e.preventDefault();
+          commitAndClose();
+        }
+      }}
+      footerStart={
+        task && onDelete && !isReadOnly ? (
+          <Button
+            aria-label="Delete task"
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="-ml-2 text-ink-400 hover:bg-red-50 hover:text-red-600 dark:text-ink-500 dark:hover:bg-night-danger dark:hover:text-red-300"
+            data-testid="task-form-delete"
+            onClick={() => { onDelete(task); onOpenChange(false); }}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        ) : null
+      }
+      footerEnd={
+        // Cancel sits left of the confirm in both modes. Note it means
+        // different things: creating, nothing has been written yet so it
+        // truly discards; editing, autosave has already persisted the
+        // fields, so it just closes without committing pending subtask
+        // titles.
+        isReadOnly ? (
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+        ) : (
+          <>
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} data-testid="task-form-cancel">
+              Cancel
+            </Button>
+            <Button type="button" disabled={!canSubmit} onClick={commitAndClose} data-testid="task-form-submit">
+              {isEditMode ? "Save Changes" : "Create Task"}
+            </Button>
+          </>
+        )
+      }
     >
-      <DialogContent
-        className="sm:max-w-md max-h-[90vh] overflow-y-auto"
-        onOpenAutoFocus={(e) => e.preventDefault()}
-        data-testid="task-form-dialog"
-      >
-        <DialogHeader>
-          <DialogTitle className="text-sm font-semibold text-ink-900 dark:text-ink-100">
-            {isReadOnly
-              ? "View Event"
-              : isExternalEvent
-                ? "Edit Event"
-                : task
-                  ? "Edit Task"
-                  : parentId
-                    ? "New Subtask"
-                    : "New Task"}
-          </DialogTitle>
-        </DialogHeader>
-        {isReadOnly && (
-          <div className="flex items-start gap-2 rounded-md bg-ink-50 dark:bg-night-raised border border-ink-100 dark:border-night-line p-2 text-[11px] text-ink-500 dark:text-ink-400 mb-1">
-            <Lock className="w-3.5 h-3.5 mt-0.5 shrink-0 text-ink-400 dark:text-ink-500" />
-            <p>
-              This event comes from a read-only calendar
-              {form.source_calendar_name ? <> (<span className="font-medium">{form.source_calendar_name}</span>)</> : null}
-              {" "}so it can't be edited or deleted from Zephyrly.
-            </p>
-          </div>
-        )}
-        <form
-          onSubmit={(e) => e.preventDefault()}
-          // Mod+Enter closes (the task is already autosaved) from anywhere
-          // in the form — including inside the rich-text description.
-          onKeyDown={(e) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && !isReadOnly && canSubmit) {
-              e.preventDefault();
-              commitAndClose();
-            }
-          }}
-          className="space-y-4"
-        >
-        {/* `display: contents` on the fieldset hides its box, but Tailwind's
-            `space-y-*` rule on the form (`> * + * { margin-top: ... }`) only
-            targets direct DOM children — the fieldset is the form's only
-            direct child, so without re-applying spacing here the inputs
-            inside collapse together (no gap between title and description).
-            Re-applying `space-y-4` on the fieldset restores the cadence. */}
-        <fieldset disabled={isReadOnly} className="contents [&>*+*]:mt-4">
-          <TitleAndDescription
+      {isReadOnly && (
+        <div className="mb-2 flex items-start gap-2 rounded-lg bg-ink-100 px-3 py-2 text-xs text-ink-600 dark:bg-night-raised dark:text-ink-300">
+          <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink-400 dark:text-ink-500" />
+          <p>
+            This event comes from a read-only calendar
+            {form.source_calendar_name ? <> (<span className="font-medium">{form.source_calendar_name}</span>)</> : null}
+            {" "}so it can't be edited or deleted from Zephyrly.
+          </p>
+        </div>
+      )}
+      {/* `display: contents` hides the fieldset's own box, so the
+          children space themselves: the title and description sit close,
+          then the property rows follow at an even step. */}
+      <fieldset disabled={isReadOnly} className="contents">
+        <TitleAndDescription
+          form={form}
+          setForm={setForm}
+          task={task}
+          priorities={priorities}
+          savedTags={savedTags}
+          onTitleEnter={() => { if (!isReadOnly && canSubmit) commitAndClose(); }}
+          readOnly={isReadOnly}
+        />
+
+        <div className="mt-5 space-y-2.5">
+          <TimeFields form={form} setForm={setForm} endTouchedRef={endTouchedRef} />
+
+          <RepeatFields
             form={form}
             setForm={setForm}
-            task={task}
-            priorities={priorities}
-            savedTags={savedTags}
-            onTitleEnter={() => { if (!isReadOnly && canSubmit) commitAndClose(); }}
-            readOnly={isReadOnly}
+            showEndDate={showEndDate}
+            setShowEndDate={setShowEndDate}
+            disabled={isExternalEvent}
           />
 
-          <PriorityAndType
+          {/* Subtasks never notify, so they don't get a reminder. */}
+          {!parentId && form.due_date && <ReminderField form={form} setForm={setForm} />}
+
+          <PriorityField
             form={form}
             setForm={setForm}
             priorities={priorities}
             isExternal={isExternal}
-            isExternalEvent={isExternalEvent}
             sourceCalendarName={sourceCalendarName}
             sourceColorHex={sourceColorHex}
             sourceProvider={sourceProvider}
           />
 
-          <RecurrenceFields
-            form={form}
-            setForm={setForm}
-            showEndDate={showEndDate}
-            setShowEndDate={setShowEndDate}
-            dayError={dayError}
-            setDayError={setDayError}
-          />
-
-          <TimeFields form={form} setForm={setForm} endTouchedRef={endTouchedRef} />
-
-          {/* Subtasks never notify, so they don't get a reminder. */}
-          {!parentId && form.due_date && <ReminderField form={form} setForm={setForm} />}
-
-          <TagsField form={form} setForm={setForm} savedTags={savedTags} />
+          <Field label="Tags">
+            <TagsField form={form} setForm={setForm} savedTags={savedTags} />
+          </Field>
 
           {!parentId && (
-            <SubtasksField
-              form={form}
-              setForm={setForm}
-              task={task}
-              existingSubtasks={existingSubtasks}
-              onToggleSubtask={onToggleSubtask}
-              onDeleteSubtask={onDeleteSubtask}
-              onEditSubtask={onEditSubtask}
-            />
+            <Field label="Subtasks">
+              <SubtasksField
+                form={form}
+                setForm={setForm}
+                task={task}
+                existingSubtasks={existingSubtasks}
+                onToggleSubtask={onToggleSubtask}
+                onDeleteSubtask={onDeleteSubtask}
+                onEditSubtask={onEditSubtask}
+              />
+            </Field>
           )}
 
-          {/* Attachments — for new tasks the chips queue locally and
-              upload after handleSubmit creates the task; for edits they
-              upload immediately to the live task id. */}
+          {/* Files — for new tasks they queue locally and upload after the
+              task is created; for edits they upload immediately to the
+              live task id. */}
           {!parentId && (
-            <AttachmentsField
-              taskId={task?.id || null}
-              pendingFiles={pendingFiles}
-              setPendingFiles={setPendingFiles}
-              readOnly={isReadOnly}
-            />
+            <Field label="Files">
+              <AttachmentsField
+                taskId={task?.id || null}
+                pendingFiles={pendingFiles}
+                setPendingFiles={setPendingFiles}
+                readOnly={isReadOnly}
+              />
+            </Field>
           )}
-
-        </fieldset>
-          <div className="flex items-center justify-between pt-2">
-            <div>
-              {task && onDelete && !isReadOnly && (
-                <Button aria-label="Delete task"
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-night-danger"
-                  data-testid="task-form-delete"
-                  onClick={() => { onDelete(task); onOpenChange(false); }}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              {/* Cancel sits left of the confirm in both modes. Note it
-                  means different things: creating, nothing has been written
-                  yet so it truly discards; editing, autosave has already
-                  persisted the fields, so it just closes without committing
-                  pending subtask titles. */}
-              {isReadOnly ? (
-                <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Close</Button>
-              ) : (
-                <>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => onOpenChange(false)}
-                  data-testid="task-form-cancel"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  disabled={!canSubmit}
-                  onClick={commitAndClose}
-                  className="bg-primary hover:bg-[var(--primary-hover)] text-primary-foreground"
-                  data-testid="task-form-submit"
-                >
-                  {isEditMode ? "Save Changes" : "Create Task"}
-                </Button>
-                </>
-              )}
-            </div>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </fieldset>
+    </FormDialog>
   );
 }

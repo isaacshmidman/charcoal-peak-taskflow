@@ -62,7 +62,7 @@ describe("ReminderField", () => {
   it("offers a time of day for an all-day task set to one", async () => {
     render(<Harness initial={{ due_date: "2026-09-30", task_time: "", reminder: "at:7:30AM" }} />);
     await waitFor(() => expect(screen.getByRole("combobox", { name: "Reminder" }).textContent).toContain("At a time"));
-    expect(screen.getByText(/7:30AM/)).toBeTruthy();
+    expect(screen.getByText(/7:30 AM/)).toBeTruthy();
   });
 
   it("says so when notifications are off", async () => {

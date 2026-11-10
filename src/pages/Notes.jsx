@@ -238,7 +238,8 @@ export default function Notes() {
         <Button
           onClick={newNote}
           data-testid="new-note-button"
-          className="bg-primary hover:bg-[var(--primary-hover)] text-primary-foreground h-9 gap-1.5"
+          aria-label="New note"
+          className="h-9 gap-1.5"
         >
           <Plus className="w-4 h-4" />
           <span className="hidden sm:inline">New note</span>

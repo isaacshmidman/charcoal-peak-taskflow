@@ -176,7 +176,7 @@ export default function Active() {
       <PageHeader title="All Tasks" sub={<>{activeTasks.length} task{activeTasks.length !== 1 ? "s" : ""}</>}>
         <PageSearch open={showSearch} onOpenChange={setShowSearch} value={search} onChange={setSearch} />
         <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} page="active" />
-        <Button onClick={() => { setEditingTask(null); setAddSubtaskParent(null); setShowForm(true); }} className="bg-primary hover:bg-[var(--primary-hover)] text-primary-foreground h-9 gap-1.5">
+        <Button aria-label="New Task" onClick={() => { setEditingTask(null); setAddSubtaskParent(null); setShowForm(true); }} className="h-9 gap-1.5">
           <Plus className="w-4 h-4" />
           <span className="hidden sm:inline">New Task</span>
         </Button>
@@ -228,7 +228,6 @@ export default function Active() {
         onToggleSubtask={handleToggleDone}
         onDeleteSubtask={(sub) => deleteWithUndo(sub, { isSubtask: true })}
         onEditSubtask={(sub) => { setShowForm(false); setEditingSubtask(sub); setShowSubtaskForm(true); }}
-        defaultDueDate=""
       />
 
       <SubtaskForm
