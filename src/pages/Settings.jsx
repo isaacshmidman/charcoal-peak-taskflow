@@ -98,13 +98,13 @@ function SubPage({ title, onBack, children }) {
           type="button"
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+          className="h-8 w-8 text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-ink-100"
           onClick={onBack}
           aria-label="Back to Settings"
         >
           <ChevronLeft className="w-5 h-5" />
         </Button>
-        <h1 className="text-base font-semibold text-slate-900 dark:text-slate-100">{title}</h1>
+        <h1 className="ds-page-title">{title}</h1>
       </div>
       <div className="space-y-8">
         {children}
@@ -119,16 +119,16 @@ function SettingsCard({ icon: Icon, label, subtitle, onClick, iconClassName }) {
     <button
       type="button"
       onClick={onClick}
-      className="w-full flex items-center gap-3 bg-surface-card border border-border-hairline rounded-xl px-4 py-3.5 hover:border-slate-200 dark:hover:border-[#454545] transition-colors text-left"
+      className="w-full flex items-center gap-3 bg-surface-card px-4 py-3 hover:bg-ink-50 dark:hover:bg-night-raised transition-colors text-left"
     >
-      <Icon className={cn("w-5 h-5 shrink-0", iconClassName || "text-slate-500 dark:text-slate-400")} />
+      <Icon className={cn("w-5 h-5 shrink-0", iconClassName || "text-ink-500 dark:text-ink-400")} />
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{label}</p>
+        <p className="text-sm font-medium text-ink-900 dark:text-ink-100">{label}</p>
         {subtitle && (
-          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 truncate">{subtitle}</p>
+          <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5 truncate">{subtitle}</p>
         )}
       </div>
-      <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 shrink-0" />
+      <ChevronRight className="w-4 h-4 text-ink-300 dark:text-ink-600 shrink-0" />
     </button>
   );
 }
@@ -243,7 +243,7 @@ export default function Settings() {
       <SubPage title="Files" onBack={returnToMain}>
         <FilesSection />
         <div>
-          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Storage</h2>
+          <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-100 mb-2">Storage</h2>
           <StorageSection />
         </div>
       </SubPage>
@@ -287,15 +287,15 @@ export default function Settings() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-base font-semibold text-slate-900 dark:text-slate-100">Settings</h1>
-          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 truncate">{user?.email || "..."}</p>
+          <h1 className="ds-page-title">Settings</h1>
+          <p className="ds-page-sub truncate">{user?.email || "..."}</p>
         </div>
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button
               variant="outline"
               size="sm"
-              className="gap-2 text-red-500 dark:text-red-300 border-red-200 dark:border-red-900 hover:bg-red-50 dark:hover:bg-[#2a1116] hover:text-red-600 dark:hover:text-red-200 hover:border-red-300 dark:hover:border-red-800 text-sm font-medium shrink-0"
+              className="gap-2 text-red-500 dark:text-red-300 border-red-200 dark:border-red-900 hover:bg-red-50 dark:hover:bg-night-danger hover:text-red-600 dark:hover:text-red-200 hover:border-red-300 dark:hover:border-red-800 text-sm font-medium shrink-0"
             >
               <LogOut className="w-4 h-4" />
               Log out
@@ -314,13 +314,13 @@ export default function Settings() {
       </div>
 
       {/* Quick toggles — two rows in one rounded card with a divider */}
-      <Card className="divide-y divide-slate-100 dark:divide-[#303030]">
+      <Card className="divide-y divide-[var(--border-hairline)]">
         <QuickThemeToggle />
         <QuickNotificationsToggle />
       </Card>
 
-      {/* Category cards */}
-      <div className="space-y-2">
+      {/* The sections, as one list */}
+      <div className="ds-list">
         <SettingsCard
           icon={Palette}
           label="Appearance"
@@ -377,12 +377,12 @@ export default function Settings() {
         />
       </div>
 
-      <p className="mt-6 text-center text-xs text-slate-400 dark:text-slate-500" data-testid="settings-legal-links">
-        <Link to="/terms" className="underline underline-offset-2 hover:text-slate-600 dark:hover:text-slate-300">
+      <p className="mt-6 text-center text-xs text-ink-400 dark:text-ink-500" data-testid="settings-legal-links">
+        <Link to="/terms" className="underline underline-offset-2 hover:text-ink-600 dark:hover:text-ink-300">
           Terms
         </Link>
         {" · "}
-        <Link to="/privacy" className="underline underline-offset-2 hover:text-slate-600 dark:hover:text-slate-300">
+        <Link to="/privacy" className="underline underline-offset-2 hover:text-ink-600 dark:hover:text-ink-300">
           Privacy
         </Link>
       </p>

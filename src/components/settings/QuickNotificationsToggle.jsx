@@ -54,9 +54,9 @@ export default function QuickNotificationsToggle() {
         {settings.enabled ? (
           <Bell className="w-5 h-5 text-emerald-500 shrink-0" />
         ) : (
-          <BellOff className="w-5 h-5 text-slate-400 dark:text-slate-500 shrink-0" />
+          <BellOff className="w-5 h-5 text-ink-400 dark:text-ink-500 shrink-0" />
         )}
-        <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
+        <span className="text-sm font-medium text-ink-900 dark:text-ink-100">
           Notifications
         </span>
       </div>

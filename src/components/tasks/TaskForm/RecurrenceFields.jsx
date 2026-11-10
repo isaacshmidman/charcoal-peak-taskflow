@@ -45,7 +45,7 @@ export default function RecurrenceFields({
   return (
     <div className="space-y-3">
       <div>
-        <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-1.5 block">Repeats</Label>
+        <Label className="text-xs font-semibold text-ink-900 dark:text-ink-100 mb-1.5 block">Repeats</Label>
         <Select
           value={form.recurrence}
           onValueChange={(v) => {
@@ -69,7 +69,7 @@ export default function RecurrenceFields({
 
       {form.recurrence === "custom_days" && (
         <div>
-          <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-2 block">Select days</Label>
+          <Label className="text-xs font-semibold text-ink-900 dark:text-ink-100 mb-2 block">Select days</Label>
           <div className="flex gap-1.5">
             {WEEKDAYS.map((day) => {
               const selected = (form.recurrence_days || []).includes(day.value);
@@ -82,8 +82,8 @@ export default function RecurrenceFields({
                   className={cn(
                     "w-9 h-9 rounded-full text-xs font-semibold transition-all border-2",
                     selected
-                      ? "bg-slate-900 text-white border-slate-900 dark:bg-slate-100 dark:text-slate-900 dark:border-slate-100"
-                      : "bg-slate-100 dark:bg-[#161616] text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-[#222222] border-transparent",
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-ink-100 dark:bg-night-raised text-ink-500 dark:text-ink-400 hover:bg-ink-200 dark:hover:bg-night-high border-transparent",
                     dayError && "border-red-500"
                   )}
                 >
@@ -96,7 +96,7 @@ export default function RecurrenceFields({
       )}
 
       <div>
-        <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-1.5 block">Repeats until</Label>
+        <Label className="text-xs font-semibold text-ink-900 dark:text-ink-100 mb-1.5 block">Repeats until</Label>
         <div className="flex items-center gap-2">
           <Select
             value={showEndDate ? "until" : "indefinite"}
@@ -130,7 +130,7 @@ export default function RecurrenceFields({
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" className="h-9 flex-1 justify-start text-sm font-normal">
-                  <CalendarIcon className="w-4 h-4 mr-2 text-slate-400 dark:text-slate-500" />
+                  <CalendarIcon className="w-4 h-4 mr-2 text-ink-400 dark:text-ink-500" />
                   {form.recurrence_end_date ? format(fromDateStr(form.recurrence_end_date), "PPP") : "Pick a date"}
                 </Button>
               </PopoverTrigger>

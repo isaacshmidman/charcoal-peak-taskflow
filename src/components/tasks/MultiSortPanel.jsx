@@ -112,7 +112,7 @@ export default function MultiSortPanel({ sorts, onSortsChange, page = "default" 
         <Button aria-label="Multi-level sorting"
           variant="ghost"
           size="icon"
-          className="h-9 w-9 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
+          className="h-9 w-9 text-ink-400 dark:text-ink-500 hover:text-ink-700 dark:hover:text-ink-200"
           title="Multi-level sorting"
         >
           <Sliders className="w-4 h-4" />
@@ -140,21 +140,21 @@ export default function MultiSortPanel({ sorts, onSortsChange, page = "default" 
                     onClick={() => toggleRow(index)}
                     className="flex-1 flex items-center gap-2 text-left min-w-0"
                   >
-                    <span className="text-xs font-semibold text-slate-900 dark:text-slate-100 shrink-0">
+                    <span className="text-xs font-semibold text-ink-900 dark:text-ink-100 shrink-0">
                       {ordinal(index + 1)} Sort:
                     </span>
-                    <span className="text-xs text-slate-500 dark:text-slate-400 truncate flex-1">{labelFor(value)}</span>
+                    <span className="text-xs text-ink-500 dark:text-ink-400 truncate flex-1">{labelFor(value)}</span>
                     {isExpanded ? (
-                      <ChevronDown className="w-4 h-4 text-slate-400 dark:text-slate-500 shrink-0" />
+                      <ChevronDown className="w-4 h-4 text-ink-400 dark:text-ink-500 shrink-0" />
                     ) : (
-                      <ChevronRight className="w-4 h-4 text-slate-400 dark:text-slate-500 shrink-0" />
+                      <ChevronRight className="w-4 h-4 text-ink-400 dark:text-ink-500 shrink-0" />
                     )}
                   </button>
                   {sorts.length > 1 && (
                     <button aria-label="Remove sort"
                       type="button"
                       onClick={() => removeSortAt(index)}
-                      className="p-1 text-slate-300 dark:text-slate-600 hover:text-red-400 dark:hover:text-red-300 transition-colors"
+                      className="p-1 text-ink-300 dark:text-ink-600 hover:text-red-400 dark:hover:text-red-300 transition-colors"
                       title="Remove sort"
                     >
                       <X className="w-3.5 h-3.5" />
@@ -176,10 +176,10 @@ export default function MultiSortPanel({ sorts, onSortsChange, page = "default" 
                           className={cn(
                             "w-full text-left px-3 py-1.5 text-xs rounded transition-colors",
                             isSelected
-                              ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 font-medium"
+                              ? "bg-primary text-primary-foreground font-medium"
                               : isUsedElsewhere
-                                ? "text-slate-300 dark:text-slate-600 cursor-not-allowed opacity-40 bg-slate-50 dark:bg-[#161616]"
-                                : "text-slate-900 dark:text-slate-100 hover:bg-slate-100 dark:hover:bg-[#222222]"
+                                ? "text-ink-300 dark:text-ink-600 cursor-not-allowed opacity-40 bg-ink-50 dark:bg-night-raised"
+                                : "text-ink-900 dark:text-ink-100 hover:bg-ink-100 dark:hover:bg-night-high"
                           )}
                         >
                           {opt.label}
@@ -196,7 +196,7 @@ export default function MultiSortPanel({ sorts, onSortsChange, page = "default" 
             <button
               type="button"
               onClick={addSort}
-              className="w-full rounded-lg border border-border-hairline bg-surface-card px-2 py-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-200 dark:hover:border-[#454545] flex items-center justify-center gap-2 transition-colors"
+              className="w-full rounded-lg border border-border-hairline bg-surface-card px-2 py-1.5 text-xs font-semibold text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-ink-100 hover:border-ink-200 dark:hover:border-night-line-bold flex items-center justify-center gap-2 transition-colors"
             >
               <Plus className="w-4 h-4" /> Add sort
             </button>

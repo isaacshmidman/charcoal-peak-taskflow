@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns/format";
 import { cn } from "@/lib/utils";
-import { colorBg, isDarkColor } from "@/lib/colors";
+import { colorCheck } from "@/lib/colors";
+import { Repeat } from "lucide-react";
 import { fromDateStr, toDateStr } from "@/lib/dates";
 
 /** @typedef {import("@/types/tasks").TaskRecord} TaskRecord */
@@ -39,10 +40,10 @@ const CompactTaskCard = forwardRef(function CompactTaskCard(
 
   const isDone = task.status === "done" || optimisticDone;
   const priority = priorities.find(p => p.id === task.priority_id);
-  const isDarkCard = isDarkColor(priority?.color);
   const isRecurring = task.task_type === "recurring" && task.recurrence && task.recurrence !== "none";
 
-  const cardStyle = priority ? (colorBg[priority.color] || colorBg.slate) : "bg-surface-card border-border-hairline";
+  // Priority is the colour of the tick box, as in the full task rows.
+  const checkTone = priority ? colorCheck[priority.color] || colorCheck.slate : undefined;
 
   return (
     <motion.div
@@ -55,13 +56,13 @@ const CompactTaskCard = forwardRef(function CompactTaskCard(
       exit={{ opacity: 0, scale: 0.97 }}
       transition={{ duration: 0.1 }}
       className={cn(
-        "rounded-lg border px-2.5 py-2 flex items-center gap-2 hover:shadow-sm transition-all",
-        cardStyle,
+        "px-3 py-2 flex items-center gap-2.5 bg-surface-card hover:bg-ink-50 dark:hover:bg-night-raised transition-colors",
         isDone && "opacity-50"
       )}>
       {/* Checkbox — the DS ink-fill primitive at its dense-row size */}
       <Checkbox
         size="sm"
+        tone={checkTone}
         checked={isDone}
         onClick={(e) => e.stopPropagation()}
         onCheckedChange={() => { if (task.status !== "done") setOptimisticDone(true); onToggleDone(task); }}
@@ -71,9 +72,8 @@ const CompactTaskCard = forwardRef(function CompactTaskCard(
       <span
         onClick={() => onEdit(task)}
         className={cn(
-          "flex-1 text-xs font-medium truncate cursor-pointer",
-          isDarkCard ? "text-white dark:text-slate-100" : "text-slate-900 dark:text-slate-100",
-          isDone && "line-through text-slate-400 dark:text-slate-500"
+          "flex-1 text-[13px] font-medium truncate cursor-pointer text-ink-900 dark:text-ink-100",
+          isDone && "line-through text-ink-400 dark:text-ink-500"
         )}
       >
         {task.title}
@@ -83,10 +83,9 @@ const CompactTaskCard = forwardRef(function CompactTaskCard(
       <div className="ml-auto flex items-center gap-1.5 shrink-0">
         {/* Recurrence dot — display only, not clickable */}
         {isRecurring && (
-          <span
-            title={task.recurrence}
-            className="w-2 h-2 rounded-full bg-violet-600 shrink-0"
-          />
+          <span title={task.recurrence} className="text-ink-400 dark:text-ink-500 shrink-0">
+            <Repeat className="w-3 h-3" />
+          </span>
         )}
 
         {/* Date chip */}
@@ -95,8 +94,8 @@ const CompactTaskCard = forwardRef(function CompactTaskCard(
             <button
               onClick={(e) => e.stopPropagation()}
               className={cn(
-                "text-[10px] leading-none px-1 py-0.5 rounded transition-colors hover:bg-white dark:hover:bg-[#222222]",
-                task.due_date ? "text-slate-400 dark:text-slate-500" : "text-slate-300 dark:text-slate-600"
+                "text-[11px] tabular-nums leading-none px-1 py-0.5 rounded transition-colors hover:bg-selected",
+                task.due_date ? "text-ink-500 dark:text-ink-400" : "text-ink-300 dark:text-ink-600"
               )}
             >
               {task.due_date ? format(fromDateStr(task.due_date), "MMM d") : "–"}
@@ -113,7 +112,7 @@ const CompactTaskCard = forwardRef(function CompactTaskCard(
               showOutsideDays fixedWeeks
             />
             {task.due_date && (
-              <div className="p-2 border-t border-slate-200 dark:border-[#303030]">
+              <div className="p-2 border-t border-ink-200 dark:border-night-line">
                 <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => {
                   onUpdate && onUpdate(task, { due_date: "" });
                   setDateOpen(false);

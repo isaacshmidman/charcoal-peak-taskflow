@@ -80,12 +80,12 @@ export default function TimeInput({ value, onChange, className, triggerClassName
         type="button"
         onClick={() => setOpen(!open)}
         className={cn(
-          "w-full flex items-center justify-between px-3 py-1.5 border border-border-strong rounded-lg bg-surface-card text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#222222] transition-colors",
+          "w-full flex items-center justify-between px-3 py-1.5 border border-border-strong rounded-lg bg-surface-card text-sm text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-night-high transition-colors",
           triggerClassName
         )}
       >
         {value}
-        <svg className={cn("w-3.5 h-3.5 text-slate-400 dark:text-slate-500 transition-transform", open && "rotate-180")} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+        <svg className={cn("w-3.5 h-3.5 text-ink-400 dark:text-ink-500 transition-transform", open && "rotate-180")} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
       </button>
 
       {open && (
@@ -101,7 +101,7 @@ export default function TimeInput({ value, onChange, className, triggerClassName
                   onClick={() => { onChange(slot); setOpen(false); }}
                   className={cn(
                     "w-full text-left px-3 py-1.5 text-base md:text-sm transition-colors",
-                    isSelected ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 font-medium" : "text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#222222]"
+                    isSelected ? "bg-primary text-primary-foreground font-medium" : "text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-night-high"
                   )}
                 >
                   {slot}

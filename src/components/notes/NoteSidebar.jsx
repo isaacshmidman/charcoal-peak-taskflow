@@ -41,7 +41,7 @@ function NoteRow({ note, active, onSelect, onDelete }) {
         <div
           className={cn(
             "absolute inset-0 rounded-lg flex items-center px-4 pointer-events-none z-0 transition-colors duration-100",
-            willDelete ? "bg-red-500" : "bg-red-100 dark:bg-[#2a1116]",
+            willDelete ? "bg-red-500" : "bg-red-100 dark:bg-night-danger",
             swipeX > 0 ? "justify-start" : "justify-end"
           )}
         >
@@ -57,13 +57,14 @@ function NoteRow({ note, active, onSelect, onDelete }) {
         data-testid={`note-row-${note.id}`}
         data-active={active ? "true" : undefined}
         className={cn(
-          // A visible hairline so each card's extent is obvious — without
-          // it the rows ran together into one undifferentiated column.
-          "relative z-10 w-full select-none rounded-lg border px-2.5 py-2 text-left",
+          // Plain rows, told apart by their three lines of type and the
+          // space between them. The open note is a quiet tint with a bar
+          // of sun at its edge — not a black block.
+          "relative z-10 w-full select-none rounded-lg px-3 py-2 text-left transition-colors",
           swiping ? "cursor-grabbing" : "cursor-pointer",
           active
-            ? "border-slate-900 bg-slate-900 text-white dark:border-slate-100 dark:bg-slate-100 dark:text-slate-900"
-            : "border-border-hairline bg-surface-card hover:bg-slate-50 dark:hover:bg-[#1c1c1c]"
+            ? "bg-ink-100 dark:bg-night-high before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-full before:bg-sun-400 before:content-['']"
+            : "bg-surface-card hover:bg-ink-50 dark:hover:bg-night-raised"
         )}
         style={
           swiping
@@ -73,20 +74,16 @@ function NoteRow({ note, active, onSelect, onDelete }) {
       >
         <p
           className={cn(
-            "truncate text-xs font-medium",
-            active
-              ? "text-white dark:text-slate-900"
-              : note.title?.trim()
-                ? "text-slate-900 dark:text-slate-100"
-                : "text-slate-400 dark:text-slate-500"
+            "truncate text-[13px]",
+            active ? "font-semibold" : "font-medium",
+            note.title?.trim() ? "text-ink-900 dark:text-ink-100" : "text-ink-400 dark:text-ink-500"
           )}
         >
           {note.title?.trim() || "New Note"}
         </p>
         <p
           className={cn(
-            "flex items-center gap-1 truncate text-[11px]",
-            active ? "text-white/70 dark:text-slate-900/70" : "text-slate-400 dark:text-slate-500"
+            "flex items-center gap-1 truncate text-xs text-ink-500 dark:text-ink-400"
           )}
         >
           {activeSchedule(note) && <CalendarClock aria-label="Schedule" className="h-3 w-3 shrink-0" />}
@@ -94,8 +91,7 @@ function NoteRow({ note, active, onSelect, onDelete }) {
         </p>
         <p
           className={cn(
-            "mt-0.5 text-[10px]",
-            active ? "text-white/50 dark:text-slate-900/50" : "text-slate-300 dark:text-slate-600"
+            "mt-0.5 text-[11px] text-ink-400 dark:text-ink-500"
           )}
         >
           {note.updated_date ? formatDistanceToNow(new Date(note.updated_date), { addSuffix: true }) : ""}
@@ -124,15 +120,15 @@ export default function NoteSidebar({
         {isLoading ? (
           <div className="space-y-1.5 px-1 pt-1">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-14 animate-pulse rounded-lg bg-slate-100 dark:bg-[#1a1a1a]" />
+              <div key={i} className="h-14 animate-pulse rounded-lg bg-ink-100 dark:bg-night-raised" />
             ))}
           </div>
         ) : notes.length === 0 ? (
-          <p className="px-2 pt-6 text-center text-xs text-slate-400 dark:text-slate-500">
+          <p className="px-2 pt-6 text-center text-xs text-ink-400 dark:text-ink-500">
             {search ? "Nothing matches." : "A quiet page. Write anything."}
           </p>
         ) : (
-          <ul className="space-y-1.5">
+          <ul className="space-y-0.5">
             {notes.map((note) => (
               <NoteRow
                 key={note.id}

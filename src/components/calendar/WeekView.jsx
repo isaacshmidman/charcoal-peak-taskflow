@@ -45,9 +45,9 @@ function AllDayCell({ dateStr, tasks, priorities, onTaskClick, onToggleDone, col
       {...createHandlers}
       data-testid={`calendar-allday-${dateStr}`}
       className={cn(
-        "flex-1 min-w-0 border-l border-slate-100 dark:border-[#303030] p-1 space-y-0.5",
+        "flex-1 min-w-0 border-l border-ink-100 dark:border-night-line p-1 space-y-0.5",
         collapsed && "overflow-hidden",
-        isOver && "bg-blue-50 dark:bg-[#101f34]"
+        isOver && "bg-blue-50 dark:bg-night-info"
       )}
     >
       {visible.map((task) => (
@@ -67,7 +67,7 @@ function AllDayCell({ dateStr, tasks, priorities, onTaskClick, onToggleDone, col
             e.stopPropagation();
             onExpand?.();
           }}
-          className="h-5 w-full rounded border border-slate-200 dark:border-[#343434] bg-slate-50 dark:bg-[#161616] truncate px-1.5 text-left text-[10px] font-semibold leading-5 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222222] transition-colors"
+          className="h-5 w-full rounded border border-ink-200 dark:border-night-line-strong bg-ink-50 dark:bg-night-raised truncate px-1.5 text-left text-[10px] font-semibold leading-5 text-ink-700 dark:text-ink-200 hover:bg-ink-100 dark:hover:bg-night-high transition-colors"
           title={`Show ${hiddenCount} more all-day task${hiddenCount === 1 ? "" : "s"}`}
         >
           {hiddenCount} more
@@ -97,15 +97,15 @@ function TimedColumn({ date, timedTasks, priorities, onTaskClick, onToggleDone, 
       {...slot.handlers}
       data-testid={`calendar-timed-${dateStr}`}
       className={cn(
-        "flex-1 min-w-0 border-l border-slate-100 dark:border-[#303030] relative",
-        isOver && "bg-blue-50 dark:bg-[#101f34]"
+        "flex-1 min-w-0 border-l border-ink-100 dark:border-night-line relative",
+        isOver && "bg-blue-50 dark:bg-night-info"
       )}
       style={{ height: HOURS.length * HOUR_HEIGHT }}
     >
       {HOURS.map((h) => (
         <div
           key={h}
-          className="absolute left-0 right-0 border-t border-slate-100 dark:border-[#303030]"
+          className="absolute left-0 right-0 border-t border-ink-100 dark:border-night-line"
           style={{ top: h * HOUR_HEIGHT, height: HOUR_HEIGHT }}
         />
       ))}
@@ -148,15 +148,15 @@ function DayHeader({ date, onClick }) {
       type="button"
       onClick={() => onClick?.(dateStr)}
       className={cn(
-        "flex-1 min-w-0 border-l border-slate-100 dark:border-[#303030] py-1 text-center hover:bg-slate-50 dark:hover:bg-[#161616]",
-        isToday && "bg-red-50 dark:bg-[#2a1116]"
+        "flex-1 min-w-0 border-l border-ink-100 dark:border-night-line py-1 text-center hover:bg-ink-50 dark:hover:bg-night-raised",
+        isToday && "bg-sun-100 dark:bg-sun-400/[0.12]"
       )}
     >
-      <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase">{format(date, "EEE")}</div>
+      <div className="text-[10px] text-ink-500 dark:text-ink-400 uppercase">{format(date, "EEE")}</div>
       <div
         className={cn(
           "text-sm font-semibold",
-          isToday ? "text-red-500" : "text-slate-900 dark:text-slate-100"
+          "text-ink-900 dark:text-ink-100"
         )}
       >
         {format(date, "d")}
@@ -253,16 +253,16 @@ export default function WeekView({
   return (
     <div
       ref={scrollRef}
-      className="border border-slate-100 dark:border-[#303030] rounded-lg bg-white dark:bg-[#0c0c0c] overflow-auto max-h-[75vh]"
+      className="border border-ink-100 dark:border-night-line rounded-lg bg-white dark:bg-night-sunken overflow-auto max-h-[75vh]"
     >
       <div className="min-w-full">
         {/* Sticky day-header row (on top) */}
-        <div className="sticky top-0 z-40 bg-white dark:bg-[#0c0c0c] border-b border-slate-100 dark:border-[#303030]">
+        <div className="sticky top-0 z-40 bg-white dark:bg-night-sunken border-b border-ink-100 dark:border-night-line">
           <div className="flex" style={{ height: DAY_HEADER_HEIGHT }}>
             {/* No border-r: the day column beside it already draws a
                 border-l, and the two together made this rule 2px thick —
                 visibly heavier than the day view's. */}
-            <div className="w-12 shrink-0 bg-white dark:bg-[#0c0c0c]" />
+            <div className="w-12 shrink-0 bg-white dark:bg-night-sunken" />
             {days.map((d) => (
               <DayHeader key={toDateStr(d)} date={d} onClick={onDayClick} />
             ))}
@@ -271,18 +271,18 @@ export default function WeekView({
 
         {/* Sticky all-day bar (directly below day headers) */}
         <div
-          className="sticky z-30 bg-white dark:bg-[#0c0c0c] border-b border-slate-100 dark:border-[#303030]"
+          className="sticky z-30 bg-white dark:bg-night-sunken border-b border-ink-100 dark:border-night-line"
           style={{ top: DAY_HEADER_HEIGHT }}
         >
           <div className="flex min-h-7">
-            <div className="w-12 shrink-0 bg-white dark:bg-[#0c0c0c] flex items-start justify-center pt-1">
+            <div className="w-12 shrink-0 bg-white dark:bg-night-sunken flex items-start justify-center pt-1">
               {/* Only offer the toggle when some day actually has enough
                   all-day tasks for collapsing to hide anything. */}
               {days.some((d) => canCollapseAllDay((byDay.get(toDateStr(d))?.allDay || []).length)) && (
                 <button
                   type="button"
                   onClick={() => setAllDayCollapsed((v) => !v)}
-                  className="inline-flex h-6 w-6 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-[#222222] dark:hover:text-slate-200"
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-md text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-700 dark:text-ink-500 dark:hover:bg-night-high dark:hover:text-ink-200"
                   aria-label={allDayCollapsed ? "Expand all-day" : "Collapse all-day"}
                 >
                   {allDayCollapsed ? (
@@ -315,14 +315,14 @@ export default function WeekView({
 
         {/* Timed grid */}
         <div className="flex">
-          <div className="w-12 shrink-0 bg-white dark:bg-[#0c0c0c] relative" style={{ height: HOURS.length * HOUR_HEIGHT }}>
+          <div className="w-12 shrink-0 bg-white dark:bg-night-sunken relative" style={{ height: HOURS.length * HOUR_HEIGHT }}>
             {/* Centred on the hour line rather than sitting under it, and
                 right-aligned so the gap to the grid is identical for
                 "1 AM" and "12 PM". Matches DayView. */}
             {HOURS.map((h) => (
               <div
                 key={h}
-                className="absolute left-0 right-0 -translate-y-1/2 pr-2 text-right text-[10px] text-slate-400 dark:text-slate-500"
+                className="absolute left-0 right-0 -translate-y-1/2 pr-2 text-right text-[10px] text-ink-400 dark:text-ink-500"
                 style={{ top: h * HOUR_HEIGHT }}
               >
                 {formatHour(h)}

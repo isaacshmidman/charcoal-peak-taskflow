@@ -38,26 +38,26 @@ function ConnectedRow({
       <div className="flex items-start gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
+            <p className="text-sm font-medium text-ink-900 dark:text-ink-100 truncate">
               {providerLabel(integration.provider)}
             </p>
             {integration.is_default && (
               <span
-                className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-amber-50 dark:bg-[#29230e] px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300"
+                className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-amber-50 dark:bg-night-warn px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300"
                 title="New tasks created in Zephyrly are pushed here."
               >
                 <Star className="w-2.5 h-2.5 fill-current" /> Default
               </span>
             )}
           </div>
-          <p className="text-xs text-slate-400 dark:text-slate-500 truncate">
+          <p className="text-xs text-ink-400 dark:text-ink-500 truncate">
             {integration.external_account_email}
           </p>
         </div>
         <Button
           variant="ghost"
           size="icon"
-          className="shrink-0 h-7 w-7 text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-[#2a1116]"
+          className="shrink-0 h-7 w-7 text-ink-400 dark:text-ink-500 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-night-danger"
           onClick={() => onDisconnect(integration.id)}
           disabled={isDisconnecting || offline}
           title="Disconnect"
@@ -118,8 +118,8 @@ function ConnectCard({ provider, onConnect, connecting, disabled }) {
   return (
     <div className="rounded-lg border border-border-hairline bg-surface-card p-3 flex items-center justify-between">
       <div>
-        <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{provider.label}</p>
-        <p className="text-xs text-slate-400 dark:text-slate-500">
+        <p className="text-sm font-medium text-ink-900 dark:text-ink-100">{provider.label}</p>
+        <p className="text-xs text-ink-400 dark:text-ink-500">
           Not connected
         </p>
       </div>
@@ -192,14 +192,14 @@ export default function IntegrationsPanel() {
   return (
     <section id="calendar-integrations" className="space-y-3">
       <div>
-        <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Calendar Integrations</h2>
-        <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+        <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-100">Calendar Integrations</h2>
+        <p className="text-xs text-ink-400 dark:text-ink-500 mt-0.5">
           Sync your tasks with Google Calendar or iCloud Calendar. Google uses OAuth; iCloud uses
           an app-specific password encrypted on the backend.
         </p>
       </div>
       {offline && (
-        <p className="rounded-lg border border-amber-100 dark:border-[#4a3512] bg-amber-50 dark:bg-[#1f1809] px-3 py-2 text-xs text-amber-700 dark:text-amber-200">
+        <p className="rounded-lg border border-amber-100 dark:border-night-warn-line bg-amber-50 dark:bg-night-warn px-3 py-2 text-xs text-amber-700 dark:text-amber-200">
           Offline: connected calendars are shown from cache. Connecting, disconnecting,
           manual sync, and calendar configuration changes resume when you are online.
         </p>
@@ -215,7 +215,7 @@ export default function IntegrationsPanel() {
         </p>
       )}
       {isLoading ? (
-        <div className="flex items-center gap-2 text-xs text-slate-400 dark:text-slate-500">
+        <div className="flex items-center gap-2 text-xs text-ink-400 dark:text-ink-500">
           <Loader2 className="w-3 h-3 animate-spin" /> Loading…
         </div>
       ) : (

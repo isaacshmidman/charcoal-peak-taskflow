@@ -25,15 +25,15 @@ export default function TokenAutocomplete({ open, items, activeIndex, onHover, o
           }}
           onMouseEnter={() => onHover(index)}
           className={cn(
-            "w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-slate-700 dark:text-slate-200",
-            index === activeIndex && "bg-slate-50 dark:bg-[#161616]"
+            "w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-ink-700 dark:text-ink-200",
+            index === activeIndex && "bg-ink-50 dark:bg-night-raised"
           )}
         >
           {item.sigil === "!" && (
             <span className={cn("w-2.5 h-2.5 rounded-full shrink-0", colorDot[item.color] || colorDot.slate)} />
           )}
           {item.sigil === "#" && (
-            <span className="text-slate-400 dark:text-slate-500 shrink-0">#</span>
+            <span className="text-ink-400 dark:text-ink-500 shrink-0">#</span>
           )}
           <span className="truncate">{item.label}</span>
         </button>

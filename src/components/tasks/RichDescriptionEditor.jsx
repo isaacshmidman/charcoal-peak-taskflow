@@ -199,8 +199,8 @@ export default function RichDescriptionEditor({
         chromeless
           ? "h-full"
           : cn(
-              "rounded-md border bg-white dark:bg-[#0c0c0c]",
-              showToolbar ? "border-slate-300 dark:border-[#454545]" : "border-slate-200 dark:border-[#343434]"
+              "rounded-md border bg-white dark:bg-night-sunken",
+              showToolbar ? "border-ink-300 dark:border-night-line-bold" : "border-ink-200 dark:border-night-line-strong"
             )
       )}
       // Keep the editor focused when interacting with the toolbar chrome.
@@ -240,7 +240,7 @@ export default function RichDescriptionEditor({
           data-richtext-toolbar
           // In a full-page note the body scrolls, so the toolbar sticks to
           // the bottom instead of drifting off with the text.
-          className={cn(chromeless && "sticky bottom-0 z-10 rounded-md border border-slate-200 bg-white dark:border-[#343434] dark:bg-[#0c0c0c]")}
+          className={cn(chromeless && "sticky bottom-0 z-10 rounded-md border border-ink-200 bg-white dark:border-night-line-strong dark:bg-night-sunken")}
         >
           <Toolbar
             editor={editor}

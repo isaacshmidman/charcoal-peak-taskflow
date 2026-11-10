@@ -22,13 +22,13 @@ export default function PriorityAndType({
     <div className="grid grid-cols-2 gap-3">
       {isExternal ? (
         <div>
-          <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-1.5 block">Calendar</Label>
+          <Label className="text-xs font-semibold text-ink-900 dark:text-ink-100 mb-1.5 block">Calendar</Label>
           <div
-            className="h-9 px-3 inline-flex items-center gap-2 w-full rounded-md border border-slate-200 dark:border-[#343434] bg-slate-50 dark:bg-[#161616] text-sm text-slate-700 dark:text-slate-200"
+            className="h-9 px-3 inline-flex items-center gap-2 w-full rounded-md border border-ink-200 dark:border-night-line-strong bg-ink-50 dark:bg-night-raised text-sm text-ink-700 dark:text-ink-200"
             title={`${sourceCalendarName} (${sourceProvider})`}
           >
             <span
-              className="inline-block w-2.5 h-2.5 rounded-full shrink-0 border border-slate-200 dark:border-[#343434]"
+              className="inline-block w-2.5 h-2.5 rounded-full shrink-0 border border-ink-200 dark:border-night-line-strong"
               style={sourceColorHex ? { backgroundColor: sourceColorHex, borderColor: hexToRgba(sourceColorHex, 0.6) || undefined } : { backgroundColor: "#94a3b8" }}
             />
             <span className="truncate">{sourceCalendarName}</span>
@@ -36,7 +36,7 @@ export default function PriorityAndType({
         </div>
       ) : (
         <div>
-          <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-1.5 block">Priority</Label>
+          <Label className="text-xs font-semibold text-ink-900 dark:text-ink-100 mb-1.5 block">Priority</Label>
           <Select value={form.priority_id} onValueChange={(v) => setForm({ ...form, priority_id: v })}>
             <SelectTrigger className="h-9">
               <SelectValue placeholder="Select..." />
@@ -56,7 +56,7 @@ export default function PriorityAndType({
       )}
 
       <div>
-        <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-1.5 block">Type</Label>
+        <Label className="text-xs font-semibold text-ink-900 dark:text-ink-100 mb-1.5 block">Type</Label>
         <Select
           value={form.task_type}
           onValueChange={(v) => setForm({ ...form, task_type: v, recurrence: v === "recurring" ? "weekly" : form.recurrence })}

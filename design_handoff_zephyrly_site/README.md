@@ -1,3 +1,8 @@
+> **Superseded (November 2026).** The app now follows the "Daylight" system in
+> `docs/design-system.md`: warm ink greys instead of slate, a full sun-yellow
+> scale, a top-of-page wash instead of the corner glow, Hanken Grotesk, and a
+> new logo. This folder is kept as a record of the earlier design.
+
 # Handoff: Zephyrly design system → your site
 
 ## Overview

@@ -32,18 +32,18 @@ export default function FilterBar({ filters, onFiltersChange, priorities = [] })
     <div className="space-y-3">
       <div className="flex gap-2 items-center">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 dark:text-slate-600" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-300 dark:text-ink-600" />
           <Input
             placeholder="Search tasks..."
             value={filters.search}
             onChange={(e) => update("search", e.target.value)}
-            className="pl-9 h-10 bg-white dark:bg-[#0c0c0c] border-slate-100 dark:border-[#303030]"
+            className="pl-9 h-10 bg-white dark:bg-night-sunken border-ink-100 dark:border-night-line"
           />
         </div>
         <Button aria-label={showAdvanced ? "Hide filters" : "More filters"}
           variant="outline"
           size="icon"
-          className={cn("h-10 w-10 shrink-0", showAdvanced && "bg-slate-100 dark:bg-[#161616]")}
+          className={cn("h-10 w-10 shrink-0", showAdvanced && "bg-ink-100 dark:bg-night-raised")}
           onClick={() => setShowAdvanced(!showAdvanced)}
         >
           <SlidersHorizontal className="w-4 h-4" />

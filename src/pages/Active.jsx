@@ -6,7 +6,6 @@ import { useOfflineMutation } from "@/hooks/useOfflineMutation";
 import { formatDeleteLabel, useDeleteWithUndo } from "@/hooks/useDeleteWithUndo";
 import { showDeleteToast } from "@/components/tasks/DeleteToast";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { AnimatedSearchInput } from "@/components/ui/animated-search-input";
 import { Plus, Search } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
@@ -176,8 +175,8 @@ export default function Active() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-base font-semibold text-slate-900 dark:text-slate-100">All Tasks</h1>
-          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{activeTasks.length} task{activeTasks.length !== 1 ? "s" : ""}</p>
+          <h1 className="ds-page-title">All Tasks</h1>
+          <p className="ds-page-sub">{activeTasks.length} task{activeTasks.length !== 1 ? "s" : ""}</p>
         </div>
         <div className="flex items-center gap-2">
           <AnimatedSearchInput
@@ -190,14 +189,14 @@ export default function Active() {
             variant="ghost"
             size="icon"
             data-search-toggle
-            className="h-9 w-9 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
+            className="h-9 w-9 text-ink-400 dark:text-ink-500 hover:text-ink-700 dark:hover:text-ink-200"
             onMouseDown={(e) => { if (showSearch) e.preventDefault(); }}
             onClick={() => { if (showSearch) setSearch(""); setShowSearch((v) => !v); }}
           >
             <Search className="w-4 h-4" />
           </Button>
           <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} page="active" />
-          <Button onClick={() => { setEditingTask(null); setAddSubtaskParent(null); setShowForm(true); }} className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200 h-9 gap-1.5">
+          <Button onClick={() => { setEditingTask(null); setAddSubtaskParent(null); setShowForm(true); }} className="bg-primary hover:bg-[var(--primary-hover)] text-primary-foreground h-9 gap-1.5">
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">New Task</span>
           </Button>
@@ -206,19 +205,19 @@ export default function Active() {
 
       {/* Active tasks */}
       {isLoading ? (
-        <div className="space-y-2">
-          {[1,2,3].map(i => <Card key={i} className="h-12 animate-pulse" />)}
+        <div className="ds-list">
+          {[1, 2, 3].map(i => <div key={i} className="h-11 animate-pulse bg-surface-card" />)}
         </div>
       ) : activeTasks.length === 0 ? (
         <div className="py-14 text-center">
           {topLevelTasks.length === 0 ? (
-            <p className="text-xs text-slate-400 dark:text-slate-500">Clear skies. Add something when you're ready.</p>
+            <p className="text-xs text-ink-400 dark:text-ink-500">Clear skies. Add something when you're ready.</p>
           ) : (
-            <p className="text-xs text-slate-400 dark:text-slate-500">Everything's in flow. Enjoy the stillness.</p>
+            <p className="text-xs text-ink-400 dark:text-ink-500">Everything's in flow. Enjoy the stillness.</p>
           )}
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="ds-list">
           <AnimatePresence mode="popLayout">
             {activeTasks.map(task => (
               <TaskCard

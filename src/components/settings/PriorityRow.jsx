@@ -34,7 +34,7 @@ export default function PriorityRow({ p, idx, total, isEditing, onStartEdit, onS
 
   if (isEditing) {
     return (
-      <div className="flex items-center gap-2 bg-white dark:bg-[#111111] border border-slate-200 dark:border-[#303030] rounded-xl px-3 py-2.5">
+      <div className="flex items-center gap-2 bg-white dark:bg-night-card border border-ink-200 dark:border-night-line rounded-xl px-3 py-2.5">
         <span className={cn("w-3 h-3 rounded-full shrink-0", colorDot[editColor] || colorDot.slate)} />
         <Input
           value={editName}
@@ -60,7 +60,7 @@ export default function PriorityRow({ p, idx, total, isEditing, onStartEdit, onS
         <Button aria-label="Save priority name" size="icon" variant="ghost" className="h-7 w-7 text-emerald-600" onClick={save}>
           <Check className="w-3.5 h-3.5" />
         </Button>
-        <Button aria-label="Cancel renaming" size="icon" variant="ghost" className="h-7 w-7 text-slate-400 dark:text-slate-500 hover:text-red-400 dark:hover:text-red-300" onClick={onStopEdit}>
+        <Button aria-label="Cancel renaming" size="icon" variant="ghost" className="h-7 w-7 text-ink-400 dark:text-ink-500 hover:text-red-400 dark:hover:text-red-300" onClick={onStopEdit}>
           <X className="w-3.5 h-3.5" />
         </Button>
       </div>);
@@ -69,21 +69,21 @@ export default function PriorityRow({ p, idx, total, isEditing, onStartEdit, onS
 
   return (
     <div
-      className="flex items-center gap-3 bg-white dark:bg-[#111111] border border-slate-100 dark:border-[#303030] rounded-xl px-3 py-2.5 hover:border-slate-200 dark:hover:border-[#454545] transition-colors"
+      className="flex items-center gap-3 bg-white dark:bg-night-card border border-ink-100 dark:border-night-line rounded-xl px-3 py-2.5 hover:border-ink-200 dark:hover:border-night-line-bold transition-colors"
       onDoubleClick={onStartEdit}>
 
       <div className="flex flex-col gap-0.5">
-        <button aria-label={`Move ${p.name} up`} onClick={onMoveUp} disabled={idx === 0} className="disabled:opacity-20 text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400 transition-colors">
+        <button aria-label={`Move ${p.name} up`} onClick={onMoveUp} disabled={idx === 0} className="disabled:opacity-20 text-ink-300 dark:text-ink-600 hover:text-ink-500 dark:hover:text-ink-400 transition-colors">
           <ArrowUp className="w-3 h-3" />
         </button>
-        <button aria-label={`Move ${p.name} down`} onClick={onMoveDown} disabled={idx === total - 1} className="disabled:opacity-20 text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400 transition-colors">
+        <button aria-label={`Move ${p.name} down`} onClick={onMoveDown} disabled={idx === total - 1} className="disabled:opacity-20 text-ink-300 dark:text-ink-600 hover:text-ink-500 dark:hover:text-ink-400 transition-colors">
           <ArrowDown className="w-3 h-3" />
         </button>
       </div>
       <span className={cn("w-3 h-3 rounded-full shrink-0", colorDot[p.color] || colorDot.slate)} />
-      <span className="text-sm font-medium text-slate-900 dark:text-slate-100 flex-1 min-w-0 break-words whitespace-normal">{p.name}</span>
+      <span className="text-sm font-medium text-ink-900 dark:text-ink-100 flex-1 min-w-0 break-words whitespace-normal">{p.name}</span>
 
-      <button aria-label={`Delete priority ${p.name}`} className="text-slate-300 dark:text-slate-600 hover:text-red-400 dark:hover:text-red-300 transition-colors" onClick={(e) => {e.stopPropagation();onDelete(p.id);}}>
+      <button aria-label={`Delete priority ${p.name}`} className="text-ink-300 dark:text-ink-600 hover:text-red-400 dark:hover:text-red-300 transition-colors" onClick={(e) => {e.stopPropagation();onDelete(p.id);}}>
         <X className="w-3.5 h-3.5" />
       </button>
     </div>);

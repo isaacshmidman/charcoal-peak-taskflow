@@ -69,8 +69,8 @@ export default function CalendarOrderSection() {
 
   return (
     <section>
-      <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Calendar Order</h2>
-      <p className="text-xs text-slate-400 dark:text-slate-500 mb-2">
+      <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-100 mb-2">Calendar Order</h2>
+      <p className="text-xs text-ink-400 dark:text-ink-500 mb-2">
         Reorder for sorting, and toggle visibility on non-Calendar pages
         (Today, All Tasks, etc.). The Calendar page has its own filter.
       </p>
@@ -80,13 +80,13 @@ export default function CalendarOrderSection() {
           return (
             <div
               key={c.key}
-              className="flex items-center gap-3 bg-surface-card border border-border-hairline rounded-xl px-3 py-2.5 hover:border-slate-200 dark:hover:border-[#454545] transition-colors"
+              className="flex items-center gap-3 bg-surface-card border border-border-hairline rounded-xl px-3 py-2.5 hover:border-ink-200 dark:hover:border-night-line-bold transition-colors"
             >
               <div className="flex flex-col gap-0.5">
                 <button
                   onClick={() => moveCalendar(idx, -1)}
                   disabled={idx === 0}
-                  className="disabled:opacity-20 text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400 transition-colors"
+                  className="disabled:opacity-20 text-ink-300 dark:text-ink-600 hover:text-ink-500 dark:hover:text-ink-400 transition-colors"
                   aria-label="Move up"
                 >
                   <ArrowUp className="w-3 h-3" />
@@ -94,7 +94,7 @@ export default function CalendarOrderSection() {
                 <button
                   onClick={() => moveCalendar(idx, 1)}
                   disabled={idx === orderedCalendars.length - 1}
-                  className="disabled:opacity-20 text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400 transition-colors"
+                  className="disabled:opacity-20 text-ink-300 dark:text-ink-600 hover:text-ink-500 dark:hover:text-ink-400 transition-colors"
                   aria-label="Move down"
                 >
                   <ArrowDown className="w-3 h-3" />
@@ -107,7 +107,7 @@ export default function CalendarOrderSection() {
                 style={{ backgroundColor: c.color || "#94a3b8" }}
                 aria-hidden
               />
-              <span className="text-sm font-medium text-slate-900 dark:text-slate-100 flex-1 min-w-0 truncate">
+              <span className="text-sm font-medium text-ink-900 dark:text-ink-100 flex-1 min-w-0 truncate">
                 {c.label}
               </span>
               <button
@@ -115,7 +115,7 @@ export default function CalendarOrderSection() {
                 className={cn(
                   "shrink-0 transition-colors",
                   isHidden
-                    ? "text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400"
+                    ? "text-ink-300 dark:text-ink-600 hover:text-ink-500 dark:hover:text-ink-400"
                     : "text-emerald-500 hover:text-emerald-600"
                 )}
                 title={isHidden ? "Hidden on non-Calendar pages" : "Visible on non-Calendar pages"}

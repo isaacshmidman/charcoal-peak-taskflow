@@ -24,7 +24,7 @@ function BarButton({ title, testid, onAction, children }) {
       aria-label={title}
       data-testid={testid}
       onMouseDown={(e) => { e.preventDefault(); onAction(); }}
-      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-[#222222]"
+      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-ink-600 hover:bg-ink-100 dark:text-ink-300 dark:hover:bg-night-high"
     >
       {children}
     </button>
@@ -155,7 +155,7 @@ export default function LinkBubble({ editor, onEditingChange }) {
             className="flex items-center gap-1"
             onSubmit={(e) => { e.preventDefault(); save(); }}
           >
-            <Link2 className="ml-1 h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" />
+            <Link2 className="ml-1 h-4 w-4 shrink-0 text-ink-400 dark:text-ink-500" />
             <div className="flex flex-col">
               <input
                 ref={inputRef}
@@ -172,14 +172,14 @@ export default function LinkBubble({ editor, onEditingChange }) {
                 autoCorrect="off"
                 spellCheck={false}
                 // 16px on phones so iOS doesn't zoom on focus.
-                className="h-7 w-56 max-w-[60vw] rounded-md border border-slate-200 bg-white px-2 text-base text-slate-900 outline-none focus:border-slate-400 dark:border-[#343434] dark:bg-[#0c0c0c] dark:text-slate-100 md:text-sm"
+                className="h-7 w-56 max-w-[60vw] rounded-md border border-ink-200 bg-white px-2 text-base text-ink-900 outline-none focus:border-ink-400 dark:border-night-line-strong dark:bg-night-sunken dark:text-ink-100 md:text-sm"
               />
               {error && <span className="px-1 pt-0.5 text-[11px] text-red-600 dark:text-red-400">{error}</span>}
             </div>
             <button
               type="submit"
               data-testid="richtext-link-save"
-              className="h-7 shrink-0 rounded-md bg-slate-900 px-2.5 text-xs font-medium text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+              className="h-7 shrink-0 rounded-md bg-primary px-2.5 text-xs font-medium text-primary-foreground hover:bg-[var(--primary-hover)]"
             >
               Save
             </button>

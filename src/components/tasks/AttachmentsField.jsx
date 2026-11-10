@@ -258,7 +258,7 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
 
   return (
     <div className="min-w-0">
-      <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-1.5 block">
+      <Label className="text-xs font-semibold text-ink-900 dark:text-ink-100 mb-1.5 block">
         Attachments
       </Label>
 
@@ -273,8 +273,8 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
           className={cn(
             "w-full flex items-center justify-center gap-2 rounded-lg border border-dashed px-3 py-3 transition-colors text-xs font-medium",
             dragOver
-              ? "border-slate-400 dark:border-slate-500 bg-slate-50 dark:bg-[#161616] text-slate-900 dark:text-slate-100"
-              : "border-slate-200 dark:border-[#343434] bg-white dark:bg-[#0c0c0c] text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-[#454545]"
+              ? "border-ink-400 dark:border-ink-500 bg-ink-50 dark:bg-night-raised text-ink-900 dark:text-ink-100"
+              : "border-ink-200 dark:border-night-line-strong bg-white dark:bg-night-sunken text-ink-500 dark:text-ink-400 hover:border-ink-300 dark:hover:border-night-line-bold"
           )}
         >
           {dragOver ? (
@@ -313,7 +313,7 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
       )}
 
       {!online && taskId && (
-        <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500">
+        <p className="mt-2 text-[11px] text-ink-400 dark:text-ink-500">
           Offline — files you attach now upload automatically when you reconnect.
         </p>
       )}

@@ -10,6 +10,7 @@
  * unless ticked here.
  */
 import { useEffect, useState } from "react";
+import Logo from "@/components/Logo";
 import { useParams } from "react-router-dom";
 import { apiClient } from "@/api/apiClient";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -54,35 +55,35 @@ export default function Connect() {
   const busy = state.phase === "sending";
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="w-full max-w-md rounded-[28px] border border-slate-200/80 dark:border-[#343434] bg-white/95 dark:bg-[#111111] backdrop-blur dark:backdrop-blur-none p-8 shadow-[0_24px_80px_rgba(15,23,42,0.08)] dark:shadow-[0_24px_80px_rgba(0,0,0,0.5)]">
+      <div className="w-full max-w-[26rem] rounded-[20px] border border-border-hairline bg-surface-card p-7 sm:p-8 shadow-hero">
         <div className="flex items-center gap-2.5 mb-6">
-          <img src="/zephyrly-logo.png" alt="Zephyrly" className="w-10 h-10 rounded-xl object-cover" />
-          <span className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Zephyrly</span>
+          <Logo size={36} />
+          <span className="text-xl font-semibold tracking-tight text-ink-900 dark:text-ink-100">Zephyrly</span>
         </div>
 
-        {state.phase === "loading" && <p className="text-sm text-slate-500 dark:text-slate-400">Checking this sign-in…</p>}
+        {state.phase === "loading" && <p className="text-sm text-ink-500 dark:text-ink-400">Checking this sign-in…</p>}
 
         {state.phase === "gone" && (
           <div data-testid="connect-gone">
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">This sign-in can't be used</h1>
-            <p className="mt-3 text-sm leading-6 text-slate-500 dark:text-slate-400">{state.message}</p>
+            <h1 className="text-xl font-semibold tracking-tight text-ink-900 dark:text-ink-100">This sign-in can't be used</h1>
+            <p className="mt-3 text-sm leading-6 text-ink-500 dark:text-ink-400">{state.message}</p>
           </div>
         )}
 
         {request && (
           <div data-testid="connect-request">
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 leading-snug break-words">
+            <h1 className="text-xl font-semibold tracking-tight text-ink-900 dark:text-ink-100 leading-snug break-words">
               Connect “{request.client_name}” to your Zephyrly account?
             </h1>
-            <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
+            <p className="mt-3 text-sm leading-6 text-ink-600 dark:text-ink-300">
               It will be able to read your tasks and notes. When you're done you'll go back to{" "}
-              <strong className="font-semibold text-slate-900 dark:text-slate-100" data-testid="connect-host">
+              <strong className="font-semibold text-ink-900 dark:text-ink-100" data-testid="connect-host">
                 {request.redirect_host}
               </strong>
               . If that isn't the app you were using, don't allow this.
             </p>
 
-            <label className="mt-5 flex items-start gap-3 rounded-2xl border border-slate-200 dark:border-[#343434] bg-slate-50 dark:bg-[#161616] px-4 py-3">
+            <label className="mt-5 flex items-start gap-3 rounded-xl border border-ink-200 dark:border-night-line-strong bg-ink-50 dark:bg-night-raised px-4 py-3">
               <Checkbox
                 checked={allowChanges}
                 onCheckedChange={setAllowChanges}
@@ -91,9 +92,9 @@ export default function Connect() {
                 data-testid="connect-allow-changes"
                 className="mt-0.5"
               />
-              <span className="text-sm leading-5 text-slate-700 dark:text-slate-200">
+              <span className="text-sm leading-5 text-ink-700 dark:text-ink-200">
                 Also let it change tasks
-                <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-slate-400">
+                <span className="mt-1 block text-xs leading-5 text-ink-500 dark:text-ink-400">
                   It can't change events from your calendars or delete anything for good, and you can undo its changes in
                   Settings → Connected apps.
                 </span>
@@ -108,7 +109,7 @@ export default function Connect() {
                 data-testid="connect-allow"
                 disabled={busy}
                 onClick={() => answer(true)}
-                className="w-full h-12 rounded-2xl bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 text-sm font-medium hover:bg-slate-800 dark:hover:bg-slate-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="w-full h-12 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-[var(--primary-hover)] disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {busy ? "Connecting…" : "Allow"}
               </button>
@@ -117,7 +118,7 @@ export default function Connect() {
                 data-testid="connect-deny"
                 disabled={busy}
                 onClick={() => answer(false)}
-                className="w-full h-12 rounded-2xl border border-slate-200 dark:border-[#343434] bg-white dark:bg-[#161616] text-slate-900 dark:text-slate-100 text-sm font-medium hover:bg-slate-50 dark:hover:bg-[#222222] disabled:opacity-60 disabled:cursor-not-allowed"
+                className="w-full h-12 rounded-xl border border-ink-200 dark:border-night-line-strong bg-white dark:bg-night-raised text-ink-900 dark:text-ink-100 text-sm font-medium hover:bg-ink-50 dark:hover:bg-night-high disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 Don't allow
               </button>

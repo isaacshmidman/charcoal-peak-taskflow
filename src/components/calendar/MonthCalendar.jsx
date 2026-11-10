@@ -56,9 +56,11 @@ function DayCell({
       ref={setNodeRef}
       onClick={handleEmptyClick}
       className={cn(
-        "flex flex-col border border-slate-100 dark:border-[#303030] rounded-md p-1 min-h-[5.5rem] transition-colors cursor-pointer",
-        inMonth ? "bg-white dark:bg-[#0c0c0c]" : "bg-slate-50 dark:bg-[#151515]",
-        isOver && "bg-blue-50 dark:bg-[#101f34] border-blue-200 dark:border-[#2f5f9c]"
+        // No border of its own: the grid's 1px gaps over a hairline-coloured
+        // ground draw the lines between days.
+        "flex flex-col p-1 min-h-[5.5rem] transition-colors cursor-pointer",
+        inMonth ? "bg-surface-card" : "bg-ink-50 dark:bg-night-base",
+        isOver && "bg-sun-100 dark:bg-sun-400/15"
       )}
     >
       <div
@@ -67,12 +69,12 @@ function DayCell({
       >
         <span
           className={cn(
-            "text-[10px] leading-none w-5 h-5 flex items-center justify-center rounded-full",
+            "text-[11px] tabular-nums leading-none w-5 h-5 flex items-center justify-center rounded-full",
             isToday
-              ? "bg-red-500 text-white font-semibold"
+              ? "bg-sun-400 text-ink-900 font-semibold"
               : inMonth
-              ? "text-slate-500 dark:text-slate-400"
-              : "text-slate-300 dark:text-slate-600"
+              ? "text-ink-500 dark:text-ink-400"
+              : "text-ink-300 dark:text-ink-600"
           )}
         >
           {format(date, "d")}
@@ -152,14 +154,14 @@ export default function MonthCalendar({
 
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-7 gap-1 text-xs font-medium text-slate-500 dark:text-slate-400 px-0.5">
+      <div className="grid grid-cols-7 text-xs font-medium text-ink-500 dark:text-ink-400">
         {weekDayLabels.map((l) => (
           <div key={l} className="text-center py-1">
             {l}
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 gap-px overflow-hidden rounded-xl border border-border-hairline bg-[var(--border-hairline)]">
         {days.map((d) => {
           const ds = toDateStr(d);
           const dayTasks = tasksByDate.get(ds) || [];

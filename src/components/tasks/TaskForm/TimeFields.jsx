@@ -18,11 +18,11 @@ export default function TimeFields({ form, setForm, endTouchedRef }) {
     <div className="space-y-2">
       <div className="flex items-end gap-3">
         <div className="flex-1">
-          <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-1.5 block">Date</Label>
+          <Label className="text-xs font-semibold text-ink-900 dark:text-ink-100 mb-1.5 block">Date</Label>
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" data-testid="task-form-date-trigger" className="w-full justify-start h-9 text-sm font-normal">
-                <CalendarIcon className="w-4 h-4 mr-2 text-slate-400 dark:text-slate-500" />
+                <CalendarIcon className="w-4 h-4 mr-2 text-ink-400 dark:text-ink-500" />
                 {form.due_date ? format(fromDateStr(form.due_date), "PPP") : "No date"}
               </Button>
             </PopoverTrigger>
@@ -46,7 +46,7 @@ export default function TimeFields({ form, setForm, endTouchedRef }) {
 
         {form.due_date && (
           <div className="flex flex-col items-center gap-1 pb-0.5">
-            <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100">Set time</Label>
+            <Label className="text-xs font-semibold text-ink-900 dark:text-ink-100">Set time</Label>
             <button
               type="button"
               role="switch"
@@ -61,9 +61,9 @@ export default function TimeFields({ form, setForm, endTouchedRef }) {
                   setForm({ ...form, task_time: "9:00AM", task_end_time: "10:00AM" });
                 }
               }}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${form.task_time ? "bg-slate-900 dark:bg-slate-100" : "bg-slate-200 dark:bg-[#222222]"}`}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${form.task_time ? "bg-ink-900 dark:bg-sun-400" : "bg-ink-300 dark:bg-night-line-bold"}`}
             >
-              <span className={`inline-block h-4 w-4 transform rounded-full bg-white dark:bg-slate-900 shadow transition-transform duration-200 ${form.task_time ? "translate-x-6" : "translate-x-1"}`} />
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white dark:bg-ink-950 transition-transform duration-200 ${form.task_time ? "translate-x-6" : "translate-x-1"}`} />
             </button>
           </div>
         )}
@@ -81,7 +81,7 @@ export default function TimeFields({ form, setForm, endTouchedRef }) {
               }));
             }}
           />
-          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">to</span>
+          <span className="text-xs font-medium text-ink-500 dark:text-ink-400">to</span>
           <TimeInput
             value={form.task_end_time || defaultEndTime(form.task_time)}
             onChange={(v) => {

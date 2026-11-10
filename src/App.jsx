@@ -53,7 +53,7 @@ const AuthenticatedApp = () => {
   if ((isLoadingPublicSettings || isLoadingAuth) && !(isOffline && hasCachedData) && !isLegalRoute) {
     return (
       <div className="fixed inset-0 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-ink-200 border-t-ink-800 rounded-full animate-spin" />
       </div>
     );
   }
@@ -64,11 +64,11 @@ const AuthenticatedApp = () => {
       return (
         <div className="fixed inset-0 flex items-center justify-center px-4">
           <div className="max-w-sm w-full bg-surface-card border border-border-strong rounded-2xl p-6 text-center shadow-sm">
-            <h1 className="text-base font-semibold text-slate-900 dark:text-slate-100">Couldn&apos;t load Zephyrly</h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">{authError.message || "Something went wrong while loading the app."}</p>
+            <h1 className="text-base font-semibold text-ink-900 dark:text-ink-100">Couldn&apos;t load Zephyrly</h1>
+            <p className="text-sm text-ink-500 dark:text-ink-400 mt-2">{authError.message || "Something went wrong while loading the app."}</p>
             <button
               onClick={() => checkAppState()}
-              className="mt-4 h-9 px-4 rounded-lg bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm font-medium hover:bg-slate-800 dark:hover:bg-slate-200"
+              className="mt-4 h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-[var(--primary-hover)]"
             >
               Try again
             </button>

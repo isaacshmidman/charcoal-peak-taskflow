@@ -1,6 +1,7 @@
 import { Outlet, Link, useLocation } from "react-router-dom";
 import { ListTodo, CalendarDays, LayoutGrid, NotebookPen, Settings, Sun, WifiOff, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import Logo from "@/components/Logo";
 import { useEffect, useState } from "react";
 import { useOfflineData } from "@/hooks/useOfflineData";
 import { useAttachmentQueue } from "@/hooks/useAttachmentQueue";
@@ -57,14 +58,17 @@ export default function Layout() {
   return (
     <div className="min-h-screen bg-transparent">
       {/* Top nav */}
-      <header className="sticky top-0 z-40 bg-white/80 dark:bg-black backdrop-blur-xl dark:backdrop-blur-none border-b border-slate-100 dark:border-[#303030]">
+      {/* The bar sits on the page wash and takes its colour, so there is
+          no line under it: a soft blur is all that separates it from what
+          scrolls beneath. */}
+      <header className="ds-bar sticky top-0 z-40">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <Link to={defaultNav} className="flex items-center gap-2.5">
-            <img src="/zephyrly-logo.png" alt="Zephyrly" className="w-7 h-7 rounded-lg object-cover" />
-            <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">Zephyrly</span>
+            <Logo size={26} />
+            <span className="text-[15px] font-semibold tracking-tight text-ink-900 dark:text-ink-100">Zephyrly</span>
           </Link>
 
-          <nav className="hidden sm:flex items-center gap-1">
+          <nav className="hidden sm:flex items-center gap-0.5">
             {navItems.map((item) => {
               const isActive = location.pathname === item.path;
               return (
@@ -78,11 +82,15 @@ export default function Layout() {
                   title={item.label}
                   aria-label={item.label}
                   className={cn(
-                    "flex items-center justify-center w-10 h-9 rounded-lg transition-all duration-200",
-                    isActive ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950" : "text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-[#161616]"
+                    // Words on a wide screen, icons where there's no room for them.
+                    "flex items-center justify-center h-8 w-10 lg:w-auto lg:px-3 rounded-lg text-sm transition-colors",
+                    isActive
+                      ? "bg-selected text-ink-900 dark:text-ink-50 font-semibold"
+                      : "text-ink-600 dark:text-ink-400 font-medium hover:text-ink-900 dark:hover:text-ink-100 hover:bg-selected"
                   )}
                 >
-                  <item.icon className="w-[18px] h-[18px]" />
+                  <item.icon className="w-[18px] h-[18px] lg:hidden" />
+                  <span className="hidden lg:inline">{item.label}</span>
                 </Link>
               );
             })}
@@ -94,28 +102,28 @@ export default function Layout() {
                 <PopoverTrigger asChild>
                   <button
                     type="button"
-                    className="h-10 w-10 inline-flex items-center justify-center rounded-lg text-red-500 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-[#2a1116] transition-colors"
+                    className="h-10 w-10 inline-flex items-center justify-center rounded-lg text-red-500 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-night-danger transition-colors"
                     aria-label="Offline status"
                     title="Offline"
                   >
                     <WifiOff className="w-4 h-4" />
                   </button>
                 </PopoverTrigger>
-                <PopoverContent align="end" className="w-72 rounded-lg border-slate-200 dark:border-[#303030] bg-surface-card p-3">
+                <PopoverContent align="end" className="w-72 rounded-lg border-ink-200 dark:border-night-line bg-surface-card p-3">
                   <div className="space-y-2">
                     <div>
-                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Offline mode</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      <p className="text-sm font-semibold text-ink-900 dark:text-ink-100">Offline mode</p>
+                      <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5">
                         Cached tasks, priorities, tags, recently deleted items, calendar connection status, and notification settings remain readable.
                       </p>
                     </div>
-                    <div className="rounded-md bg-slate-50 dark:bg-[#171717] border border-slate-100 dark:border-[#303030] p-2">
-                      <p className="text-[11px] font-medium text-slate-700 dark:text-slate-200">Queued until you reconnect</p>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    <div className="rounded-md bg-ink-50 dark:bg-night-raised border border-ink-100 dark:border-night-line p-2">
+                      <p className="text-[11px] font-medium text-ink-700 dark:text-ink-200">Queued until you reconnect</p>
+                      <p className="text-[11px] text-ink-500 dark:text-ink-400 mt-0.5">
                         Task, priority, tag, and recently deleted edits sync automatically as soon as the app is back online.
                       </p>
                     </div>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    <p className="text-[11px] text-ink-500 dark:text-ink-400">
                       Calendar connect/sync/configuration, push notification subscription/tests, and server-scheduled reminders require an internet connection.
                     </p>
                   </div>
@@ -127,10 +135,10 @@ export default function Layout() {
               onClick={() => window.dispatchEvent(new Event("settingsNavClicked"))}
               className={cn(
                 "flex items-center justify-center rounded-lg transition-colors",
-                "w-10 h-10 -mr-1",
+                "w-9 h-9 -mr-1",
                 location.pathname === "/Settings"
-                  ? "text-slate-900 dark:text-slate-950 bg-slate-100 dark:bg-slate-100"
-                  : "text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-[#161616]"
+                  ? "text-ink-900 dark:text-ink-50 bg-selected"
+                  : "text-ink-600 dark:text-ink-400 hover:text-ink-900 dark:hover:text-ink-100 hover:bg-selected"
               )}
             >
               <Settings className="w-4 h-4 pointer-events-none" />
@@ -143,7 +151,7 @@ export default function Layout() {
       {/* px-5 keeps the row off the screen edges; the items are square
           tap targets rather than flex-1 cells, so six of them read as a
           tidy row instead of six wide bars butted together. */}
-      <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/90 dark:bg-black backdrop-blur-xl dark:backdrop-blur-none border-t border-slate-100 dark:border-[#303030] px-5 pt-2 pb-5">
+      <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-ink-50/90 dark:bg-night-base/90 backdrop-blur-xl border-t border-border-hairline px-5 pt-2 pb-5">
         <div className="flex items-center justify-between">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path;
@@ -161,7 +169,7 @@ export default function Layout() {
                   // and it keeps the active pill square around the icon
                   // instead of stretching the full width of a cell.
                   "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-all touch-manipulation",
-                  isActive ? "text-slate-900 dark:text-slate-100 bg-slate-100/80 dark:bg-[#161616]" : "text-slate-400 dark:text-slate-500"
+                  isActive ? "text-ink-900 dark:text-ink-50 bg-selected" : "text-ink-400 dark:text-ink-500"
                 )}
               >
                 <item.icon className="w-[22px] h-[22px]" />
@@ -172,7 +180,7 @@ export default function Layout() {
       </nav>
 
       {/* Main content */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 pb-28 sm:pb-6">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-5 sm:pt-7 pb-28 sm:pb-10">
         <Outlet />
       </main>
 

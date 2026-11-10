@@ -84,7 +84,7 @@ export default function TitleAndDescription({ form, setForm, task, priorities = 
       <EditorLoadBoundary fallback={<PlainDescriptionFallback form={form} setForm={setForm} />}>
         <Suspense
           fallback={
-            <div className="h-20 rounded-md border border-slate-200 dark:border-[#343434] bg-white dark:bg-[#0c0c0c] px-3 py-2 text-sm text-slate-400 dark:text-slate-500">
+            <div className="h-20 rounded-md border border-ink-200 dark:border-night-line-strong bg-white dark:bg-night-sunken px-3 py-2 text-sm text-ink-400 dark:text-ink-500">
               Loading editor…
             </div>
           }

@@ -193,14 +193,14 @@ export default function NotificationsPanel({ onOpenAdvanced }) {
 
   // Trigger styles for the Select dropdowns in this panel — re-used by
   // the all-day TimeInput so it visually matches the rest of the form.
-  const SELECT_TRIGGER_CLASS = "h-9 bg-white dark:bg-[#111111] dark:border-[#343434] text-sm font-medium text-slate-900 dark:text-slate-100";
+  const SELECT_TRIGGER_CLASS = "h-9 bg-white dark:bg-night-card dark:border-night-line-strong text-sm font-medium text-ink-900 dark:text-ink-100";
 
   return (
     <section id="notifications" className="space-y-3">
-      <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Notifications</h2>
+      <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-100">Notifications</h2>
 
       {offline && (
-        <p className="rounded-lg border border-amber-100 dark:border-[#4a3512] bg-amber-50 dark:bg-[#1f1809] px-3 py-2 text-xs text-amber-700 dark:text-amber-200">
+        <p className="rounded-lg border border-amber-100 dark:border-night-warn-line bg-amber-50 dark:bg-night-warn px-3 py-2 text-xs text-amber-700 dark:text-amber-200">
           Offline — notification settings will save when you reconnect.
         </p>
       )}
@@ -217,9 +217,9 @@ export default function NotificationsPanel({ onOpenAdvanced }) {
           {draft.enabled ? (
             <Bell className="w-5 h-5 text-emerald-500 shrink-0" />
           ) : (
-            <BellOff className="w-5 h-5 text-slate-400 dark:text-slate-500 shrink-0" />
+            <BellOff className="w-5 h-5 text-ink-400 dark:text-ink-500 shrink-0" />
           )}
-          <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+          <p className="text-sm font-medium text-ink-900 dark:text-ink-100">
             Notifications
           </p>
         </div>
@@ -250,7 +250,7 @@ export default function NotificationsPanel({ onOpenAdvanced }) {
                 type="button"
                 variant="outline"
                 size="sm"
-                className="w-full h-11 gap-2 text-sm rounded-xl text-red-500 dark:text-red-300 border-red-200 dark:border-red-900 hover:bg-red-50 dark:hover:bg-[#2a1116] hover:text-red-600 dark:hover:text-red-200 hover:border-red-300 dark:hover:border-red-800"
+                className="w-full h-11 gap-2 text-sm rounded-xl text-red-500 dark:text-red-300 border-red-200 dark:border-red-900 hover:bg-red-50 dark:hover:bg-night-danger hover:text-red-600 dark:hover:text-red-200 hover:border-red-300 dark:hover:border-red-800"
                 disabled={deviceBusy || offline}
                 onClick={() => unsubscribeMutation.mutate()}
               >
@@ -266,7 +266,7 @@ export default function NotificationsPanel({ onOpenAdvanced }) {
                 type="button"
                 variant="outline"
                 size="sm"
-                className="w-full h-11 gap-2 text-sm rounded-xl bg-white dark:bg-[#111111] border-slate-100 dark:border-[#303030] hover:border-slate-200 dark:hover:border-[#454545] text-slate-900 dark:text-slate-100"
+                className="w-full h-11 gap-2 text-sm rounded-xl bg-white dark:bg-night-card border-ink-100 dark:border-night-line hover:border-ink-200 dark:hover:border-night-line-bold text-ink-900 dark:text-ink-100"
                 disabled={deviceBusy || offline}
                 onClick={() => subscribeMutation.mutate()}
               >
@@ -298,10 +298,10 @@ export default function NotificationsPanel({ onOpenAdvanced }) {
 
           {/* Remind me — reminder timing options. */}
           <SettingBox className="space-y-3">
-            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Adjust Notification Timing</p>
+            <p className="text-sm font-medium text-ink-900 dark:text-ink-100">Adjust Notification Timing</p>
 
             <div className="space-y-2">
-              <label className="block text-xs font-medium text-slate-600 dark:text-slate-300">Timed tasks</label>
+              <label className="block text-xs font-medium text-ink-600 dark:text-ink-300">Timed tasks</label>
               <Select
                 value={timedMode}
                 disabled={offline}
@@ -317,12 +317,12 @@ export default function NotificationsPanel({ onOpenAdvanced }) {
                 <SelectTrigger className={SELECT_TRIGGER_CLASS}>
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="bg-white dark:bg-[#111111] dark:border-[#343434]">
+                <SelectContent className="bg-white dark:bg-night-card dark:border-night-line-strong">
                   {TIMED_PRESETS.map((preset) => (
                     <SelectItem
                       key={preset.value}
                       value={preset.value}
-                      className="text-sm font-medium text-slate-900 dark:text-slate-100"
+                      className="text-sm font-medium text-ink-900 dark:text-ink-100"
                     >
                       {preset.label}
                     </SelectItem>
@@ -337,10 +337,10 @@ export default function NotificationsPanel({ onOpenAdvanced }) {
                     disabled={offline}
                     onValueChange={(direction) => updateCustomOffset({ direction })}
                   >
-                    <SelectTrigger className="h-9 bg-white dark:bg-[#111111] dark:border-[#343434] text-xs font-medium text-slate-900 dark:text-slate-100">
+                    <SelectTrigger className="h-9 bg-white dark:bg-night-card dark:border-night-line-strong text-xs font-medium text-ink-900 dark:text-ink-100">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="bg-white dark:bg-[#111111] dark:border-[#343434]">
+                    <SelectContent className="bg-white dark:bg-night-card dark:border-night-line-strong">
                       <SelectItem value="before">Before</SelectItem>
                       <SelectItem value="after">After</SelectItem>
                     </SelectContent>
@@ -359,10 +359,10 @@ export default function NotificationsPanel({ onOpenAdvanced }) {
                     disabled={offline}
                     onValueChange={(unit) => updateCustomOffset({ unit })}
                   >
-                    <SelectTrigger className="h-9 bg-white dark:bg-[#111111] dark:border-[#343434] text-xs font-medium text-slate-900 dark:text-slate-100">
+                    <SelectTrigger className="h-9 bg-white dark:bg-night-card dark:border-night-line-strong text-xs font-medium text-ink-900 dark:text-ink-100">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="bg-white dark:bg-[#111111] dark:border-[#343434]">
+                    <SelectContent className="bg-white dark:bg-night-card dark:border-night-line-strong">
                       <SelectItem value="minutes">Minutes</SelectItem>
                       <SelectItem value="hours">Hours</SelectItem>
                       <SelectItem value="days">Days</SelectItem>
@@ -373,7 +373,7 @@ export default function NotificationsPanel({ onOpenAdvanced }) {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1 text-xs font-medium text-slate-600 dark:text-slate-300">
+              <div className="space-y-1 text-xs font-medium text-ink-600 dark:text-ink-300">
                 <span>All-day tasks</span>
                 <div className="flex items-center gap-2">
                   <input
@@ -381,7 +381,7 @@ export default function NotificationsPanel({ onOpenAdvanced }) {
                     checked={draft.allDayEnabled}
                     disabled={offline}
                     onChange={(e) => patchDraft({ allDayEnabled: e.target.checked })}
-                    className="h-4 w-4 accent-slate-900 dark:accent-slate-100 shrink-0"
+                    className="h-4 w-4 accent-ink-900 dark:accent-ink-100 shrink-0"
                   />
                   <div className={cn("flex-1 min-w-0", (!draft.allDayEnabled || offline) && "opacity-50 pointer-events-none")}>
                     <TimeInput
@@ -394,7 +394,7 @@ export default function NotificationsPanel({ onOpenAdvanced }) {
                 </div>
               </div>
 
-              <label className="space-y-1 text-xs font-medium text-slate-600 dark:text-slate-300">
+              <label className="space-y-1 text-xs font-medium text-ink-600 dark:text-ink-300">
                 <span>Missed reminders</span>
                 <Select
                   value={String(draft.missedGraceMinutes)}
@@ -404,7 +404,7 @@ export default function NotificationsPanel({ onOpenAdvanced }) {
                   <SelectTrigger className={SELECT_TRIGGER_CLASS}>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-[#111111] dark:border-[#343434]">
+                  <SelectContent className="bg-white dark:bg-night-card dark:border-night-line-strong">
                     <SelectItem value="0">Skip missed</SelectItem>
                     <SelectItem value="30">Last 30 minutes</SelectItem>
                     <SelectItem value="120">Last 2 hours</SelectItem>
@@ -418,8 +418,8 @@ export default function NotificationsPanel({ onOpenAdvanced }) {
               className={cn(
                 "flex items-center gap-2 text-xs font-medium",
                 calendarsConnected
-                  ? "text-slate-700 dark:text-slate-200 cursor-pointer"
-                  : "text-slate-400 dark:text-slate-500 cursor-not-allowed"
+                  ? "text-ink-700 dark:text-ink-200 cursor-pointer"
+                  : "text-ink-400 dark:text-ink-500 cursor-not-allowed"
               )}
               title={
                 calendarsConnected
@@ -432,7 +432,7 @@ export default function NotificationsPanel({ onOpenAdvanced }) {
                 checked={draft.includeExternalEvents && calendarsConnected}
                 disabled={offline || !calendarsConnected}
                 onChange={(e) => patchDraft({ includeExternalEvents: e.target.checked })}
-                className="h-4 w-4 accent-slate-900 dark:accent-slate-100 disabled:opacity-50"
+                className="h-4 w-4 accent-ink-900 dark:accent-ink-100 disabled:opacity-50"
               />
               Include read-only Google and Apple calendar events
             </label>
@@ -444,20 +444,20 @@ export default function NotificationsPanel({ onOpenAdvanced }) {
             <button
               type="button"
               onClick={onOpenAdvanced}
-              className="w-full flex items-center justify-between bg-white dark:bg-[#111111] border border-slate-100 dark:border-[#303030] rounded-xl px-4 py-3 hover:border-slate-200 dark:hover:border-[#454545] transition-colors"
+              className="w-full flex items-center justify-between bg-white dark:bg-night-card border border-ink-100 dark:border-night-line rounded-xl px-4 py-3 hover:border-ink-200 dark:hover:border-night-line-bold transition-colors"
             >
-              <span className="text-sm font-medium text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                <SlidersHorizontal className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+              <span className="text-sm font-medium text-ink-900 dark:text-ink-100 flex items-center gap-2">
+                <SlidersHorizontal className="w-4 h-4 text-ink-500 dark:text-ink-400" />
                 Advanced Notification Settings
               </span>
-              <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600" />
+              <ChevronRight className="w-4 h-4 text-ink-300 dark:text-ink-600" />
             </button>
           )}
         </>
       )}
 
       {statusMessage && (
-        <p className="text-xs text-slate-500 dark:text-slate-400">{statusMessage}</p>
+        <p className="text-xs text-ink-500 dark:text-ink-400">{statusMessage}</p>
       )}
     </section>
   );

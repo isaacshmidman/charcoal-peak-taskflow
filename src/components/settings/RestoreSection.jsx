@@ -68,9 +68,9 @@ export default function RestoreSection() {
   };
 
   return (
-    <div className="space-y-3 border-t border-slate-100 pt-5 dark:border-[#303030]">
-      <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Restore from an export</h2>
-      <p className="text-sm text-slate-600 dark:text-slate-300">
+    <div className="space-y-3 border-t border-ink-100 pt-5 dark:border-night-line">
+      <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-100">Restore from an export</h2>
+      <p className="text-sm text-ink-600 dark:text-ink-300">
         Choose an export you downloaded (the .zip, or its data.json) to bring back anything that's missing. Nothing
         already here is changed or removed.
       </p>
@@ -97,7 +97,7 @@ export default function RestoreSection() {
 
       <div aria-live="polite" data-testid="restore-status">
         {!online && !busy && (
-          <p className="text-center text-xs text-slate-400 dark:text-slate-500">You're offline. Restoring needs a connection.</p>
+          <p className="text-center text-xs text-ink-400 dark:text-ink-500">You're offline. Restoring needs a connection.</p>
         )}
         {state.phase === "uploading" && (
           <div className="space-y-1.5">
@@ -107,26 +107,26 @@ export default function RestoreSection() {
               aria-valuemin={0}
               aria-valuemax={100}
               aria-valuenow={state.percent}
-              className="h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-[#303030]"
+              className="h-1.5 overflow-hidden rounded-full bg-ink-100 dark:bg-night-line"
             >
-              <div className="h-full bg-slate-900 transition-[width] dark:bg-slate-100" style={{ width: `${state.percent}%` }} />
+              <div className="h-full bg-primary transition-[width]" style={{ width: `${state.percent}%` }} />
             </div>
-            <p className="text-center text-xs text-slate-500 dark:text-slate-400">
+            <p className="text-center text-xs text-ink-500 dark:text-ink-400">
               Uploading… {state.percent}%. Keep this page open until it finishes.
             </p>
           </div>
         )}
         {state.phase === "working" && (
-          <p className="text-center text-xs text-slate-500 dark:text-slate-400">Restoring… Keep this page open until it finishes.</p>
+          <p className="text-center text-xs text-ink-500 dark:text-ink-400">Restoring… Keep this page open until it finishes.</p>
         )}
         {state.phase === "failed" && (
           <p className="text-xs text-red-600 dark:text-red-400" data-testid="restore-error">{state.message}</p>
         )}
         {state.phase === "done" && (
-          <div className="space-y-1.5 rounded-lg bg-slate-50 px-3 py-2.5 dark:bg-[#252525]" data-testid="restore-summary">
-            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{describeRestore(state.result?.added)}</p>
+          <div className="space-y-1.5 rounded-lg bg-ink-50 px-3 py-2.5 dark:bg-night-high" data-testid="restore-summary">
+            <p className="text-sm font-medium text-ink-900 dark:text-ink-100">{describeRestore(state.result?.added)}</p>
             {(state.result?.notes || []).length > 0 && (
-              <ul className="list-disc space-y-0.5 pl-4 text-xs text-slate-500 dark:text-slate-400">
+              <ul className="list-disc space-y-0.5 pl-4 text-xs text-ink-500 dark:text-ink-400">
                 {state.result.notes.map((note) => (
                   <li key={note}>{note}</li>
                 ))}

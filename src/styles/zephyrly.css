@@ -1,121 +1,133 @@
 /* ─────────────────────────────────────────────────────────────────
-   Zephyrly Design System — distilled tokens + brand typeface.
-   Source of truth: design_handoff_zephyrly_site/ (README + tokens/).
+   Zephyrly design system — "Daylight" (2026-11).
 
-   Deliberately NOT a verbatim copy of the handoff's colors.css: names
-   that collide with the shadcn HSL-triplet variables in index.css
-   (--background, --foreground, --primary, --secondary, --ring,
-   --border, --destructive*) are omitted — those stay in shadcn triplet
-   format because tailwind.config.js consumes them as hsl(var(--x)).
-   Everything else from the handoff lives here under its documented
-   name so new work can build against var(--*) instead of raw hex.
+   Two colours carry the brand: ink and sun. Everything else is a
+   quiet step of one or the other.
+
+     ink   warm near-black and its greys. The neutral for text, lines
+           and surfaces. Deliberately NOT a blue-grey: it shares the
+           yellow's warmth, so the two sit together.
+     sun   the brand lemon, as a full scale. The pale end is the page
+           wash; 400 is the accent (ticks, the dark-mode primary
+           button, "today"); the deep end is text on a yellow tint.
+
+   One gradient: a clean wash of sun fading down from the top of the
+   page into paper. No blobs, no glows.
+
+   Tailwind exposes these as `ink-*`, `sun-*`, `night-*` and the
+   surface/border names (tailwind.config.js). The shadcn names
+   (--background, --primary, --border …) live in index.css as HSL
+   triplets, because tailwind.config.js reads them as hsl(var(--x)).
    ───────────────────────────────────────────────────────────────── */
 
-/* ── Brand typeface: Plus Jakarta Sans (self-hosted) ─────────────
-   400/500/600/700 carry the UI; 800 sets the wordmark "Z". */
+/* ── Typeface: Hanken Grotesk (variable, self-hosted, SIL OFL —
+   licence beside the files in public/fonts). One file covers every
+   weight from 100 to 900. */
 @font-face {
-  font-family: "Plus Jakarta Sans";
+  font-family: "Hanken Grotesk";
   font-style: normal;
-  font-weight: 400;
+  font-weight: 100 900;
   font-display: swap;
-  src: url("/fonts/plus-jakarta-sans-400.woff2") format("woff2");
+  src: url("/fonts/hanken-grotesk-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 @font-face {
-  font-family: "Plus Jakarta Sans";
+  font-family: "Hanken Grotesk";
   font-style: normal;
-  font-weight: 500;
+  font-weight: 100 900;
   font-display: swap;
-  src: url("/fonts/plus-jakarta-sans-500.woff2") format("woff2");
-}
-@font-face {
-  font-family: "Plus Jakarta Sans";
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url("/fonts/plus-jakarta-sans-600.woff2") format("woff2");
-}
-@font-face {
-  font-family: "Plus Jakarta Sans";
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url("/fonts/plus-jakarta-sans-700.woff2") format("woff2");
-}
-@font-face {
-  font-family: "Plus Jakarta Sans";
-  font-style: normal;
-  font-weight: 800;
-  font-display: swap;
-  src: url("/fonts/plus-jakarta-sans-800.woff2") format("woff2");
+  src: url("/fonts/hanken-grotesk-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 :root {
-  /* ── Brand ──────────────────────────────────────────────────
-     The yellow is atmosphere, not a fill — no colored brand button. */
-  --brand-glow-1: #f5f5a0;
-  --brand-glow-2: #fdfdcf;
-  --brand-yellow: #f3e23f;
-  --brand-yellow-soft: #faf6c4;
-  --brand-ink: #0a0a0a;
-  /* THE signature: warm radial glow, bottom-right of every screen.
-     Applied to <body> (fixed, no-repeat) in index.css. index.html
-     keeps a hex copy as the pre-CSS FOUC guard — update both. */
-  --brand-bg-light: radial-gradient(circle at 100% 100%, #f5f5a0 0%, #fdfdcf 12%, #ffffff 40%);
-  /* Opaque warm-dark → black stops; translucent stops band hard. */
-  --brand-bg-dark: radial-gradient(circle at 100% 100%, #343422 0%, #1d1d14 16%, #0b0b08 38%, #000000 66%);
+  /* ── Ink: the warm neutral ────────────────────────────────── */
+  --ink-50: #fafaf7;  /* paper — the page */
+  --ink-100: #f3f2ed; /* quiet fill, hover */
+  --ink-200: #e7e5de; /* hairline */
+  --ink-300: #d4d1c8; /* control border */
+  --ink-400: #98948a; /* captions, icons at rest */
+  --ink-500: #77736a; /* secondary text */
+  --ink-600: #5a564e;
+  --ink-700: #423f39;
+  --ink-800: #2a2824;
+  --ink-900: #1a1915; /* ink — text, primary button */
+  --ink-950: #100f0d;
 
-  /* ── Slate ramp (the real neutral; identical to Tailwind slate) ── */
-  --slate-50:  #f8fafc;
-  --slate-100: #f1f5f9;
-  --slate-200: #e2e8f0;
-  --slate-300: #cbd5e1;
-  --slate-400: #94a3b8;
-  --slate-500: #64748b;
-  --slate-600: #475569;
-  --slate-700: #334155;
-  --slate-800: #1e293b;
-  --slate-900: #0f172a;
-  --slate-950: #020617;
+  /* ── Sun: the brand lemon ─────────────────────────────────── */
+  --sun-50: #fffdeb;
+  --sun-100: #fff9c7;
+  --sun-200: #fff29a;
+  --sun-300: #fbe96a;
+  --sun-400: #f3e23f; /* THE yellow */
+  --sun-500: #e3cb1b;
+  --sun-600: #bda010;
+  --sun-700: #8c750c; /* text on a sun tint */
+  --sun-800: #69580f;
+  --sun-900: #493e10;
+  --sun-950: #2a2409;
+
+  /* ── Night: dark-mode surfaces, warm like the ink ─────────── */
+  --night-base: #131311;        /* the page */
+  --night-sunken: #151513;      /* fields set into a card */
+  --night-card: #1b1a17;
+  --night-raised: #232220;      /* hover, quiet fill */
+  --night-high: #2b2a26;        /* pressed, code */
+  --night-line: #2f2d28;        /* hairline */
+  --night-line-strong: #3b3933; /* control border */
+  --night-line-bold: #504d45;
+  --night-danger: #2c1512;      /* red tint */
+  --night-info: #131e30;        /* blue tint */
+  --night-warn: #2a240c;        /* amber tint */
+  --night-warn-line: #4a3f12;
+  --night-good: #12241a;        /* green tint */
+
+  /* Kept under their old names for the note↔task link styles. */
+  --brand-yellow: var(--sun-400);
+  --brand-ink: var(--ink-900);
+
+  /* ── The wash ─────────────────────────────────────────────────
+     Stops are in px, not %, so the band of colour is the same depth
+     on a phone and a wide monitor, and so it still looks right where
+     a fixed background isn't honoured (iOS) and it scrolls away.
+     index.html keeps a literal copy for the moment before this file
+     loads — change both together. */
+  --wash-top-light: #fff5a6;
+  --wash-top-dark: #2e2a0e;
+  --wash-light: linear-gradient(180deg, #fff5a6 0, #fffad8 110px, #fafaf7 300px);
+  --wash-dark: linear-gradient(180deg, #2e2a0e 0, #1e1c10 110px, #131311 300px);
+  /* For a mark, a badge, an empty state: the same yellow, corner to corner. */
+  --sun-gradient: linear-gradient(135deg, var(--sun-100) 0%, var(--sun-400) 100%);
 
   /* ── Surfaces & borders (light) ───────────────────────────── */
+  --surface-page: var(--ink-50);
   --surface-card: #ffffff;
-  --surface-card-glass: rgba(255, 255, 255, 0.8); /* sticky header + blur */
-  --surface-muted: var(--slate-50);
-  --border-hairline: var(--slate-100); /* handoff --border; renamed: shadcn owns --border */
-  --border-strong: var(--slate-200);   /* inputs, dividers */
+  --surface-card-glass: rgba(255, 247, 184, 0.82); /* the bar over the wash */
+  --surface-muted: var(--ink-100);
+  --border-hairline: var(--ink-200);
+  --border-strong: var(--ink-300);
 
   /* ── Text roles (light) ───────────────────────────────────── */
-  --text-body: var(--slate-900);
-  --text-secondary: var(--slate-500);
-  --text-muted: var(--slate-400);
-  --text-faint: var(--slate-300);
+  --text-body: var(--ink-900);
+  --text-secondary: var(--ink-500);
+  --text-muted: var(--ink-400);
+  --text-faint: var(--ink-300);
 
   /* ── Action & status ──────────────────────────────────────── */
-  --primary-hover: var(--slate-800);
-  --destructive-soft: #f87171; /* overdue bar, swipe peel */
-  --destructive-bg: #fef2f2;
-  --accent-recurring: #7c3aed;
-  --accent-recurring-bg: #f5f3ff;
-
-  /* ── Priority palette (mirrors src/lib/colors.js) ─────────── */
-  --pri-red: #f87171;    --pri-red-bg: #fef2f2;    --pri-red-border: #fee2e2;
-  --pri-orange: #fb923c; --pri-orange-bg: #fff7ed; --pri-orange-border: #ffedd5;
-  --pri-yellow: #facc15; --pri-yellow-bg: #fefce8; --pri-yellow-border: #fef9c3;
-  --pri-green: #4ade80;  --pri-green-bg: #f0fdf4;  --pri-green-border: #dcfce7;
-  --pri-blue: #60a5fa;   --pri-blue-bg: #eff6ff;   --pri-blue-border: #dbeafe;
-  --pri-violet: #a78bfa; --pri-violet-bg: #f5f3ff; --pri-violet-border: #ede9fe;
-  --pri-pink: #f472b6;   --pri-pink-bg: #fdf2f8;   --pri-pink-border: #fce7f3;
-  --pri-teal: #2dd4bf;   --pri-teal-bg: #f0fdfa;   --pri-teal-border: #ccfbf1;
-  --pri-cyan: #22d3ee;   --pri-cyan-bg: #ecfeff;   --pri-cyan-border: #cffafe;
-  --pri-rose: #fb7185;   --pri-rose-bg: #fff1f2;   --pri-rose-border: #ffe4e6;
-  --pri-slate: #94a3b8;
-  --pri-brown: #b45309;
+  --primary-hover: var(--ink-700);
+  --selected: rgba(26, 25, 21, 0.07); /* the page you're on, the row you picked */
+  --destructive-soft: #e5604c; /* overdue bar, swipe peel */
+  --destructive-bg: #fdf1ee;
+  --accent-recurring: var(--ink-500);
+  --accent-recurring-bg: var(--ink-100);
 
   /* ── Typography ───────────────────────────────────────────── */
-  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system,
+  --font-sans: "Hanken Grotesk", ui-sans-serif, system-ui, -apple-system,
     BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-logo: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
-  --weight-logo: 800;
+  --font-logo: var(--font-sans);
+  --weight-logo: 700;
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   --text-2xs: 10px;  /* date chips, tiny meta */
   --text-xs2: 11px;  /* counts, captions */
@@ -125,19 +137,19 @@
   --container-max: 72rem;
   --header-height: 56px;
   --control-height: 36px;
-  --control-height-lg: 48px;
+  --control-height-lg: 44px;
 
   /* ── Radii beyond the shadcn base (--radius stays in index.css) ── */
-  --radius-xl: 12px;  /* task cards, panels */
-  --radius-2xl: 16px; /* auth inputs, info blocks */
-  --radius-3xl: 28px; /* hero / auth card */
+  --radius-xl: 12px;  /* lists, panels */
+  --radius-2xl: 14px; /* dialogs */
+  --radius-3xl: 20px; /* the sign-in card */
 
-  /* ── Shadows — whisper-soft ───────────────────────────────── */
-  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
-  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
-  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
-  --shadow-pop: 0 8px 28px rgba(15, 23, 42, 0.12);
-  --shadow-hero: 0 24px 80px rgba(15, 23, 42, 0.08);
+  /* ── Shadows — only where something really floats ─────────── */
+  --shadow-xs: 0 1px 1px rgba(26, 25, 21, 0.04);
+  --shadow-sm: 0 1px 2px rgba(26, 25, 21, 0.06);
+  --shadow-md: 0 4px 14px rgba(26, 25, 21, 0.08);
+  --shadow-pop: 0 10px 30px rgba(26, 25, 21, 0.12), 0 1px 2px rgba(26, 25, 21, 0.06);
+  --shadow-hero: 0 24px 60px rgba(73, 62, 16, 0.1);
 
   /* ── Motion — quick and gentle, no bounce ─────────────────── */
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
@@ -145,21 +157,25 @@
   --duration-base: 200ms;
 }
 
-/* ── Dark scope (matches the app's established dark hex) ─────── */
 .dark {
-  --surface-card: #111111;
-  --surface-card-glass: #000000; /* dark header is opaque black */
-  --surface-muted: #161616;
-  --border-hairline: #303030;
-  --border-strong: #343434;
+  --surface-page: var(--night-base);
+  --surface-card: var(--night-card);
+  --surface-card-glass: rgba(38, 35, 14, 0.82);
+  --surface-muted: var(--night-raised);
+  --border-hairline: var(--night-line);
+  --border-strong: var(--night-line-strong);
 
-  --text-body: #ededed;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  --text-faint: #475569;
+  --text-body: #f1efe8;
+  --text-secondary: var(--ink-400);
+  --text-muted: var(--ink-500);
+  --text-faint: var(--ink-600);
 
-  --primary-hover: var(--slate-200); /* primary inverts to light in dark */
-  --destructive-bg: #2a1116;
-  --accent-recurring: #c4b5fd;
-  --accent-recurring-bg: #201735;
+  --primary-hover: var(--sun-300); /* primary is sun in dark */
+  --selected: rgba(255, 253, 235, 0.09);
+  --destructive-bg: var(--night-danger);
+  --accent-recurring: var(--ink-400);
+  --accent-recurring-bg: var(--night-raised);
+
+  --shadow-pop: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 253, 235, 0.04);
+  --shadow-hero: 0 24px 60px rgba(0, 0, 0, 0.45);
 }

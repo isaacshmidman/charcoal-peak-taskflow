@@ -3,13 +3,14 @@ import { render, screen } from "@testing-library/react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./card";
 
 describe("Card", () => {
-  it("renders the DS surface: token background, hairline border, 12px radius, hover shadow", () => {
+  it("renders the DS surface: token background, hairline border, 12px radius, and no shadow", () => {
     render(<Card data-testid="card">content</Card>);
     const card = screen.getByTestId("card");
     expect(card.className).toContain("bg-surface-card");
     expect(card.className).toContain("border-border-hairline");
     expect(card.className).toContain("rounded-xl");
-    expect(card.className).toContain("hover:shadow-sm");
+    // Flat at rest and on hover: a card isn't a button, so it doesn't lift.
+    expect(card.className).not.toContain("shadow");
   });
 
   it("merges a consumer className without losing the surface", () => {

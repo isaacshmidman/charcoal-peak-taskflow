@@ -90,18 +90,18 @@ export default function TagsSection() {
 
   return (
     <section>
-      <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Tags</h2>
+      <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-100 mb-2">Tags</h2>
 
       <Card className="overflow-hidden">
         {savedTags.slice(-20).length === 0 ?
-          <p className="text-xs text-slate-400 px-4 py-3">No saved tags yet</p> :
+          <p className="text-xs text-ink-400 px-4 py-3">No saved tags yet</p> :
 
           savedTags.slice(-20).map((tag, i, arr) =>
-            <div key={tag.id} className={cn("flex items-center justify-between px-4 py-2", i < arr.length - 1 && "border-b border-slate-50 dark:border-[#303030]")}>
-              <span className="text-sm font-medium text-slate-900 dark:text-slate-100 flex items-center gap-2 min-w-0 break-words whitespace-normal">
-                <Tag className="w-3 h-3 text-slate-900 dark:text-slate-100 shrink-0" /><span className="break-words whitespace-normal">{tag.name}</span>
+            <div key={tag.id} className={cn("flex items-center justify-between px-4 py-2", i < arr.length - 1 && "border-b border-ink-50 dark:border-night-line")}>
+              <span className="text-sm font-medium text-ink-900 dark:text-ink-100 flex items-center gap-2 min-w-0 break-words whitespace-normal">
+                <Tag className="w-3 h-3 text-ink-900 dark:text-ink-100 shrink-0" /><span className="break-words whitespace-normal">{tag.name}</span>
               </span>
-              <button aria-label={`Delete tag ${tag.name}`} onClick={() => deleteTagMutation.mutate(tag.id)} className="text-slate-300 dark:text-slate-600 hover:text-red-400 dark:hover:text-red-300 transition-colors">
+              <button aria-label={`Delete tag ${tag.name}`} onClick={() => deleteTagMutation.mutate(tag.id)} className="text-ink-300 dark:text-ink-600 hover:text-red-400 dark:hover:text-red-300 transition-colors">
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -129,7 +129,7 @@ export default function TagsSection() {
             if (t && !savedTags.find((s) => s.name === t)) createTagMutation.mutate(t);
             setNewTagName("");
           }}
-          className="h-9 px-3 bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200">
+          variant="outline" className="h-9 w-9 px-0 shrink-0">
 
           <Plus className="w-4 h-4" />
         </Button>

@@ -1,7 +1,7 @@
 /**
- * Shared color palette for priority swatches and task card backgrounds.
- * Used by Settings (swatch picker), TaskCard (card bg), and RecentlyDeleted
- * (DeletedTaskCard bg). Keep in sync — adding a color here adds it everywhere.
+ * Shared colour palette for priorities: the swatch (colorDot), the tick
+ * box of a task row (colorCheck) and the soft tint of a calendar chip
+ * (colorBg). Keep the three in step — a colour added here needs all of them.
  */
 
 /**
@@ -20,9 +20,9 @@ export const COLOR_OPTIONS = [
   { value: "teal", label: "Teal", class: "bg-teal-400" },
   { value: "cyan", label: "Cyan", class: "bg-cyan-400" },
   { value: "rose", label: "Rose", class: "bg-rose-400" },
-  { value: "slate", label: "Gray", class: "bg-slate-400" },
-  { value: "black", label: "Black", class: "bg-slate-900 dark:bg-slate-100" },
-  { value: "white", label: "White", class: "bg-white border border-slate-300 dark:border-slate-500" },
+  { value: "slate", label: "Gray", class: "bg-ink-400" },
+  { value: "black", label: "Black", class: "bg-ink-900 dark:bg-ink-100" },
+  { value: "white", label: "White", class: "bg-white border border-ink-300 dark:border-ink-500" },
   { value: "brown", label: "Brown", class: "bg-amber-700" },
   { value: "red_alt", label: "Red (deep)", class: "bg-red-600" },
   { value: "orange_alt", label: "Orange (deep)", class: "bg-orange-600" },
@@ -45,9 +45,9 @@ export const colorDot = {
   teal: "bg-teal-400",
   cyan: "bg-cyan-400",
   rose: "bg-rose-400",
-  slate: "bg-slate-400",
-  black: "bg-slate-900 dark:bg-slate-100",
-  white: "bg-white border border-slate-300 dark:border-slate-500",
+  slate: "bg-ink-400",
+  black: "bg-ink-900 dark:bg-ink-100",
+  white: "bg-white border border-ink-300 dark:border-ink-500",
   brown: "bg-amber-700",
   red_alt: "bg-red-600",
   orange_alt: "bg-orange-600",
@@ -57,29 +57,65 @@ export const colorDot = {
   violet_alt: "bg-violet-700",
 };
 
-/** Task card background + border class, tuned to match the dot hue at low saturation. */
+/**
+ * A soft tint of the priority's colour, for the places where colour IS the
+ * point: chips on the calendar, the swatch behind a priority's name. Task
+ * rows in a list don't use it — there the colour sits on the tick box
+ * (colorCheck below) and the row stays plain.
+ *
+ * Dark mode is the same hue at low opacity, so a tint reads as a tint of
+ * the surface it sits on rather than a block of its own.
+ */
 /** @type {Record<string, string>} */
 export const colorBg = {
-  red: "bg-red-50 border-red-100 dark:bg-[#2a1116] dark:border-[#6f2634]",
-  orange: "bg-orange-50 border-orange-100 dark:bg-[#2b180f] dark:border-[#76401c]",
-  yellow: "bg-yellow-50 border-yellow-100 dark:bg-[#29230e] dark:border-[#73621d]",
-  green: "bg-green-50 border-green-100 dark:bg-[#10261b] dark:border-[#2f6f4b]",
-  blue: "bg-blue-50 border-blue-100 dark:bg-[#101f34] dark:border-[#2f5f9c]",
-  violet: "bg-violet-50 border-violet-100 dark:bg-[#201735] dark:border-[#61419e]",
-  pink: "bg-pink-50 border-pink-100 dark:bg-[#2a1220] dark:border-[#743057]",
-  teal: "bg-teal-50 border-teal-100 dark:bg-[#102723] dark:border-[#2f756b]",
-  cyan: "bg-cyan-50 border-cyan-100 dark:bg-[#102630] dark:border-[#2f7086]",
-  rose: "bg-rose-50 border-rose-100 dark:bg-[#2b1219] dark:border-[#763044]",
-  slate: "bg-slate-50 border-slate-100 dark:bg-[#111111] dark:border-[#303030]",
-  black: "bg-slate-900 border-slate-900 text-white dark:bg-[#080808] dark:border-[#343434] dark:text-slate-100",
-  white: "bg-white border-slate-200 dark:bg-[#161616] dark:border-[#3a3a3a]",
-  brown: "bg-amber-50 border-amber-100 dark:bg-[#2a1a0d] dark:border-[#7a4b1c]",
-  red_alt: "bg-red-100 border-red-200 dark:bg-[#341219] dark:border-[#8a2f3c]",
-  orange_alt: "bg-orange-100 border-orange-200 dark:bg-[#351a0d] dark:border-[#93501f]",
-  yellow_alt: "bg-yellow-100 border-yellow-200 dark:bg-[#30270b] dark:border-[#8b711b]",
-  green_alt: "bg-green-100 border-green-200 dark:bg-[#0e2f1c] dark:border-[#347f4e]",
-  blue_alt: "bg-blue-100 border-blue-200 dark:bg-[#0f2340] dark:border-[#346bad]",
-  violet_alt: "bg-violet-100 border-violet-200 dark:bg-[#251746] dark:border-[#6b46b3]",
+  red: "bg-red-50 border-red-100 dark:bg-red-400/[0.12] dark:border-red-400/20",
+  orange: "bg-orange-50 border-orange-100 dark:bg-orange-400/[0.12] dark:border-orange-400/20",
+  yellow: "bg-yellow-50 border-yellow-100 dark:bg-yellow-400/[0.12] dark:border-yellow-400/20",
+  green: "bg-green-50 border-green-100 dark:bg-green-400/[0.12] dark:border-green-400/20",
+  blue: "bg-blue-50 border-blue-100 dark:bg-blue-400/[0.12] dark:border-blue-400/20",
+  violet: "bg-violet-50 border-violet-100 dark:bg-violet-400/[0.12] dark:border-violet-400/20",
+  pink: "bg-pink-50 border-pink-100 dark:bg-pink-400/[0.12] dark:border-pink-400/20",
+  teal: "bg-teal-50 border-teal-100 dark:bg-teal-400/[0.12] dark:border-teal-400/20",
+  cyan: "bg-cyan-50 border-cyan-100 dark:bg-cyan-400/[0.12] dark:border-cyan-400/20",
+  rose: "bg-rose-50 border-rose-100 dark:bg-rose-400/[0.12] dark:border-rose-400/20",
+  slate: "bg-ink-100 border-ink-200 dark:bg-night-raised dark:border-night-line",
+  black: "bg-ink-900 border-ink-900 text-white dark:bg-night-sunken dark:border-night-line-strong dark:text-ink-100",
+  white: "bg-white border-ink-200 dark:bg-night-raised dark:border-night-line-strong",
+  brown: "bg-amber-50 border-amber-100 dark:bg-amber-600/[0.14] dark:border-amber-600/25",
+  red_alt: "bg-red-100 border-red-200 dark:bg-red-500/20 dark:border-red-500/30",
+  orange_alt: "bg-orange-100 border-orange-200 dark:bg-orange-500/20 dark:border-orange-500/30",
+  yellow_alt: "bg-yellow-100 border-yellow-200 dark:bg-yellow-500/20 dark:border-yellow-500/30",
+  green_alt: "bg-green-100 border-green-200 dark:bg-green-500/20 dark:border-green-500/30",
+  blue_alt: "bg-blue-100 border-blue-200 dark:bg-blue-500/20 dark:border-blue-500/30",
+  violet_alt: "bg-violet-100 border-violet-200 dark:bg-violet-500/20 dark:border-violet-500/30",
+};
+
+/**
+ * The tick box of a task that isn't done yet, in its priority's colour: a
+ * ring of it, and a breath of it inside. This is how a list shows priority.
+ */
+/** @type {Record<string, string>} */
+export const colorCheck = {
+  red: "border-red-400 bg-red-400/10 hover:bg-red-400/25",
+  orange: "border-orange-400 bg-orange-400/10 hover:bg-orange-400/25",
+  yellow: "border-yellow-400 bg-yellow-400/10 hover:bg-yellow-400/25",
+  green: "border-green-400 bg-green-400/10 hover:bg-green-400/25",
+  blue: "border-blue-400 bg-blue-400/10 hover:bg-blue-400/25",
+  violet: "border-violet-400 bg-violet-400/10 hover:bg-violet-400/25",
+  pink: "border-pink-400 bg-pink-400/10 hover:bg-pink-400/25",
+  teal: "border-teal-400 bg-teal-400/10 hover:bg-teal-400/25",
+  cyan: "border-cyan-400 bg-cyan-400/10 hover:bg-cyan-400/25",
+  rose: "border-rose-400 bg-rose-400/10 hover:bg-rose-400/25",
+  slate: "border-ink-400 bg-ink-400/10 hover:bg-ink-400/25",
+  black: "border-ink-900 bg-ink-900/5 hover:bg-ink-900/15 dark:border-ink-100 dark:bg-white/5 dark:hover:bg-white/15",
+  white: "border-ink-300 bg-white hover:bg-ink-100 dark:border-ink-400 dark:bg-white/5 dark:hover:bg-white/15",
+  brown: "border-amber-700 bg-amber-700/10 hover:bg-amber-700/25",
+  red_alt: "border-red-600 bg-red-600/10 hover:bg-red-600/25",
+  orange_alt: "border-orange-600 bg-orange-600/10 hover:bg-orange-600/25",
+  yellow_alt: "border-yellow-600 bg-yellow-600/10 hover:bg-yellow-600/25",
+  green_alt: "border-green-700 bg-green-700/10 hover:bg-green-700/25",
+  blue_alt: "border-blue-700 bg-blue-700/10 hover:bg-blue-700/25",
+  violet_alt: "border-violet-700 bg-violet-700/10 hover:bg-violet-700/25",
 };
 
 /** True when the given color has a dark background and needs light text. */

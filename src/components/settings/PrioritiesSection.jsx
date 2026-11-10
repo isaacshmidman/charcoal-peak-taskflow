@@ -138,7 +138,7 @@ export default function PrioritiesSection() {
 
   return (
     <section>
-      <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Priority Levels</h2>
+      <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-100 mb-2">Priority Levels</h2>
 
       <div className="space-y-2">
         {sorted.map((p, idx) =>
@@ -179,7 +179,7 @@ export default function PrioritiesSection() {
             )}
           </SelectContent>
         </Select>
-        <Button aria-label="Add priority" onClick={addPriority} className="h-9 px-3 bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200">
+        <Button aria-label="Add priority" onClick={addPriority} variant="outline" className="h-9 w-9 px-0 shrink-0">
           <Plus className="w-4 h-4" />
         </Button>
       </div>

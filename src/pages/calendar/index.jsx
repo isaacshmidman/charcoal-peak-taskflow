@@ -430,7 +430,7 @@ export default function Calendar() {
         <DragOverlay>
           {activeTask ? (
             <div
-              className="relative ring-2 ring-slate-900 shadow-lg rounded transition-[width] duration-150 ease-out origin-center"
+              className="relative ring-2 ring-ink-900 shadow-lg rounded transition-[width] duration-150 ease-out origin-center"
               style={overlayWidth ? { width: overlayWidth } : undefined}
             >
               {/* Over an hour column: the time it will land at, riding on
@@ -439,7 +439,7 @@ export default function Calendar() {
               {dropPreview && (
                 <div
                   data-testid="calendar-drop-time"
-                  className="pointer-events-none absolute bottom-full left-0 mb-1 whitespace-nowrap rounded bg-slate-900 px-1.5 py-0.5 text-[10px] font-semibold text-white shadow dark:bg-slate-100 dark:text-slate-900"
+                  className="pointer-events-none absolute bottom-full left-0 mb-1 whitespace-nowrap rounded bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground shadow"
                 >
                   {timeRangeLabel(dropPreview.start, dropPreview.end)}
                 </div>
@@ -457,7 +457,7 @@ export default function Calendar() {
       </DndContext>
 
       {timezone && (
-        <p className="text-center text-xs text-slate-400 dark:text-slate-500 mt-4">
+        <p className="text-center text-xs text-ink-400 dark:text-ink-500 mt-4">
           Time Zone: {timezone}
         </p>
       )}

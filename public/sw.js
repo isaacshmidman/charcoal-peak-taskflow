@@ -1,4 +1,4 @@
-const CACHE_NAME = 'zephyrly-v18';
+const CACHE_NAME = 'zephyrly-v19';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -7,11 +7,8 @@ const STATIC_ASSETS = [
   '/apple-touch-icon.png',
   '/icon.svg',
   // Brand typeface — precached so offline loads keep the DS font.
-  '/fonts/plus-jakarta-sans-400.woff2',
-  '/fonts/plus-jakarta-sans-500.woff2',
-  '/fonts/plus-jakarta-sans-600.woff2',
-  '/fonts/plus-jakarta-sans-700.woff2',
-  '/fonts/plus-jakarta-sans-800.woff2',
+  '/fonts/hanken-grotesk-latin.woff2',
+  '/fonts/hanken-grotesk-latin-ext.woff2',
 ];
 
 const isLocalhost = ["localhost", "127.0.0.1"].includes(self.location.hostname);

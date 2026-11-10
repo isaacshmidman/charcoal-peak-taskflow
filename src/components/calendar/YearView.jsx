@@ -28,11 +28,11 @@ function MiniMonth({ month, onDayClick }) {
   }, [month]);
 
   return (
-    <div className="p-2 rounded-lg border border-slate-100 dark:border-[#303030] bg-white dark:bg-[#0c0c0c]">
-      <div className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-1">
+    <div className="p-2 rounded-lg border border-ink-100 dark:border-night-line bg-white dark:bg-night-sunken">
+      <div className="text-xs font-semibold text-ink-900 dark:text-ink-100 mb-1">
         {format(month, "MMMM")}
       </div>
-      <div className="grid grid-cols-7 gap-0.5 text-[9px] text-slate-400 dark:text-slate-500 text-center mb-0.5">
+      <div className="grid grid-cols-7 gap-0.5 text-[9px] text-ink-400 dark:text-ink-500 text-center mb-0.5">
         {WEEKDAY_LETTERS.map((l, i) => (
           <div key={i}>{l}</div>
         ))}
@@ -50,9 +50,9 @@ function MiniMonth({ month, onDayClick }) {
               onClick={() => onDayClick?.(toDateStr(d))}
               className={cn(
                 "text-[10px] aspect-square flex items-center justify-center rounded-full",
-                !inMonth && "text-slate-300 dark:text-slate-600",
-                inMonth && !isToday && "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#222222]",
-                isToday && "bg-red-500 text-white font-semibold"
+                !inMonth && "text-ink-300 dark:text-ink-600",
+                inMonth && !isToday && "text-ink-600 dark:text-ink-300 hover:bg-ink-100 dark:hover:bg-night-high",
+                isToday && "bg-sun-400 text-ink-900 font-semibold"
               )}
             >
               {format(d, "d")}

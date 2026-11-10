@@ -10,6 +10,7 @@
  * kept) and this page has to change with it.
  */
 import { Link } from "react-router-dom";
+import Logo from "@/components/Logo";
 import { useAuth } from "@/lib/AuthContext";
 
 const UPDATED = "8 October 2026";
@@ -32,17 +33,17 @@ function Contact() {
 function LegalPage({ title, children, other }) {
   return (
     <div className="min-h-screen px-4 py-10">
-      <article className="mx-auto max-w-2xl text-slate-700 dark:text-slate-300">
+      <article className="mx-auto max-w-2xl text-ink-700 dark:text-ink-300">
         <Link to="/" className="mb-8 inline-flex items-center gap-2.5">
-          <img src="/zephyrly-logo.png" alt="" className="h-8 w-8 rounded-lg object-cover" />
-          <span className="text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-100">Zephyrly</span>
+          <Logo size={30} title="" />
+          <span className="text-lg font-semibold tracking-tight text-ink-900 dark:text-ink-100">Zephyrly</span>
         </Link>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">{title}</h1>
-        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Last updated {UPDATED}</p>
-        <div className="mt-6 space-y-6 text-sm leading-6 [&_h2]:mb-1.5 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:text-slate-900 dark:[&_h2]:text-slate-100 [&_li]:ml-5 [&_li]:list-disc [&_ul]:space-y-1">
+        <h1 className="text-2xl font-semibold tracking-tight text-ink-900 dark:text-ink-100">{title}</h1>
+        <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">Last updated {UPDATED}</p>
+        <div className="mt-6 space-y-6 text-sm leading-6 [&_h2]:mb-1.5 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:text-ink-900 dark:[&_h2]:text-ink-100 [&_li]:ml-5 [&_li]:list-disc [&_ul]:space-y-1">
           {children}
         </div>
-        <p className="mt-10 border-t border-border-hairline pt-4 text-xs text-slate-500 dark:text-slate-400">
+        <p className="mt-10 border-t border-border-hairline pt-4 text-xs text-ink-500 dark:text-ink-400">
           <Link to={other.to} className="underline underline-offset-2">
             {other.label}
           </Link>

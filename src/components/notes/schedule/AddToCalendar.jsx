@@ -220,7 +220,7 @@ export default function AddToCalendar({ schedule }) {
           aria-label="Add to calendar"
           title="Add to calendar"
           data-testid="schedule-add-to-calendar"
-          className="h-8 w-8 shrink-0 text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-200"
+          className="h-8 w-8 shrink-0 text-ink-400 hover:text-ink-700 dark:text-ink-500 dark:hover:text-ink-200"
         >
           <CalendarPlus className="h-4 w-4" />
         </Button>
@@ -247,14 +247,14 @@ export default function AddToCalendar({ schedule }) {
         ) : (
           <>
             <div className="space-y-1">
-              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Add to calendar</p>
-              <p className="text-[11px] leading-snug text-slate-400 dark:text-slate-500">
+              <p className="text-sm font-semibold text-ink-900 dark:text-ink-100">Add to calendar</p>
+              <p className="text-[11px] leading-snug text-ink-400 dark:text-ink-500">
                 Each slot with something in it becomes a task at its times, on the day you choose.
               </p>
             </div>
 
             <div className="space-y-1.5">
-              <p className="text-xs font-medium text-slate-700 dark:text-slate-300">Day</p>
+              <p className="text-xs font-medium text-ink-700 dark:text-ink-300">Day</p>
               <div className="flex flex-wrap items-center gap-1.5">
                 <Chip selected={date === today && !picking} onClick={() => pickDay(today)}>
                   Today
@@ -283,9 +283,9 @@ export default function AddToCalendar({ schedule }) {
             </div>
 
             <div className="space-y-1.5">
-              <p className="text-xs font-medium text-slate-700 dark:text-slate-300">Slots</p>
+              <p className="text-xs font-medium text-ink-700 dark:text-ink-300">Slots</p>
               {rows.length === 0 ? (
-                <p className="text-xs text-slate-500 dark:text-slate-400">Nothing to add yet. Write what’s happening in a slot first.</p>
+                <p className="text-xs text-ink-500 dark:text-ink-400">Nothing to add yet. Write what’s happening in a slot first.</p>
               ) : (
                 <ul className="space-y-0.5" data-testid="add-to-calendar-slots">
                   {rows.map((row) => {
@@ -306,7 +306,7 @@ export default function AddToCalendar({ schedule }) {
                           }}
                           className={cn(
                             "flex items-start gap-2 rounded-md px-1.5 py-1 text-xs",
-                            row.there ? "text-slate-400 dark:text-slate-500" : "cursor-pointer text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-[#161616]"
+                            row.there ? "text-ink-400 dark:text-ink-500" : "cursor-pointer text-ink-700 hover:bg-ink-50 dark:text-ink-200 dark:hover:bg-night-raised"
                           )}
                         >
                           <Checkbox
@@ -317,7 +317,7 @@ export default function AddToCalendar({ schedule }) {
                             onClick={(event) => event.stopPropagation()}
                             onCheckedChange={toggle}
                           />
-                          <span className="w-[7.5rem] shrink-0 tabular-nums text-slate-500 dark:text-slate-400">
+                          <span className="w-[7.5rem] shrink-0 tabular-nums text-ink-500 dark:text-ink-400">
                             {timeLabel(row.task_time)} – {timeLabel(row.task_end_time)}
                           </span>
                           <span className="min-w-0 flex-1 break-words">
@@ -337,7 +337,7 @@ export default function AddToCalendar({ schedule }) {
               onClick={start}
               disabled={!toAdd.length || adding}
               data-testid="add-to-calendar-confirm"
-              className="h-9 w-full bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+              className="h-9 w-full bg-primary text-primary-foreground hover:bg-[var(--primary-hover)]"
             >
               {!toAdd.length
                 ? "Nothing to add"
@@ -347,7 +347,7 @@ export default function AddToCalendar({ schedule }) {
             </Button>
 
             <div className="space-y-1.5 border-t border-border-hairline pt-3">
-              <p className="text-[11px] font-medium text-slate-600 dark:text-slate-300">When a slot looks like a task already on that day</p>
+              <p className="text-[11px] font-medium text-ink-600 dark:text-ink-300">When a slot looks like a task already on that day</p>
               <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="When a slot looks like a task already on that day">
                 {[
                   ["ask", "Ask me"],
@@ -359,7 +359,7 @@ export default function AddToCalendar({ schedule }) {
                   </Chip>
                 ))}
               </div>
-              <p className="text-[11px] leading-snug text-slate-400 dark:text-slate-500">
+              <p className="text-[11px] leading-snug text-ink-400 dark:text-ink-500">
                 Alike means the same words, leaving out little ones like “the”, “at” or “tmr”. Merging moves the task you have to the slot’s time instead
                 of adding another.
               </p>
@@ -381,13 +381,13 @@ function SimilarPrompt({ date, plan, onChoose, dontAsk, onDontAsk, wouldMerge, o
           type="button"
           onClick={onBack}
           aria-label="Back"
-          className="-ml-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-[#1f1f1f] dark:hover:text-slate-200"
+          className="-ml-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-ink-400 hover:bg-ink-100 hover:text-ink-700 dark:hover:bg-night-raised dark:hover:text-ink-200"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
         </button>
         <div className="space-y-0.5">
-          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Already on {dayLabel(date)}?</p>
-          <p className="text-[11px] leading-snug text-slate-400 dark:text-slate-500">
+          <p className="text-sm font-semibold text-ink-900 dark:text-ink-100">Already on {dayLabel(date)}?</p>
+          <p className="text-[11px] leading-snug text-ink-400 dark:text-ink-500">
             {asked.length === 1 ? "This slot looks like a task you already have that day." : "These slots look like tasks you already have that day."}
           </p>
         </div>
@@ -408,11 +408,11 @@ function SimilarPrompt({ date, plan, onChoose, dontAsk, onDontAsk, wouldMerge, o
           return (
             <li key={row.slotId} className="space-y-1.5 rounded-md border border-border-hairline p-2" data-testid="similar-match">
               <div className="text-xs">
-                <p className="text-slate-900 dark:text-slate-100">
+                <p className="text-ink-900 dark:text-ink-100">
                   <span className="font-medium">{row.title}</span>
-                  <span className="text-slate-500 dark:text-slate-400"> · {timeLabel(row.task_time)} – {timeLabel(row.task_end_time)}</span>
+                  <span className="text-ink-500 dark:text-ink-400"> · {timeLabel(row.task_time)} – {timeLabel(row.task_end_time)}</span>
                 </p>
-                <p className="text-slate-500 dark:text-slate-400">
+                <p className="text-ink-500 dark:text-ink-400">
                   looks like “{match.task.title}” · {taskTimes(match.task)}
                 </p>
               </div>
@@ -423,7 +423,7 @@ function SimilarPrompt({ date, plan, onChoose, dontAsk, onDontAsk, wouldMerge, o
                   </Chip>
                 ))}
               </div>
-              <p className="text-[11px] leading-snug text-slate-400 dark:text-slate-500">
+              <p className="text-[11px] leading-snug text-ink-400 dark:text-ink-500">
                 {!match.canMerge
                   ? match.why === "calendar"
                     ? "It’s from a connected calendar, so it can’t be moved here."
@@ -439,12 +439,12 @@ function SimilarPrompt({ date, plan, onChoose, dontAsk, onDontAsk, wouldMerge, o
 
       <div className="space-y-0.5">
         {/* Not a <label> around the checkbox: see the slot rows. */}
-        <div className="flex cursor-pointer items-center gap-2 text-xs text-slate-700 dark:text-slate-200" onClick={() => onDontAsk(!dontAsk)}>
+        <div className="flex cursor-pointer items-center gap-2 text-xs text-ink-700 dark:text-ink-200" onClick={() => onDontAsk(!dontAsk)}>
           <Checkbox size="sm" checked={dontAsk} aria-label="Don’t ask again" onClick={(event) => event.stopPropagation()} onCheckedChange={onDontAsk} />
           Don’t ask again
         </div>
         {dontAsk && (
-          <p className="pl-6 text-[11px] leading-snug text-slate-400 dark:text-slate-500" data-testid="dont-ask-note">
+          <p className="pl-6 text-[11px] leading-snug text-ink-400 dark:text-ink-500" data-testid="dont-ask-note">
             {wouldMerge
               ? "From now on, slots like tasks already there are merged without asking."
               : "From now on, slots like tasks already there are added on their own without asking."}{" "}
@@ -462,7 +462,7 @@ function SimilarPrompt({ date, plan, onChoose, dontAsk, onDontAsk, wouldMerge, o
           onClick={onConfirm}
           disabled={busy}
           data-testid="similar-confirm"
-          className="h-9 flex-1 bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+          className="h-9 flex-1 bg-primary text-primary-foreground hover:bg-[var(--primary-hover)]"
         >
           {confirmLabel}
         </Button>
@@ -483,8 +483,8 @@ function Chip({ selected, onClick, children, testId, role }) {
       className={cn(
         "h-7 rounded-md border px-2 text-xs transition-colors",
         selected
-          ? "border-slate-900 bg-slate-900 text-white dark:border-slate-100 dark:bg-slate-100 dark:text-slate-900"
-          : "border-border-hairline text-slate-600 hover:border-border-strong dark:text-slate-300"
+          ? "border-primary bg-primary text-primary-foreground"
+          : "border-border-hairline text-ink-600 hover:border-border-strong dark:text-ink-300"
       )}
     >
       {children}

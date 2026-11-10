@@ -11,15 +11,15 @@ export default function AppearanceSection() {
   const { appearance, setAppearance } = useTheme();
   return (
     <section>
-      <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Default Appearance</h2>
+      <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-100 mb-2">Default Appearance</h2>
       <Select value={appearance} onValueChange={setAppearance}>
-        <SelectTrigger className="w-48 h-9 bg-white dark:bg-[#111111] dark:border-[#343434] text-sm font-medium text-slate-900 dark:text-slate-100">
+        <SelectTrigger className="w-48 h-9 bg-white dark:bg-night-card dark:border-night-line-strong text-sm font-medium text-ink-900 dark:text-ink-100">
           <SelectValue />
         </SelectTrigger>
-        <SelectContent className="bg-white dark:bg-[#111111] dark:border-[#343434]">
-          <SelectItem value="system" className="text-sm font-medium text-slate-900 dark:text-slate-100">System</SelectItem>
-          <SelectItem value="light" className="text-sm font-medium text-slate-900 dark:text-slate-100">Light</SelectItem>
-          <SelectItem value="dark" className="text-sm font-medium text-slate-900 dark:text-slate-100">Dark</SelectItem>
+        <SelectContent className="bg-white dark:bg-night-card dark:border-night-line-strong">
+          <SelectItem value="system" className="text-sm font-medium text-ink-900 dark:text-ink-100">System</SelectItem>
+          <SelectItem value="light" className="text-sm font-medium text-ink-900 dark:text-ink-100">Light</SelectItem>
+          <SelectItem value="dark" className="text-sm font-medium text-ink-900 dark:text-ink-100">Dark</SelectItem>
         </SelectContent>
       </Select>
     </section>

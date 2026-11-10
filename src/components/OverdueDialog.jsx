@@ -51,10 +51,10 @@ export default function OverdueDialog({ open, onOpenChange, overdueTasks = [], p
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md" data-testid="overdue-dialog">
         <DialogHeader>
-          <DialogTitle className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+          <DialogTitle className="text-sm font-semibold text-ink-900 dark:text-ink-100">
             Overdue Tasks
           </DialogTitle>
-          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5" data-testid="overdue-count">
+          <p className="text-xs text-ink-400 dark:text-ink-500 mt-0.5" data-testid="overdue-count">
             {n} Overdue Task{n === 1 ? "" : "s"}
           </p>
         </DialogHeader>
@@ -66,10 +66,10 @@ export default function OverdueDialog({ open, onOpenChange, overdueTasks = [], p
               className={cn("flex items-center gap-2.5 px-3 py-2 rounded-lg border cursor-pointer", colorFor(task))}
             >
               <Checkbox checked={checked.has(task.id)} onCheckedChange={() => toggle(task.id)} />
-              <span className="text-sm text-slate-900 dark:text-slate-100 flex-1 min-w-0 truncate">
+              <span className="text-sm text-ink-900 dark:text-ink-100 flex-1 min-w-0 truncate">
                 {task.title}
               </span>
-              <span className="text-[10px] text-slate-500 dark:text-slate-400 shrink-0 ml-1">
+              <span className="text-[10px] text-ink-500 dark:text-ink-400 shrink-0 ml-1">
                 {format(new Date(task.due_date + "T00:00:00"), "MMM d")}
               </span>
             </label>

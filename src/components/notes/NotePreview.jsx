@@ -49,7 +49,7 @@ function renderNode(node, key) {
     case "heading":
       return createElement("p", { key, className: "m-0 font-semibold" }, (node.content || []).map(renderNode));
     case "blockquote":
-      return createElement("div", { key, className: "pl-2 border-l-2 border-slate-200 dark:border-[#303030]" }, (node.content || []).map(renderNode));
+      return createElement("div", { key, className: "pl-2 border-l-2 border-ink-200 dark:border-night-line" }, (node.content || []).map(renderNode));
     case "codeBlock":
       return createElement("code", { key, className: "block text-[0.85em]" }, (node.content || []).map(renderNode));
     case "bulletList":
@@ -72,7 +72,7 @@ function renderNode(node, key) {
         createElement("div", { key: `${key}b`, className: cn("min-w-0", node.attrs?.checked && "line-through opacity-60") }, (node.content || []).map(renderNode))
       );
     case "horizontalRule":
-      return createElement("hr", { key, className: "my-1 border-slate-100 dark:border-[#303030]" });
+      return createElement("hr", { key, className: "my-1 border-ink-100 dark:border-night-line" });
     default:
       // Unknown node → render its children if any.
       return node.content ? createElement("div", { key }, node.content.map(renderNode)) : null;

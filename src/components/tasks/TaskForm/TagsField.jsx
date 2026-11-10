@@ -32,7 +32,7 @@ export default function TagsField({ form, setForm, savedTags }) {
 
   return (
     <div>
-      <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-1.5 block">Tags</Label>
+      <Label className="text-xs font-semibold text-ink-900 dark:text-ink-100 mb-1.5 block">Tags</Label>
       <div className="flex gap-2">
         <div className="relative flex-1">
           <Input
@@ -51,7 +51,7 @@ export default function TagsField({ form, setForm, savedTags }) {
                   key={tag}
                   type="button"
                   onMouseDown={(e) => { e.preventDefault(); addTag(tag); }}
-                  className="w-full text-left text-xs font-medium px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-[#222222] text-slate-900 dark:text-slate-100"
+                  className="w-full text-left text-xs font-medium px-3 py-1.5 hover:bg-ink-50 dark:hover:bg-night-high text-ink-900 dark:text-ink-100"
                 >
                   {tag}
                 </button>
@@ -59,7 +59,7 @@ export default function TagsField({ form, setForm, savedTags }) {
             </div>
           )}
         </div>
-        <Button aria-label="Add tag" type="button" size="sm" onClick={() => addTag()} className="h-9 px-3 bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200">
+        <Button aria-label="Add tag" type="button" size="sm" onClick={() => addTag()} variant="outline" className="h-9 w-9 px-0 shrink-0">
           <Plus className="w-4 h-4" />
         </Button>
       </div>
@@ -68,7 +68,7 @@ export default function TagsField({ form, setForm, savedTags }) {
           {form.tags.map(tag => (
             <Badge key={tag} variant="secondary" className="text-xs gap-1 pr-1 max-w-full break-words whitespace-normal">
               <span className="break-words whitespace-normal">{tag}</span>
-              <button aria-label={`Remove tag ${tag}`} type="button" onClick={() => removeTag(tag)} className="text-slate-400 dark:text-slate-500 hover:text-red-400 dark:hover:text-red-300 transition-colors"><X className="w-3 h-3" /></button>
+              <button aria-label={`Remove tag ${tag}`} type="button" onClick={() => removeTag(tag)} className="text-ink-400 dark:text-ink-500 hover:text-red-400 dark:hover:text-red-300 transition-colors"><X className="w-3 h-3" /></button>
             </Badge>
           ))}
         </div>

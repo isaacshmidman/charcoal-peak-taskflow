@@ -7,7 +7,7 @@ export default function EmptyArrow({ message = "Add a task to get started!" }) {
         height="70"
         viewBox="0 0 80 70"
         fill="none"
-        className="text-slate-300 mb-1"
+        className="text-ink-300 mb-1"
       >
         {/* Curvy arrow path going up-right */}
         <path
@@ -27,7 +27,7 @@ export default function EmptyArrow({ message = "Add a task to get started!" }) {
           strokeLinejoin="round"
         />
       </svg>
-      <p className="text-slate-400 text-sm text-right -mt-1">{message}</p>
+      <p className="text-ink-400 text-sm text-right -mt-1">{message}</p>
     </div>
   );
 }

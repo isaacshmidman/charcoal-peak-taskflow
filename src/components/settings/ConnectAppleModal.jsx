@@ -74,8 +74,8 @@ export default function ConnectAppleModal({ open, onOpenChange }) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="rounded-md border border-slate-100 dark:border-[#303030] bg-slate-50 dark:bg-[#161616] p-2.5 text-xs text-slate-600 dark:text-slate-300 space-y-1.5">
-            <p className="font-medium text-slate-700 dark:text-slate-200">How to get an app-specific password</p>
+          <div className="rounded-md border border-ink-100 dark:border-night-line bg-ink-50 dark:bg-night-raised p-2.5 text-xs text-ink-600 dark:text-ink-300 space-y-1.5">
+            <p className="font-medium text-ink-700 dark:text-ink-200">How to get an app-specific password</p>
             <ol className="list-decimal list-inside space-y-0.5">
               <li>
                 Sign in at{" "}
@@ -96,7 +96,7 @@ export default function ConnectAppleModal({ open, onOpenChange }) {
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-medium text-slate-700 dark:text-slate-200">Apple ID</label>
+            <label className="text-xs font-medium text-ink-700 dark:text-ink-200">Apple ID</label>
             <input
               type="email"
               required
@@ -104,12 +104,12 @@ export default function ConnectAppleModal({ open, onOpenChange }) {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@icloud.com"
-              className="w-full rounded-md border border-slate-200 dark:border-[#343434] bg-white dark:bg-[#0c0c0c] px-2.5 py-1.5 text-base md:text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-slate-400 dark:focus:border-slate-500 focus:outline-none"
+              className="w-full rounded-md border border-ink-200 dark:border-night-line-strong bg-white dark:bg-night-sunken px-2.5 py-1.5 text-base md:text-sm text-ink-900 dark:text-ink-100 placeholder:text-ink-400 dark:placeholder:text-ink-500 focus:border-ink-400 dark:focus:border-ink-500 focus:outline-none"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-medium text-slate-700 dark:text-slate-200">App-specific password</label>
+            <label className="text-xs font-medium text-ink-700 dark:text-ink-200">App-specific password</label>
             <input
               type="password"
               required
@@ -117,15 +117,15 @@ export default function ConnectAppleModal({ open, onOpenChange }) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="xxxx-xxxx-xxxx-xxxx"
-              className="w-full rounded-md border border-slate-200 dark:border-[#343434] bg-white dark:bg-[#0c0c0c] px-2.5 py-1.5 text-base md:text-sm font-mono text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-slate-400 dark:focus:border-slate-500 focus:outline-none"
+              className="w-full rounded-md border border-ink-200 dark:border-night-line-strong bg-white dark:bg-night-sunken px-2.5 py-1.5 text-base md:text-sm font-mono text-ink-900 dark:text-ink-100 placeholder:text-ink-400 dark:placeholder:text-ink-500 focus:border-ink-400 dark:focus:border-ink-500 focus:outline-none"
             />
-            <p className="text-[11px] text-slate-400 dark:text-slate-500">
+            <p className="text-[11px] text-ink-400 dark:text-ink-500">
               Your password is encrypted at rest and only used for CalDAV calls to iCloud.
             </p>
           </div>
 
           {errorMsg && (
-            <div className="flex items-start gap-1.5 rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-[#29230e] p-2 text-xs text-amber-700 dark:text-amber-300">
+            <div className="flex items-start gap-1.5 rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-night-warn p-2 text-xs text-amber-700 dark:text-amber-300">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
               <span>{errorMsg}</span>
             </div>

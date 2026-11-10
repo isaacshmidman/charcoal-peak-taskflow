@@ -36,7 +36,7 @@ export default function SubtasksField({
 
   return (
     <div>
-      <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-1.5 block">Subtasks</Label>
+      <Label className="text-xs font-semibold text-ink-900 dark:text-ink-100 mb-1.5 block">Subtasks</Label>
 
       <div className="flex gap-2">
         <Input
@@ -46,7 +46,7 @@ export default function SubtasksField({
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSubtask(); } }}
           className=""
         />
-        <Button aria-label="Add subtask" type="button" size="sm" onClick={addSubtask} className="h-9 px-3 bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200">
+        <Button aria-label="Add subtask" type="button" size="sm" onClick={addSubtask} variant="outline" className="h-9 w-9 px-0 shrink-0">
           <Plus className="w-4 h-4" />
         </Button>
       </div>
@@ -63,13 +63,13 @@ export default function SubtasksField({
                 onClick={() => onToggleSubtask && onToggleSubtask(sub)}
                 className={cn(
                   "shrink-0 w-3.5 h-3.5 rounded border-2 flex items-center justify-center transition-all",
-                  sub.status === "done" ? "bg-slate-900 border-slate-900 text-white dark:bg-slate-100 dark:border-slate-100 dark:text-slate-900" : "border-slate-400 dark:border-slate-500 hover:border-slate-600 dark:hover:border-slate-300 bg-white/80 dark:bg-[#0c0c0c]"
+                  sub.status === "done" ? "bg-primary border-primary text-primary-foreground" : "border-ink-400 dark:border-ink-500 hover:border-ink-600 dark:hover:border-ink-300 bg-white/80 dark:bg-night-sunken"
                 )}
               >
                 {sub.status === "done" && <CheckSquare className="w-2 h-2" />}
               </button>
               <span
-                className={cn("cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 break-words whitespace-normal max-w-full", sub.status === "done" && "line-through opacity-50")}
+                className={cn("cursor-pointer hover:text-ink-600 dark:hover:text-ink-300 break-words whitespace-normal max-w-full", sub.status === "done" && "line-through opacity-50")}
                 onClick={() => onEditSubtask && onEditSubtask(sub)}
               >
                 {sub.title}
@@ -77,7 +77,7 @@ export default function SubtasksField({
               <button aria-label={`Delete subtask ${sub.title}`}
                 type="button"
                 onPointerDown={(e) => { e.preventDefault(); onDeleteSubtask && onDeleteSubtask(sub); }}
-                className="text-slate-400 dark:text-slate-500 hover:text-red-400 dark:hover:text-red-300 transition-colors"
+                className="text-ink-400 dark:text-ink-500 hover:text-red-400 dark:hover:text-red-300 transition-colors"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -85,9 +85,9 @@ export default function SubtasksField({
           ))}
           {(form.subtask_titles || []).map((title, idx) => (
             <div key={idx} className="inline-flex items-center gap-1.5 bg-secondary text-secondary-foreground rounded-full px-2.5 py-0.5 text-xs font-semibold group">
-              <div className="shrink-0 w-3.5 h-3.5 rounded border-2 border-slate-400" />
+              <div className="shrink-0 w-3.5 h-3.5 rounded border-2 border-ink-400" />
               <span className="break-words whitespace-normal max-w-full">{title}</span>
-              <button aria-label={`Remove subtask ${title}`} type="button" onPointerDown={(e) => { e.preventDefault(); removeSubtask(idx); }} className="text-slate-400 dark:text-slate-500 hover:text-red-400 dark:hover:text-red-300 transition-colors">
+              <button aria-label={`Remove subtask ${title}`} type="button" onPointerDown={(e) => { e.preventDefault(); removeSubtask(idx); }} className="text-ink-400 dark:text-ink-500 hover:text-red-400 dark:hover:text-red-300 transition-colors">
                 <X className="w-3 h-3" />
               </button>
             </div>

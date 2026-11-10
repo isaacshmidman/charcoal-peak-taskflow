@@ -40,7 +40,7 @@ export default function StorageSection() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 text-xs text-slate-400 dark:text-slate-500">
+      <div className="flex items-center gap-2 text-xs text-ink-400 dark:text-ink-500">
         <Loader2 className="w-4 h-4 animate-spin" />
         Loading storage usage…
       </div>
@@ -68,26 +68,26 @@ export default function StorageSection() {
       ? "bg-red-500 dark:bg-red-400"
       : pct >= 80
         ? "bg-amber-500 dark:bg-amber-400"
-        : "bg-slate-700 dark:bg-slate-300";
+        : "bg-ink-700 dark:bg-ink-300";
 
   return (
     <div className="space-y-6">
       <section className="rounded-xl border border-border-hairline bg-surface-card px-4 py-4 space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+            <p className="text-sm font-medium text-ink-900 dark:text-ink-100">
               {formatBytes(used)} of {formatBytes(max)} used
             </p>
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+            <p className="text-xs text-ink-400 dark:text-ink-500 mt-0.5">
               {formatBytes(free)} free
             </p>
           </div>
-          <p className="text-xs font-medium text-slate-500 dark:text-slate-400 shrink-0">
+          <p className="text-xs font-medium text-ink-500 dark:text-ink-400 shrink-0">
             {pct.toFixed(pct >= 10 ? 0 : 1)}%
           </p>
         </div>
 
-        <div className="h-2 w-full rounded-full bg-slate-100 dark:bg-[#0c0c0c] overflow-hidden">
+        <div className="h-2 w-full rounded-full bg-ink-100 dark:bg-night-sunken overflow-hidden">
           <div
             className={cn("h-full rounded-full transition-all duration-500", barClass)}
             style={{ width: `${pct}%` }}
@@ -95,7 +95,7 @@ export default function StorageSection() {
           />
         </div>
 
-        <p className="text-xs text-slate-400 dark:text-slate-500">
+        <p className="text-xs text-ink-400 dark:text-ink-500">
           Attachments live alongside your tasks. Removing one frees its
           space straight away. A deleted task keeps its files in Recently
           Deleted, where they still count, until it's restored or
@@ -104,31 +104,31 @@ export default function StorageSection() {
       </section>
 
       <section>
-        <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">
+        <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-100 mb-2">
           Largest tasks
         </h2>
         {biggestTasks.length === 0 ? (
-          <p className="text-xs text-slate-400 dark:text-slate-500 px-1">
+          <p className="text-xs text-ink-400 dark:text-ink-500 px-1">
             No attachments yet. Drop a file into any task to see it here.
           </p>
         ) : (
-          <ul className="rounded-xl border border-border-hairline bg-surface-card divide-y divide-slate-100 dark:divide-[#303030] overflow-hidden">
+          <ul className="rounded-xl border border-border-hairline bg-surface-card divide-y divide-ink-100 dark:divide-night-line overflow-hidden">
             {biggestTasks.map((task) => (
               <li
                 key={`${task.task_id}:${task.in_recently_deleted ? "deleted" : "live"}`}
                 className="flex items-center gap-3 px-4 py-3"
               >
-                <FileText className="w-4 h-4 text-slate-400 dark:text-slate-500 shrink-0" />
+                <FileText className="w-4 h-4 text-ink-400 dark:text-ink-500 shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate" title={task.task_title}>
+                  <p className="text-sm font-medium text-ink-900 dark:text-ink-100 truncate" title={task.task_title}>
                     {task.task_title}
                   </p>
-                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+                  <p className="text-xs text-ink-400 dark:text-ink-500 mt-0.5">
                     {task.file_count} file{task.file_count === 1 ? "" : "s"}
                     {task.in_recently_deleted && " · in Recently Deleted"}
                   </p>
                 </div>
-                <p className="text-xs font-medium text-slate-700 dark:text-slate-200 shrink-0">
+                <p className="text-xs font-medium text-ink-700 dark:text-ink-200 shrink-0">
                   {formatBytes(task.total_bytes)}
                 </p>
               </li>

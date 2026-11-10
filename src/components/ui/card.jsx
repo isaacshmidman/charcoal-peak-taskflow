@@ -3,12 +3,10 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 
 /**
- * Zephyrly base card: white surface, 1px hairline, 12px radius, and a
- * whisper-soft shadow on hover. Contract: design system README
- * (design_handoff_zephyrly_site). Uses the var()-backed token classes
- * (surface-card / border-hairline) so dark mode swaps automatically —
- * the same values the app's hand-rolled `bg-white dark:bg-[#111111]
- * rounded-xl border border-slate-100 dark:border-[#303030]` cards use.
+ * Zephyrly base card: one flat surface with a hairline and a 12px radius.
+ * No shadow, at rest or on hover — a card that lifts when the pointer
+ * passes says "press me", and most cards aren't buttons. The token
+ * classes (surface-card / border-hairline) swap with the theme.
  */
 
 /** @type {import("react").ForwardRefExoticComponent<import("react").HTMLAttributes<HTMLDivElement> & import("react").RefAttributes<HTMLDivElement>>} */
@@ -17,7 +15,7 @@ const Card = React.forwardRef(function Card({ className, ...props }, ref) {
     <div
       ref={ref}
       className={cn(
-        "bg-surface-card border border-border-hairline rounded-xl transition-shadow duration-200 hover:shadow-sm",
+        "bg-surface-card border border-border-hairline rounded-xl",
         className
       )}
       {...props}
@@ -37,7 +35,7 @@ const CardTitle = React.forwardRef(function CardTitle({ className, ...props }, r
   return (
     <h3
       ref={ref}
-      className={cn("text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100", className)}
+      className={cn("text-sm font-semibold tracking-tight text-ink-900 dark:text-ink-100", className)}
       {...props}
     />
   );
@@ -49,7 +47,7 @@ const CardDescription = React.forwardRef(function CardDescription({ className, .
   return (
     <p
       ref={ref}
-      className={cn("text-xs text-slate-500 dark:text-slate-400", className)}
+      className={cn("text-xs text-ink-500 dark:text-ink-400", className)}
       {...props}
     />
   );

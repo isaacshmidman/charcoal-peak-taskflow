@@ -54,35 +54,35 @@ export default function DefaultsSection({ navOptions }) {
   return (
     <>
       <section>
-        <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Default View</h2>
+        <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-100 mb-2">Default View</h2>
         <Select value={selectedDefaultNav} onValueChange={saveDefaultNav}>
-          <SelectTrigger className="w-48 h-9 bg-white dark:bg-[#111111] dark:border-[#343434] text-sm font-medium text-slate-900 dark:text-slate-100">
+          <SelectTrigger className="w-48 h-9 bg-white dark:bg-night-card dark:border-night-line-strong text-sm font-medium text-ink-900 dark:text-ink-100">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent className="bg-white dark:bg-[#111111] dark:border-[#343434]">
+          <SelectContent className="bg-white dark:bg-night-card dark:border-night-line-strong">
             {navOrder.map((path) => {
               const opt = navOptions.find((o) => o.value === path);
-              return opt ? <SelectItem key={opt.value} value={opt.value} className="text-sm font-medium text-slate-900 dark:text-slate-100">{opt.label}</SelectItem> : null;
+              return opt ? <SelectItem key={opt.value} value={opt.value} className="text-sm font-medium text-ink-900 dark:text-ink-100">{opt.label}</SelectItem> : null;
             })}
           </SelectContent>
         </Select>
       </section>
 
       <section>
-        <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Navigation Order</h2>
+        <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-100 mb-2">Navigation Order</h2>
 
         <div className="space-y-2">
           {navOrder.map((path, idx) =>
-            <div key={path} className="flex items-center gap-3 bg-surface-card border border-border-hairline rounded-xl px-3 py-2.5 hover:border-slate-200 dark:hover:border-[#454545] transition-colors">
+            <div key={path} className="flex items-center gap-3 bg-surface-card border border-border-hairline rounded-xl px-3 py-2.5 hover:border-ink-200 dark:hover:border-night-line-bold transition-colors">
               <div className="flex flex-col gap-0.5">
-                <button aria-label={`Move ${navOptions.find((o) => o.value === path)?.label || path} up`} onClick={() => moveNav(idx, -1)} disabled={idx === 0} className="disabled:opacity-20 text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400 transition-colors">
+                <button aria-label={`Move ${navOptions.find((o) => o.value === path)?.label || path} up`} onClick={() => moveNav(idx, -1)} disabled={idx === 0} className="disabled:opacity-20 text-ink-300 dark:text-ink-600 hover:text-ink-500 dark:hover:text-ink-400 transition-colors">
                   <ArrowUp className="w-3 h-3" />
                 </button>
-                <button aria-label={`Move ${navOptions.find((o) => o.value === path)?.label || path} down`} onClick={() => moveNav(idx, 1)} disabled={idx === navOrder.length - 1} className="disabled:opacity-20 text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400 transition-colors">
+                <button aria-label={`Move ${navOptions.find((o) => o.value === path)?.label || path} down`} onClick={() => moveNav(idx, 1)} disabled={idx === navOrder.length - 1} className="disabled:opacity-20 text-ink-300 dark:text-ink-600 hover:text-ink-500 dark:hover:text-ink-400 transition-colors">
                   <ArrowDown className="w-3 h-3" />
                 </button>
               </div>
-              <span className="text-sm font-medium text-slate-900 dark:text-slate-100 flex-1">{NAV_LABELS[path]}</span>
+              <span className="text-sm font-medium text-ink-900 dark:text-ink-100 flex-1">{NAV_LABELS[path]}</span>
             </div>
           )}
         </div>

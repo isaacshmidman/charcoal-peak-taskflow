@@ -38,8 +38,8 @@ function OptionRow({ title, description, checked, onChange, disabled, supported 
       !supported && "opacity-60"
     )}>
       <div className="min-w-0">
-        <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{title}</p>
-        <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+        <p className="text-sm font-medium text-ink-900 dark:text-ink-100">{title}</p>
+        <p className="text-xs text-ink-400 dark:text-ink-500 mt-0.5">
           {!supported ? "Not supported on this device" : description}
         </p>
       </div>
@@ -130,21 +130,21 @@ export default function AdvancedNotificationSettings({ onBack }) {
           type="button"
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+          className="h-8 w-8 text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-ink-100"
           onClick={onBack}
           aria-label="Back to Settings"
         >
           <ChevronLeft className="w-5 h-5" />
         </Button>
         <div>
-          <h1 className="text-base font-semibold text-slate-900 dark:text-slate-100">Advanced Notification Settings</h1>
-          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+          <h1 className="text-base font-semibold text-ink-900 dark:text-ink-100">Advanced Notification Settings</h1>
+          <p className="text-xs text-ink-400 dark:text-ink-500 mt-0.5">
             Fine-tune how reminders behave on this account. Per-device limits show up in grey.
           </p>
         </div>
       </div>
 
-      <div className="rounded-xl border border-slate-100 dark:border-[#303030] bg-white dark:bg-[#111111] px-4 py-1 divide-y divide-slate-100 dark:divide-[#303030]">
+      <div className="rounded-xl border border-ink-100 dark:border-night-line bg-white dark:bg-night-card px-4 py-1 divide-y divide-ink-100 dark:divide-night-line">
         <OptionRow
           title="Persistence"
           description="Notifications stay visible until you dismiss them."
@@ -194,7 +194,7 @@ export default function AdvancedNotificationSettings({ onBack }) {
       </div>
 
       {statusMessage && (
-        <p className="text-xs text-slate-500 dark:text-slate-400">{statusMessage}</p>
+        <p className="text-xs text-ink-500 dark:text-ink-400">{statusMessage}</p>
       )}
     </div>
   );

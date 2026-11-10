@@ -59,16 +59,16 @@ export default function AttachmentLightbox({ attachment, onClose }) {
       {loadError ? (
         <div
           onClick={(e) => e.stopPropagation()}
-          className="max-w-sm w-full bg-white dark:bg-[#161616] rounded-2xl p-6 text-center space-y-3 shadow-2xl"
+          className="max-w-sm w-full bg-white dark:bg-night-raised rounded-2xl p-6 text-center space-y-3 shadow-2xl"
         >
-          <div className="mx-auto w-12 h-12 rounded-full bg-slate-100 dark:bg-[#222222] flex items-center justify-center">
-            <ImageOff className="w-6 h-6 text-slate-400 dark:text-slate-500" />
+          <div className="mx-auto w-12 h-12 rounded-full bg-ink-100 dark:bg-night-high flex items-center justify-center">
+            <ImageOff className="w-6 h-6 text-ink-400 dark:text-ink-500" />
           </div>
           <div>
-            <p className="text-sm font-medium text-slate-900 dark:text-slate-100 break-all">
+            <p className="text-sm font-medium text-ink-900 dark:text-ink-100 break-all">
               {attachment.filename}
             </p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            <p className="text-xs text-ink-500 dark:text-ink-400 mt-1">
               This browser can't preview the file inline
               {attachment.mime_type ? ` (${attachment.mime_type})` : ""}.
               Open it in a new tab instead.
@@ -78,7 +78,7 @@ export default function AttachmentLightbox({ attachment, onClose }) {
             href={originalUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-sm font-medium text-slate-900 dark:text-slate-100 hover:underline"
+            className="inline-flex items-center gap-2 text-sm font-medium text-ink-900 dark:text-ink-100 hover:underline"
           >
             <ExternalLink className="w-4 h-4" />
             Open {attachment.filename}

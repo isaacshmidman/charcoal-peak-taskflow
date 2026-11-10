@@ -9,7 +9,7 @@ import { isMacLike } from "@/lib/shortcuts";
 
 function Kbd({ children }) {
   return (
-    <kbd className="inline-flex items-center justify-center min-w-[1.4rem] h-6 px-1.5 rounded border border-slate-200 dark:border-[#343434] bg-slate-50 dark:bg-[#161616] text-[11px] font-semibold text-slate-700 dark:text-slate-200 shadow-sm">
+    <kbd className="inline-flex items-center justify-center min-w-[1.4rem] h-6 px-1.5 rounded border border-ink-200 dark:border-night-line-strong bg-ink-50 dark:bg-night-raised text-[11px] font-semibold text-ink-700 dark:text-ink-200 shadow-sm">
       {children}
     </kbd>
   );
@@ -18,11 +18,11 @@ function Kbd({ children }) {
 function Row({ keys, label }) {
   return (
     <div className="flex items-center justify-between gap-3 py-1">
-      <span className="text-xs text-slate-600 dark:text-slate-300">{label}</span>
+      <span className="text-xs text-ink-600 dark:text-ink-300">{label}</span>
       <span className="flex items-center gap-1 shrink-0">
         {keys.map((k, i) => (
           <span key={i} className="flex items-center gap-1">
-            {i > 0 && <span className="text-[10px] text-slate-400 dark:text-slate-500">then</span>}
+            {i > 0 && <span className="text-[10px] text-ink-400 dark:text-ink-500">then</span>}
             <Kbd>{k}</Kbd>
           </span>
         ))}
@@ -34,10 +34,10 @@ function Row({ keys, label }) {
 function Section({ title, children }) {
   return (
     <div>
-      <h3 className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1">
+      <h3 className="text-[11px] font-semibold uppercase tracking-wide text-ink-400 dark:text-ink-500 mb-1">
         {title}
       </h3>
-      <div className="divide-y divide-slate-50 dark:divide-[#1d1d1d]">{children}</div>
+      <div className="divide-y divide-ink-50 dark:divide-night-raised">{children}</div>
     </div>
   );
 }
@@ -49,7 +49,7 @@ export default function ShortcutsHelp({ open, onOpenChange }) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+          <DialogTitle className="text-sm font-semibold text-ink-900 dark:text-ink-100">
             Keyboard shortcuts
           </DialogTitle>
         </DialogHeader>
@@ -101,7 +101,7 @@ export default function ShortcutsHelp({ open, onOpenChange }) {
             <Row keys={[`${mod} ⇧ 9`]} label="Checklist" />
             <Row keys={["Tab"]} label="Indent (⇧ Tab to outdent)" />
             <Row keys={["⇧ ↵"]} label="Line break in the same paragraph" />
-            <p className="pt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
+            <p className="pt-2 text-xs leading-5 text-ink-500 dark:text-ink-400">
               Markdown works as you type or paste:{" "}
               <code className="font-mono">#</code> heading, <code className="font-mono">-</code> bullets,{" "}
               <code className="font-mono">1.</code> numbers, <code className="font-mono">&gt;</code> quote,{" "}

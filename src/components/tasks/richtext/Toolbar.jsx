@@ -85,7 +85,7 @@ const TEXT_STYLES = [
   { key: "h1", label: "Heading 1", level: 1, className: "text-base font-semibold" },
   { key: "h2", label: "Heading 2", level: 2, className: "text-sm font-semibold" },
   { key: "h3", label: "Heading 3", level: 3, className: "text-xs font-semibold" },
-  { key: "quote", label: "Quote", className: "text-xs italic text-slate-500 dark:text-slate-400" },
+  { key: "quote", label: "Quote", className: "text-xs italic text-ink-500 dark:text-ink-400" },
   { key: "code", label: "Code block", className: "text-xs font-mono" },
 ];
 
@@ -120,8 +120,8 @@ function TBtn({ active, disabled, onAction, title, children, testid }) {
       className={cn(
         "inline-flex items-center justify-center h-7 min-w-7 px-1 rounded-md transition-colors shrink-0",
         active
-          ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
-          : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#222222]",
+          ? "bg-primary text-primary-foreground"
+          : "text-ink-600 dark:text-ink-300 hover:bg-ink-100 dark:hover:bg-night-high",
         disabled && "opacity-40 cursor-not-allowed"
       )}
     >
@@ -148,7 +148,7 @@ function Picker({ icon: Icon, title, open, setOpen, onOpenChange, children, open
           setOpen(next);
           onOpenChange?.(next);
         }}
-        className="inline-flex items-center gap-0.5 h-7 px-1.5 rounded-md text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#222222] transition-colors"
+        className="inline-flex items-center gap-0.5 h-7 px-1.5 rounded-md text-ink-600 dark:text-ink-300 hover:bg-ink-100 dark:hover:bg-night-high transition-colors"
       >
         <Icon className="w-4 h-4" />
         <ChevronDown className="w-3 h-3" />
@@ -270,13 +270,13 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
 
   return (
     <div className={cn(
-      "flex items-center gap-0.5 flex-wrap px-1.5 py-1 bg-slate-50 dark:bg-[#0c0c0c]",
+      "flex items-center gap-0.5 flex-wrap px-1.5 py-1 bg-ink-50 dark:bg-night-sunken",
       placement === "docked"
         // Docked under the editor: only a top rule, and the bottom corners
         // must match the parent's INNER radius (6px box - 1px border = 5px).
         // Leaving them square let this opaque grey paint into the parent's
         // corner arc, which is what made the border look doubled there.
-        ? "border-t border-slate-100 dark:border-[#303030] rounded-b-[5px]"
+        ? "border-t border-ink-100 dark:border-night-line rounded-b-[5px]"
         : placement === "flush"
           // Docked to a pane edge: the wrapper draws the rule, so this
           // adds no border or radius that could double up on it.
@@ -292,7 +292,7 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
         <Redo2 className="w-4 h-4" />
       </TBtn>
 
-      <span className="w-px h-5 bg-slate-200 dark:bg-[#303030] mx-0.5 shrink-0" />
+      <span className="w-px h-5 bg-ink-200 dark:bg-night-line mx-0.5 shrink-0" />
 
       {/* Text style */}
       <Picker icon={Heading} title="Text style" testid="richtext-style" open={styleOpen} setOpen={setStyleOpen} onOpenChange={anyPickerOpen} openUp={placement !== "standalone"}>
@@ -304,27 +304,27 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
               data-testid={`richtext-style-${t.key}`}
               onMouseDown={(e) => { e.preventDefault(); pick(setStyleOpen, () => setTextStyle(t.key)); }}
               className={cn(
-                "w-full text-left px-2 py-1.5 rounded text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222222]",
-                activeStyle === t.key && "bg-slate-100 dark:bg-[#222222]"
+                "w-full text-left px-2 py-1.5 rounded text-ink-700 dark:text-ink-200 hover:bg-ink-100 dark:hover:bg-night-high",
+                activeStyle === t.key && "bg-ink-100 dark:bg-night-high"
               )}
             >
               <span className={t.className}>{t.label}</span>
             </button>
           ))}
-          <div className="my-1 h-px bg-slate-100 dark:bg-[#303030]" />
+          <div className="my-1 h-px bg-ink-100 dark:bg-night-line" />
           <button
             type="button"
             data-testid="richtext-clear-formatting"
             onMouseDown={(e) => { e.preventDefault(); pick(setStyleOpen, clearFormatting); }}
-            className="w-full flex items-center gap-2 text-left text-xs px-2 py-1.5 rounded text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222222]"
+            className="w-full flex items-center gap-2 text-left text-xs px-2 py-1.5 rounded text-ink-700 dark:text-ink-200 hover:bg-ink-100 dark:hover:bg-night-high"
           >
-            <RemoveFormatting className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+            <RemoveFormatting className="w-3.5 h-3.5 text-ink-500 dark:text-ink-400" />
             Clear formatting
           </button>
         </div>
       </Picker>
 
-      <span className="w-px h-5 bg-slate-200 dark:bg-[#303030] mx-0.5 shrink-0" />
+      <span className="w-px h-5 bg-ink-200 dark:bg-night-line mx-0.5 shrink-0" />
 
       <TBtn title="Bold" active={editor.isActive("bold")} onAction={() => apply(() => editor.chain().focus().toggleBold().run())}>
         <Bold className="w-4 h-4" />
@@ -348,7 +348,7 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
         <Link2 className="w-4 h-4" />
       </TBtn>
 
-      <span className="w-px h-5 bg-slate-200 dark:bg-[#303030] mx-0.5 shrink-0" />
+      <span className="w-px h-5 bg-ink-200 dark:bg-night-line mx-0.5 shrink-0" />
 
       {/* Text color */}
       <Picker icon={Baseline} title="Text color" open={colorOpen} setOpen={setColorOpen} onOpenChange={anyPickerOpen} openUp={placement !== "standalone"}>
@@ -359,7 +359,7 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
               type="button"
               title={c.label}
               onMouseDown={(e) => { e.preventDefault(); pick(setColorOpen, () => editor.chain().focus().setColor(c.hex).run()); }}
-              className="w-6 h-6 rounded-full border border-slate-200 dark:border-[#343434]"
+              className="w-6 h-6 rounded-full border border-ink-200 dark:border-night-line-strong"
               style={{ backgroundColor: c.hex }}
             />
           ))}
@@ -367,7 +367,7 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
         <button
           type="button"
           onMouseDown={(e) => { e.preventDefault(); pick(setColorOpen, () => editor.chain().focus().unsetColor().run()); }}
-          className="mt-1.5 w-full text-[11px] text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 py-1 rounded hover:bg-slate-100 dark:hover:bg-[#222222]"
+          className="mt-1.5 w-full text-[11px] text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-ink-100 py-1 rounded hover:bg-ink-100 dark:hover:bg-night-high"
         >
           Default color
         </button>
@@ -382,7 +382,7 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
               type="button"
               title={c.label}
               onMouseDown={(e) => { e.preventDefault(); pick(setHlOpen, () => editor.chain().focus().toggleHighlight({ color: c.hex }).run()); }}
-              className="w-6 h-6 rounded border border-slate-200 dark:border-[#343434]"
+              className="w-6 h-6 rounded border border-ink-200 dark:border-night-line-strong"
               style={{ backgroundColor: c.hex }}
             />
           ))}
@@ -390,7 +390,7 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
         <button
           type="button"
           onMouseDown={(e) => { e.preventDefault(); pick(setHlOpen, () => editor.chain().focus().unsetHighlight().run()); }}
-          className="mt-1.5 w-full text-[11px] text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 py-1 rounded hover:bg-slate-100 dark:hover:bg-[#222222]"
+          className="mt-1.5 w-full text-[11px] text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-ink-100 py-1 rounded hover:bg-ink-100 dark:hover:bg-night-high"
         >
           No highlight
         </button>
@@ -410,7 +410,7 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
                   else editor.chain().focus().unsetFontFamily().run();
                 });
               }}
-              className="w-full text-left text-xs px-2 py-1.5 rounded text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222222]"
+              className="w-full text-left text-xs px-2 py-1.5 rounded text-ink-700 dark:text-ink-200 hover:bg-ink-100 dark:hover:bg-night-high"
               style={{ fontFamily: f.stack || undefined }}
             >
               {f.label}
@@ -419,7 +419,7 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
         </div>
       </Picker>
 
-      <span className="w-px h-5 bg-slate-200 dark:bg-[#303030] mx-0.5 shrink-0" />
+      <span className="w-px h-5 bg-ink-200 dark:bg-night-line mx-0.5 shrink-0" />
 
       {/* Lists */}
       <Picker icon={ListIcon} title="Lists" open={listOpen} setOpen={setListOpen} onOpenChange={anyPickerOpen} openUp={placement !== "standalone"}>
@@ -429,9 +429,9 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
               key={o.key}
               type="button"
               onMouseDown={(e) => { e.preventDefault(); pick(setListOpen, () => setListType(o.key)); }}
-              className="w-full flex items-center gap-2 text-left text-xs px-2 py-1.5 rounded text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222222]"
+              className="w-full flex items-center gap-2 text-left text-xs px-2 py-1.5 rounded text-ink-700 dark:text-ink-200 hover:bg-ink-100 dark:hover:bg-night-high"
             >
-              <span className="w-5 text-center text-slate-500 dark:text-slate-400">{o.glyph}</span>
+              <span className="w-5 text-center text-ink-500 dark:text-ink-400">{o.glyph}</span>
               {o.label}
             </button>
           ))}
@@ -441,7 +441,7 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
         <ListChecks className="w-4 h-4" />
       </TBtn>
 
-      <span className="w-px h-5 bg-slate-200 dark:bg-[#303030] mx-0.5 shrink-0" />
+      <span className="w-px h-5 bg-ink-200 dark:bg-night-line mx-0.5 shrink-0" />
 
       <TBtn title="Decrease indent" onAction={outdent}>
         <Outdent className="w-4 h-4" />
@@ -456,7 +456,7 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
           control here, so it never blurs the editable on iOS. */}
       {onMakeTask && (
         <>
-          <span className="w-px h-5 bg-slate-200 dark:bg-[#303030] mx-0.5 shrink-0" />
+          <span className="w-px h-5 bg-ink-200 dark:bg-night-line mx-0.5 shrink-0" />
           <TBtn
             title={hasSelection ? "Make task from selection" : "Select text to make a task"}
             disabled={!hasSelection}
@@ -476,7 +476,7 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
       <span
         className={cn(
           "ml-auto text-[10px] tabular-nums px-1.5 shrink-0",
-          words >= wordLimit ? "text-red-500 dark:text-red-400 font-semibold" : "text-slate-400 dark:text-slate-500"
+          words >= wordLimit ? "text-red-500 dark:text-red-400 font-semibold" : "text-ink-400 dark:text-ink-500"
         )}
       >
         {words}/{wordLimit}

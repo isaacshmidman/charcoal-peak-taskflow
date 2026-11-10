@@ -29,11 +29,11 @@ export default function SplitDivider({
       <div
         className={cn(
           "w-0.5 rounded-full transition-all duration-150",
-          // Visible at rest: the old slate-200 / #222 vanished into the
+          // Visible at rest: the old ink-200 / #222 vanished into the
           // surface behind it, so the divider read as empty space.
           snapped
-            ? "h-12 bg-slate-500 dark:bg-slate-300"
-            : "h-8 bg-slate-300 dark:bg-[#3a3a3a] group-hover:bg-slate-400 dark:group-hover:bg-slate-500"
+            ? "h-12 bg-ink-500 dark:bg-ink-300"
+            : "h-8 bg-ink-300 dark:bg-night-line-strong group-hover:bg-ink-400 dark:group-hover:bg-ink-500"
         )}
       />
     </div>

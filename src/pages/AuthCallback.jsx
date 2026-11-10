@@ -57,12 +57,12 @@ export default function AuthCallback() {
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="w-full max-w-md rounded-3xl border border-border-strong bg-surface-card p-8 shadow-sm text-center">
-        <div className="mx-auto w-12 h-12 rounded-2xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 flex items-center justify-center">
+      <div className="w-full max-w-md rounded-[20px] border border-border-hairline bg-surface-card p-8 shadow-hero text-center">
+        <div className="mx-auto w-12 h-12 rounded-xl bg-primary text-primary-foreground flex items-center justify-center">
           <LoaderCircle className="w-5 h-5 animate-spin" />
         </div>
-        <h1 className="mt-5 text-xl font-semibold text-slate-900 dark:text-slate-100">Finishing sign-in</h1>
-        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+        <h1 className="mt-5 text-xl font-semibold text-ink-900 dark:text-ink-100">Finishing sign-in</h1>
+        <p className="mt-2 text-sm text-ink-500 dark:text-ink-400">
           We&apos;re connecting your Google session and bringing you back into Zephyrly.
         </p>
       </div>

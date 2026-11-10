@@ -72,11 +72,11 @@ export default function TimedEventBlock({
           // A strip across the bottom edge: easy to grab, invisible until
           // hovered or focused. touch-none so a finger drags it instead of
           // scrolling.
-          className="group/handle absolute inset-x-1 bottom-0 flex h-2 cursor-ns-resize touch-none items-end justify-center rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-slate-500 dark:focus-visible:ring-slate-300"
+          className="group/handle absolute inset-x-1 bottom-0 flex h-2 cursor-ns-resize touch-none items-end justify-center rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ink-500 dark:focus-visible:ring-ink-300"
         >
           <span
             className={cn(
-              "mb-0.5 h-0.5 w-6 rounded-full bg-slate-500/70 transition-opacity dark:bg-slate-300/70",
+              "mb-0.5 h-0.5 w-6 rounded-full bg-ink-500/70 transition-opacity dark:bg-ink-300/70",
               resizing ? "opacity-100" : "opacity-0 group-hover/event:opacity-100 group-focus-visible/handle:opacity-100"
             )}
           />
@@ -86,7 +86,7 @@ export default function TimedEventBlock({
       {resizing && (
         <div
           data-testid="calendar-resize-time"
-          className="pointer-events-none absolute left-0.5 top-full z-40 mt-1 whitespace-nowrap rounded bg-slate-900 px-1.5 py-0.5 text-[10px] font-semibold text-white shadow dark:bg-slate-100 dark:text-slate-900"
+          className="pointer-events-none absolute left-0.5 top-full z-40 mt-1 whitespace-nowrap rounded bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground shadow"
         >
           {timeRangeLabel(startMin, shownEnd)}
         </div>

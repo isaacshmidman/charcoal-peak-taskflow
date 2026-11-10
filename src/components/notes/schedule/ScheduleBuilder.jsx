@@ -74,7 +74,7 @@ export default function ScheduleBuilder({ schedule, editor, noteHasText }) {
         ))}
       </ol>
       {noteHasText && (
-        <p className="px-2 pt-4 text-xs text-slate-400 dark:text-slate-500">
+        <p className="px-2 pt-4 text-xs text-ink-400 dark:text-ink-500">
           This note’s text is kept. Turn Schedule off to see it.
         </p>
       )}
@@ -96,11 +96,11 @@ function Slot({ slot, isNow, editor, textRef, onNext }) {
       // line of its own under them; wider, it all sits on one line.
       className={cn(
         "group relative flex flex-wrap items-center gap-x-2 py-1 pl-2 pr-0.5 sm:flex-nowrap sm:gap-x-3",
-        isNow && "bg-slate-50 dark:bg-[#141414]"
+        isNow && "bg-ink-50 dark:bg-night-sunken"
       )}
     >
-      {isNow && <span aria-hidden="true" className="absolute inset-y-1 left-0 w-0.5 rounded-full bg-slate-900 dark:bg-slate-100" />}
-      <div className="flex shrink-0 items-center text-slate-500 dark:text-slate-400">
+      {isNow && <span aria-hidden="true" className="absolute inset-y-1 left-0 w-0.5 rounded-full bg-primary" />}
+      <div className="flex shrink-0 items-center text-ink-500 dark:text-ink-400">
         <TimeField
           value={slot.start}
           label={`Start of ${range}`}
@@ -109,7 +109,7 @@ function Slot({ slot, isNow, editor, textRef, onNext }) {
           onCommit={commitStart}
           onProblem={editor.problem}
         />
-        <span aria-hidden="true" className="px-0.5 text-slate-300 dark:text-slate-600">–</span>
+        <span aria-hidden="true" className="px-0.5 text-ink-300 dark:text-ink-600">–</span>
         <TimeField
           end
           value={slot.end}
@@ -138,11 +138,11 @@ function Slot({ slot, isNow, editor, textRef, onNext }) {
         // 16px on phones: iOS zooms into any field smaller than that. With
         // no hover on a phone, the empty line says faintly what it's for.
         className={cn(
-          "order-last min-w-0 basis-full bg-transparent pb-1 pl-0.5 text-base text-slate-900 outline-none dark:text-slate-100",
-          "placeholder:text-slate-300/60 focus:placeholder:text-slate-300 dark:placeholder:text-slate-600/50 dark:focus:placeholder:text-slate-600",
+          "order-last min-w-0 basis-full bg-transparent pb-1 pl-0.5 text-base text-ink-900 outline-none dark:text-ink-100",
+          "placeholder:text-ink-300/60 focus:placeholder:text-ink-300 dark:placeholder:text-ink-600/50 dark:focus:placeholder:text-ink-600",
           "sm:order-none sm:flex-1 sm:basis-auto sm:py-1 sm:pl-0 md:text-sm",
-          "sm:placeholder:text-transparent sm:group-hover:placeholder:text-slate-300 sm:focus:placeholder:text-slate-300",
-          "dark:sm:placeholder:text-transparent dark:sm:group-hover:placeholder:text-slate-600 dark:sm:focus:placeholder:text-slate-600"
+          "sm:placeholder:text-transparent sm:group-hover:placeholder:text-ink-300 sm:focus:placeholder:text-ink-300",
+          "dark:sm:placeholder:text-transparent dark:sm:group-hover:placeholder:text-ink-600 dark:sm:focus:placeholder:text-ink-600"
         )}
       />
       <DropdownMenu>
@@ -151,7 +151,7 @@ function Slot({ slot, isNow, editor, textRef, onNext }) {
             type="button"
             aria-label={`More for ${range}`}
             data-testid="slot-menu"
-            className="ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-md sm:ml-0 text-slate-400 opacity-0 transition-opacity hover:bg-slate-100 hover:text-slate-700 focus:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100 data-[state=open]:opacity-100 dark:text-slate-500 dark:hover:bg-[#1f1f1f] dark:hover:text-slate-200 [@media(hover:none)]:opacity-60"
+            className="ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-md sm:ml-0 text-ink-400 opacity-0 transition-opacity hover:bg-ink-100 hover:text-ink-700 focus:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100 data-[state=open]:opacity-100 dark:text-ink-500 dark:hover:bg-night-raised dark:hover:text-ink-200 [@media(hover:none)]:opacity-60"
           >
             <MoreHorizontal className="h-4 w-4" />
           </button>

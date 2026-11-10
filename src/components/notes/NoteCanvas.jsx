@@ -127,7 +127,7 @@ export default function NoteCanvas({
             size="icon"
             aria-label="Back to notes"
             data-testid="note-back"
-            className="-ml-2 h-8 w-8 shrink-0 text-slate-400 dark:text-slate-500 sm:hidden"
+            className="-ml-2 h-8 w-8 shrink-0 text-ink-400 dark:text-ink-500 sm:hidden"
             onClick={onBack}
           >
             <ArrowLeft className="h-4 w-4" />
@@ -149,7 +149,7 @@ export default function NoteCanvas({
             scrollRef.current?.querySelector(".tiptap-prose")?.focus();
             editor?.commands.setTextSelection(0);
           }}
-          className="min-w-0 flex-1 bg-transparent text-lg font-semibold text-slate-900 outline-none placeholder:text-slate-300 dark:text-slate-100 dark:placeholder:text-slate-600"
+          className="min-w-0 flex-1 bg-transparent text-lg font-semibold text-ink-900 outline-none placeholder:text-ink-300 dark:text-ink-100 dark:placeholder:text-ink-600"
         />
         {/* Top corner: the Schedule switch, and its settings once it's on. */}
         <div className="flex shrink-0 items-center gap-1 pt-1">
@@ -157,7 +157,7 @@ export default function NoteCanvas({
           {scheduleOn && (
             <ScheduleSettings schedule={schedule} editor={scheduleEditor} defaults={scheduleDefaults} saveDefaults={saveScheduleDefaults} />
           )}
-          <label className="flex cursor-pointer items-center gap-2 pl-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+          <label className="flex cursor-pointer items-center gap-2 pl-1 text-xs font-medium text-ink-500 dark:text-ink-400">
             Schedule
             <SettingsToggle checked={scheduleOn} onChange={setScheduleOn} label="Schedule builder" />
           </label>
@@ -180,7 +180,7 @@ export default function NoteCanvas({
         >
           <Suspense
             fallback={
-              <div className="px-3 py-2 text-sm text-slate-400 dark:text-slate-500">Loading editor…</div>
+              <div className="px-3 py-2 text-sm text-ink-400 dark:text-ink-500">Loading editor…</div>
             }
           >
             <RichDescriptionEditor
@@ -212,7 +212,7 @@ export default function NoteCanvas({
       <div
         data-richtext-toolbar
         className={cn(
-          "shrink-0 border-t border-border-hairline bg-slate-50 transition-opacity dark:bg-[#0c0c0c]",
+          "shrink-0 border-t border-border-hairline bg-ink-50 transition-opacity dark:bg-night-sunken",
           showToolbar && !scheduleOn ? "opacity-100" : "pointer-events-none opacity-0",
           scheduleOn && "hidden"
         )}

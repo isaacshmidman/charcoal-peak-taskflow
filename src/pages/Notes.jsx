@@ -255,8 +255,8 @@ export default function Notes() {
           sidebar so the page reads like the rest of the app. */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-base font-semibold text-slate-900 dark:text-slate-100">Notes</h1>
-          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+          <h1 className="ds-page-title">Notes</h1>
+          <p className="ds-page-sub">
             {notes.length} note{notes.length !== 1 ? "s" : ""}
           </p>
         </div>
@@ -271,7 +271,7 @@ export default function Notes() {
             variant="ghost"
             size="icon"
             data-search-toggle
-            className="h-9 w-9 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
+            className="h-9 w-9 text-ink-400 dark:text-ink-500 hover:text-ink-700 dark:hover:text-ink-200"
             onMouseDown={(event) => { if (showSearch) event.preventDefault(); }}
             onClick={() => { if (showSearch) setSearch(""); setShowSearch((v) => !v); }}
           >
@@ -280,7 +280,7 @@ export default function Notes() {
           <Button
             onClick={newNote}
             data-testid="new-note-button"
-            className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200 h-9 gap-1.5"
+            className="bg-primary hover:bg-[var(--primary-hover)] text-primary-foreground h-9 gap-1.5"
           >
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">New note</span>
@@ -336,8 +336,8 @@ export default function Notes() {
       ) : (
         <section className={cn("flex-1 items-center justify-center", mobilePane === "list" ? "hidden sm:flex" : "flex")}>
           <div className="text-center">
-            <NotebookPen className="mx-auto mb-2 h-5 w-5 text-slate-300 dark:text-slate-600" />
-            <p className="text-xs text-slate-400 dark:text-slate-500">
+            <NotebookPen className="mx-auto mb-2 h-5 w-5 text-ink-300 dark:text-ink-600" />
+            <p className="text-xs text-ink-400 dark:text-ink-500">
               {search ? "Nothing matches." : "A quiet page. Write anything."}
             </p>
           </div>

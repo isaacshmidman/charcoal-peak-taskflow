@@ -3,7 +3,7 @@ import { forwardRef, useState, useMemo, useEffect } from "react";
 import { apiClient } from "@/api/apiClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
-import { ArrowLeft, Trash2, Search, RotateCcw, CheckSquare, NotebookPen } from "lucide-react";
+import { ArrowLeft, Trash2, Search, RotateCcw, Check, NotebookPen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { AnimatedSearchInput } from "@/components/ui/animated-search-input";
@@ -26,7 +26,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import MultiSortPanel from "@/components/tasks/MultiSortPanel";
-import { colorBg, isDarkColor } from "@/lib/colors";
+import { colorCheck } from "@/lib/colors";
 import { compareDeletedNote, compareDeletedTask, sortTrash } from "@/lib/trash-sort";
 import { activeSchedule, schedulePreview, scheduleSearchText } from "@/lib/schedule";
 
@@ -239,13 +239,13 @@ export default function RecentlyDeleted({ onBack } = {}) {
                 navigate("/Settings");
               }
             }}
-            className="flex items-center justify-center w-8 h-8 rounded-lg text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-[#222222] transition-colors"
+            className="flex items-center justify-center w-8 h-8 rounded-lg text-ink-400 dark:text-ink-500 hover:text-ink-900 dark:hover:text-ink-100 hover:bg-ink-100 dark:hover:bg-night-high transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
           <div>
-            <h1 className="text-base font-semibold text-slate-900 dark:text-slate-100">Recently Deleted</h1>
-            <p className="text-xs text-slate-400 dark:text-slate-500">
+            <h1 className="ds-page-title">Recently Deleted</h1>
+            <p className="text-xs text-ink-400 dark:text-ink-500">
               {displayedTasks.length + displayedNotes.length} item{displayedTasks.length + displayedNotes.length !== 1 ? "s" : ""}
             </p>
           </div>
@@ -257,7 +257,7 @@ export default function RecentlyDeleted({ onBack } = {}) {
             onChange={setSearch}
             onClose={() => setSearchOpen(false)}
           />
-          <Button aria-label={searchOpen ? "Close search" : "Search"} variant="ghost" size="icon" data-search-toggle className="h-9 w-9 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200" onMouseDown={(e) => e.preventDefault()} onClick={() => setSearchOpen(!searchOpen)}>
+          <Button aria-label={searchOpen ? "Close search" : "Search"} variant="ghost" size="icon" data-search-toggle className="h-9 w-9 text-ink-400 dark:text-ink-500 hover:text-ink-700 dark:hover:text-ink-200" onMouseDown={(e) => e.preventDefault()} onClick={() => setSearchOpen(!searchOpen)}>
             <Search className="w-4 h-4" />
           </Button>
           <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} page="deleted" />
@@ -266,7 +266,7 @@ export default function RecentlyDeleted({ onBack } = {}) {
               <Button aria-label="Empty recently deleted"
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-[#2a1116]"
+                className="h-9 w-9 text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-night-danger"
                 title="Empty recently deleted"
                 onClick={() => setShowEmptyDialog(true)}
               >
@@ -287,7 +287,7 @@ export default function RecentlyDeleted({ onBack } = {}) {
                   <button
                     type="button"
                     onClick={() => setShowEmptyDialog(false)}
-                    className="w-full h-12 rounded-xl bg-slate-100 dark:bg-[#161616] hover:bg-slate-200 dark:hover:bg-[#222222] text-slate-700 dark:text-slate-200 text-sm font-medium shadow-sm transition-colors"
+                    className="w-full h-12 rounded-xl bg-ink-100 dark:bg-night-raised hover:bg-ink-200 dark:hover:bg-night-high text-ink-700 dark:text-ink-200 text-sm font-medium shadow-sm transition-colors"
                   >
                     Cancel
                   </button>
@@ -300,7 +300,7 @@ export default function RecentlyDeleted({ onBack } = {}) {
 
       {/* Retention setting */}
       <Card className="flex items-center gap-3 px-4 py-3">
-        <span className="text-xs font-medium text-slate-500 dark:text-slate-400 flex-1">Keep deleted items for</span>
+        <span className="text-xs font-medium text-ink-500 dark:text-ink-400 flex-1">Keep deleted items for</span>
         <Select value={retentionDays} onValueChange={handleRetentionChange}>
           <SelectTrigger className="w-32 h-8 text-xs">
             <SelectValue />
@@ -315,14 +315,14 @@ export default function RecentlyDeleted({ onBack } = {}) {
 
       {displayedTasks.length === 0 && displayedNotes.length === 0 ? (
         <div className="py-14 text-center">
-          <p className="text-xs text-slate-400 dark:text-slate-500">Nothing here. The bin sits empty.</p>
+          <p className="text-xs text-ink-400 dark:text-ink-500">Nothing here. The bin sits empty.</p>
         </div>
       ) : (
         <>
           {/* Sections mirror the Notes page: heading only when non-empty. */}
           {displayedTasks.length > 0 && (
             <div className="space-y-2">
-              <h2 className="text-xs font-semibold text-slate-900 dark:text-slate-100">Tasks</h2>
+              <h2 className="text-xs font-medium text-ink-500 dark:text-ink-400">Tasks</h2>
               <AnimatePresence mode="popLayout">
                 {displayedTasks.map(record => (
                   <DeletedTaskCard
@@ -338,7 +338,7 @@ export default function RecentlyDeleted({ onBack } = {}) {
           )}
           {displayedNotes.length > 0 && (
             <div className="space-y-2">
-              <h2 className="text-xs font-semibold text-slate-900 dark:text-slate-100">Notes</h2>
+              <h2 className="text-xs font-medium text-ink-500 dark:text-ink-400">Notes</h2>
               <div className="grid gap-2 sm:grid-cols-2">
               <AnimatePresence mode="popLayout">
                 {displayedNotes.map(record => (
@@ -366,13 +366,10 @@ export default function RecentlyDeleted({ onBack } = {}) {
 // <AnimatePresence mode="popLayout">, which measures an exiting child
 // through a ref to hold its box while it animates out — see TaskCard.
 const DeletedNoteCard = forwardRef(function DeletedNoteCard(
-  { record, priorityMap, onRestore, onDelete },
+  { record, onRestore, onDelete },
   ref
 ) {
-  const priority = priorityMap[record.priority_id];
-  const colorKey = priority?.color || record.priority_color || "slate";
-  const cardBg = colorBg[colorKey] || colorBg.slate;
-  const isDarkCard = isDarkColor(colorKey);
+  const cardBg = "bg-surface-card border-border-hairline";
   const deletedDate = record.deleted_at ? format(new Date(record.deleted_at), "MMM d, yyyy") : "";
 
   return (
@@ -388,32 +385,32 @@ const DeletedNoteCard = forwardRef(function DeletedNoteCard(
       <div className={cn("rounded-xl border flex overflow-hidden", cardBg)}>
         <div className="flex-1 min-w-0 px-3 py-2.5">
           <div className="flex items-start gap-2">
-            <NotebookPen className="shrink-0 w-6 h-6 text-slate-400 dark:text-slate-500" />
+            <NotebookPen className="shrink-0 w-6 h-6 text-ink-400 dark:text-ink-500" />
 
             <div className="flex-1 min-w-0">
               <p className={cn(
                 "text-sm font-medium truncate",
-                isDarkCard ? "text-white dark:text-slate-100" : "text-slate-900 dark:text-slate-100",
-                !record.title && "text-slate-400 dark:text-slate-500"
+                "text-ink-900 dark:text-ink-100",
+                !record.title && "text-ink-400 dark:text-ink-500"
               )}>
                 {record.title || "Untitled"}
               </p>
               {activeSchedule(record) ? (
-                <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                <p className="text-xs text-ink-500 dark:text-ink-400 truncate mt-0.5">
                   {schedulePreview(activeSchedule(record))}
                 </p>
               ) : record.content_text?.trim() && (
-                <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                <p className="text-xs text-ink-500 dark:text-ink-400 truncate mt-0.5">
                   {record.content_text}
                 </p>
               )}
 
               <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                <span className="text-[10px] font-medium text-red-600 dark:text-red-300 bg-red-50 dark:bg-[#2a1116] border border-red-200 dark:border-red-800 px-1.5 py-0.5 rounded">
+                <span className="text-[11px] font-medium text-red-600 dark:text-red-400">
                   Deleted {deletedDate}
                 </span>
                 {record.tags?.length > 0 && record.tags.slice(0, 2).map(tag => (
-                  <span key={tag} className="text-[10px] font-medium text-slate-500 dark:text-slate-300 bg-white/70 dark:bg-[#0c0c0c] px-1.5 py-0.5 rounded border border-slate-200 dark:border-[#343434]">
+                  <span key={tag} className="text-[11px] text-ink-500 dark:text-ink-400">
                     {tag}
                   </span>
                 ))}
@@ -423,7 +420,7 @@ const DeletedNoteCard = forwardRef(function DeletedNoteCard(
             <div className="flex items-center gap-1 shrink-0">
               <button aria-label="Restore"
                 onClick={onRestore}
-                className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-[#10261b] transition-colors"
+                className="p-1.5 rounded-lg text-ink-400 dark:text-ink-500 hover:text-emerald-600 dark:hover:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-night-good transition-colors"
                 title="Restore"
                 data-testid={`restore-note-${record.id}`}
               >
@@ -431,7 +428,7 @@ const DeletedNoteCard = forwardRef(function DeletedNoteCard(
               </button>
               <button aria-label="Delete permanently"
                 onClick={onDelete}
-                className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-[#2a1116] transition-colors"
+                className="p-1.5 rounded-lg text-ink-400 dark:text-ink-500 hover:text-red-500 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-night-danger transition-colors"
                 title="Delete permanently"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -450,8 +447,7 @@ const DeletedTaskCard = forwardRef(function DeletedTaskCard(
 ) {
   const priority = priorityMap[record.priority_id];
   const colorKey = priority?.color || record.priority_color || "slate";
-  const cardBg = colorBg[colorKey] || colorBg.slate;
-  const isDarkCard = isDarkColor(colorKey);
+  const cardBg = "bg-surface-card border-border-hairline";
   const isDone = record.was_completed;
 
   const deletedDate = record.deleted_at ? format(new Date(record.deleted_at), "MMM d, yyyy") : "";
@@ -471,38 +467,38 @@ const DeletedTaskCard = forwardRef(function DeletedTaskCard(
           <div className="flex items-start gap-2">
             {/* Status indicator */}
             <div className={cn(
-              "shrink-0 w-7 h-7 rounded-md border-2 flex items-center justify-center",
-              isDone ? "bg-slate-900 border-slate-900 text-white dark:bg-slate-100 dark:border-slate-100 dark:text-slate-900" : "border-slate-300 dark:border-slate-600 bg-white/80 dark:bg-[#0c0c0c]"
+              "shrink-0 w-6 h-6 rounded-md border-[1.5px] flex items-center justify-center",
+              isDone ? "bg-sun-400 border-sun-500 text-ink-900 dark:border-sun-400" : colorCheck[colorKey] || colorCheck.slate
             )}>
-              {isDone && <CheckSquare className="w-3.5 h-3.5" />}
+              {isDone && <Check className="w-3.5 h-3.5" strokeWidth={3} />}
             </div>
 
             <div className="flex-1 min-w-0">
               <p className={cn(
                 "text-sm font-medium truncate",
-                isDarkCard ? "text-white dark:text-slate-100" : "text-slate-900 dark:text-slate-100",
-                isDone && "line-through text-slate-400 dark:text-slate-500"
+                "text-ink-900 dark:text-ink-100",
+                isDone && "line-through text-ink-400 dark:text-ink-500"
               )}>
                 {record.title}
               </p>
 
               {/* Deleted-at badge */}
               <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                <span className="text-[10px] font-medium text-red-600 dark:text-red-300 bg-red-50 dark:bg-[#2a1116] border border-red-200 dark:border-red-800 px-1.5 py-0.5 rounded">
+                <span className="text-[11px] font-medium text-red-600 dark:text-red-400">
                   Deleted {deletedDate}
                 </span>
                 {record.due_date && (
-                  <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                  <span className="text-[10px] text-ink-400 dark:text-ink-500">
                     Due {format(new Date(record.due_date + "T00:00:00"), "MMM d")}
                   </span>
                 )}
                 {record.tags?.length > 0 && record.tags.slice(0, 2).map(tag => (
-                  <span key={tag} className="text-[10px] font-medium text-slate-500 dark:text-slate-300 bg-white/70 dark:bg-[#0c0c0c] px-1.5 py-0.5 rounded border border-slate-200 dark:border-[#343434]">
+                  <span key={tag} className="text-[11px] text-ink-500 dark:text-ink-400">
                     {tag}
                   </span>
                 ))}
                 {record.subtasks?.length > 0 && (
-                  <span className="text-[10px] text-slate-400 dark:text-slate-500">{record.subtasks.length} subtask{record.subtasks.length !== 1 ? "s" : ""}</span>
+                  <span className="text-[10px] text-ink-400 dark:text-ink-500">{record.subtasks.length} subtask{record.subtasks.length !== 1 ? "s" : ""}</span>
                 )}
               </div>
             </div>
@@ -511,14 +507,14 @@ const DeletedTaskCard = forwardRef(function DeletedTaskCard(
             <div className="flex items-center gap-1 shrink-0">
               <button aria-label="Restore"
                 onClick={onRestore}
-                className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-[#10261b] transition-colors"
+                className="p-1.5 rounded-lg text-ink-400 dark:text-ink-500 hover:text-emerald-600 dark:hover:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-night-good transition-colors"
                 title="Restore"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
               </button>
               <button aria-label="Delete permanently"
                 onClick={onDelete}
-                className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-[#2a1116] transition-colors"
+                className="p-1.5 rounded-lg text-ink-400 dark:text-ink-500 hover:text-red-500 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-night-danger transition-colors"
                 title="Delete permanently"
               >
                 <Trash2 className="w-3.5 h-3.5" />

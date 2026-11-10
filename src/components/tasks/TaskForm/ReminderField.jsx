@@ -90,7 +90,7 @@ export default function ReminderField({ form, setForm }) {
 
   return (
     <div data-testid="task-form-reminder">
-      <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-1.5 block">Reminder</Label>
+      <Label className="text-xs font-semibold text-ink-900 dark:text-ink-100 mb-1.5 block">Reminder</Label>
       <div className="flex items-center gap-2">
         <Select value={selected} onValueChange={choose}>
           <SelectTrigger className="h-9 flex-1" aria-label="Reminder">
@@ -111,7 +111,7 @@ export default function ReminderField({ form, setForm }) {
         )}
       </div>
       {!settings.enabled && (
-        <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
+        <p className="mt-1 text-[11px] text-ink-400 dark:text-ink-500">
           Notifications are off, so no reminders are sent. Turn them on in Settings → Notifications.
         </p>
       )}

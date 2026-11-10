@@ -96,7 +96,7 @@ export default function SubtaskList({
         <div className="px-3 pb-2">
           <button
             onClick={() => setSubtasksExpanded(!subtasksExpanded)}
-            className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center gap-0.5"
+            className="text-[10px] text-ink-400 dark:text-ink-500 flex items-center gap-0.5"
           >
             {subtasksExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
             {doneSubtasks}/{subtasks.length} subtasks
@@ -173,10 +173,10 @@ export default function SubtaskList({
                   >
                     {onReorderSubtasks && (
                       <div className="flex flex-col gap-0.5 opacity-0 group-hover/sub:opacity-100 transition-opacity">
-                        <button aria-label={`Move ${sub.title} up`} type="button" onClick={(e) => { e.stopPropagation(); moveSubtask(-1); }} disabled={subIdx === 0} className="disabled:opacity-20 text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400 transition-colors">
+                        <button aria-label={`Move ${sub.title} up`} type="button" onClick={(e) => { e.stopPropagation(); moveSubtask(-1); }} disabled={subIdx === 0} className="disabled:opacity-20 text-ink-300 dark:text-ink-600 hover:text-ink-500 dark:hover:text-ink-400 transition-colors">
                           <ArrowUp className="w-3 h-3" />
                         </button>
-                        <button aria-label={`Move ${sub.title} down`} type="button" onClick={(e) => { e.stopPropagation(); moveSubtask(1); }} disabled={subIdx === subtasks.length - 1} className="disabled:opacity-20 text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400 transition-colors">
+                        <button aria-label={`Move ${sub.title} down`} type="button" onClick={(e) => { e.stopPropagation(); moveSubtask(1); }} disabled={subIdx === subtasks.length - 1} className="disabled:opacity-20 text-ink-300 dark:text-ink-600 hover:text-ink-500 dark:hover:text-ink-400 transition-colors">
                           <ArrowDown className="w-3 h-3" />
                         </button>
                       </div>
@@ -187,16 +187,16 @@ export default function SubtaskList({
                       onClick={(e) => e.stopPropagation()}
                       onCheckedChange={() => onToggleDone(sub)}
                     />
-                    <span className={cn("text-xs font-medium text-slate-900 dark:text-slate-100 flex-1 truncate", sub.status === "done" && "line-through text-slate-400 dark:text-slate-500")}>
+                    <span className={cn("text-xs font-medium text-ink-900 dark:text-ink-100 flex-1 truncate", sub.status === "done" && "line-through text-ink-400 dark:text-ink-500")}>
                       {sub.title}
                     </span>
                     {sub.due_date && (
-                      <span className={cn("text-[10px] shrink-0", subOverdue ? "text-red-400" : "text-slate-400 dark:text-slate-500")}>
+                      <span className={cn("text-[10px] shrink-0", subOverdue ? "text-red-400" : "text-ink-400 dark:text-ink-500")}>
                         {format(new Date(sub.due_date + "T00:00:00"), "MMM d")}{sub.task_time ? `, ${sub.task_time}` : ""}
                       </span>
                     )}
                     <button aria-label={`Delete subtask ${sub.title}`}
-                      className="opacity-0 group-hover/sub:opacity-100 text-slate-400 dark:text-slate-500 hover:text-red-400 dark:hover:text-red-300 transition-colors"
+                      className="opacity-0 group-hover/sub:opacity-100 text-ink-400 dark:text-ink-500 hover:text-red-400 dark:hover:text-red-300 transition-colors"
                       onClick={(e) => { e.stopPropagation(); if (wasSwipe()) return; onDelete(sub); }}
                     >
                       <X className="w-3 h-3" />
@@ -208,7 +208,7 @@ export default function SubtaskList({
               {onAddSubtask && (
                 <button
                   onClick={() => onAddSubtask(task)}
-                  className="text-[10px] text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 flex items-center gap-1 mt-1 transition-colors"
+                  className="text-[10px] text-ink-400 dark:text-ink-500 hover:text-ink-600 dark:hover:text-ink-300 flex items-center gap-1 mt-1 transition-colors"
                 >
                   <Plus className="w-3 h-3" /> Add subtask
                 </button>

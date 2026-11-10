@@ -59,7 +59,7 @@ function TimedDropZone({ dateStr, children }) {
   return (
     <div
       ref={setNodeRef}
-      className={cn("relative", isOver && "bg-blue-50 dark:bg-[#101f34]")}
+      className={cn("relative", isOver && "bg-blue-50 dark:bg-night-info")}
       style={{ height: HOURS.length * HOUR_HEIGHT }}
     >
       {children}
@@ -85,9 +85,9 @@ function AllDayOverlayCell({ dateStr, allDayTasks, priorities, onTaskClick, onTo
       {...createHandlers}
       data-testid={`calendar-allday-${dateStr}`}
       className={cn(
-        "flex-1 min-w-0 border-l border-slate-100 dark:border-[#303030] p-1 space-y-0.5",
+        "flex-1 min-w-0 border-l border-ink-100 dark:border-night-line p-1 space-y-0.5",
         collapsed && "overflow-hidden",
-        isOver && "bg-blue-50 dark:bg-[#101f34]"
+        isOver && "bg-blue-50 dark:bg-night-info"
       )}
     >
       {visible.map((task) => (
@@ -107,7 +107,7 @@ function AllDayOverlayCell({ dateStr, allDayTasks, priorities, onTaskClick, onTo
             e.stopPropagation();
             onExpand?.();
           }}
-          className="h-5 w-full rounded border border-slate-200 dark:border-[#343434] bg-slate-50 dark:bg-[#161616] truncate px-1.5 text-left text-[10px] font-semibold leading-5 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222222] transition-colors"
+          className="h-5 w-full rounded border border-ink-200 dark:border-night-line-strong bg-ink-50 dark:bg-night-raised truncate px-1.5 text-left text-[10px] font-semibold leading-5 text-ink-700 dark:text-ink-200 hover:bg-ink-100 dark:hover:bg-night-high transition-colors"
           title={`Show ${hiddenCount} more all-day task${hiddenCount === 1 ? "" : "s"}`}
         >
           {hiddenCount} more
@@ -139,19 +139,19 @@ function MobileAllDayOverlay({
     8;
 
   return (
-    <div className="sticky top-0 z-30 bg-white dark:bg-[#0c0c0c] border-b border-slate-100 dark:border-[#303030]">
+    <div className="sticky top-0 z-30 bg-white dark:bg-night-sunken border-b border-ink-100 dark:border-night-line">
       <div className="flex" style={{ height }}>
         {/* No border-r: the cell beside it already draws a border-l, and
             the two together rendered this rule 2px thick — a pixel heavier
             than the week tab's. */}
-        <div className="w-12 shrink-0 bg-white dark:bg-[#0c0c0c] flex items-start justify-center pt-1">
+        <div className="w-12 shrink-0 bg-white dark:bg-night-sunken flex items-start justify-center pt-1">
           {/* Only offer the toggle when collapsing actually hides
               something — an arrow that expands nothing is a dead control. */}
           {collapsible && (
             <button
               type="button"
               onClick={onToggleCollapsed}
-              className="inline-flex h-6 w-6 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-[#222222] dark:hover:text-slate-200"
+              className="inline-flex h-6 w-6 items-center justify-center rounded-md text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-700 dark:text-ink-500 dark:hover:bg-night-high dark:hover:text-ink-200"
               aria-label={collapsed ? "Expand all-day" : "Collapse all-day"}
             >
               {collapsed ? (
@@ -189,22 +189,22 @@ function AllDayColumn({ dateStr, allDayTasks, priorities, onTaskClick, onToggleD
       {...createHandlers}
       data-testid={`calendar-allday-${dateStr}`}
       className={cn(
-        "border border-slate-100 dark:border-[#303030] rounded-lg bg-white dark:bg-[#0c0c0c] p-2 h-full",
-        isOver && "bg-blue-50 dark:bg-[#101f34]"
+        "border border-ink-100 dark:border-night-line rounded-lg bg-white dark:bg-night-sunken p-2 h-full",
+        isOver && "bg-blue-50 dark:bg-night-info"
       )}
     >
-      <h3 className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-2">All day</h3>
+      <h3 className="text-xs font-semibold text-ink-700 dark:text-ink-200 mb-2">All day</h3>
       {allDayTasks.length === 0 ? null : (
         <div
           className={cn(
             "space-y-1 overflow-y-auto",
             "[&::-webkit-scrollbar]:w-1",
             "[&::-webkit-scrollbar-track]:bg-transparent",
-            "[&::-webkit-scrollbar-thumb]:bg-slate-200",
-            "dark:[&::-webkit-scrollbar-thumb]:bg-slate-700",
+            "[&::-webkit-scrollbar-thumb]:bg-ink-200",
+            "dark:[&::-webkit-scrollbar-thumb]:bg-ink-700",
             "[&::-webkit-scrollbar-thumb]:rounded-full",
-            "[&::-webkit-scrollbar-thumb:hover]:bg-slate-300",
-            "dark:[&::-webkit-scrollbar-thumb:hover]:bg-slate-600",
+            "[&::-webkit-scrollbar-thumb:hover]:bg-ink-300",
+            "dark:[&::-webkit-scrollbar-thumb:hover]:bg-ink-600",
           )}
           style={{ maxHeight: "calc(70vh - 2.5rem)" }}
         >
@@ -322,7 +322,7 @@ export default function DayView({
       {/* Timed column */}
       <div
         ref={timedScrollRef}
-        className="flex-1 min-w-0 relative border border-slate-100 dark:border-[#303030] rounded-lg bg-white dark:bg-[#0c0c0c] overflow-y-auto max-h-[70vh]"
+        className="flex-1 min-w-0 relative border border-ink-100 dark:border-night-line rounded-lg bg-white dark:bg-night-sunken overflow-y-auto max-h-[70vh]"
       >
         {!useSideAllDay && (
           <MobileAllDayOverlay
@@ -341,20 +341,20 @@ export default function DayView({
           {/* The vertical rule sits at the gutter's edge, lining up with
               the one MobileAllDayOverlay already draws beside its expand
               arrow, so the grid reads as one column either way. */}
-          <div className="absolute left-12 top-0 bottom-0 w-px bg-slate-100 dark:bg-[#303030] pointer-events-none" />
+          <div className="absolute left-12 top-0 bottom-0 w-px bg-ink-100 dark:bg-night-line pointer-events-none" />
 
           {HOURS.map((h) => (
             <div key={h}>
               {/* Label centred on the line, right-aligned so the gap to
                   the grid is the same for "1 AM" and "12 PM". */}
               <div
-                className="absolute left-0 w-12 -translate-y-1/2 pr-2 text-right text-[10px] text-slate-400 dark:text-slate-500 select-none"
+                className="absolute left-0 w-12 -translate-y-1/2 pr-2 text-right text-[10px] text-ink-400 dark:text-ink-500 select-none"
                 style={{ top: h * HOUR_HEIGHT }}
               >
                 {formatHour(h)}
               </div>
               <div
-                className="absolute left-12 right-0 border-t border-slate-100 dark:border-[#303030]"
+                className="absolute left-12 right-0 border-t border-ink-100 dark:border-night-line"
                 style={{ top: h * HOUR_HEIGHT }}
               />
             </div>

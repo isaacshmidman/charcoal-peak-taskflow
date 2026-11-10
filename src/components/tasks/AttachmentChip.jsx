@@ -100,7 +100,7 @@ export default function AttachmentChip({
       // chip instead of forcing the chip (and the whole TaskForm dialog)
       // to grow horizontally. relative + overflow-hidden so the progress
       // bar can pin to the bottom edge inside the rounded corners.
-      "relative overflow-hidden flex items-center gap-2.5 w-full min-w-0 bg-white dark:bg-[#0c0c0c] border border-slate-200 dark:border-[#343434] rounded-lg px-2.5 py-2 group/att",
+      "relative overflow-hidden flex items-center gap-2.5 w-full min-w-0 bg-white dark:bg-night-sunken border border-ink-200 dark:border-night-line-strong rounded-lg px-2.5 py-2 group/att",
       uploadError && "border-red-300 dark:border-red-900"
     )}>
       {/* Thumbnail or icon */}
@@ -110,7 +110,7 @@ export default function AttachmentChip({
           aria-label={attachment ? `Preview ${attachment.filename}` : "Uploading attachment"}
           onClick={() => attachment && onPreview && onPreview(attachment)}
           disabled={!attachment}
-          className="shrink-0 w-10 h-10 rounded-md overflow-hidden bg-slate-100 dark:bg-[#161616] border border-slate-200 dark:border-[#343434] disabled:cursor-default"
+          className="shrink-0 w-10 h-10 rounded-md overflow-hidden bg-ink-100 dark:bg-night-raised border border-ink-200 dark:border-night-line-strong disabled:cursor-default"
           title={attachment ? "Preview" : undefined}
         >
           <img
@@ -121,12 +121,12 @@ export default function AttachmentChip({
           />
         </button>
       ) : (
-        <div className="shrink-0 w-10 h-10 rounded-md flex items-center justify-center bg-slate-100 dark:bg-[#161616] border border-slate-200 dark:border-[#343434]">
+        <div className="shrink-0 w-10 h-10 rounded-md flex items-center justify-center bg-ink-100 dark:bg-night-raised border border-ink-200 dark:border-night-line-strong">
           {isImage && thumbError
-            ? <ImageOff className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+            ? <ImageOff className="w-4 h-4 text-ink-400 dark:text-ink-500" />
             : isImage
-              ? <ImageIcon className="w-4 h-4 text-slate-500 dark:text-slate-400" />
-              : <FileText className="w-4 h-4 text-slate-500 dark:text-slate-400" />}
+              ? <ImageIcon className="w-4 h-4 text-ink-500 dark:text-ink-400" />
+              : <FileText className="w-4 h-4 text-ink-500 dark:text-ink-400" />}
         </div>
       )}
 
@@ -137,7 +137,7 @@ export default function AttachmentChip({
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); if (onPreview) onPreview(attachment); }}
-              className="block w-full text-left text-sm font-medium text-slate-900 dark:text-slate-100 hover:underline truncate"
+              className="block w-full text-left text-sm font-medium text-ink-900 dark:text-ink-100 hover:underline truncate"
               title={`Preview ${filename}`}
             >
               {filename}
@@ -147,7 +147,7 @@ export default function AttachmentChip({
               href={apiClient.attachments.urlFor(attachment.id)}
               target="_blank"
               rel="noopener noreferrer"
-              className="block text-sm font-medium text-slate-900 dark:text-slate-100 hover:underline truncate"
+              className="block text-sm font-medium text-ink-900 dark:text-ink-100 hover:underline truncate"
               title={`Open ${filename}`}
               onClick={(e) => e.stopPropagation()}
             >
@@ -155,23 +155,23 @@ export default function AttachmentChip({
             </a>
           )
         ) : (
-          <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate" title={filename}>
+          <p className="text-sm font-medium text-ink-900 dark:text-ink-100 truncate" title={filename}>
             {filename}
           </p>
         )}
-        <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 truncate">{statusText}</p>
+        <p className="text-[11px] text-ink-400 dark:text-ink-500 mt-0.5 truncate">{statusText}</p>
       </div>
 
       {/* Right-side actions */}
       <div className="flex items-center gap-1 shrink-0">
         {offlineQueued && (
-          <CloudOff className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+          <CloudOff className="w-4 h-4 text-ink-400 dark:text-ink-500" />
         )}
         {uploadError && onRetry && (
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onRetry(); }}
-            className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors p-1 -m-1 rounded"
+            className="text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-ink-100 transition-colors p-1 -m-1 rounded"
             aria-label="Retry upload"
             title="Retry"
           >
@@ -179,7 +179,7 @@ export default function AttachmentChip({
           </button>
         )}
         {uploading && !uploadError && !offlineQueued && (
-          <Loader2 className="w-4 h-4 text-slate-400 dark:text-slate-500 animate-spin" />
+          <Loader2 className="w-4 h-4 text-ink-400 dark:text-ink-500 animate-spin" />
         )}
         {attachment?.id && !uploading && (
           <button
@@ -189,7 +189,7 @@ export default function AttachmentChip({
               e.preventDefault();
               triggerDownload(attachment);
             }}
-            className="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition-colors p-1 -m-1 rounded"
+            className="text-ink-400 dark:text-ink-500 hover:text-ink-700 dark:hover:text-ink-200 transition-colors p-1 -m-1 rounded"
             aria-label={`Download ${filename}`}
             title="Download"
           >
@@ -200,7 +200,7 @@ export default function AttachmentChip({
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onDelete(); }}
-            className="text-slate-300 dark:text-slate-600 hover:text-red-400 dark:hover:text-red-300 transition-colors p-1 -m-1 rounded opacity-60 group-hover/att:opacity-100 focus:opacity-100"
+            className="text-ink-300 dark:text-ink-600 hover:text-red-400 dark:hover:text-red-300 transition-colors p-1 -m-1 rounded opacity-60 group-hover/att:opacity-100 focus:opacity-100"
             aria-label={`Remove ${filename}`}
             title="Remove"
           >
@@ -213,9 +213,9 @@ export default function AttachmentChip({
           chip's rounded corners. Determinate width tracks bytes sent;
           while queued (progress null) it shows a thin sliver. */}
       {hasBar && (
-        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-100 dark:bg-[#222222]">
+        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-ink-100 dark:bg-night-high">
           <div
-            className="h-full bg-slate-900 dark:bg-slate-100 transition-[width] duration-200 ease-out"
+            className="h-full bg-primary transition-[width] duration-200 ease-out"
             style={{ width: barWidth }}
           />
         </div>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { KeyRound, Mail } from "lucide-react";
+import Logo from "@/components/Logo";
 import { apiClient } from "@/api/apiClient";
 import { useAuth } from "@/lib/AuthContext";
 import { safeInAppPath, sanitizeNavRoute } from "@/lib/navigation";
@@ -112,21 +113,17 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="w-full max-w-md rounded-[28px] border border-slate-200/80 dark:border-[#343434] bg-white/95 dark:bg-[#111111] backdrop-blur dark:backdrop-blur-none p-8 shadow-[0_24px_80px_rgba(15,23,42,0.08)] dark:shadow-[0_24px_80px_rgba(0,0,0,0.5)]">
-        <div className="flex items-center gap-2.5 mb-6">
-          <img
-            src="/zephyrly-logo.png"
-            alt="Zephyrly"
-            className="w-10 h-10 rounded-xl object-cover"
-          />
-          <span className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+      <div className="w-full max-w-md rounded-[20px] border border-border-hairline bg-surface-card p-7 sm:p-8 shadow-hero">
+        <div className="flex items-center gap-2.5 mb-7">
+          <Logo size={34} />
+          <span className="text-xl font-semibold tracking-tight text-ink-900 dark:text-ink-100">
             Zephyrly
           </span>
         </div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 leading-snug">
+        <h1 className="text-[1.625rem] font-semibold tracking-tight text-ink-900 dark:text-ink-100 leading-[1.2]">
           Your work doesn't stop when you close the app. Neither do we.
         </h1>
-        <p className="mt-3 text-sm leading-6 text-slate-500 dark:text-slate-400">
+        <p className="mt-2.5 text-sm leading-6 text-ink-500 dark:text-ink-400">
           Sign in to pick up where you left off.
         </p>
 
@@ -134,32 +131,32 @@ export default function Login() {
           <>
             <form className="mt-6 space-y-3" onSubmit={handleEmailPasswordSignIn}>
               <label className="block">
-                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Email</span>
-                <div className="mt-1 flex items-center gap-3 rounded-2xl border border-slate-200 dark:border-[#343434] bg-white dark:bg-[#161616] px-4 h-12">
-                  <Mail className="w-4 h-4 text-slate-400 dark:text-slate-500 shrink-0" />
+                <span className="text-xs font-medium text-ink-500 dark:text-ink-400">Email</span>
+                <div className="mt-1.5 flex items-center gap-3 rounded-xl border border-border-strong bg-surface-card dark:bg-night-sunken px-3.5 h-11 transition-[border-color,box-shadow] focus-within:border-ink-900 focus-within:ring-[3px] focus-within:ring-ink-900/10 dark:focus-within:border-sun-400 dark:focus-within:ring-sun-400/20">
+                  <Mail className="w-4 h-4 text-ink-400 dark:text-ink-500 shrink-0" />
                   <input
                     data-testid="login-email"
                     type="text"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
                     placeholder="Enter any email"
-                    className="w-full bg-transparent text-base md:text-sm text-slate-900 dark:text-slate-100 outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                    className="w-full bg-transparent text-base md:text-sm text-ink-900 dark:text-ink-100 outline-none placeholder:text-ink-400 dark:placeholder:text-ink-500"
                     autoComplete="username"
                   />
                 </div>
               </label>
 
               <label className="block">
-                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Password</span>
-                <div className="mt-1 flex items-center gap-3 rounded-2xl border border-slate-200 dark:border-[#343434] bg-white dark:bg-[#161616] px-4 h-12">
-                  <KeyRound className="w-4 h-4 text-slate-400 dark:text-slate-500 shrink-0" />
+                <span className="text-xs font-medium text-ink-500 dark:text-ink-400">Password</span>
+                <div className="mt-1.5 flex items-center gap-3 rounded-xl border border-border-strong bg-surface-card dark:bg-night-sunken px-3.5 h-11 transition-[border-color,box-shadow] focus-within:border-ink-900 focus-within:ring-[3px] focus-within:ring-ink-900/10 dark:focus-within:border-sun-400 dark:focus-within:ring-sun-400/20">
+                  <KeyRound className="w-4 h-4 text-ink-400 dark:text-ink-500 shrink-0" />
                   <input
                     data-testid="login-password"
                     type="password"
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
                     placeholder="Enter any password"
-                    className="w-full bg-transparent text-base md:text-sm text-slate-900 dark:text-slate-100 outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                    className="w-full bg-transparent text-base md:text-sm text-ink-900 dark:text-ink-100 outline-none placeholder:text-ink-400 dark:placeholder:text-ink-500"
                     autoComplete="current-password"
                   />
                 </div>
@@ -171,16 +168,16 @@ export default function Login() {
                 type="submit"
                 data-testid="login-submit"
                 disabled={isLoadingAuth}
-                className="w-full h-12 rounded-2xl bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 text-sm font-medium hover:bg-slate-800 dark:hover:bg-slate-200 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center"
+                className="w-full h-11 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-[var(--primary-hover)] transition-colors disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center"
               >
                 <span>{isLoadingAuth ? "Signing in..." : "Sign In"}</span>
               </button>
             </form>
 
-            <div className="mt-5 flex items-center gap-3 text-xs text-slate-400 dark:text-slate-500">
-              <div className="h-px flex-1 bg-slate-200 dark:bg-[#222222]" />
+            <div className="mt-5 flex items-center gap-3 text-xs text-ink-400 dark:text-ink-500">
+              <div className="h-px flex-1 bg-[var(--border-hairline)]" />
               <span>or</span>
-              <div className="h-px flex-1 bg-slate-200 dark:bg-[#222222]" />
+              <div className="h-px flex-1 bg-[var(--border-hairline)]" />
             </div>
           </>
         ) : (
@@ -190,7 +187,7 @@ export default function Login() {
         <button
           onClick={handleGoogleSignIn}
           disabled={!googleEnabled}
-          className={`${emailPasswordEnabled ? "mt-5" : "mt-6"} w-full h-12 rounded-2xl border border-slate-200 dark:border-[#343434] bg-white dark:bg-[#161616] text-slate-900 dark:text-slate-100 text-sm font-medium hover:bg-slate-50 dark:hover:bg-[#222222] inline-flex items-center justify-center gap-3 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed`}
+          className={`${emailPasswordEnabled ? "mt-5" : "mt-6"} w-full h-11 rounded-xl border border-border-strong bg-surface-card text-ink-900 dark:text-ink-100 text-sm font-medium hover:bg-surface-muted transition-colors inline-flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed`}
         >
           <svg viewBox="0 0 24 24" className="w-5 h-5" aria-hidden="true">
             <path fill="#EA4335" d="M12 10.2v3.9h5.4c-.2 1.3-1.7 3.9-5.4 3.9-3.2 0-5.8-2.7-5.8-6s2.6-6 5.8-6c1.8 0 3 .8 3.7 1.5l2.5-2.4C16.6 3.6 14.5 2.7 12 2.7 6.9 2.7 2.8 6.9 2.8 12s4.1 9.3 9.2 9.3c5.3 0 8.8-3.7 8.8-8.9 0-.6-.1-1-.1-1.4H12Z" />
@@ -201,8 +198,8 @@ export default function Login() {
           <span>Sign In with Google</span>
         </button>
 
-        <div className="mt-5 rounded-2xl bg-slate-50 dark:bg-[#161616] border border-slate-200 dark:border-[#343434] px-4 py-3">
-          <p className="text-xs text-slate-500 dark:text-slate-400 leading-5">
+        <div className="mt-4">
+          <p className="text-xs text-ink-500 dark:text-ink-400 leading-5 text-center">
             {googleEnabled
               ? "Google sign-in will bring you right back to this app automatically."
               : isOffline
@@ -215,12 +212,12 @@ export default function Login() {
           </p>
         </div>
 
-        <p className="mt-5 text-center text-xs text-slate-400 dark:text-slate-500">
-          <Link to="/terms" className="underline underline-offset-2 hover:text-slate-600 dark:hover:text-slate-300">
+        <p className="mt-5 text-center text-xs text-ink-400 dark:text-ink-500">
+          <Link to="/terms" className="underline underline-offset-2 hover:text-ink-600 dark:hover:text-ink-300">
             Terms
           </Link>
           {" · "}
-          <Link to="/privacy" className="underline underline-offset-2 hover:text-slate-600 dark:hover:text-slate-300">
+          <Link to="/privacy" className="underline underline-offset-2 hover:text-ink-600 dark:hover:text-ink-300">
             Privacy
           </Link>
         </p>

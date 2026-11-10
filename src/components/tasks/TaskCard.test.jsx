@@ -49,7 +49,7 @@ describe("TaskCard", () => {
     fireEvent.click(toggle);
 
     expect(onToggleDone).toHaveBeenCalledWith(expect.objectContaining({ id: "series-1" }));
-    expect(toggle.className).toContain("bg-slate-900");
+    expect(toggle.className).toContain("bg-sun-400");
 
     rerender(
       <TaskCard
@@ -63,14 +63,14 @@ describe("TaskCard", () => {
       />
     );
 
-    // Tokenize so a `dark:bg-[#0c0c0c]` (the legitimate dark-mode
+    // Tokenize so a `dark:bg-night-sunken` (the legitimate dark-mode
     // equivalent of bg-white/80 on the unchecked checkbox) doesn't trip
     // a substring match. We're asserting the toggle isn't in its filled
-    // "checked" state — that state uses the bare `bg-slate-900` class.
+    // "checked" state — that state uses the bare `bg-sun-400` class.
     const toggleClassTokens = screen
       .getByTestId("task-toggle-series-1")
       .className.split(/\s+/);
-    expect(toggleClassTokens).not.toContain("bg-slate-900");
+    expect(toggleClassTokens).not.toContain("bg-sun-400");
   });
 
   it("marks a task that has a description, previewing it on hover", () => {

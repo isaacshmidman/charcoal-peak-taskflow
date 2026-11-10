@@ -107,7 +107,7 @@ export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubm
     >
       <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto" onOpenAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader>
-          <DialogTitle className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+          <DialogTitle className="text-sm font-semibold text-ink-900 dark:text-ink-100">
             {isEditMode ? "Edit Subtask" : "Add Subtask"}
           </DialogTitle>
         </DialogHeader>
@@ -136,7 +136,7 @@ export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubm
           >
             <Suspense
               fallback={
-                <div className="min-h-[5rem] rounded-md border border-slate-200 dark:border-[#343434] bg-white dark:bg-[#0c0c0c] px-3 py-2 text-sm text-slate-400 dark:text-slate-500">
+                <div className="min-h-[5rem] rounded-md border border-ink-200 dark:border-night-line-strong bg-white dark:bg-night-sunken px-3 py-2 text-sm text-ink-400 dark:text-ink-500">
                   Loading editor…
                 </div>
               }
@@ -154,11 +154,11 @@ export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubm
           <div className="space-y-2">
             <div className="flex items-end gap-3">
               <div className="flex-1">
-                <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-1.5 block">Date</Label>
+                <Label className="text-xs font-semibold text-ink-900 dark:text-ink-100 mb-1.5 block">Date</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="w-full justify-start h-9 text-sm font-normal">
-                      <CalendarIcon className="w-4 h-4 mr-2 text-slate-400 dark:text-slate-500" />
+                      <CalendarIcon className="w-4 h-4 mr-2 text-ink-400 dark:text-ink-500" />
                       {form.due_date ? format(fromDateStr(form.due_date), "PPP") : "No date"}
                     </Button>
                   </PopoverTrigger>
@@ -183,16 +183,16 @@ export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubm
 
               {form.due_date && (
                 <div className="flex flex-col items-center gap-1 pb-0.5">
-                  <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100">Set time</Label>
+                  <Label className="text-xs font-semibold text-ink-900 dark:text-ink-100">Set time</Label>
                   <button
                     type="button"
                     role="switch"
                     aria-checked={!!form.task_time}
                     aria-label="Set time"
                     onClick={() => setForm({ ...form, task_time: form.task_time ? "" : "9:00AM" })}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${form.task_time ? "bg-slate-900 dark:bg-slate-100" : "bg-slate-200 dark:bg-[#222222]"}`}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${form.task_time ? "bg-ink-900 dark:bg-sun-400" : "bg-ink-300 dark:bg-night-line-bold"}`}
                   >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white dark:bg-slate-900 shadow transition-transform duration-200 ${form.task_time ? "translate-x-6" : "translate-x-1"}`} />
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white dark:bg-ink-950 transition-transform duration-200 ${form.task_time ? "translate-x-6" : "translate-x-1"}`} />
                   </button>
                 </div>
               )}
@@ -207,7 +207,7 @@ export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubm
             <div>
               {task && onDelete && (
                 <Button aria-label="Delete subtask" type="button" variant="ghost" size="icon"
-                  className="text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-[#2a1116]"
+                  className="text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-night-danger"
                   onClick={() => { onDelete(task); onOpenChange(false); }}>
                   <Trash2 className="w-4 h-4" />
                 </Button>
@@ -220,7 +220,7 @@ export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubm
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} data-testid="subtask-form-cancel">
                 Cancel
               </Button>
-              <Button type="button" disabled={!isValid} onClick={commitAndClose} className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200">
+              <Button type="button" disabled={!isValid} onClick={commitAndClose} className="bg-primary hover:bg-[var(--primary-hover)] text-primary-foreground">
                 {isEditMode ? "Save Changes" : "Create Subtask"}
               </Button>
             </div>
@@ -267,10 +267,10 @@ function TimeInput({ value, onChange }) {
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-3 py-1.5 border border-border-strong rounded-lg bg-surface-card text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#222222] transition-colors"
+        className="w-full flex items-center justify-between px-3 py-1.5 border border-border-strong rounded-lg bg-surface-card text-sm text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-night-high transition-colors"
       >
         {value}
-        <svg className={cn("w-3.5 h-3.5 text-slate-400 dark:text-slate-500 transition-transform", open && "rotate-180")} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className={cn("w-3.5 h-3.5 text-ink-400 dark:text-ink-500 transition-transform", open && "rotate-180")} fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
@@ -287,7 +287,7 @@ function TimeInput({ value, onChange }) {
                 onClick={() => { onChange(slot); setOpen(false); }}
                 className={cn(
                   "w-full text-left px-3 py-1.5 text-base md:text-sm transition-colors",
-                  isSelected ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 font-medium" : "text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#222222]"
+                  isSelected ? "bg-primary text-primary-foreground font-medium" : "text-ink-700 dark:text-ink-200 hover:bg-ink-50 dark:hover:bg-night-high"
                 )}
                 >
                 {slot}

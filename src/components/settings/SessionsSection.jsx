@@ -79,14 +79,14 @@ export default function SessionsSection() {
   };
 
   if (!online) {
-    return <p className="text-xs text-slate-500 dark:text-slate-400">Signed-in devices need a connection.</p>;
+    return <p className="text-xs text-ink-500 dark:text-ink-400">Signed-in devices need a connection.</p>;
   }
 
   const others = (sessions || []).filter((s) => !s.current);
 
   return (
     <div className="space-y-4" data-testid="sessions-section">
-      <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">
+      <p className="text-xs leading-5 text-ink-500 dark:text-ink-400">
         Everywhere your account is signed in. If you don’t recognise one, sign it out: it has to sign in with Google again to
         get back in.
       </p>
@@ -96,24 +96,24 @@ export default function SessionsSection() {
         </p>
       )}
       {sessions === null && !error ? (
-        <p className="text-xs text-slate-400 dark:text-slate-500">Loading…</p>
+        <p className="text-xs text-ink-400 dark:text-ink-500">Loading…</p>
       ) : (
-        <Card className="divide-y divide-slate-100 dark:divide-[#303030]">
+        <Card className="divide-y divide-ink-100 dark:divide-night-line">
           {(sessions || []).map((session) => {
             const Icon = /iPhone|Android|iPad/.test(session.device) ? Smartphone : Laptop;
             return (
               <div key={session.id} className="flex items-center gap-3 px-4 py-3" data-testid="session-row">
-                <Icon className="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" />
+                <Icon className="h-4 w-4 shrink-0 text-ink-400 dark:text-ink-500" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                  <p className="text-sm font-medium text-ink-900 dark:text-ink-100">
                     {session.device}
                     {session.current && (
-                      <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-[#1f1f1f] dark:text-slate-300">
+                      <span className="ml-2 rounded bg-ink-100 px-1.5 py-0.5 text-[10px] font-medium text-ink-600 dark:bg-night-raised dark:text-ink-300">
                         This device
                       </span>
                     )}
                   </p>
-                  <p className="truncate text-xs text-slate-400 dark:text-slate-500">
+                  <p className="truncate text-xs text-ink-400 dark:text-ink-500">
                     {session.current ? "Active now" : activeLabel(session.last_active_at)} · Signed in {signedInOn(session.signed_in_at)}
                     {session.ip_address ? ` · ${session.ip_address}` : ""}
                   </p>

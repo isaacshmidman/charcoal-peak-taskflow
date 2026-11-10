@@ -9,7 +9,6 @@ import { useDeletedTasks } from "@/hooks/useDeletedTasks";
 import { useOfflineMutation } from "@/hooks/useOfflineMutation";
 import { buildCompletedItems, buildCompletedTaskItem, sortCompletedItems } from "@/lib/completedItems";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { AnimatedSearchInput } from "@/components/ui/animated-search-input";
 import { showDeleteToast } from "@/components/tasks/DeleteToast";
 import {
@@ -169,8 +168,8 @@ export default function Completed() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-base font-semibold text-slate-900 dark:text-slate-100">Completed</h1>
-          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{completedItems.length} task{completedItems.length !== 1 ? "s" : ""}</p>
+          <h1 className="ds-page-title">Completed</h1>
+          <p className="ds-page-sub">{completedItems.length} task{completedItems.length !== 1 ? "s" : ""}</p>
         </div>
         <div className="flex items-center gap-2">
           <AnimatedSearchInput
@@ -183,7 +182,7 @@ export default function Completed() {
             variant="ghost"
             size="icon"
             data-search-toggle
-            className="h-9 w-9 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
+            className="h-9 w-9 text-ink-400 dark:text-ink-500 hover:text-ink-700 dark:hover:text-ink-200"
             onMouseDown={(event) => { if (showSearch) event.preventDefault(); }}
             onClick={() => { if (showSearch) setSearch(""); setShowSearch((v) => !v); }}
           >
@@ -195,7 +194,7 @@ export default function Completed() {
               <Button aria-label="Delete all completed"
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-[#2a1116]"
+                className="h-9 w-9 text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-night-danger"
                 title="Delete all completed"
                 onClick={() => setShowDeleteAllDialog(true)}
               >
@@ -216,7 +215,7 @@ export default function Completed() {
                   <button
                     type="button"
                     onClick={() => setShowDeleteAllDialog(false)}
-                    className="w-full h-12 rounded-xl bg-slate-100 dark:bg-[#161616] hover:bg-slate-200 dark:hover:bg-[#222222] text-slate-700 dark:text-slate-200 text-sm font-medium shadow-sm transition-colors"
+                    className="w-full h-12 rounded-xl bg-ink-100 dark:bg-night-raised hover:bg-ink-200 dark:hover:bg-night-high text-ink-700 dark:text-ink-200 text-sm font-medium shadow-sm transition-colors"
                   >
                     Cancel
                   </button>
@@ -228,15 +227,15 @@ export default function Completed() {
       </div>
 
       {isLoading ? (
-        <div className="space-y-2">
-          {[1, 2, 3].map((i) => <Card key={i} className="h-12 animate-pulse" />)}
+        <div className="ds-list">
+          {[1, 2, 3].map((i) => <div key={i} className="h-11 animate-pulse bg-surface-card" />)}
         </div>
       ) : completedItems.length === 0 ? (
         <div className="text-center py-14">
-          <p className="text-xs text-slate-400 dark:text-slate-500">Nothing finished yet. Completed tasks settle here.</p>
+          <p className="text-xs text-ink-400 dark:text-ink-500">Nothing finished yet. Completed tasks settle here.</p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="ds-list">
           <AnimatePresence mode="popLayout">
             {completedItems.map((item) => {
               return (

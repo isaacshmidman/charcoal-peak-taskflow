@@ -59,18 +59,18 @@ function FileResultRow({ att, onPreview, onOpenTask }) {
           type="button"
           aria-label={`Preview ${att.filename}`}
           onClick={() => onPreview(att)}
-          className="shrink-0 w-10 h-10 rounded-md overflow-hidden bg-slate-100 dark:bg-[#161616] border border-slate-200 dark:border-[#343434]"
+          className="shrink-0 w-10 h-10 rounded-md overflow-hidden bg-ink-100 dark:bg-night-raised border border-ink-200 dark:border-night-line-strong"
           title="Preview"
         >
           <img src={thumbUrl} alt="" className="w-full h-full object-cover" onError={() => setThumbError(true)} />
         </button>
       ) : (
-        <div className="shrink-0 w-10 h-10 rounded-md flex items-center justify-center bg-slate-100 dark:bg-[#161616] border border-slate-200 dark:border-[#343434]">
+        <div className="shrink-0 w-10 h-10 rounded-md flex items-center justify-center bg-ink-100 dark:bg-night-raised border border-ink-200 dark:border-night-line-strong">
           {isImage && thumbError
-            ? <ImageOff className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+            ? <ImageOff className="w-4 h-4 text-ink-400 dark:text-ink-500" />
             : isImage
-              ? <ImageIcon className="w-4 h-4 text-slate-500 dark:text-slate-400" />
-              : <FileText className="w-4 h-4 text-slate-500 dark:text-slate-400" />}
+              ? <ImageIcon className="w-4 h-4 text-ink-500 dark:text-ink-400" />
+              : <FileText className="w-4 h-4 text-ink-500 dark:text-ink-400" />}
         </div>
       )}
 
@@ -80,10 +80,10 @@ function FileResultRow({ att, onPreview, onOpenTask }) {
         className="flex-1 min-w-0 text-left"
         title={`Open “${att.task_title}”`}
       >
-        <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate hover:underline">
+        <p className="text-sm font-medium text-ink-900 dark:text-ink-100 truncate hover:underline">
           {att.filename}
         </p>
-        <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 truncate">
+        <p className="text-xs text-ink-400 dark:text-ink-500 mt-0.5 truncate">
           {att.task_title} · {formatSize(att.size_bytes)}
         </p>
       </button>
@@ -91,7 +91,7 @@ function FileResultRow({ att, onPreview, onOpenTask }) {
       <button
         type="button"
         onClick={download}
-        className="shrink-0 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition-colors p-1 -m-1 rounded"
+        className="shrink-0 text-ink-400 dark:text-ink-500 hover:text-ink-700 dark:hover:text-ink-200 transition-colors p-1 -m-1 rounded"
         aria-label={`Download ${att.filename}`}
         title="Download"
       >
@@ -134,7 +134,7 @@ export default function FilesSection() {
   return (
     <div className="space-y-3">
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500 pointer-events-none" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400 dark:text-ink-500 pointer-events-none" />
         <Input
           autoFocus
           value={rawQuery}
@@ -151,23 +151,23 @@ export default function FilesSection() {
       ) : (
         <>
           <div className="flex items-center gap-2">
-            <h2 className="text-xs font-semibold text-slate-500 dark:text-slate-400">{heading}</h2>
-            {isFetching && <Loader2 className="w-3 h-3 animate-spin text-slate-400 dark:text-slate-500" />}
+            <h2 className="text-xs font-semibold text-ink-500 dark:text-ink-400">{heading}</h2>
+            {isFetching && <Loader2 className="w-3 h-3 animate-spin text-ink-400 dark:text-ink-500" />}
           </div>
 
           {isLoading ? (
-            <div className="flex items-center gap-2 text-xs text-slate-400 dark:text-slate-500 px-1">
+            <div className="flex items-center gap-2 text-xs text-ink-400 dark:text-ink-500 px-1">
               <Loader2 className="w-4 h-4 animate-spin" />
               Loading…
             </div>
           ) : results.length === 0 ? (
-            <p className="text-xs text-slate-400 dark:text-slate-500 px-1">
+            <p className="text-xs text-ink-400 dark:text-ink-500 px-1">
               {debounced
                 ? "No files match that name."
                 : "No attachments yet. Drop a file into any task to see it here."}
             </p>
           ) : (
-            <ul className="rounded-xl border border-slate-100 dark:border-[#303030] bg-white dark:bg-[#111111] divide-y divide-slate-100 dark:divide-[#303030] overflow-hidden">
+            <ul className="rounded-xl border border-ink-100 dark:border-night-line bg-white dark:bg-night-card divide-y divide-ink-100 dark:divide-night-line overflow-hidden">
               {results.map((att) => (
                 <FileResultRow
                   key={att.id}

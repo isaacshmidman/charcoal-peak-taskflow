@@ -22,7 +22,7 @@ describe("Checkbox", () => {
 
     const box = screen.getByRole("checkbox");
     expect(box.getAttribute("aria-checked")).toBe("true");
-    expect(box.className).toContain("bg-slate-900");
+    expect(box.className).toContain("bg-sun-400");
     expect(box.querySelector("svg")).not.toBe(null);
 
     fireEvent.click(box);
@@ -68,7 +68,7 @@ describe("Checkbox", () => {
 
     rerender(<Checkbox checked={false} size="task" />);
     box = screen.getByRole("checkbox");
-    expect(box.className).toContain("w-7");
+    expect(box.className).toContain("w-6");
     expect(box.className).toContain("rounded-md");
   });
 

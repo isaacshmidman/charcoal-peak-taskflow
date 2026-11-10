@@ -11,10 +11,13 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Zephyrly" />
-    <meta name="theme-color" content="#f5f5a0" />
+    <meta name="theme-color" content="#fff5a6" />
     <meta name="color-scheme" content="light dark" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="manifest" href="/manifest.json" />
+    <!-- The typeface, fetched alongside the page rather than after the
+         stylesheet asks for it, so text doesn't start in a fallback and swap. -->
+    <link rel="preload" href="/fonts/hanken-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin />
     <title>Zephyrly</title>
     <!-- Apply the user's saved appearance BEFORE React mounts so the page
          doesn't flash light-then-dark (FOUC) on cold loads. Mirrors the
@@ -29,24 +32,23 @@
           if (dark) {
             document.documentElement.classList.add("dark");
             var theme = document.querySelector('meta[name="theme-color"]');
-            if (theme) theme.setAttribute("content", "#000000");
+            if (theme) theme.setAttribute("content", "#2e2a0e");
           }
         } catch (_) {}
       })();
     </script>
     <style>
-      /* Pre-CSS FOUC guard: paints the brand glow before any stylesheet
-         loads, so these MUST stay literal hex. Canonical values live in
-         --brand-bg-light / --brand-bg-dark (src/styles/zephyrly.css) —
-         keep the two in sync when the brand gradient changes. */
+      /* Paints the page wash before any stylesheet loads, so these MUST
+         stay literal hex. The real values are --wash-light / --wash-dark
+         in src/styles/zephyrly.css — change both together. */
       html {
         min-height: 100%;
-        background: radial-gradient(circle at 100% 100%, #f5f5a0 0%, #fdfdcf 12%, #ffffff 40%);
+        background: #fff5a6;
         color-scheme: light;
       }
 
       html.dark {
-        background: radial-gradient(circle at 100% 100%, #343422 0%, #1d1d14 16%, #0b0b08 38%, #000000 66%);
+        background: #2e2a0e;
         color-scheme: dark;
       }
 
@@ -57,7 +59,11 @@
 
       body {
         margin: 0;
-        background: transparent;
+        background: #fafaf7 linear-gradient(180deg, #fff5a6 0, #fffad8 110px, #fafaf7 300px) no-repeat fixed;
+      }
+
+      html.dark body {
+        background: #131311 linear-gradient(180deg, #2e2a0e 0, #1e1c10 110px, #131311 300px) no-repeat fixed;
       }
     </style>
   </head>

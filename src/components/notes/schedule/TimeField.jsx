@@ -274,7 +274,7 @@ export default function TimeField({ value, end = false, label, validate, onCommi
   const hourText = pending.part === "hour" ? pending.digit : String(parts.hour);
   const minuteText = pending.part === "minute" ? pending.digit : String(parts.minute).padStart(2, "0");
   const partClass =
-    "rounded-[3px] bg-transparent p-0 text-inherit caret-transparent outline-none selection:bg-transparent focus:bg-slate-200 focus:text-slate-900 dark:focus:bg-[#2c2c2c] dark:focus:text-slate-100";
+    "rounded-[3px] bg-transparent p-0 text-inherit caret-transparent outline-none selection:bg-transparent focus:bg-ink-200 focus:text-ink-900 dark:focus:bg-night-high dark:focus:text-ink-100";
   // The digits are 16px on phones (iOS zooms into any smaller field) and
   // 14px wider; AM/PM sits smaller beside them, like a clock.
   const digitClass = "text-base tabular-nums md:text-sm";

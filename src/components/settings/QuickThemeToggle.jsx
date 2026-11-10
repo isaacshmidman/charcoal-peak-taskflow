@@ -10,7 +10,6 @@
  */
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useTheme } from "@/lib/ThemeProvider";
-import { cn } from "@/lib/utils";
 
 const OPTIONS = [
   { value: "system", label: "System", Icon: Monitor },
@@ -26,12 +25,12 @@ export default function QuickThemeToggle() {
   return (
     <div className="flex items-center justify-between gap-3 px-4 py-3">
       <div className="flex items-center gap-3 min-w-0">
-        <LeadIcon className="w-5 h-5 text-slate-500 dark:text-slate-400 shrink-0" />
-        <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
+        <LeadIcon className="w-5 h-5 text-ink-500 dark:text-ink-400 shrink-0" />
+        <span className="text-sm font-medium text-ink-900 dark:text-ink-100">
           Appearance
         </span>
       </div>
-      <div className="inline-flex rounded-lg border border-slate-100 dark:border-[#303030] bg-slate-50 dark:bg-[#0c0c0c] p-0.5 shrink-0">
+      <div className="ds-seg shrink-0">
         {OPTIONS.map(({ value, label, Icon }) => (
           <button
             key={value}
@@ -40,12 +39,7 @@ export default function QuickThemeToggle() {
             title={label}
             aria-label={label}
             aria-pressed={appearance === value}
-            className={cn(
-              "inline-flex items-center justify-center w-9 h-7 rounded-md transition-colors",
-              appearance === value
-                ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-sm"
-                : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
-            )}
+            className="ds-seg-item w-9 h-7"
           >
             <Icon className="w-3.5 h-3.5" />
           </button>

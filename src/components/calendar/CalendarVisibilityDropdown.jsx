@@ -52,8 +52,8 @@ export default function CalendarVisibilityDropdown({ calendars, hidden, onChange
           variant="ghost"
           size="icon"
           className={cn(
-            "h-9 w-9 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200",
-            !allShown && "text-slate-700 dark:text-slate-200"
+            "h-9 w-9 text-ink-400 dark:text-ink-500 hover:text-ink-700 dark:hover:text-ink-200",
+            !allShown && "text-ink-700 dark:text-ink-200"
           )}
           title="Show / hide calendars"
           aria-label="Show / hide calendars"
@@ -62,27 +62,27 @@ export default function CalendarVisibilityDropdown({ calendars, hidden, onChange
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64 p-2">
-        <div className="flex items-center justify-between px-1.5 pb-1.5 border-b border-slate-100 dark:border-[#303030]">
-          <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">Calendars</span>
+        <div className="flex items-center justify-between px-1.5 pb-1.5 border-b border-ink-100 dark:border-night-line">
+          <span className="text-xs font-semibold text-ink-700 dark:text-ink-200">Calendars</span>
           <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={showAll}
-              className="text-[11px] text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 px-1.5 py-0.5 rounded hover:bg-slate-100 dark:hover:bg-[#222222]"
+              className="text-[11px] text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-ink-100 px-1.5 py-0.5 rounded hover:bg-ink-100 dark:hover:bg-night-high"
             >
               All
             </button>
             <button
               type="button"
               onClick={hideAll}
-              className="text-[11px] text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 px-1.5 py-0.5 rounded hover:bg-slate-100 dark:hover:bg-[#222222]"
+              className="text-[11px] text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-ink-100 px-1.5 py-0.5 rounded hover:bg-ink-100 dark:hover:bg-night-high"
             >
               None
             </button>
           </div>
         </div>
         {calendars.length === 0 ? (
-          <p className="text-xs text-slate-400 dark:text-slate-500 px-2 py-3 text-center">
+          <p className="text-xs text-ink-400 dark:text-ink-500 px-2 py-3 text-center">
             No calendars to filter.
           </p>
         ) : (
@@ -92,22 +92,22 @@ export default function CalendarVisibilityDropdown({ calendars, hidden, onChange
               return (
                 <li key={c.key}>
                   <label
-                    className="flex items-center gap-2 px-1.5 py-1.5 rounded hover:bg-slate-50 dark:hover:bg-[#222222] cursor-pointer"
+                    className="flex items-center gap-2 px-1.5 py-1.5 rounded hover:bg-ink-50 dark:hover:bg-night-high cursor-pointer"
                   >
                     <input
                       type="checkbox"
                       checked={!isHidden}
                       onChange={() => toggle(c.key)}
-                      className="h-3.5 w-3.5 accent-slate-700"
+                      className="h-3.5 w-3.5 accent-ink-700"
                     />
                     {c.color ? (
                       <span
-                        className="inline-block w-2.5 h-2.5 rounded-sm shrink-0 border border-slate-200 dark:border-[#343434]"
+                        className="inline-block w-2.5 h-2.5 rounded-sm shrink-0 border border-ink-200 dark:border-night-line-strong"
                         style={{ backgroundColor: c.color }}
                         aria-hidden
                       />
                     ) : null}
-                    <span className="text-xs text-slate-700 dark:text-slate-200 truncate flex-1 min-w-0">
+                    <span className="text-xs text-ink-700 dark:text-ink-200 truncate flex-1 min-w-0">
                       {c.label}
                     </span>
                   </label>

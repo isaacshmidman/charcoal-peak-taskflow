@@ -12,10 +12,10 @@ import { Button } from "@/components/ui/button";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { AlignLeft, Calendar, Paperclip, Trash2 } from "lucide-react";
+import { AlignLeft, Calendar, Paperclip, Repeat, Trash2 } from "lucide-react";
 import { format } from "date-fns/format";
 import { cn } from "@/lib/utils";
-import { colorBg, isDarkColor } from "@/lib/colors";
+import { colorCheck } from "@/lib/colors";
 import { fromDateStr, toDateStr } from "@/lib/dates";
 import TagsRow from "./TagsRow.jsx";
 import SubtaskList from "./SubtaskList.jsx";
@@ -91,8 +91,8 @@ const TaskCard = forwardRef(function TaskCard({
 
   const recurrenceLabel = buildRecurrenceShortLabel(task);
 
-  const cardBg = priority ? colorBg[priority.color] || colorBg.slate : "bg-surface-card border-border-hairline";
-  const isDarkCard = isDarkColor(priority?.color);
+  // Priority is the colour of the tick box; the row itself stays plain.
+  const checkTone = priority ? colorCheck[priority.color] || colorCheck.slate : undefined;
 
   // Overdue: has a due_date, not done, and date is in the past (before today)
   const isOverdue = !isDone && task.due_date && parseDateLocal(task.due_date) < new Date(new Date().setHours(0,0,0,0));
@@ -132,8 +132,8 @@ const TaskCard = forwardRef(function TaskCard({
       {swiping && Math.abs(swipeX) > 20 && (() => {
         return (
           <div className={cn(
-            "absolute inset-0 rounded-xl flex items-center px-5 pointer-events-none z-0 transition-colors duration-100",
-            willDelete ? "bg-red-500" : "bg-red-100 dark:bg-[#2a1116]",
+            "absolute inset-0 flex items-center px-5 pointer-events-none z-0 transition-colors duration-100",
+            willDelete ? "bg-red-500" : "bg-red-100 dark:bg-night-danger",
             swipeX > 0 ? "justify-start" : "justify-end"
           )}>
             <Trash2 className={cn("w-5 h-5 transition-colors duration-100", willDelete ? "text-white" : "text-red-400")} />
@@ -143,25 +143,26 @@ const TaskCard = forwardRef(function TaskCard({
       <div
         ref={cardRef}
         className={cn(
-          "group rounded-xl border transition-all hover:shadow-sm flex overflow-hidden relative z-10 select-none",
-          cardBg,
-          isDone && "opacity-55",
+          // A row in a .ds-list: the list draws the frame and the dividers.
+          "group bg-surface-card transition-colors hover:bg-ink-50 dark:hover:bg-night-raised flex overflow-hidden relative z-10 select-none",
+          isDone && "opacity-60",
           swiping ? "cursor-grabbing" : "cursor-grab"
         )}
         style={swiping ? { transform: `translateX(${swipeX}px)`, transition: "none" } : { transform: "translateX(0)", transition: "transform 0.2s ease" }}
       >
         {/* Overdue left bar — always reserve 4px so non-overdue and overdue rows align */}
-        <div className={cn("w-1 shrink-0 rounded-l-xl", isOverdue ? "bg-red-400" : "bg-transparent")} />
+        <div className={cn("w-[3px] shrink-0", isOverdue ? "bg-[var(--destructive-soft)]" : "bg-transparent")} />
 
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 px-3 py-2.5">
+          <div className="flex items-center gap-3 pl-3 pr-3 py-2">
             {/* Completion button — the origin of the DS ink-fill Checkbox,
                 now rendered through it. onClick's stopPropagation +
                 preventDefault run BEFORE the toggle (swipe-row hygiene,
                 composed by the primitive, never suppresses the check). */}
             <Checkbox
               size="task"
+              tone={checkTone}
               checked={isDone && !optimisticUndone}
               onPointerDown={(e) => { e.stopPropagation(); }}
               onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
@@ -176,8 +177,7 @@ const TaskCard = forwardRef(function TaskCard({
               onClick={(e) => { e.stopPropagation(); if (didSwipe.current) return; onEdit(task); }}
             >
               <h3 className={cn(
-                "text-sm font-medium truncate",
-                isDarkCard ? "text-white" : "text-slate-900 dark:text-slate-100",
+                "text-[15px] sm:text-sm font-medium truncate text-ink-900 dark:text-ink-100",
                 isDone && "line-through opacity-50"
               )}>
                 {task.title}
@@ -185,7 +185,7 @@ const TaskCard = forwardRef(function TaskCard({
             </div>
 
             {/* Right side meta */}
-            <div className="flex items-center gap-1.5 shrink-0 ml-1">
+            <div className="flex items-center gap-2 shrink-0 ml-1">
               {/* Tags — desktop only */}
               <TagsRow tags={task.tags} />
 
@@ -199,7 +199,7 @@ const TaskCard = forwardRef(function TaskCard({
                   start of it. */}
               {preview && (
                 <span
-                  className="inline-flex items-center text-slate-400 dark:text-slate-500 px-1 py-0.5"
+                  className="inline-flex items-center text-ink-400 dark:text-ink-500 px-1 py-0.5"
                   title={preview}
                   aria-label="Has a description"
                   data-testid={`task-has-description-${task.id}`}
@@ -214,7 +214,7 @@ const TaskCard = forwardRef(function TaskCard({
                   form where the attachments live. */}
               {task.attachment_count > 0 && (
                 <span
-                  className="inline-flex items-center gap-0.5 text-[11px] text-slate-400 dark:text-slate-500 px-1.5 py-0.5 rounded"
+                  className="inline-flex items-center gap-0.5 text-[11px] text-ink-400 dark:text-ink-500 px-1.5 py-0.5 rounded"
                   title={`${task.attachment_count} attachment${task.attachment_count === 1 ? "" : "s"}`}
                 >
                   <Paperclip className="w-3 h-3" />
@@ -228,15 +228,17 @@ const TaskCard = forwardRef(function TaskCard({
                   {task.due_date ? (
                     <button
                       onClick={(e) => e.stopPropagation()}
-                      className="text-[11px] flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors text-slate-400 dark:text-slate-400 hover:bg-white dark:hover:bg-[#222222]"
+                      className={cn(
+                        "text-xs tabular-nums flex items-center gap-1 px-1.5 py-0.5 rounded-md transition-colors hover:bg-selected",
+                        isOverdue ? "text-red-600 dark:text-red-400 font-medium" : "text-ink-500 dark:text-ink-400"
+                      )}
                     >
-                      <Calendar className="w-3 h-3" />
                       {dateDisplay}
                     </button>
                   ) : (
                     <button aria-label="Set a date"
                       onClick={(e) => e.stopPropagation()}
-                      className="text-[11px] text-slate-300 dark:text-slate-600 hover:text-slate-400 dark:hover:text-slate-300 hover:bg-white dark:hover:bg-[#222222] px-1.5 py-0.5 rounded transition-colors"
+                      className="text-xs text-ink-300 dark:text-ink-600 hover:text-ink-500 dark:hover:text-ink-300 hover:bg-selected px-1.5 py-0.5 rounded-md transition-colors"
                     >
                       <Calendar className="w-3 h-3" />
                     </button>
@@ -289,21 +291,13 @@ const TaskCard = forwardRef(function TaskCard({
 
 export default TaskCard;
 
-// Shows badge when there's space (xs+), dot on very small screens
+// A repeating task says how often in plain small text, behind a repeat
+// mark. On the narrowest phones only the mark shows.
 function RecurrenceBadge({ label }) {
-  // "Sun, Mon, Tue, Wed, Thu, Fri, Sat" is 30 chars — keep the chip visible for full weekly lists.
-  const isShort = label.length <= 32;
-  if (isShort) {
-    return (
-      <>
-        <span className="xs:hidden w-2 h-2 rounded-full bg-violet-600 shrink-0 inline-block" title={label} />
-        <span className="hidden xs:inline text-[10px] font-medium text-violet-600 dark:text-violet-300 bg-violet-50 dark:bg-[#201735] border border-violet-200 dark:border-[#61419e] px-1.5 py-0.5 rounded max-w-[240px] truncate shrink-0">
-          {label}
-        </span>
-      </>
-    );
-  }
   return (
-    <span className="w-2 h-2 rounded-full bg-violet-600 shrink-0 inline-block" title={label} />
+    <span className="inline-flex items-center gap-1 text-xs text-ink-500 dark:text-ink-400 shrink-0 max-w-[240px]" title={label}>
+      <Repeat className="w-3 h-3 shrink-0" />
+      <span className="hidden xs:inline truncate">{label}</span>
+    </span>
   );
 }

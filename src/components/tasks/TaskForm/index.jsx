@@ -248,7 +248,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
         data-testid="task-form-dialog"
       >
         <DialogHeader>
-          <DialogTitle className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+          <DialogTitle className="text-sm font-semibold text-ink-900 dark:text-ink-100">
             {isReadOnly
               ? "View Event"
               : isExternalEvent
@@ -261,8 +261,8 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
           </DialogTitle>
         </DialogHeader>
         {isReadOnly && (
-          <div className="flex items-start gap-2 rounded-md bg-slate-50 dark:bg-[#161616] border border-slate-100 dark:border-[#303030] p-2 text-[11px] text-slate-500 dark:text-slate-400 mb-1">
-            <Lock className="w-3.5 h-3.5 mt-0.5 shrink-0 text-slate-400 dark:text-slate-500" />
+          <div className="flex items-start gap-2 rounded-md bg-ink-50 dark:bg-night-raised border border-ink-100 dark:border-night-line p-2 text-[11px] text-ink-500 dark:text-ink-400 mb-1">
+            <Lock className="w-3.5 h-3.5 mt-0.5 shrink-0 text-ink-400 dark:text-ink-500" />
             <p>
               This event comes from a read-only calendar
               {form.source_calendar_name ? <> (<span className="font-medium">{form.source_calendar_name}</span>)</> : null}
@@ -358,7 +358,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-[#2a1116]"
+                  className="text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-night-danger"
                   data-testid="task-form-delete"
                   onClick={() => { onDelete(task); onOpenChange(false); }}
                 >
@@ -388,7 +388,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
                   type="button"
                   disabled={!canSubmit}
                   onClick={commitAndClose}
-                  className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+                  className="bg-primary hover:bg-[var(--primary-hover)] text-primary-foreground"
                   data-testid="task-form-submit"
                 >
                   {isEditMode ? "Save Changes" : "Create Task"}

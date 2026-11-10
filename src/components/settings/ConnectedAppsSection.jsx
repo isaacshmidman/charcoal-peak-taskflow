@@ -75,7 +75,7 @@ function Mono({ children, testId }) {
   return (
     <pre
       data-testid={testId}
-      className="min-w-0 flex-1 overflow-x-auto whitespace-pre-wrap break-all rounded-md border border-border-hairline bg-slate-50 px-2.5 py-2 font-mono text-xs text-slate-800 dark:bg-[#161616] dark:text-slate-200"
+      className="min-w-0 flex-1 overflow-x-auto whitespace-pre-wrap break-all rounded-md border border-border-hairline bg-ink-50 px-2.5 py-2 font-mono text-xs text-ink-800 dark:bg-night-raised dark:text-ink-200"
     >
       {children}
     </pre>
@@ -98,7 +98,7 @@ function Paste({ label, value, testId }) {
  */
 function SiriSteps({ created }) {
   const siri = siriSetup(created.mcp_url, created.token);
-  const step = "text-xs leading-5 text-slate-600 dark:text-slate-300";
+  const step = "text-xs leading-5 text-ink-600 dark:text-ink-300";
   return (
     <div className="space-y-4" data-testid="ai-siri-steps">
       <p className={step}>
@@ -106,7 +106,7 @@ function SiriSteps({ created }) {
         that's allowed to change them.
       </p>
       <div className="space-y-2">
-        <p className="text-sm font-medium text-slate-900 dark:text-slate-100">What's due in Zephyrly</p>
+        <p className="text-sm font-medium text-ink-900 dark:text-ink-100">What's due in Zephyrly</p>
         <ol className={`list-decimal space-y-2 pl-4 ${step}`}>
           <li>
             Add <strong>Get Contents of URL</strong> with this address:
@@ -127,7 +127,7 @@ function SiriSteps({ created }) {
         </ol>
       </div>
       <div className="space-y-2">
-        <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Add to Zephyrly</p>
+        <p className="text-sm font-medium text-ink-900 dark:text-ink-100">Add to Zephyrly</p>
         <ol className={`list-decimal space-y-2 pl-4 ${step}`}>
           <li>
             Add <strong>Ask for Input</strong> (Text): “What's the task?”
@@ -159,23 +159,23 @@ function NewToken({ created, onDone }) {
   const [app, setApp] = useState(snippets[0].id);
   const chosen = snippets.find((s) => s.id === app) || snippets[0];
   return (
-    <div className="space-y-4 rounded-lg bg-slate-50 px-3 py-3 dark:bg-[#252525]" data-testid="ai-new-token">
+    <div className="space-y-4 rounded-lg bg-ink-50 px-3 py-3 dark:bg-night-high" data-testid="ai-new-token">
       <div className="space-y-1.5">
-        <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Copy this token now. It won't be shown again.</p>
+        <p className="text-sm font-medium text-ink-900 dark:text-ink-100">Copy this token now. It won't be shown again.</p>
         <div className="flex items-start gap-2">
           <Mono testId="ai-token-value">{created.token}</Mono>
           <CopyButton text={created.token} label="Copy token" />
         </div>
       </div>
       <div className="space-y-1.5">
-        <p className="text-xs text-slate-500 dark:text-slate-400">Server address</p>
+        <p className="text-xs text-ink-500 dark:text-ink-400">Server address</p>
         <div className="flex items-start gap-2">
           <Mono>{created.mcp_url}</Mono>
           <CopyButton text={created.mcp_url} label="Copy server address" />
         </div>
       </div>
       <div className="space-y-2">
-        <p className="text-xs text-slate-500 dark:text-slate-400">Set it up in</p>
+        <p className="text-xs text-ink-500 dark:text-ink-400">Set it up in</p>
         <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="AI app">
           {snippets.map((s) => (
             <button
@@ -186,8 +186,8 @@ function NewToken({ created, onDone }) {
               onClick={() => setApp(s.id)}
               className={
                 s.id === chosen.id
-                  ? "rounded-full bg-slate-900 px-2.5 py-1 text-xs font-medium text-white dark:bg-slate-100 dark:text-slate-900"
-                  : "rounded-full border border-border-strong px-2.5 py-1 text-xs text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100"
+                  ? "rounded-full bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground"
+                  : "rounded-full border border-border-strong px-2.5 py-1 text-xs text-ink-600 hover:text-ink-900 dark:text-ink-300 dark:hover:text-ink-100"
               }
             >
               {s.label}
@@ -198,7 +198,7 @@ function NewToken({ created, onDone }) {
           <SiriSteps created={created} />
         ) : (
           <>
-            <p className="text-xs text-slate-600 dark:text-slate-300">{chosen.where}</p>
+            <p className="text-xs text-ink-600 dark:text-ink-300">{chosen.where}</p>
             <div className="flex items-start gap-2">
               <Mono testId="ai-setup-snippet">{chosen.text}</Mono>
               <CopyButton text={chosen.text} label={`Copy ${chosen.label} setup`} />
@@ -232,8 +232,8 @@ function GrantRow({ grant, online, onChanged }) {
     <div className="space-y-3 px-4 py-3" data-testid={`ai-grant-${grant.id}`}>
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">{grant.label}</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="truncate text-sm font-medium text-ink-900 dark:text-ink-100">{grant.label}</p>
+          <p className="text-xs text-ink-500 dark:text-ink-400">
             {grant.can_write ? "Can read and change tasks" : "Can read"} · {lastUsedLabel(grant.last_used_at)}
           </p>
         </div>
@@ -256,7 +256,7 @@ function GrantRow({ grant, online, onChanged }) {
         </AlertDialog>
       </div>
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-slate-700 dark:text-slate-200">Allow changes to tasks</p>
+        <p className="text-sm text-ink-700 dark:text-ink-200">Allow changes to tasks</p>
         <SettingsToggle
           checked={grant.can_write}
           disabled={!online || busy}
@@ -289,8 +289,8 @@ function ActivityRow({ entry, online, onUndone }) {
     <li className="space-y-1 px-4 py-3" data-testid={`ai-activity-${entry.id}`}>
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-sm text-slate-900 dark:text-slate-100">{entry.summary}</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-sm text-ink-900 dark:text-ink-100">{entry.summary}</p>
+          <p className="text-xs text-ink-500 dark:text-ink-400">
             {entry.app} · {time}
           </p>
         </div>
@@ -299,9 +299,9 @@ function ActivityRow({ entry, online, onUndone }) {
             Undo
           </Button>
         )}
-        {entry.undo === "undone" && <span className="shrink-0 pt-1 text-xs text-slate-400 dark:text-slate-500">Undone</span>}
+        {entry.undo === "undone" && <span className="shrink-0 pt-1 text-xs text-ink-400 dark:text-ink-500">Undone</span>}
         {entry.undo === "recently_deleted" && (
-          <Link to="/RecentlyDeleted" className="shrink-0 pt-1 text-xs font-medium text-slate-600 underline dark:text-slate-300">
+          <Link to="/RecentlyDeleted" className="shrink-0 pt-1 text-xs font-medium text-ink-600 underline dark:text-ink-300">
             In Recently Deleted
           </Link>
         )}
@@ -369,16 +369,16 @@ export default function ConnectedAppsSection() {
   return (
     <>
       <div className="space-y-3">
-        <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">AI apps</h2>
-        <p className="text-sm text-slate-600 dark:text-slate-300">
+        <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-100">AI apps</h2>
+        <p className="text-sm text-ink-600 dark:text-ink-300">
           Let Claude, ChatGPT and other AI apps read your tasks and notes, and change them only if you allow it. They can't
           change events from your calendars or delete anything for good, and you can undo what they change.
         </p>
-        {!online && <p className="text-xs text-slate-400 dark:text-slate-500">You're offline. Connected apps need a connection.</p>}
+        {!online && <p className="text-xs text-ink-400 dark:text-ink-500">You're offline. Connected apps need a connection.</p>}
         {loadError && <p className="text-xs text-red-600 dark:text-red-400">{loadError}</p>}
-        {grants && grants.length === 0 && <p className="text-sm text-slate-400 dark:text-slate-500" data-testid="ai-no-grants">Nothing connected yet.</p>}
+        {grants && grants.length === 0 && <p className="text-sm text-ink-400 dark:text-ink-500" data-testid="ai-no-grants">Nothing connected yet.</p>}
         {grants && grants.length > 0 && (
-          <Card className="divide-y divide-slate-100 dark:divide-[#303030]" data-testid="ai-grants">
+          <Card className="divide-y divide-ink-100 dark:divide-night-line" data-testid="ai-grants">
             {grants.map((grant) => (
               <GrantRow key={grant.id} grant={grant} online={online} onChanged={load} />
             ))}
@@ -386,9 +386,9 @@ export default function ConnectedAppsSection() {
         )}
       </div>
 
-      <div className="space-y-3 border-t border-slate-100 pt-5 dark:border-[#303030]">
-        <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Connect an app with a token</h2>
-        <p className="text-sm text-slate-600 dark:text-slate-300">
+      <div className="space-y-3 border-t border-ink-100 pt-5 dark:border-night-line">
+        <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-100">Connect an app with a token</h2>
+        <p className="text-sm text-ink-600 dark:text-ink-300">
           For apps you set up yourself: Claude Code, Claude Desktop, Cursor, LM Studio, Gemini CLI, Open WebUI, scripts, and
           Siri through Shortcuts.
         </p>
@@ -404,7 +404,7 @@ export default function ConnectedAppsSection() {
               aria-label="Token name"
               data-testid="ai-token-label"
             />
-            <label className="flex items-center gap-2.5 text-sm text-slate-700 dark:text-slate-200">
+            <label className="flex items-center gap-2.5 text-sm text-ink-700 dark:text-ink-200">
               <Checkbox checked={allowChanges} onCheckedChange={setAllowChanges} aria-label="Allow changes to tasks" data-testid="ai-token-allow-changes" />
               Allow changes to tasks
             </label>
@@ -416,16 +416,16 @@ export default function ConnectedAppsSection() {
         )}
       </div>
 
-      <div className="space-y-3 border-t border-slate-100 pt-5 dark:border-[#303030]">
-        <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Recent changes by AI apps</h2>
+      <div className="space-y-3 border-t border-ink-100 pt-5 dark:border-night-line">
+        <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-100">Recent changes by AI apps</h2>
         {activity.length === 0 ? (
-          <p className="text-sm text-slate-400 dark:text-slate-500">No changes yet.</p>
+          <p className="text-sm text-ink-400 dark:text-ink-500">No changes yet.</p>
         ) : (
           byDay(activity).map((group) => (
             <div key={group.day} className="space-y-1.5">
-              <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{group.day}</p>
+              <p className="text-xs font-medium text-ink-500 dark:text-ink-400">{group.day}</p>
               <Card>
-                <ul className="divide-y divide-slate-100 dark:divide-[#303030]">
+                <ul className="divide-y divide-ink-100 dark:divide-night-line">
                   {group.entries.map((entry) => (
                     <ActivityRow key={entry.id} entry={entry} online={online} onUndone={load} />
                   ))}

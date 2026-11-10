@@ -132,7 +132,7 @@ export default function ScheduleSettings({ schedule, editor, defaults = {}, save
           aria-label="Advanced settings"
           title="Advanced settings"
           data-testid="schedule-settings"
-          className="h-8 w-8 shrink-0 text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-200"
+          className="h-8 w-8 shrink-0 text-ink-400 hover:text-ink-700 dark:text-ink-500 dark:hover:text-ink-200"
         >
           <SlidersHorizontal className="h-4 w-4" />
         </Button>
@@ -145,8 +145,8 @@ export default function ScheduleSettings({ schedule, editor, defaults = {}, save
         data-testid="schedule-settings-panel"
       >
         <div className="space-y-1">
-          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Advanced settings</p>
-          <p className="flex items-start gap-1 text-[11px] leading-snug text-slate-400 dark:text-slate-500">
+          <p className="text-sm font-semibold text-ink-900 dark:text-ink-100">Advanced settings</p>
+          <p className="flex items-start gap-1 text-[11px] leading-snug text-ink-400 dark:text-ink-500">
             <Pin aria-hidden="true" className="mt-px h-3 w-3 shrink-0" />
             <span>Pin a setting to start every new schedule with it. Schedules you already have keep their own.</span>
           </p>
@@ -177,9 +177,9 @@ export default function ScheduleSettings({ schedule, editor, defaults = {}, save
         </Setting>
 
         <Setting title="Day" error={errorFor("dayStart") || errorFor("dayEnd")}>
-          <div className="space-y-1.5 text-sm text-slate-700 dark:text-slate-300">
+          <div className="space-y-1.5 text-sm text-ink-700 dark:text-ink-300">
             <div className="flex items-center gap-2">
-              <span className="w-10 text-xs text-slate-500 dark:text-slate-400">Starts</span>
+              <span className="w-10 text-xs text-ink-500 dark:text-ink-400">Starts</span>
               <TimeField
                 value={dayStart}
                 label="Day starts"
@@ -192,7 +192,7 @@ export default function ScheduleSettings({ schedule, editor, defaults = {}, save
               <span className="ml-auto">{pin("dayStart")}</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="w-10 text-xs text-slate-500 dark:text-slate-400">Ends</span>
+              <span className="w-10 text-xs text-ink-500 dark:text-ink-400">Ends</span>
               <TimeField
                 end
                 value={dayEnd}
@@ -226,7 +226,7 @@ export default function ScheduleSettings({ schedule, editor, defaults = {}, save
         </Setting>
 
         <div className="flex items-center gap-2">
-          <p className="flex-1 text-xs font-medium text-slate-700 dark:text-slate-300">Highlight the slot happening now</p>
+          <p className="flex-1 text-xs font-medium text-ink-700 dark:text-ink-300">Highlight the slot happening now</p>
           {pin("now")}
           <SettingsToggle checked={schedule.now} onChange={(on) => set("now", on)} label="Highlight the slot happening now" />
         </div>
@@ -239,7 +239,7 @@ function Setting({ title, hint, pin, error, children }) {
   return (
     <div className="space-y-1.5">
       <div className="flex items-center gap-2">
-        <p className="flex-1 text-xs font-medium text-slate-700 dark:text-slate-300">{title}</p>
+        <p className="flex-1 text-xs font-medium text-ink-700 dark:text-ink-300">{title}</p>
         {pin}
       </div>
       {children}
@@ -248,7 +248,7 @@ function Setting({ title, hint, pin, error, children }) {
           {error}
         </p>
       )}
-      {hint && <p className="text-[11px] leading-snug text-slate-400 dark:text-slate-500">{hint}</p>}
+      {hint && <p className="text-[11px] leading-snug text-ink-400 dark:text-ink-500">{hint}</p>}
     </div>
   );
 }
@@ -264,7 +264,7 @@ function PinButton({ setting, pinned, holds, onToggle }) {
   return (
     <span className="flex shrink-0 items-center gap-1">
       {elsewhere && (
-        <span className="text-[10px] text-slate-400 dark:text-slate-500" data-testid={`pinned-${setting}`}>
+        <span className="text-[10px] text-ink-400 dark:text-ink-500" data-testid={`pinned-${setting}`}>
           Pinned: {PINNED_LABEL[setting](pinned)}
         </span>
       )}
@@ -284,8 +284,8 @@ function PinButton({ setting, pinned, holds, onToggle }) {
         className={cn(
           "flex h-6 w-6 items-center justify-center rounded-md transition-colors",
           holds
-            ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
-            : "text-slate-300 hover:bg-slate-100 hover:text-slate-600 dark:text-slate-600 dark:hover:bg-[#1f1f1f] dark:hover:text-slate-300"
+            ? "bg-primary text-primary-foreground"
+            : "text-ink-300 hover:bg-ink-100 hover:text-ink-600 dark:text-ink-600 dark:hover:bg-night-raised dark:hover:text-ink-300"
         )}
       >
         <Pin className={cn("h-3.5 w-3.5", holds && "fill-current")} />
@@ -318,14 +318,14 @@ function Choices({ name, value, options, label, min, max, onPick }) {
           className={cn(
             "h-7 rounded-md border px-2 text-xs transition-colors",
             value === n
-              ? "border-slate-900 bg-slate-900 text-white dark:border-slate-100 dark:bg-slate-100 dark:text-slate-900"
-              : "border-border-hairline text-slate-600 hover:border-border-strong dark:text-slate-300"
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-border-hairline text-ink-600 hover:border-border-strong dark:text-ink-300"
           )}
         >
           {label(n)}
         </button>
       ))}
-      <label className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+      <label className="flex items-center gap-1 text-xs text-ink-500 dark:text-ink-400">
         <input
           type="number"
           inputMode="numeric"
@@ -345,8 +345,8 @@ function Choices({ name, value, options, label, min, max, onPick }) {
             }
           }}
           className={cn(
-            "h-7 w-[4.5rem] rounded-md border bg-transparent px-2 text-xs text-slate-700 outline-none focus:border-border-strong dark:text-slate-200",
-            custom ? "border-slate-900 dark:border-slate-100" : "border-border-hairline"
+            "h-7 w-[4.5rem] rounded-md border bg-transparent px-2 text-xs text-ink-700 outline-none focus:border-border-strong dark:text-ink-200",
+            custom ? "border-ink-900 dark:border-ink-100" : "border-border-hairline"
           )}
         />
         min
@@ -364,21 +364,21 @@ function Option({ checked, onSelect, title, hint }) {
       onClick={onSelect}
       className={cn(
         "flex w-full items-start gap-2 rounded-md border px-2.5 py-2 text-left transition-colors",
-        checked ? "border-border-strong bg-slate-50 dark:bg-[#161616]" : "border-border-hairline hover:border-border-strong"
+        checked ? "border-border-strong bg-ink-50 dark:bg-night-raised" : "border-border-hairline hover:border-border-strong"
       )}
     >
       <span
         aria-hidden="true"
         className={cn(
           "mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border",
-          checked ? "border-slate-900 dark:border-slate-100" : "border-slate-300 dark:border-slate-600"
+          checked ? "border-ink-900 dark:border-ink-100" : "border-ink-300 dark:border-ink-600"
         )}
       >
-        {checked && <span className="h-1.5 w-1.5 rounded-full bg-slate-900 dark:bg-slate-100" />}
+        {checked && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
       </span>
       <span>
-        <span className="block text-xs font-medium text-slate-800 dark:text-slate-200">{title}</span>
-        <span className="block text-[11px] leading-snug text-slate-400 dark:text-slate-500">{hint}</span>
+        <span className="block text-xs font-medium text-ink-800 dark:text-ink-200">{title}</span>
+        <span className="block text-[11px] leading-snug text-ink-400 dark:text-ink-500">{hint}</span>
       </span>
     </button>
   );

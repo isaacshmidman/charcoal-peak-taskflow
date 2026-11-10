@@ -24,13 +24,13 @@ export default function SettingsToggle({ checked, onChange, disabled, label }) {
       onClick={() => onChange(!checked)}
       className={cn(
         "relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none shrink-0",
-        checked ? "bg-slate-900 dark:bg-slate-100" : "bg-slate-200 dark:bg-[#222222]",
+        checked ? "bg-ink-900 dark:bg-sun-400" : "bg-ink-300 dark:bg-night-line-bold",
         disabled && "opacity-40 cursor-not-allowed"
       )}
     >
       <span
         className={cn(
-          "inline-block h-4 w-4 transform rounded-full bg-white dark:bg-slate-900 shadow transition-transform duration-200",
+          "inline-block h-4 w-4 transform rounded-full bg-white dark:bg-ink-950 transition-transform duration-200",
           checked ? "translate-x-6" : "translate-x-1"
         )}
       />

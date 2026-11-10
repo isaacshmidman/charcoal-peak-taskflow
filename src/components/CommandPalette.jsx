@@ -190,7 +190,7 @@ export default function CommandPalette({ open, onOpenChange }) {
           value={query}
           data-testid="command-palette-input"
           placeholder="Type a command or search tasks…"
-          className="w-full h-12 px-4 bg-transparent text-base md:text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none border-b border-slate-100 dark:border-[#303030]"
+          className="w-full h-12 px-4 bg-transparent text-base md:text-sm text-ink-900 dark:text-ink-100 placeholder:text-ink-400 dark:placeholder:text-ink-500 outline-none border-b border-ink-100 dark:border-night-line"
           onChange={(e) => {
             setQuery(e.target.value);
             setActiveIndex(0);
@@ -210,13 +210,13 @@ export default function CommandPalette({ open, onOpenChange }) {
         />
         <div ref={listRef} className="max-h-72 overflow-y-auto py-1.5">
           {flat.length === 0 ? (
-            <p className="px-4 py-6 text-center text-xs text-slate-400 dark:text-slate-500">
+            <p className="px-4 py-6 text-center text-xs text-ink-400 dark:text-ink-500">
               Nothing matches.
             </p>
           ) : (
             sections.map((section) => (
               <div key={section.title}>
-                <p className="px-4 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                <p className="px-4 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-ink-400 dark:text-ink-500">
                   {section.title}
                 </p>
                 {section.items.map((command) => {
@@ -231,14 +231,14 @@ export default function CommandPalette({ open, onOpenChange }) {
                       onClick={() => execute(command)}
                       onMouseEnter={() => setActiveIndex(index)}
                       className={cn(
-                        "w-full flex items-center gap-2.5 px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200",
-                        index === clampedIndex && "bg-slate-50 dark:bg-[#161616]"
+                        "w-full flex items-center gap-2.5 px-4 py-2 text-left text-sm text-ink-700 dark:text-ink-200",
+                        index === clampedIndex && "bg-ink-50 dark:bg-night-raised"
                       )}
                     >
-                      <Icon className="w-3.5 h-3.5 shrink-0 text-slate-400 dark:text-slate-500" />
+                      <Icon className="w-3.5 h-3.5 shrink-0 text-ink-400 dark:text-ink-500" />
                       <span className="truncate">{command.label}</span>
                       {command.task?.due_date && (
-                        <span className="ml-auto shrink-0 text-[10px] text-slate-400 dark:text-slate-500">
+                        <span className="ml-auto shrink-0 text-[10px] text-ink-400 dark:text-ink-500">
                           {command.task.due_date}
                         </span>
                       )}
