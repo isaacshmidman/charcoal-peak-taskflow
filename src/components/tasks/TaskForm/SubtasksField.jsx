@@ -11,6 +11,7 @@ import { useState } from "react";
 import { Check, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { afterPress } from "@/lib/afterPress";
 import { cn } from "@/lib/utils";
 
 const rowClass = "group/sub flex min-h-8 items-start gap-2.5 py-1";
@@ -109,8 +110,10 @@ export default function SubtasksField({
           enterKeyHint="done"
           onChange={(e) => setText(e.target.value)}
           // Leaving the box with something typed keeps it — otherwise
-          // pressing Create straight after typing would drop it.
-          onBlur={add}
+          // pressing Create straight after typing would drop it. It joins
+          // the list once the mouse is up: adding a row mid-press would
+          // move whatever is being clicked out from under the pointer.
+          onBlur={() => afterPress(add)}
           onKeyDown={(e) => {
             if (e.key !== "Enter" || e.nativeEvent?.isComposing) return;
             // Enter here adds a subtask; it must never finish the form.
@@ -118,7 +121,6 @@ export default function SubtasksField({
             e.stopPropagation();
             add();
           }}
-          className="sm:text-sm"
         />
         <Button
           type="button"

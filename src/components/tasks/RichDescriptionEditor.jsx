@@ -12,9 +12,12 @@
  * legacy `description` column (notifications/search keep reading the
  * plaintext mirror).
  *
- * Toolbar: a docked bar shown only while the editor is focused (or a
- * picker is open). All buttons use onMouseDown+preventDefault so they
- * never blur the editable on iOS — see Toolbar.jsx.
+ * Toolbar: a docked bar that arrives the first time the editor is
+ * focused and then stays, quieter while you're elsewhere. It used to
+ * leave again on blur — which meant that clicking the field under the
+ * description moved that field 40px up while the mouse button was still
+ * down, and the click missed. All buttons use onMouseDown+preventDefault
+ * so they never blur the editable on iOS — see Toolbar.jsx.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
@@ -75,6 +78,8 @@ export default function RichDescriptionEditor({
   const onFocusChangeRef = useRef(onFocusChange);
   onFocusChangeRef.current = onFocusChange;
   const [focused, setFocused] = useState(false);
+  // Once true, stays true: the toolbar never un-mounts under the pointer.
+  const [everFocused, setEverFocused] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   // Typing a link address moves focus into the link bar's input; that
   // isn't leaving the editor, so the toolbar must not drop away.
@@ -149,7 +154,7 @@ export default function RichDescriptionEditor({
         text: updated.getText(),
       }));
     },
-    onFocus() { setFocused(true); onFocusChangeRef.current?.(true); },
+    onFocus() { setFocused(true); setEverFocused(true); onFocusChangeRef.current?.(true); },
     onBlur() {
       // Defer so opening a picker (which momentarily blurs) doesn't flash
       // the toolbar closed; the picker sets pickerOpen synchronously.
@@ -191,7 +196,8 @@ export default function RichDescriptionEditor({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor]);
 
-  const showToolbar = toolbar === "docked" && !disabled && (focused || pickerOpen);
+  const active = !disabled && (focused || pickerOpen);
+  const showToolbar = toolbar === "docked" && !disabled && (everFocused || pickerOpen);
 
   return (
     <div
@@ -203,15 +209,11 @@ export default function RichDescriptionEditor({
           : cn(
               "rounded-lg border bg-surface-card dark:bg-night-sunken transition-[border-color,box-shadow]",
               // Focused, it takes the same ring every other field does.
-              showToolbar
+              active
                 ? "border-ink-900 ring-[3px] ring-ink-900/10 dark:border-sun-400 dark:ring-sun-400/20"
                 : "border-border-strong"
             )
       )}
-      // Keep the editor focused when interacting with the toolbar chrome.
-      onMouseDown={(e) => {
-        if (e.target.closest?.("[data-richtext-toolbar]")) return;
-      }}
     >
       <EditorContent editor={editor} />
       {limitNotice && (
@@ -235,6 +237,7 @@ export default function RichDescriptionEditor({
             linkEditingRef.current = editing;
             if (editing) {
               setFocused(true);
+              setEverFocused(true);
               onFocusChangeRef.current?.(true);
             }
           }}
@@ -245,7 +248,11 @@ export default function RichDescriptionEditor({
           data-richtext-toolbar
           // In a full-page note the body scrolls, so the toolbar sticks to
           // the bottom instead of drifting off with the text.
-          className={cn(chromeless && "sticky bottom-0 z-10 rounded-md border border-ink-200 bg-white dark:border-night-line-strong dark:bg-night-sunken")}
+          className={cn(
+            "transition-opacity",
+            !active && "opacity-50 hover:opacity-100",
+            chromeless && "sticky bottom-0 z-10 rounded-md border border-ink-200 bg-white dark:border-night-line-strong dark:bg-night-sunken"
+          )}
         >
           <Toolbar
             editor={editor}

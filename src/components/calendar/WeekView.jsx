@@ -48,7 +48,7 @@ function AllDayCell({ dateStr, tasks, priorities, onTaskClick, onToggleDone, col
       className={cn(
         "flex-1 min-w-0 border-l border-ink-100 dark:border-night-line p-1 space-y-0.5",
         collapsed && "overflow-hidden",
-        isOver && "bg-blue-50 dark:bg-night-info"
+        isOver && "bg-sun-100/60 dark:bg-sun-400/10"
       )}
     >
       {visible.map((task) => (
@@ -99,7 +99,7 @@ function TimedColumn({ date, timedTasks, priorities, onTaskClick, onToggleDone, 
       data-testid={`calendar-timed-${dateStr}`}
       className={cn(
         "flex-1 min-w-0 border-l border-ink-100 dark:border-night-line relative",
-        isOver && "bg-blue-50 dark:bg-night-info"
+        isOver && "bg-sun-100/60 dark:bg-sun-400/10"
       )}
       style={{ height: HOURS.length * HOUR_HEIGHT }}
     >

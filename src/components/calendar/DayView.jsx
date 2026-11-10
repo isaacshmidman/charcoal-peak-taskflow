@@ -87,7 +87,7 @@ function AllDayOverlayCell({ dateStr, allDayTasks, priorities, onTaskClick, onTo
       className={cn(
         "flex-1 min-w-0 border-l border-ink-100 dark:border-night-line p-1 space-y-0.5",
         collapsed && "overflow-hidden",
-        isOver && "bg-blue-50 dark:bg-night-info"
+        isOver && "bg-sun-100/60 dark:bg-sun-400/10"
       )}
     >
       {visible.map((task) => (

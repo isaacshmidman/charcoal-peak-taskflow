@@ -24,7 +24,7 @@ function BarButton({ title, testid, onAction, children }) {
       aria-label={title}
       data-testid={testid}
       onMouseDown={(e) => { e.preventDefault(); onAction(); }}
-      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-ink-600 hover:bg-ink-100 dark:text-ink-300 dark:hover:bg-night-high"
+      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-ink-600 hover:bg-selected dark:text-ink-300"
     >
       {children}
     </button>
@@ -149,9 +149,11 @@ export default function LinkBubble({ editor, onEditingChange }) {
       className="z-50"
       data-testid="richtext-link-bubble"
     >
-      <div className="flex max-w-[calc(100vw-2rem)] items-center gap-0.5 rounded-lg border border-border-strong bg-surface-card p-1 shadow-lg">
+      <div className="flex max-w-[calc(100vw-2rem)] items-center gap-0.5 rounded-lg border border-border-hairline bg-popover p-1 shadow-pop">
         {editing ? (
           <form
+            // Tells a dialog around the editor that Escape here is ours.
+            data-own-escape=""
             className="flex items-center gap-1"
             onSubmit={(e) => { e.preventDefault(); save(); }}
           >
@@ -172,7 +174,7 @@ export default function LinkBubble({ editor, onEditingChange }) {
                 autoCorrect="off"
                 spellCheck={false}
                 // 16px on phones so iOS doesn't zoom on focus.
-                className="h-7 w-56 max-w-[60vw] rounded-md border border-ink-200 bg-white px-2 text-base text-ink-900 outline-none focus:border-ink-400 dark:border-night-line-strong dark:bg-night-sunken dark:text-ink-100 md:text-sm"
+                className="h-7 w-56 max-w-[60vw] rounded-md border border-border-strong bg-surface-card px-2 text-base text-foreground outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground focus:border-ink-900 focus:ring-[3px] focus:ring-ink-900/10 dark:bg-night-sunken dark:focus:border-sun-400 dark:focus:ring-sun-400/20 md:text-sm"
               />
               {error && <span className="px-1 pt-0.5 text-[11px] text-red-600 dark:text-red-400">{error}</span>}
             </div>
@@ -194,7 +196,7 @@ export default function LinkBubble({ editor, onEditingChange }) {
                 title={href}
                 data-testid="richtext-link-label"
                 onMouseDown={(e) => e.preventDefault()}
-                className="max-w-[14rem] truncate px-1.5 text-xs text-blue-600 underline underline-offset-2 dark:text-blue-400"
+                className="max-w-[14rem] truncate px-1.5 text-xs font-medium text-ink-900 underline decoration-sun-600 decoration-[1.5px] underline-offset-2 dark:text-ink-100 dark:decoration-sun-400"
               >
                 {linkLabel(href)}
               </a>

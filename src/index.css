@@ -480,6 +480,23 @@
 /* Links look like links, in the page's own ink: underlined in sun rather
    than turned blue. Editing, a click only moves the caret (the link bar
    under it has Open); read-only, a click follows it, so show a hand. */
+/* The format bar on a touch screen: one line that scrolls sideways,
+   fading out at the right edge to show there is more. */
+@media (pointer: coarse) {
+  .richtext-toolbar-row {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    padding-right: 1.25rem;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 1.25rem), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 1.25rem), transparent);
+  }
+  .richtext-toolbar-row::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 .tiptap-prose a {
   color: inherit;
   font-weight: 500;

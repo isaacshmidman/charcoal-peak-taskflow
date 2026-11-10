@@ -23,6 +23,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, BellOff, ChevronRight, Loader2, ShieldOff, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import TimeInput from "@/components/tasks/TaskForm/TimeInput.jsx";
@@ -352,7 +353,7 @@ export default function NotificationsPanel({ onOpenAdvanced }) {
                     value={customParts.amount}
                     disabled={offline}
                     onChange={(e) => updateCustomOffset({ amount: e.target.value })}
-                    className="h-9 text-base md:text-sm"
+                    className="h-9"
                   />
                   <Select
                     value={customParts.unit}
@@ -376,12 +377,11 @@ export default function NotificationsPanel({ onOpenAdvanced }) {
               <div className="space-y-1 text-xs font-medium text-ink-600 dark:text-ink-300">
                 <span>All-day tasks</span>
                 <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={draft.allDayEnabled}
+                  <Checkbox
+                    checked={!!draft.allDayEnabled}
                     disabled={offline}
-                    onChange={(e) => patchDraft({ allDayEnabled: e.target.checked })}
-                    className="h-4 w-4 accent-ink-900 dark:accent-ink-100 shrink-0"
+                    onCheckedChange={(on) => patchDraft({ allDayEnabled: on })}
+                    aria-label="Remind me about all-day tasks"
                   />
                   <div className={cn("flex-1 min-w-0", (!draft.allDayEnabled || offline) && "opacity-50 pointer-events-none")}>
                     <TimeInput
@@ -427,12 +427,11 @@ export default function NotificationsPanel({ onOpenAdvanced }) {
                   : "Connect a Google or Apple calendar in Settings → Integrations to enable this."
               }
             >
-              <input
-                type="checkbox"
-                checked={draft.includeExternalEvents && calendarsConnected}
+              <Checkbox
+                size="sm"
+                checked={!!(draft.includeExternalEvents && calendarsConnected)}
                 disabled={offline || !calendarsConnected}
-                onChange={(e) => patchDraft({ includeExternalEvents: e.target.checked })}
-                className="h-4 w-4 accent-ink-900 dark:accent-ink-100 disabled:opacity-50"
+                onCheckedChange={(on) => patchDraft({ includeExternalEvents: on })}
               />
               Include read-only Google and Apple calendar events
             </label>

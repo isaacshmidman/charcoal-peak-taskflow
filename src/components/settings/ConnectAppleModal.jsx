@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useIntegrations } from "@/hooks/useIntegrations";
 import { AlertTriangle, ExternalLink, Loader2 } from "lucide-react";
 
@@ -83,7 +84,7 @@ export default function ConnectAppleModal({ open, onOpenChange }) {
                   href="https://appleid.apple.com/account/manage"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-600 dark:text-blue-300 hover:underline inline-flex items-center gap-0.5"
+                  className="inline-flex items-center gap-0.5 font-medium text-ink-900 underline decoration-sun-600 decoration-[1.5px] underline-offset-2 dark:text-ink-100 dark:decoration-sun-400"
                 >
                   appleid.apple.com
                   <ExternalLink className="w-3 h-3" />
@@ -96,28 +97,31 @@ export default function ConnectAppleModal({ open, onOpenChange }) {
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-medium text-ink-700 dark:text-ink-200">Apple ID</label>
-            <input
+            <label htmlFor="apple-id" className="text-xs font-medium text-ink-700 dark:text-ink-200">Apple ID</label>
+            <Input
+              id="apple-id"
               type="email"
               required
               autoComplete="username"
+              autoCapitalize="none"
+              spellCheck={false}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@icloud.com"
-              className="w-full rounded-md border border-ink-200 dark:border-night-line-strong bg-white dark:bg-night-sunken px-2.5 py-1.5 text-base md:text-sm text-ink-900 dark:text-ink-100 placeholder:text-ink-400 dark:placeholder:text-ink-500 focus:border-ink-400 dark:focus:border-ink-500 focus:outline-none"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-medium text-ink-700 dark:text-ink-200">App-specific password</label>
-            <input
+            <label htmlFor="apple-app-password" className="text-xs font-medium text-ink-700 dark:text-ink-200">App-specific password</label>
+            <Input
+              id="apple-app-password"
               type="password"
               required
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="xxxx-xxxx-xxxx-xxxx"
-              className="w-full rounded-md border border-ink-200 dark:border-night-line-strong bg-white dark:bg-night-sunken px-2.5 py-1.5 text-base md:text-sm font-mono text-ink-900 dark:text-ink-100 placeholder:text-ink-400 dark:placeholder:text-ink-500 focus:border-ink-400 dark:focus:border-ink-500 focus:outline-none"
+              className="font-mono"
             />
             <p className="text-[11px] text-ink-400 dark:text-ink-500">
               Your password is encrypted at rest and only used for CalDAV calls to iCloud.

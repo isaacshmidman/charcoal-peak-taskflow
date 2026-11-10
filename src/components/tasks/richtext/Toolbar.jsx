@@ -1,14 +1,21 @@
 // @ts-nocheck
 /**
  * @file Docked formatting toolbar for RichDescriptionEditor. Receives
- * the TipTap `editor` instance. Lives inside the Radix Dialog subtree
- * (no portal) and is shown/hidden by the parent based on editor focus.
+ * the TipTap `editor` instance, and is shown/hidden by the parent based
+ * on editor focus.
  *
  * iOS hardening: every control fires on `onMouseDown` with
  * `preventDefault()` so tapping a button never blurs the editable
- * (keeps the selection + keyboard up). The dropdown pickers
- * (color/highlight/font/list) DO take focus when opened — the parent
- * keeps the toolbar visible while `onPickerOpenChange(true)` is active.
+ * (keeps the selection + keyboard up). The same goes for the menus
+ * (style/colour/highlight/font/lists): they float above the page in a
+ * portal, so the scrolling body of a form can't cut them off, and they
+ * never take focus. The parent keeps the toolbar visible while one is
+ * open (`onPickerOpenChange(true)`).
+ *
+ * With a mouse the bar wraps onto a second line when it has to. On a
+ * touch screen it stays one line and scrolls sideways, the way a phone's
+ * own format bar does — two lines of buttons over a keyboard leave no
+ * room for the words.
  */
 import { useEffect, useReducer, useRef, useState } from "react";
 import {
@@ -32,7 +39,7 @@ import {
   Link2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useOutsideClick } from "@/hooks/useOutsideClick";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { isMacLike } from "@/lib/shortcuts";
 
 // 10 readable text colors (Tailwind ~500). "Default" clears the mark.
@@ -107,6 +114,8 @@ const LIST_OPTIONS = [
 
 /** A toolbar icon button. Uses onMouseDown+preventDefault for iOS focus. */
 function TBtn({ active, disabled, onAction, title, children, testid }) {
+  // Where the finger went down, to tell a tap from a swipe along the bar.
+  const touchStart = useRef(null);
   return (
     <button
       type="button"
@@ -116,7 +125,20 @@ function TBtn({ active, disabled, onAction, title, children, testid }) {
       aria-pressed={!!active}
       disabled={disabled}
       onMouseDown={(e) => { e.preventDefault(); if (!disabled) onAction(); }}
-      onTouchEnd={(e) => { e.preventDefault(); if (!disabled) onAction(); }}
+      onTouchStart={(e) => {
+        const t = e.touches[0];
+        touchStart.current = t ? { x: t.clientX, y: t.clientY } : null;
+      }}
+      onTouchEnd={(e) => {
+        const start = touchStart.current;
+        touchStart.current = null;
+        const t = e.changedTouches?.[0];
+        // Scrolling the bar and lifting the finger over a button isn't a
+        // press. (No start point = a synthetic event: treat it as a tap.)
+        if (start && t && Math.hypot(t.clientX - start.x, t.clientY - start.y) > 10) return;
+        e.preventDefault();
+        if (!disabled) onAction();
+      }}
       className={cn(
         "inline-flex items-center justify-center h-7 min-w-7 px-1 rounded-md transition-colors shrink-0",
         // On is a quiet press, not a block of the primary colour: several
@@ -132,43 +154,54 @@ function TBtn({ active, disabled, onAction, title, children, testid }) {
   );
 }
 
-/** A dropdown popover anchored under its trigger. Reuses useOutsideClick. */
+/**
+ * A menu that opens from a toolbar button. It floats in a portal and
+ * moves itself to stay on screen, so it is never cut off by the box it
+ * sits in. Nothing in it takes focus: the caret stays in the text.
+ */
 function Picker({ icon: Icon, title, open, setOpen, onOpenChange, children, openUp = true, testid }) {
-  const ref = useRef(null);
-  useOutsideClick(ref, () => { setOpen(false); onOpenChange?.(false); }, open);
+  const triggerRef = useRef(null);
+  const change = (next) => { setOpen(next); onOpenChange?.(next); };
   return (
-    <div ref={ref} className="relative shrink-0">
-      <button
-        type="button"
-        title={title}
-        aria-label={title}
-        aria-expanded={open}
-        data-testid={testid}
-        onMouseDown={(e) => {
-          e.preventDefault();
-          const next = !open;
-          setOpen(next);
-          onOpenChange?.(next);
-        }}
-        className={cn(
-          "inline-flex items-center gap-0.5 h-7 px-1.5 rounded-md text-ink-600 dark:text-ink-300 transition-colors",
-          open ? "bg-selected" : "hover:bg-selected"
-        )}
+    <Popover open={open} onOpenChange={change}>
+      <PopoverAnchor asChild>
+        <button
+          ref={triggerRef}
+          type="button"
+          title={title}
+          aria-label={title}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          data-testid={testid}
+          onMouseDown={(e) => { e.preventDefault(); change(!open); }}
+          className={cn(
+            "inline-flex shrink-0 items-center gap-0.5 h-7 px-1.5 rounded-md text-ink-600 dark:text-ink-300 transition-colors",
+            open ? "bg-selected" : "hover:bg-selected"
+          )}
+        >
+          <Icon className="w-4 h-4" />
+          <ChevronDown className="w-3 h-3" />
+        </button>
+      </PopoverAnchor>
+      <PopoverContent
+        // A bar docked under the editor opens upward; one pinned above the
+        // note opens downward. Either flips if there isn't room.
+        side={openUp ? "top" : "bottom"}
+        align="start"
+        collisionPadding={8}
+        data-richtext-toolbar
+        className="w-auto rounded-lg p-1.5"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        onCloseAutoFocus={(e) => e.preventDefault()}
+        // The button toggles the menu itself; without this, pressing it
+        // while open would close the menu and at once open it again.
+        onInteractOutside={(e) => { if (triggerRef.current?.contains(e.target)) e.preventDefault(); }}
+        // A press in the menu's padding must not take the caret either.
+        onMouseDown={(e) => e.preventDefault()}
       >
-        <Icon className="w-4 h-4" />
-        <ChevronDown className="w-3 h-3" />
-      </button>
-      {open && (
-        <div className={cn(
-          "absolute left-0 z-50 rounded-lg border border-border-hairline bg-popover shadow-pop p-1.5",
-          // A bar docked under the editor opens upward; one pinned above
-          // the note has to open downward or it lands off-screen.
-          openUp ? "bottom-full mb-1" : "top-full mt-1"
-        )}>
-          {children}
-        </div>
-      )}
-    </div>
+        {children}
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -275,7 +308,7 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
 
   return (
     <div className={cn(
-      "flex items-center gap-0.5 flex-wrap px-1.5 py-1",
+      "flex items-end gap-1 px-1.5 py-1",
       placement === "docked"
         // Docked under the editor: only a top rule. No fill of its own, so
         // there is nothing to square off the box's rounded corners.
@@ -287,6 +320,7 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
           // Standalone bar: its own rounded box.
           : "rounded-lg border border-border-hairline"
     )}>
+      <div className="richtext-toolbar-row flex min-w-0 flex-1 flex-wrap items-center gap-0.5" data-testid="richtext-toolbar-row">
       {/* Undo/redo. Cmd+Z covers a keyboard; a phone has nothing else. */}
       <TBtn title="Undo" testid="richtext-undo" disabled={!editor.can().undo()} onAction={() => editor.chain().focus().undo().run()}>
         <Undo2 className="w-4 h-4" />
@@ -475,10 +509,12 @@ export default function Toolbar({ editor, onPickerOpenChange, wordLimit = 500, o
         </>
       )}
 
-      {/* Word counter */}
+      </div>
+
+      {/* Word counter — outside the row, so it stays put while the row scrolls. */}
       <span
         className={cn(
-          "ml-auto text-[11px] tabular-nums px-1.5 shrink-0",
+          "shrink-0 px-1 text-[11px] leading-7 tabular-nums",
           words >= wordLimit ? "text-red-500 dark:text-red-400 font-semibold" : "text-ink-400 dark:text-ink-500"
         )}
       >

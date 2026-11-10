@@ -9,6 +9,7 @@
 import { useRef, useState } from "react";
 import { X } from "lucide-react";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
+import { afterPress } from "@/lib/afterPress";
 import { cn } from "@/lib/utils";
 
 export default function TagsField({ form, setForm, savedTags }) {
@@ -112,8 +113,11 @@ export default function TagsField({ form, setForm, savedTags }) {
             onChange={(e) => { setText(e.target.value); setDismissed(false); setActive(0); }}
             onKeyDown={onKeyDown}
             onFocus={() => { setFocused(true); setDismissed(false); }}
-            onBlur={() => { setFocused(false); if (typed) add(typed); }}
-            className="h-6 min-w-[3rem] flex-1 bg-transparent px-1 text-base text-foreground outline-none placeholder:text-muted-foreground sm:text-sm"
+            // The typed tag becomes a chip once the mouse is up: a new chip
+            // can wrap the box onto another line, and doing that mid-press
+            // would move whatever is being clicked.
+            onBlur={() => { setFocused(false); if (typed) afterPress(() => add(typed)); }}
+            className="h-6 min-w-[3rem] flex-1 bg-transparent px-1 text-base text-foreground outline-none placeholder:text-muted-foreground md:text-sm"
           />
         </div>
       </PopoverAnchor>

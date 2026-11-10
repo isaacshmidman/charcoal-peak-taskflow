@@ -86,6 +86,8 @@ follows. Inside `cn()`, write `text-[11px]` instead.
 | A page's top | `components/PageHeader.jsx` — title, sub-line, actions; it stays put while the page scrolls. `PageSearch` is its search button. |
 | Two columns with a divider you can drag | `ui/TwoPane` (Notes, the calendar's day view). |
 | A form in a dialog | `tasks/TaskForm/parts.jsx`: `FormDialog` (quiet heading, a body that scrolls, a footer that stays), `Field` (one property per line: label left, control right), `DateField` (the date button and its pop-up). The task form and the subtask form are both built from these. |
+| A text box | `ui/Input`, `ui/Textarea`. 16px on phones (anything smaller makes iOS zoom the page), 14px from tablets up — the primitive does this, so don't set a size at the call site. No hand-rolled `<input>` borders, no native tick boxes: `ui/Checkbox` and `ui/Switch`. |
+| Rich text | `tasks/RichDescriptionEditor.jsx`. Its format bar arrives on first focus and then stays (quieter when you're elsewhere); its menus float in a portal so nothing can cut them off; on a touch screen the bar is one line that scrolls sideways. A link looks the same everywhere: ink, sun underline. |
 | Picking a date | `ui/Calendar`. The picked day is the only filled one; today is a small sun dot under its number. |
 | The logo | `components/Logo.jsx`. The PNG app icons are renders of `public/icon.svg`: `node scripts/render-icons.mjs`. |
 
@@ -97,6 +99,23 @@ primary button becomes sun with ink text, which is where the brand shows
 most. Use the surface names (`bg-surface-card`, `border-border-hairline`)
 where you can — they swap by themselves — and `dark:` with a `night-*` name
 where you can't.
+
+## Nothing moves under the pointer
+
+A click is a press and a release, and focus leaves the old box on the
+*press*. So anything that changes the layout when a box loses focus —
+a toolbar that hides, a typed tag turning into a chip, a new row — moves
+the control being clicked before the button comes up, and the click
+misses. Three rules keep that from happening:
+
+- Chrome that appears on focus stays once it has appeared.
+- Tidying on blur goes through `afterPress()` (`src/lib/afterPress.js`),
+  which waits for the click and runs just ahead of it.
+- A form dialog hangs from the top (`FormDialog`), so growing never moves
+  what is above the new row. A centred dialog re-centres every time.
+
+`e2e/task-flows.spec.ts` has a `humanClick` helper that holds the button
+down for a moment; Playwright's own `click()` is too quick to catch this.
 
 ## What to avoid
 

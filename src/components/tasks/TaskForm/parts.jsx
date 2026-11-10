@@ -39,7 +39,14 @@ export function FormDialog({ open, onOpenChange, title, testid, onKeyDown, focus
       <DialogContent
         // The body scrolls, not the dialog: the title bar and the buttons
         // stay where they are however long the form gets.
-        className="flex max-h-[min(92dvh,46rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg"
+        // Hung from the top, not centred. A centred form re-centres every
+        // time it grows — a time row appears, a subtask is added, a file
+        // is attached — which moves the whole form, including the control
+        // just clicked. Hung from the top it only ever grows downward.
+        // (The top is where a full-height form would be if centred.)
+        // Arrives with a short drop: the stock slide is measured from a
+        // centred dialog and would fall half the form's height.
+        className="top-[max(4dvh,calc(50dvh-23rem))] flex max-h-[min(92dvh,46rem)] translate-y-0 flex-col gap-0 overflow-hidden p-0 data-[state=closed]:!slide-out-to-top-2 data-[state=open]:!slide-in-from-top-2 sm:max-w-lg"
         // Radix would focus the first control whatever it is. A new item
         // wants the caret in its title; an existing one wants nothing
         // focused (on a phone that would throw the keyboard up over it).
@@ -48,6 +55,13 @@ export function FormDialog({ open, onOpenChange, title, testid, onKeyDown, focus
           if (focusTitle && window.matchMedia?.("(pointer: fine)").matches) {
             e.currentTarget.querySelector("[data-title-input]")?.focus();
           }
+        }}
+        // Something inside that has its own use for Escape (the link box:
+        // Escape abandons the link) keeps it. The dialog listens ahead of
+        // everything on the page, so without this the same keypress also
+        // closed the form — and a new task closed is a new task lost.
+        onEscapeKeyDown={(e) => {
+          if (e.target instanceof Element && e.target.closest("[data-own-escape]")) e.preventDefault();
         }}
         aria-describedby={undefined}
         data-testid={testid}

@@ -4,6 +4,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -92,13 +93,13 @@ export default function CalendarVisibilityDropdown({ calendars, hidden, onChange
               return (
                 <li key={c.key}>
                   <label
-                    className="flex items-center gap-2 px-1.5 py-1.5 rounded hover:bg-ink-50 dark:hover:bg-night-high cursor-pointer"
+                    className="flex items-center gap-2 px-1.5 py-1.5 rounded hover:bg-selected cursor-pointer"
                   >
-                    <input
-                      type="checkbox"
+                    <Checkbox
+                      size="sm"
                       checked={!isHidden}
-                      onChange={() => toggle(c.key)}
-                      className="h-3.5 w-3.5 accent-ink-700"
+                      onCheckedChange={() => toggle(c.key)}
+                      aria-label={`Show ${c.label}`}
                     />
                     {c.color ? (
                       <span

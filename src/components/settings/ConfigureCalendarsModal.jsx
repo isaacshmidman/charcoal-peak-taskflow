@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import {
   Popover,
   PopoverContent,
@@ -360,16 +361,13 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
                       </span>
                     )}
                   </div>
-                  <label className="inline-flex items-center cursor-pointer shrink-0">
-                    <input
-                      type="checkbox"
-                      checked={c.enabled}
-                      disabled={offline}
-                      onChange={(e) => toggle(c.external_calendar_id, e.target.checked)}
-                      className="sr-only peer"
-                    />
-                    <span className="relative w-9 h-5 rounded-full bg-ink-200 dark:bg-night-high peer-checked:bg-emerald-500 peer-disabled:opacity-50 transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:rounded-full after:bg-white after:shadow after:transition-transform peer-checked:after:translate-x-4" />
-                  </label>
+                  <Switch
+                    checked={!!c.enabled}
+                    disabled={offline}
+                    onChange={(on) => toggle(c.external_calendar_id, on)}
+                    label={`Sync ${c.summary || "this calendar"}`}
+                    className="shrink-0"
+                  />
                 </li>
               ))}
             </ul>

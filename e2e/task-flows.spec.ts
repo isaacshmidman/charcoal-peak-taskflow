@@ -800,6 +800,101 @@ test("files in the task form: a mixed pick keeps the good ones, and a drop anywh
   await expect(page.getByText("Trip paperwork")).toBeVisible();
 });
 
+// A person holds the mouse button down for a moment. Anything that changes
+// the layout when a box loses focus (which happens on mouse-DOWN) used to
+// move the control being clicked before the button came up, so the click
+// missed. Playwright's own click() is too fast to notice; these press,
+// wait, and release.
+async function humanClick(page: Page, target: Locator) {
+  // Fully in view and at rest first: the form's opening animation, or the
+  // browser scrolling a half-hidden control into view as it takes focus,
+  // would otherwise read as the control moving.
+  await target.evaluate(async (el) => {
+    const dialog = el.closest("[role='dialog']");
+    await Promise.all((dialog?.getAnimations() ?? []).map((animation) => animation.finished.catch(() => {})));
+    el.scrollIntoView({ block: "center" });
+  });
+  const box = (await target.boundingBox())!;
+  await page.mouse.move(box.x + Math.min(40, box.width / 2), box.y + box.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(80);
+  const held = (await target.boundingBox())!;
+  await page.mouse.up();
+  return { movedWhileHeld: Math.round(held.y - box.y) };
+}
+
+test("clicking the date after typing a description doesn't miss", async ({ page }) => {
+  await installMockBackend(page, { tasks: [], priorities: [defaultPriority] });
+  await page.goto("/Today");
+  await page.getByRole("button", { name: "New Task" }).click();
+  const form = page.getByTestId("task-form-dialog");
+  await page.getByTestId("task-form-title").fill("Renew passport");
+  await form.locator(".tiptap-prose").click();
+  await page.keyboard.type("Bring two photos");
+  await expect(page.getByTestId("richtext-style")).toBeVisible();
+
+  const top = (await form.boundingBox())!.y;
+  const click = await humanClick(page, page.getByTestId("task-form-date-trigger"));
+  expect(click.movedWhileHeld).toBe(0);
+  await expect(page.getByRole("grid")).toBeVisible();
+  // The form hangs from the top: growing never moves what's above.
+  expect(Math.round((await form.boundingBox())!.y - top)).toBe(0);
+  // The format bar stays once it has appeared, so nothing jumps back up.
+  await expect(page.getByTestId("richtext-style")).toBeVisible();
+});
+
+test("a subtask or tag left in its box doesn't make the next click miss, and is still kept", async ({ page }) => {
+  const api = await installMockBackend(page, { tasks: [], priorities: [defaultPriority] });
+  await page.goto("/Today");
+  await page.getByRole("button", { name: "New Task" }).click();
+  const form = page.getByTestId("task-form-dialog");
+  await page.getByTestId("task-form-title").fill("Post the parcel");
+
+  // Typed, not entered — then straight to "Add files" below it.
+  await page.getByLabel("New subtask").fill("Buy stamps");
+  const chooser = page.waitForEvent("filechooser");
+  const click = await humanClick(page, page.getByTestId("attachments-add"));
+  expect(click.movedWhileHeld).toBe(0);
+  await chooser;
+  await expect(page.getByTestId("task-form-subtasks").getByText("Buy stamps")).toBeVisible();
+
+  // Same for a tag, then straight to Create.
+  await page.getByLabel("Add a tag").fill("errands");
+  await humanClick(page, page.getByTestId("task-form-submit"));
+  await expect(form).toBeHidden();
+  const tasks = (await api.getState()).tasks;
+  expect(tasks.find((t) => t.title === "Post the parcel")).toMatchObject({ tags: ["errands"] });
+  expect(tasks.some((t) => t.title === "Buy stamps")).toBe(true);
+});
+
+test("Escape in the link box closes the link box, not the whole form", async ({ page }) => {
+  await installMockBackend(page, { tasks: [], priorities: [defaultPriority] });
+  await page.goto("/Today");
+  await page.getByRole("button", { name: "New Task" }).click();
+  const form = page.getByTestId("task-form-dialog");
+  await page.getByTestId("task-form-title").fill("Book the venue");
+  await form.locator(".tiptap-prose").click();
+  await page.keyboard.type("Their site");
+
+  await page.keyboard.press("ControlOrMeta+k");
+  await expect(page.getByTestId("richtext-link-input")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("richtext-link-input")).toBeHidden();
+  // The half-written task is still there.
+  await expect(form).toBeVisible();
+  await expect(page.getByTestId("task-form-title")).toHaveValue("Book the venue");
+
+  // A menu from the format bar closes on Escape the same way.
+  await page.getByTestId("richtext-style").click();
+  await expect(page.getByTestId("richtext-style-h1")).toBeVisible();
+  // All of it shows: the form's scrolling body used to cut the top off.
+  await expect(page.getByTestId("richtext-style-paragraph")).toBeInViewport({ ratio: 1 });
+  await expect(page.getByTestId("richtext-clear-formatting")).toBeInViewport({ ratio: 1 });
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("richtext-style-h1")).toBeHidden();
+  await expect(form).toBeVisible();
+});
+
 test("the date pop-up fills only the day you pick, and closes when you pick it", async ({ page }) => {
   await installMockBackend(page, { tasks: [], priorities: [defaultPriority] });
   await page.goto("/Today");
