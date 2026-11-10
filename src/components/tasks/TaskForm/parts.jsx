@@ -6,7 +6,8 @@
  *   FormDialog  the dialog itself — a quiet heading, a body that scrolls,
  *               and a footer that stays put (delete left, actions right).
  *   Field       one property on one line: a quiet label, then its control.
- *   DateField   the date button and its pop-up calendar.
+ *   DateField   the date button and its pop-up calendar (DatePopover is
+ *               the pop-up alone, for a date that isn't shown as a field).
  */
 import { useId, useState } from "react";
 import { addDays } from "date-fns/addDays";
@@ -108,20 +109,20 @@ export function friendlyDate(dateStr) {
 }
 
 /**
- * The date button. Picking a day closes the pop-up — one click, done.
+ * The pop-up month, around whatever opens it. Picking a day closes it —
+ * one click, done. `children` is the trigger (one element).
  *
  * @param {{
  *   value: string,                       // "yyyy-MM-dd" or ""
  *   onChange: (next: string) => void,    // "" when cleared
- *   placeholder?: string,
  *   clearLabel?: string,                 // omit to offer no way to clear
  *   shortcuts?: boolean,                 // Today / Tomorrow / Next week
- *   testid?: string,
  *   clearTestid?: string,
- *   className?: string,
+ *   align?: "start" | "center" | "end",
+ *   children: import("react").ReactNode,
  * }} props
  */
-export function DateField({ value, onChange, placeholder = "No date", clearLabel, shortcuts = true, testid, clearTestid, className }) {
+export function DatePopover({ value, onChange, clearLabel, shortcuts = true, clearTestid, align = "start", children }) {
   const [open, setOpen] = useState(false);
   const pick = (next) => { onChange(next); setOpen(false); };
   const today = new Date();
@@ -132,22 +133,8 @@ export function DateField({ value, onChange, placeholder = "No date", clearLabel
   ];
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          data-testid={testid}
-          className={cn(
-            "h-9 w-full justify-start gap-2 px-3 text-sm font-normal",
-            !value && "text-ink-400 dark:text-ink-500",
-            className
-          )}
-        >
-          <CalendarIcon className="h-4 w-4 shrink-0 text-ink-400 dark:text-ink-500" />
-          <span className="truncate">{value ? friendlyDate(value) : placeholder}</span>
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
+      <PopoverTrigger asChild>{children}</PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align={align} onClick={(e) => e.stopPropagation()}>
         <Calendar
           mode="single"
           selected={value ? fromDateStr(value) : undefined}
@@ -186,5 +173,39 @@ export function DateField({ value, onChange, placeholder = "No date", clearLabel
         )}
       </PopoverContent>
     </Popover>
+  );
+}
+
+/**
+ * The date button of a form: a DatePopover behind a full-width button.
+ *
+ * @param {{
+ *   value: string,
+ *   onChange: (next: string) => void,
+ *   placeholder?: string,
+ *   clearLabel?: string,
+ *   shortcuts?: boolean,
+ *   testid?: string,
+ *   clearTestid?: string,
+ *   className?: string,
+ * }} props
+ */
+export function DateField({ value, onChange, placeholder = "No date", clearLabel, shortcuts = true, testid, clearTestid, className }) {
+  return (
+    <DatePopover value={value} onChange={onChange} clearLabel={clearLabel} shortcuts={shortcuts} clearTestid={clearTestid}>
+      <Button
+        type="button"
+        variant="outline"
+        data-testid={testid}
+        className={cn(
+          "h-9 w-full justify-start gap-2 px-3 text-sm font-normal",
+          !value && "text-ink-400 dark:text-ink-500",
+          className
+        )}
+      >
+        <CalendarIcon className="h-4 w-4 shrink-0 text-ink-400 dark:text-ink-500" />
+        <span className="truncate">{value ? friendlyDate(value) : placeholder}</span>
+      </Button>
+    </DatePopover>
   );
 }

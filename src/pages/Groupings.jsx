@@ -27,7 +27,15 @@ import { calendarKeyForTask } from "@/lib/calendar-order";
 import { useShortcutEvent } from "@/hooks/useShortcutEvent";
 import { SHORTCUT_EVENTS } from "@/lib/shortcuts";
 
-function GroupColumn({ title, subtitle, tasks, priorities, priorityOrderMap, onToggleDone, onEdit, onDelete, onUpdate, today, wide, sorts, calendarIndexByKey }) {
+/**
+ * One column of a board: a heading, a count, and its tasks.
+ *
+ * Every column is the same plain surface. Only Today is marked, with a
+ * wash of sun behind its heading — one accent, not a colour per column.
+ * A column of overdue tasks shows its count in red, and nothing else
+ * about it changes.
+ */
+function GroupColumn({ title, subtitle, tasks, priorities, priorityOrderMap, onToggleDone, onEdit, onDelete, onUpdate, today, overdue, meta, sorts, calendarIndexByKey, columnRef, testid }) {
   // One comparator for every task list — see lib/task-sort.js.
   const compareFn = (a, b, sortValue) =>
     compareTasks(a, b, sortValue, { priorityOrderMap, calendarIndexByKey });
@@ -43,25 +51,37 @@ function GroupColumn({ title, subtitle, tasks, priorities, priorityOrderMap, onT
   }, [tasks, sorts, priorityOrderMap, calendarIndexByKey]);
 
   return (
-    // Every column is the same plain surface. Only Today is marked, with a
-    // wash of sun behind its heading — one accent, not a colour per column.
-    <div className={`flex-shrink-0 ${wide ? "w-72" : "w-60"} flex flex-col rounded-xl border border-border-hairline bg-surface-card overflow-hidden`}>
-      <div className={cn("px-3 py-2.5 border-b border-border-hairline", today && "bg-sun-100 dark:bg-sun-400/[0.12]")}>
-        <p className="text-sm font-semibold text-ink-900 dark:text-ink-100">{title}</p>
-        <p className="text-xs2 text-ink-500 dark:text-ink-400 mt-0.5">
-          {subtitle ? `${subtitle} · ` : ""}{tasks.length} task{tasks.length !== 1 ? "s" : ""}
-        </p>
-      </div>
-      {/* An empty group keeps the height of a two-task one. Without a
-          floor it collapsed to a sliver once the "Clear skies" line was
-          removed, so a board of empty groups looked ragged. */}
-      <div
-        className={cn(
-          "flex-1 overflow-y-auto max-h-[70vh] divide-y divide-[var(--border-hairline)]",
-          // An empty column stays as tall as one holding two rows.
-          sorted.length === 0 && "min-h-[4.75rem]"
-        )}
-      >
+    <section
+      ref={columnRef}
+      data-testid={testid}
+      aria-label={`${title}, ${tasks.length} task${tasks.length !== 1 ? "s" : ""}`}
+      // On a phone a column is most of the screen and the board snaps to
+      // it. From a tablet up, columns share the width when they all fit
+      // and keep a readable minimum (so the board scrolls) when they don't.
+      className={cn(
+        "flex w-[80vw] max-w-[19rem] shrink-0 snap-start flex-col overflow-hidden rounded-xl border border-border-hairline bg-surface-card",
+        "sm:w-auto sm:max-w-[22rem] sm:flex-1",
+        today ? "sm:min-w-[17rem]" : "sm:min-w-[15rem]"
+      )}
+    >
+      <header className={cn("border-b border-border-hairline px-3 py-2.5", today && "bg-sun-100 dark:bg-sun-400/[0.12]")}>
+        <div className="flex items-baseline justify-between gap-2">
+          <h3 className="min-w-0 truncate text-sm font-semibold text-ink-900 dark:text-ink-100" title={title}>{title}</h3>
+          <span
+            className={cn(
+              "shrink-0 text-xs tabular-nums",
+              overdue && tasks.length > 0 ? "font-semibold text-red-600 dark:text-red-400" : "text-ink-500 dark:text-ink-400"
+            )}
+          >
+            {tasks.length}
+          </span>
+        </div>
+        {subtitle ? <p className="mt-0.5 text-[11px] text-ink-500 dark:text-ink-400">{subtitle}</p> : null}
+      </header>
+      {/* An empty column keeps the height of a two-task one, so a board
+          with empty columns doesn't look ragged. A long one scrolls
+          inside itself, so the board never grows taller than the screen. */}
+      <div className="max-h-[max(14rem,calc(100dvh-23.5rem))] min-h-[4.75rem] flex-1 divide-y divide-[var(--border-hairline)] overflow-y-auto overscroll-contain sm:max-h-[max(14rem,calc(100dvh-19rem))]">
         {sorted.length === 0 ? null : (
           <AnimatePresence mode="popLayout">
             {sorted.map(task => (
@@ -73,14 +93,30 @@ function GroupColumn({ title, subtitle, tasks, priorities, priorityOrderMap, onT
                 onEdit={onEdit}
                 onDelete={onDelete}
                 onUpdate={onUpdate}
+                meta={meta}
               />
             ))}
           </AnimatePresence>
         )}
       </div>
+    </section>
+  );
+}
+
+/** The row of columns. Scrolls sideways when they don't all fit. */
+function Board({ scrollRef, children }) {
+  return (
+    <div
+      ref={scrollRef}
+      data-testid="groupings-board"
+      className="-mx-4 flex snap-x snap-proximity items-start gap-3 overflow-x-auto scroll-px-4 px-4 pb-4 sm:-mx-6 sm:scroll-px-6 sm:px-6"
+    >
+      {children}
     </div>
   );
 }
+
+const VIEWS = [["date", "By date"], ["tag", "By tag"]];
 
 export default function Groupings() {
   const [showForm, setShowForm] = useState(false);
@@ -98,6 +134,14 @@ export default function Groupings() {
   const [search, setSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [recurringDeleteTask, setRecurringDeleteTask] = useState(null);
+  // One board at a time — by date or by tag — remembered between visits.
+  const [view, setView] = useState(() => {
+    try { return localStorage.getItem("groupings_view") === "tag" ? "tag" : "date"; } catch { return "date"; }
+  });
+  const chooseView = (next) => {
+    setView(next);
+    try { localStorage.setItem("groupings_view", next); } catch { /* private mode: just don't remember */ }
+  };
   const todayColRef = useRef(null);
   const scrollContainerRef = useRef(null);
 
@@ -214,17 +258,23 @@ export default function Groupings() {
       const col = todayColRef.current;
       const containerRect = container.getBoundingClientRect();
       const colRect = col.getBoundingClientRect();
-      // Center of today column relative to scroll content (accounting for current scroll position)
-      const colMidFromScrollLeft = (colRect.left - containerRect.left) + container.scrollLeft + colRect.width / 2;
-      // Half the visible width of the scroll container
-      const containerHalf = container.clientWidth / 2;
-      container.scrollLeft = colMidFromScrollLeft - containerHalf;
+      // Today's left edge within the scrolling content.
+      const colLeft = (colRect.left - containerRect.left) + container.scrollLeft;
+      // On a wide screen Today sits in the middle, with what's overdue
+      // on its left and what's coming on its right. On a phone a column
+      // is most of the screen, so Today starts at the edge instead —
+      // centred, it would rest between two snap points.
+      const narrow = colRect.width > container.clientWidth * 0.6;
+      container.scrollLeft = narrow
+        ? colLeft - 16
+        : colLeft + colRect.width / 2 - container.clientWidth / 2;
     }
   };
 
+  // On arrival, and whenever the date board comes back into view.
   useEffect(() => {
-    centerToday();
-  }, []);
+    if (view === "date") centerToday();
+  }, [view]);
 
   // Re-center once tasks have loaded and columns are rendered — runs exactly
   // once on the first non-empty load so completing a task later doesn't reset
@@ -237,20 +287,53 @@ export default function Groupings() {
     requestAnimationFrame(centerToday);
   }, [tasks.length]);
 
+  // Past, Yesterday and "No date" only appear when something is in them:
+  // an empty Past is the good state, and not worth a column. The four
+  // that look ahead are always there.
   const columns = [
-    { key: "past", title: "Past", subtitle: "Before yesterday", tasks: groups.past },
-    { key: "yest", title: "Yesterday", subtitle: format(yesterday, "MMM d"), tasks: groups.yest },
-    { key: "tod", title: "Today", subtitle: format(today, "MMM d"), tasks: groups.tod, today: true, wide: true },
-    { key: "tom", title: "Tomorrow", subtitle: format(tomorrow, "MMM d"), tasks: groups.tom },
-    { key: "next7", title: "Next 7 Days", subtitle: `${format(addDays(tomorrow, 1), "MMM d")} – ${format(nextSevenDaysEnd, "MMM d")}`, tasks: groups.next7 },
-    { key: "future", title: "Future", subtitle: `After ${format(nextSevenDaysEnd, "MMM d")}`, tasks: groups.future },
-    { key: "noDue", title: "No Due Date", tasks: groups.noDue },
-  ];
+    { key: "past", title: "Past", subtitle: `Before ${format(yesterday, "MMM d")}`, tasks: groups.past, overdue: true, optional: true },
+    { key: "yest", title: "Yesterday", subtitle: format(yesterday, "EEE, MMM d"), tasks: groups.yest, overdue: true, optional: true, meta: "time" },
+    { key: "tod", title: "Today", subtitle: format(today, "EEE, MMM d"), tasks: groups.tod, today: true, meta: "time" },
+    { key: "tom", title: "Tomorrow", subtitle: format(tomorrow, "EEE, MMM d"), tasks: groups.tom, meta: "time" },
+    { key: "next7", title: "Next 7 days", subtitle: `${format(addDays(tomorrow, 1), "MMM d")} – ${format(nextSevenDaysEnd, "MMM d")}`, tasks: groups.next7 },
+    { key: "future", title: "Later", subtitle: `After ${format(nextSevenDaysEnd, "MMM d")}`, tasks: groups.future },
+    { key: "noDue", title: "No date", tasks: groups.noDue, optional: true },
+  ].filter((col) => !col.optional || col.tasks.length > 0);
+
+  const columnProps = {
+    priorities,
+    priorityOrderMap,
+    onToggleDone: handleToggleDone,
+    onEdit: handleEdit,
+    onDelete: handleDelete,
+    onUpdate: handleUpdate,
+    sorts,
+  };
 
   return (
-    <div className="space-y-5">
-      <PageHeader title="Groupings" sub={<>{topLevel.length} task{topLevel.length !== 1 ? "s" : ""}</>}>
-        <PageSearch open={showSearch} onOpenChange={setShowSearch} value={search} onChange={setSearch} placeholder="Search title or tag..." />
+    <div>
+      <PageHeader
+        title="Groupings"
+        sub={<>{topLevel.length} task{topLevel.length !== 1 ? "s" : ""}</>}
+        below={
+          <div className="mt-3 flex">
+            <div className="ds-seg flex-1 sm:flex-none">
+              {VIEWS.map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => chooseView(key)}
+                  aria-pressed={view === key}
+                  className="ds-seg-item flex-1 px-3 py-1 text-xs sm:flex-none"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        }
+      >
+        <PageSearch open={showSearch} onOpenChange={setShowSearch} value={search} onChange={setSearch} placeholder="Search title or tag" />
         <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} page="groupings" />
         <Button aria-label="New Task" onClick={() => { setEditingTask(null); setAddSubtaskParent(null); setShowForm(true); }} className="h-9 gap-1.5">
           <Plus className="w-4 h-4" />
@@ -258,52 +341,44 @@ export default function Groupings() {
         </Button>
       </PageHeader>
 
-      {/* Date-based groups */}
-      <h2 className="text-xs font-medium text-ink-500 dark:text-ink-400 mb-3">By date</h2>
-      <div ref={scrollContainerRef} className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4">
-        {columns.map(col => (
-          <div key={col.key} ref={col.key === "tod" ? todayColRef : null}>
-            <GroupColumn
-              title={col.title}
-              subtitle={col.subtitle}
-              tasks={col.tasks}
-              priorities={priorities}
-              priorityOrderMap={priorityOrderMap}
-              onToggleDone={handleToggleDone}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-              onUpdate={handleUpdate}
-              today={col.today}
-              wide={col.wide}
-              sorts={sorts}
-              calendarIndexByKey={calendarIndexByKey}
-            />
-          </div>
-        ))}
-      </div>
-
-      {/* Tag-based groups */}
-      {tagGroups.length > 0 && (
-        <div>
-          <h2 className="text-xs font-medium text-ink-500 dark:text-ink-400 mb-3">By tag</h2>
-          <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4">
-            {tagGroups.map(({ tag, tasks: tagTasks }) => (
+      <div className="mt-3">
+        {view === "date" ? (
+          // Keyed, so each board is its own element and starts from its
+          // own beginning rather than inheriting the other's scroll.
+          <Board key="date" scrollRef={scrollContainerRef}>
+            {columns.map((col) => (
               <GroupColumn
-                key={tag}
-                title={tag}
-                tasks={tagTasks}
-                priorities={priorities}
-                priorityOrderMap={priorityOrderMap}
-                onToggleDone={handleToggleDone}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                onUpdate={handleUpdate}
-                sorts={sorts}
+                key={col.key}
+                testid={`group-${col.key}`}
+                columnRef={col.key === "tod" ? todayColRef : undefined}
+                title={col.title}
+                subtitle={col.subtitle}
+                tasks={col.tasks}
+                today={col.today}
+                overdue={col.overdue}
+                meta={col.meta}
+                calendarIndexByKey={calendarIndexByKey}
+                {...columnProps}
               />
             ))}
+          </Board>
+        ) : tagGroups.length > 0 ? (
+          <Board key="tag">
+            {tagGroups.map(({ tag, tasks: tagTasks }) => (
+              <GroupColumn key={tag} testid={`group-tag-${tag}`} title={tag} tasks={tagTasks} {...columnProps} />
+            ))}
+          </Board>
+        ) : (
+          <div className="rounded-xl border border-dashed border-border-strong px-6 py-12 text-center" data-testid="groupings-no-tags">
+            <p className="text-sm font-medium text-ink-900 dark:text-ink-100">
+              {search ? "No tagged tasks match your search" : "No tagged tasks yet"}
+            </p>
+            <p className="mx-auto mt-1 max-w-xs text-xs text-ink-500 dark:text-ink-400">
+              {search ? "Try a different word, or clear the search." : "Add a tag to a task and it gets a column here, with every other task that shares it."}
+            </p>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       <TaskForm
         open={showForm}
