@@ -19,11 +19,12 @@ FROM node:22.14.0-slim
 
 WORKDIR /app
 
-# Install libvips (image processing) WITH libheif so sharp's HEIC →
-# JPEG conversion uses native code instead of a slow JS fallback.
-# Phone photos (iPhone defaults to HEIC) need this — without it the
-# upload appears to hang for tens of seconds, then the file can't
-# render in any non-Safari browser.
+# System image libraries. NOTE: sharp does not use these — it ships its
+# own prebuilt library, and would only use the system one if compiled
+# against it (Debian's is older than sharp accepts). HEIC photos are
+# converted by backend/lib/heic.js instead, which needs nothing from the
+# system. These are kept only so this image doesn't change shape in the
+# same release as that fix; they can be dropped in a later one.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       libvips \

@@ -29,7 +29,7 @@
  *     readOnly?: boolean,
  *   }} props
  */
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Paperclip, Upload } from "lucide-react";
 import { apiClient } from "@/api/apiClient";
@@ -50,20 +50,55 @@ function makeTempId() {
   return `temp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-function validateFile(file, existingCount) {
-  if (existingCount >= MAX_PER_TASK) {
-    return `Too many attachments (max ${MAX_PER_TASK}).`;
+// Mirrors the backend blocklist so the user hears about it at once.
+const BLOCKED_EXTENSIONS = ["exe", "bat", "cmd", "com", "scr", "msi", "app", "dmg", "sh", "ps1"];
+
+/** Why one file can't be attached, or null if it can. */
+function validateFile(file) {
+  if (file.size === 0) {
+    // A folder dragged in shows up as an empty file; so does a truly
+    // empty one. Either way there is nothing to upload.
+    return `“${file.name}” is empty (folders can't be attached).`;
   }
   if (file.size > MAX_FILE_BYTES) {
     return `“${file.name}” is too large (max ${MAX_FILE_BYTES / 1_000_000} MB).`;
   }
-  // Mirror the backend blocklist so the user gets immediate feedback.
-  const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
-  if (["exe", "bat", "cmd", "com", "scr", "msi", "app", "dmg", "sh", "ps1"].includes(ext)) {
-    return `“.${ext}” files are not allowed.`;
+  const ext = file.name.includes(".") ? file.name.split(".").pop().toLowerCase() : "";
+  if (BLOCKED_EXTENSIONS.includes(ext)) {
+    return `“${file.name}”: .${ext} files are not allowed.`;
   }
   return null;
 }
+
+/**
+ * Sort a picked batch into what can be attached and why the rest can't.
+ * One bad file no longer sinks the whole batch: the good ones go ahead
+ * and the message names the ones left out.
+ *
+ * @param {File[]} files
+ * @param {number} existingCount  files already on the task
+ * @returns {{ accepted: File[], problems: string[] }}
+ */
+export function sortPickedFiles(files, existingCount) {
+  const accepted = [];
+  const problems = [];
+  let overLimit = 0;
+  for (const file of files) {
+    const problem = validateFile(file);
+    if (problem) problems.push(problem);
+    else if (existingCount + accepted.length >= MAX_PER_TASK) overLimit += 1;
+    else accepted.push(file);
+  }
+  if (overLimit) {
+    problems.push(
+      `A task holds ${MAX_PER_TASK} files — ${overLimit === 1 ? "1 file was" : `${overLimit} files were`} left out.`
+    );
+  }
+  return { accepted, problems };
+}
+
+/** True when a drag or a paste is carrying files (not text, not a link). */
+const carriesFiles = (dataTransfer) => Array.from(dataTransfer?.types || []).includes("Files");
 
 /** Bump the cached task's attachment_count by `delta` (positive or negative). */
 function patchCachedTaskCount(queryClient, taskId, delta) {
@@ -81,6 +116,7 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
   const queryClient = useQueryClient();
   const online = useOnlineStatus();
   const inputRef = useRef(null);
+  const rootRef = useRef(null);
   const [dragOver, setDragOver] = useState(false);
   const [previewing, setPreviewing] = useState(null);
   const [topLevelError, setTopLevelError] = useState("");
@@ -181,37 +217,38 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
     setTopLevelError("");
     const fileList = Array.from(files || []);
     if (!fileList.length) return;
-    for (let i = 0; i < fileList.length; i++) {
-      const validation = validateFile(fileList[i], totalCount + i);
-      if (validation) {
-        setTopLevelError(validation);
-        return;
-      }
+
+    // A task that doesn't exist on the server yet can't take files while
+    // offline: there is no id to queue them against, and they would be
+    // dropped without a word when the task is created.
+    if (!online && (!taskId || String(taskId).startsWith("offline_"))) {
+      setTopLevelError("You're offline. Save this task, then add its files once you're back online.");
+      return;
     }
+
+    const { accepted, problems } = sortPickedFiles(fileList, totalCount);
+    if (problems.length) setTopLevelError(problems.join(" "));
+    if (!accepted.length) return;
+
     // ── Offline path (existing task only) ──────────────────────
     // Stash the files in IndexedDB; the replay driver uploads them on
     // reconnect. We do NOT touch pendingFiles for these — they render
     // from the offlineAttachments query as "queued (offline)" chips.
     if (taskId && !online) {
-      if (String(taskId).startsWith("offline_")) {
-        // The task itself was created offline and hasn't synced; its
-        // server id will differ, so we can't queue an upload against it.
-        setTopLevelError("Reconnect to the internet to attach files to a newly created task.");
-        return;
-      }
-      Promise.all(fileList.map((file) => attachmentQueue.enqueue({ taskId, file })))
+      Promise.all(accepted.map((file) => attachmentQueue.enqueue({ taskId, file })))
         .then(() => queryClient.invalidateQueries({ queryKey: ["offlineAttachments", taskId] }))
         .catch(() => setTopLevelError("Couldn't queue files for offline upload on this device."));
       return;
     }
 
-    const newPending = fileList.map((file) => ({
+    const newPending = accepted.map((file) => ({
       tempId: makeTempId(),
       file,
       status: "queued",
       progress: 0,
     }));
-    setPendingFiles([...(pendingFiles || []), ...newPending]);
+    // Functional, so two batches added in quick succession both land.
+    setPendingFiles((current = []) => [...current, ...newPending]);
     if (taskId) {
       // Existing task, online — schedule uploads; the semaphore caps concurrency.
       newPending.forEach(({ file, tempId }) => {
@@ -220,6 +257,60 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
     }
     // For NEW task: parent's handleSubmit will call flushPendingUploads.
   };
+
+  // The whole form takes a dropped or pasted file, not just the small
+  // "Add files" strip. Before this, a file dropped a few pixels wide of
+  // the strip made the browser leave the app and open the file instead —
+  // taking the half-filled form with it.
+  const handleFilesRef = useRef(handleFiles);
+  handleFilesRef.current = handleFiles;
+  useEffect(() => {
+    if (readOnly) return undefined;
+    const form = rootRef.current?.closest("[role='dialog']") || rootRef.current;
+    if (!form) return undefined;
+    const inForm = (event) => form.contains(event.target);
+
+    const onDragOver = (event) => {
+      if (!carriesFiles(event.dataTransfer)) return;
+      // Always claim a file drag while the form is open, so a miss never
+      // navigates away; only a drop inside the form attaches.
+      event.preventDefault();
+      event.dataTransfer.dropEffect = inForm(event) ? "copy" : "none";
+      setDragOver(inForm(event));
+    };
+    const onDrop = (event) => {
+      if (!carriesFiles(event.dataTransfer)) return;
+      event.preventDefault();
+      setDragOver(false);
+      if (inForm(event)) handleFilesRef.current(event.dataTransfer.files);
+    };
+    const onDragEnd = (event) => {
+      // Left the window (no related target), or the drag was abandoned.
+      if (event.type === "dragend" || !event.relatedTarget) setDragOver(false);
+    };
+    const onPaste = (event) => {
+      const data = event.clipboardData;
+      if (!data?.files?.length || !inForm(event)) return;
+      // Copying from a document or a spreadsheet puts a picture of the
+      // selection on the clipboard next to the text. That paste is text.
+      if (data.getData("text/plain")) return;
+      event.preventDefault();
+      handleFilesRef.current(data.files);
+    };
+
+    window.addEventListener("dragover", onDragOver);
+    window.addEventListener("drop", onDrop);
+    window.addEventListener("dragleave", onDragEnd);
+    window.addEventListener("dragend", onDragEnd);
+    window.addEventListener("paste", onPaste);
+    return () => {
+      window.removeEventListener("dragover", onDragOver);
+      window.removeEventListener("drop", onDrop);
+      window.removeEventListener("dragleave", onDragEnd);
+      window.removeEventListener("dragend", onDragEnd);
+      window.removeEventListener("paste", onPaste);
+    };
+  }, [readOnly]);
 
   /** Remove an offline-queued (not-yet-uploaded) file from IndexedDB. */
   const removeOfflineQueued = async (id) => {
@@ -244,27 +335,14 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
     }
   };
 
-  const onDrop = (e) => {
-    e.preventDefault();
-    setDragOver(false);
-    if (!readOnly) handleFiles(e.dataTransfer.files);
-  };
-
-  const onDragOver = (e) => {
-    e.preventDefault();
-    if (!readOnly) setDragOver(true);
-  };
-
   return (
-    <div className="min-w-0">
+    <div className="min-w-0" ref={rootRef}>
       {/* Drop zone + file picker trigger */}
       {!readOnly && (
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          onDrop={onDrop}
-          onDragOver={onDragOver}
-          onDragLeave={() => setDragOver(false)}
+          data-testid="attachments-add"
           className={cn(
             "flex min-h-9 w-full items-center gap-2 rounded-lg border border-dashed px-3 py-1.5 text-left text-sm transition-colors",
             "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ink-900/10 dark:focus-visible:ring-sun-400/20",
@@ -276,12 +354,13 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
           {dragOver ? (
             <>
               <Upload className="h-4 w-4 shrink-0" />
-              Drop to attach
+              Drop anywhere here to attach
             </>
           ) : (
             <>
               <Paperclip className="h-4 w-4 shrink-0" />
-              Add files, or drop them here
+              {/* Nothing can be dragged onto a phone, so it doesn't offer. */}
+              <span>Add files<span className="[@media(pointer:coarse)]:hidden">, or drop them here</span></span>
             </>
           )}
         </button>
@@ -296,6 +375,7 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
         // Library", "Take Photo or Video", "Choose Files" — which is
         // what the user expects on Apple devices.
         multiple
+        data-testid="attachments-input"
         className="hidden"
         onChange={(e) => {
           handleFiles(e.target.files);
@@ -305,7 +385,7 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
       />
 
       {topLevelError && (
-        <p className="mt-2 text-xs text-red-500 dark:text-red-300">{topLevelError}</p>
+        <p role="alert" className="mt-2 text-xs text-red-600 dark:text-red-400">{topLevelError}</p>
       )}
 
       {!online && taskId && (
@@ -330,7 +410,9 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
               key={tempId}
               attachment={null}
               localFile={file}
-              uploading={status === "uploading" || status === "queued"}
+              // A new task's files wait for Save; nothing is in flight.
+              uploading={!!taskId && (status === "uploading" || status === "queued")}
+              waitingForSave={!taskId}
               progress={status === "uploading" ? progress : null}
               uploadError={status === "error" ? (error || "Upload failed") : null}
               onRetry={status === "error" && taskId
@@ -369,7 +451,7 @@ export default function AttachmentsField({ taskId, pendingFiles, setPendingFiles
  *
  * @param {string} taskId
  * @param {Array<{ tempId: string, file: File }>} pending
- * @returns {Promise<Array<{ file: File, ok: boolean, error?: string }>>}
+ * @returns {Promise<Array<{ file: File, ok: boolean, error?: string, status?: number }>>}
  */
 export async function flushPendingUploads(taskId, pending) {
   if (!taskId || !pending?.length) return [];
@@ -381,8 +463,61 @@ export async function flushPendingUploads(taskId, pending) {
     } catch (err) {
       const msg = err?.message || "Upload failed";
       console.warn("Attachment upload failed for", file.name, msg);
-      results.push({ file, ok: false, error: msg });
+      results.push({ file, ok: false, error: msg, status: err?.status });
     }
   }
   return results;
+}
+
+/** A refusal the server will repeat, as opposed to a dropped connection. */
+const isRefusal = attachmentQueue.isPermanentUploadFailure;
+
+/**
+ * Upload the files picked for a task that has just been created, and
+ * deal with the ones that didn't make it — which used to vanish without
+ * a word, because the form that could have shown the error had closed.
+ *
+ *   - the connection dropped (or the server hiccuped): the file is put
+ *     in the offline queue and uploads by itself when things recover;
+ *   - the server refused it: nothing to retry, so the reason is reported;
+ *   - the task itself was only saved offline: there is no server task to
+ *     attach to yet, so that is reported too.
+ *
+ * @param {string} taskId
+ * @param {Array<{ tempId: string, file: File }>} pending
+ * @returns {Promise<{ uploaded: number, queued: number, message: string }>}
+ *   `message` is "" when everything uploaded; otherwise a sentence to show.
+ */
+export async function attachToNewTask(taskId, pending) {
+  if (!taskId || !pending?.length) return { uploaded: 0, queued: 0, message: "" };
+  const count = (n) => `${n} file${n === 1 ? "" : "s"}`;
+
+  if (String(taskId).startsWith("offline_")) {
+    return {
+      uploaded: 0,
+      queued: 0,
+      message: `The task was saved offline, so its ${count(pending.length)} couldn't be attached. Add ${pending.length === 1 ? "it" : "them"} again once you're back online.`,
+    };
+  }
+
+  const results = await flushPendingUploads(taskId, pending);
+  const failed = results.filter((r) => !r.ok);
+  const refused = failed.filter((r) => isRefusal(r.status));
+  const retryable = failed.filter((r) => !isRefusal(r.status));
+
+  let queued = 0;
+  for (const { file } of retryable) {
+    try {
+      await attachmentQueue.enqueue({ taskId, file });
+      queued += 1;
+    } catch {
+      refused.push({ file, ok: false, error: "it couldn't be saved on this device to retry" });
+    }
+  }
+
+  const parts = [];
+  if (queued) parts.push(`${count(queued)} will finish uploading when the connection is back.`);
+  if (refused.length === 1) parts.push(`Couldn't attach “${refused[0].file.name}”: ${refused[0].error}`);
+  else if (refused.length > 1) parts.push(`Couldn't attach ${count(refused.length)}: ${refused[0].error}`);
+  return { uploaded: results.length - failed.length, queued, message: parts.join(" ") };
 }

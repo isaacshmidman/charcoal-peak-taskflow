@@ -25,6 +25,20 @@
  * ancient browser, SSR), reads return [] and writes reject — callers
  * treat a rejected enqueue as "couldn't queue, surface an error".
  */
+/** Fired on `window` whenever a file is added to the queue. */
+export const QUEUED_EVENT = "zephyrly:attachment-queued";
+
+/**
+ * True when the server refused the file and would refuse it again (bad
+ * request, not yours, task gone, too large, blocked type). Anything else
+ * — no connection, a server hiccup, an expired session — is worth
+ * another try, so the file stays queued.
+ * @param {number | string | undefined} status
+ */
+export function isPermanentUploadFailure(status) {
+  return [400, 403, 404, 413, 415].includes(Number(status));
+}
+
 const DB_NAME = "zephyrly-attachments";
 const STORE = "pending";
 const DB_VERSION = 1;
@@ -94,6 +108,8 @@ export async function enqueue({ taskId, file }) {
     t.onerror = () => reject(t.error);
     t.onabort = () => reject(t.error);
   });
+  // Tell the replay driver (useAttachmentQueue) there is something to send.
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(QUEUED_EVENT));
   // Don't hand the raw bytes back to callers — they only need metadata.
   const { bytes: _bytes, ...meta } = record;
   return meta;

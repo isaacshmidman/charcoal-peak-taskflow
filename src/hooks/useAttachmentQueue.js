@@ -3,8 +3,9 @@
  * @file Drains the offline attachment queue (Pri 6). Mounted once in
  * Layout, alongside useOfflineData (which replays JSON mutations).
  *
- * On `online` / `focus`, and once on mount if already online, it walks
- * the IndexedDB queue and uploads each file. Mirrors useOfflineData's
+ * On `online` / `focus`, once on mount if already online, and on a timer
+ * while anything is still waiting, it walks the IndexedDB queue and
+ * uploads each file. Mirrors useOfflineData's
  * guards: a single drain runs at a time (inFlightRef), and a drain
  * requested while one is running re-runs afterward (requestedRef).
  *
@@ -19,9 +20,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/api/apiClient";
 import * as attachmentQueue from "@/lib/attachmentQueue";
 
-function isPermanent(status) {
-  return [400, 403, 404, 413, 415].includes(Number(status));
-}
+const isPermanent = attachmentQueue.isPermanentUploadFailure;
+
+// A file that failed while the connection was UP (the server hiccuped, or
+// the upload was cut off) gets no `online` event to wake it. So a drain
+// that leaves something behind books another go: 20 s, then doubling to
+// 5 minutes at most.
+const FIRST_RETRY_MS = 20_000;
+const MAX_RETRY_MS = 5 * 60_000;
 
 export function useAttachmentQueue() {
   const queryClient = useQueryClient();
@@ -29,6 +35,18 @@ export function useAttachmentQueue() {
   const requestedRef = useRef(false);
 
   useEffect(() => {
+    let retryTimer = null;
+    let retryDelay = FIRST_RETRY_MS;
+    let stopped = false;
+    const scheduleRetry = () => {
+      if (stopped || retryTimer) return;
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        retryDelay = Math.min(retryDelay * 2, MAX_RETRY_MS);
+        void drain();
+      }, retryDelay);
+    };
+
     const drain = async () => {
       if (typeof navigator !== "undefined" && !navigator.onLine) return;
       if (inFlightRef.current) {
@@ -36,6 +54,7 @@ export function useAttachmentQueue() {
         return;
       }
       inFlightRef.current = true;
+      let leftBehind = 0;
       try {
         const items = await attachmentQueue.listAll();
         for (const item of items) {
@@ -56,7 +75,8 @@ export function useAttachmentQueue() {
               await attachmentQueue.remove(item.id);
               queryClient.invalidateQueries({ queryKey: ["offlineAttachments", item.taskId] });
             }
-            // Transient → leave in queue for the next tick.
+            // Transient → leave in queue for the next go.
+            else leftBehind += 1;
           }
         }
       } finally {
@@ -64,18 +84,29 @@ export function useAttachmentQueue() {
         if (requestedRef.current) {
           requestedRef.current = false;
           void drain();
+        } else if (leftBehind) {
+          scheduleRetry();
+        } else {
+          retryDelay = FIRST_RETRY_MS;
         }
       }
     };
 
     window.addEventListener("online", drain);
     window.addEventListener("focus", drain);
+    // Something was just queued. If that happened offline, `online` will
+    // drain it; if the connection is up, it failed a moment ago, so wait
+    // a little rather than hammering.
+    window.addEventListener(attachmentQueue.QUEUED_EVENT, scheduleRetry);
     if (typeof navigator === "undefined" || navigator.onLine) {
       void drain();
     }
     return () => {
+      stopped = true;
+      if (retryTimer) clearTimeout(retryTimer);
       window.removeEventListener("online", drain);
       window.removeEventListener("focus", drain);
+      window.removeEventListener(attachmentQueue.QUEUED_EVENT, scheduleRetry);
     };
   }, [queryClient]);
 }

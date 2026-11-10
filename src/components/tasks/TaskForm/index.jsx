@@ -32,7 +32,8 @@ import { Field, FormDialog } from "./parts.jsx";
 import TimeFields from "./TimeFields.jsx";
 import TagsField from "./TagsField.jsx";
 import SubtasksField from "./SubtasksField.jsx";
-import AttachmentsField, { flushPendingUploads } from "../AttachmentsField.jsx";
+import AttachmentsField, { attachToNewTask } from "../AttachmentsField.jsx";
+import { showDeleteToast } from "../DeleteToast.jsx";
 import { useAutosave } from "@/hooks/useAutosave";
 import { isReadOnlyTask } from "@/lib/task-filters";
 import ReminderField from "./ReminderField.jsx";
@@ -223,13 +224,15 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
       if (res?.id) savedIdRef.current = res.id;
     }
     if (!task && filesToFlush.length && savedIdRef.current) {
-      try {
-        await flushPendingUploads(savedIdRef.current, filesToFlush);
-        queryClient.invalidateQueries({ queryKey: ["tasks"] });
-        queryClient.invalidateQueries({ queryKey: ["taskAttachments", savedIdRef.current] });
-      } catch {
-        // Errors surface inside AttachmentsField on the next open.
-      }
+      const taskId = savedIdRef.current;
+      // The form has closed, so anything that goes wrong has to be said
+      // somewhere else: a file that didn't upload is either queued to
+      // retry by itself or named in a message — never silently dropped.
+      const { message } = await attachToNewTask(taskId, filesToFlush);
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["taskAttachments", taskId] });
+      queryClient.invalidateQueries({ queryKey: ["offlineAttachments", taskId] });
+      if (message) showDeleteToast({ label: message, hideUndo: true, duration: 8000 });
     }
   };
 

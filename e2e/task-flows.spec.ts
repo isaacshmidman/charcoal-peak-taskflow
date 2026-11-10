@@ -762,6 +762,44 @@ test("a very long link in the task form wraps instead of making the form scroll 
   expect(overflow).toEqual({ sideways: 0, past: 0 });
 });
 
+test("files in the task form: a mixed pick keeps the good ones, and a drop anywhere in the form attaches", async ({ page }) => {
+  await installMockBackend(page, { tasks: [], priorities: [defaultPriority] });
+  await page.goto("/Today");
+  await page.getByRole("button", { name: "New Task" }).click();
+  const form = page.getByTestId("task-form-dialog");
+  await page.getByTestId("task-form-title").fill("Trip paperwork");
+
+  await page.getByTestId("attachments-input").setInputFiles([
+    { name: "itinerary.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4 itinerary") },
+    { name: "installer.exe", mimeType: "application/octet-stream", buffer: Buffer.from("MZ") },
+    { name: "budget.xlsx", mimeType: "", buffer: Buffer.from("PK budget") },
+  ]);
+  await expect(form.getByText("itinerary.pdf")).toBeVisible();
+  await expect(form.getByText("budget.xlsx")).toBeVisible();
+  await expect(form.getByRole("alert")).toContainText(".exe files are not allowed");
+  // Nothing is uploading yet — the task doesn't exist.
+  await expect(form.getByText(/uploads when you save/)).toHaveCount(2);
+  await expect(form.getByText(/Uploading/)).toHaveCount(0);
+
+  // Drop a file on the title — nowhere near the "Add files" strip.
+  const dropped = await page.getByTestId("task-form-title").evaluate((target) => {
+    const data = new DataTransfer();
+    data.items.add(new File(["boarding pass"], "boarding-pass.png", { type: "image/png" }));
+    const fire = (type: string) =>
+      target.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: data }));
+    // false = the app claimed it, so the browser won't open the file.
+    return { over: fire("dragover"), drop: fire("drop") };
+  });
+  expect(dropped).toEqual({ over: false, drop: false });
+  await expect(form.getByText("boarding-pass.png")).toBeVisible();
+  await expect(page).toHaveURL(/\/Today/);
+
+  // The form still saves with files picked.
+  await page.getByTestId("task-form-submit").click();
+  await expect(form).toBeHidden();
+  await expect(page.getByText("Trip paperwork")).toBeVisible();
+});
+
 test("the date pop-up fills only the day you pick, and closes when you pick it", async ({ page }) => {
   await installMockBackend(page, { tasks: [], priorities: [defaultPriority] });
   await page.goto("/Today");

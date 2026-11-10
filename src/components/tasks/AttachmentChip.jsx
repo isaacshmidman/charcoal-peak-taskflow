@@ -21,6 +21,7 @@
  *     uploading?: boolean,        — true while queued or in flight
  *     progress?: number | null,   — 0–100 while uploading; null = indeterminate
  *     offlineQueued?: boolean,    — stored in IndexedDB, awaiting reconnect
+ *     waitingForSave?: boolean,   — picked for a task that isn't saved yet
  *     uploadError?: string | null,
  *     onRetry?: () => void,       — only meaningful when uploadError set
  *     onPreview?: (a: any) => void,
@@ -28,9 +29,30 @@
  *   }} props
  */
 import { useEffect, useState } from "react";
-import { CloudOff, Download, FileText, Image as ImageIcon, ImageOff, Loader2, RefreshCw, X } from "lucide-react";
+import {
+  CloudOff, Download, File as FileIcon, FileArchive, FileSpreadsheet, FileText, Film,
+  Image as ImageIcon, ImageOff, Loader2, Music, Presentation, RefreshCw, X,
+} from "lucide-react";
 import { apiClient } from "@/api/apiClient";
 import { cn } from "@/lib/utils";
+
+const ICON_BY_EXTENSION = {
+  pdf: FileText, doc: FileText, docx: FileText, pages: FileText, rtf: FileText, txt: FileText, md: FileText, odt: FileText,
+  xls: FileSpreadsheet, xlsx: FileSpreadsheet, csv: FileSpreadsheet, tsv: FileSpreadsheet, numbers: FileSpreadsheet, ods: FileSpreadsheet,
+  ppt: Presentation, pptx: Presentation, key: Presentation, odp: Presentation,
+  zip: FileArchive, rar: FileArchive, "7z": FileArchive, tar: FileArchive, gz: FileArchive,
+};
+
+/** The icon for a file that has no picture of its own. */
+export function iconForFile(filename, mimeType) {
+  const type = String(mimeType || "").toLowerCase();
+  if (type.startsWith("image/")) return ImageIcon;
+  if (type.startsWith("video/")) return Film;
+  if (type.startsWith("audio/")) return Music;
+  const name = String(filename || "");
+  const ext = name.includes(".") ? name.split(".").pop().toLowerCase() : "";
+  return ICON_BY_EXTENSION[ext] || (type.startsWith("text/") ? FileText : FileIcon);
+}
 
 /** "1234567" → "1.2 MB" using SI units (matches the Settings → Storage page). */
 function formatSize(bytes) {
@@ -46,6 +68,7 @@ export default function AttachmentChip({
   uploading,
   progress,
   offlineQueued,
+  waitingForSave,
   uploadError,
   onRetry,
   onPreview,
@@ -87,7 +110,12 @@ export default function AttachmentChip({
   if (uploadError) statusText = <span className="text-red-500 dark:text-red-300">{uploadError}</span>;
   else if (offlineQueued) statusText = "Queued — uploads when you're back online";
   else if (uploading) statusText = typeof progress === "number" ? `Uploading… ${progress}%` : "Uploading…";
+  // Picked for a task that isn't saved yet: nothing is uploading, so no
+  // spinner — just say when it will.
+  else if (waitingForSave) statusText = `${formatSize(sizeBytes)} · uploads when you save`;
   else statusText = formatSize(sizeBytes);
+
+  const TypeIcon = iconForFile(filename, attachment?.mime_type || localFile?.type);
 
   // Determinate bar width: the measured progress while uploading, or a
   // thin indeterminate sliver while queued (progress null).
@@ -122,11 +150,12 @@ export default function AttachmentChip({
         </button>
       ) : (
         <div className="shrink-0 w-10 h-10 rounded-md flex items-center justify-center bg-ink-100 dark:bg-night-raised border border-ink-200 dark:border-night-line-strong">
-          {isImage && thumbError
+          {/* The crossed-out picture is for a SAVED image that won't show.
+              A photo still on its way up (an iPhone HEIC, say, which this
+              browser can't draw) is not broken — it gets the plain icon. */}
+          {isImage && thumbError && attachment
             ? <ImageOff className="w-4 h-4 text-ink-400 dark:text-ink-500" />
-            : isImage
-              ? <ImageIcon className="w-4 h-4 text-ink-500 dark:text-ink-400" />
-              : <FileText className="w-4 h-4 text-ink-500 dark:text-ink-400" />}
+            : <TypeIcon className="w-4 h-4 text-ink-500 dark:text-ink-400" />}
         </div>
       )}
 

@@ -55,6 +55,7 @@
     "date-fns": "^3.6.0",
     "date-fns-tz": "^3.2.0",
     "framer-motion": "^11.16.4",
+    "heic-decode": "^2.1.0",
     "linkifyjs": "^4.3.3",
     "lucide-react": "^0.475.0",
     "marked": "^18.0.10",

@@ -18,6 +18,7 @@ import {
   listAttachmentsForTask,
   MAX_FILE_BYTES,
   MAX_TOTAL_BYTES_PER_USER,
+  resolveMimeType,
 } from "./attachments.js";
 import { createEntityRecord, deleteEntityRecord } from "./store.js";
 
@@ -281,6 +282,91 @@ describe("attachments", () => {
     // ?thumb=1 should still resolve to the original when no thumb exists.
     const thumb = getAttachment(db, config, { appId: APP_ID, user: USER, id: created.id, thumb: true });
     expect(thumb.servingThumb).toBe(false);
+  });
+
+  it("works out the type from the name when the browser sends none", async () => {
+    // What Chrome on Windows sends for a format the system doesn't know.
+    const upload = (filename, mimeType) =>
+      createAttachment(db, config, { appId: APP_ID, user: USER, taskId: TASK_ID, file: { filename, mimeType, data: Buffer.from("bytes") } });
+
+    const photo = await upload("holiday.PNG", "");
+    expect(photo.mime_type).toBe("image/png");
+    expect(photo.is_image).toBe(true);
+
+    const pdf = await upload("lease.pdf", "application/octet-stream");
+    expect(pdf.mime_type).toBe("application/pdf");
+
+    const song = await upload("voice memo.m4a", "application/octet-stream");
+    expect(song.mime_type).toBe("audio/mp4");
+
+    // A type the browser DID name is kept, whatever the file is called.
+    const named = await upload("notes.pdf", "text/plain");
+    expect(named.mime_type).toBe("text/plain");
+
+    // An unknown extension stays a plain download.
+    const unknown = await upload("backup.xyz", "");
+    expect(unknown.mime_type).toBe("application/octet-stream");
+    expect(unknown.is_image).toBe(false);
+  });
+
+  it("resolveMimeType never invents a type that could run in the page", () => {
+    for (const name of ["page.html", "page.htm", "drawing.svg", "feed.xml", "script.js"]) {
+      expect(resolveMimeType(name, "")).toBe("application/octet-stream");
+    }
+    expect(resolveMimeType("clip.MOV", "")).toBe("video/quicktime");
+    expect(resolveMimeType("sheet.xlsx", "application/octet-stream")).toMatch(/spreadsheetml/);
+    expect(resolveMimeType("no-extension", "")).toBe("application/octet-stream");
+    expect(resolveMimeType("a.png", "image/webp; charset=binary")).toBe("image/webp; charset=binary");
+  });
+
+  it("turns an iPhone HEIC photo into a JPEG every browser can show, the right way up", async () => {
+    // A real HEIC (made with macOS sips) whose stored pixels are 320×240
+    // with a quarter-turn recorded in the file — a portrait photo.
+    const heic = readFileSync(new URL("./test-support/fixtures/portrait.heic", import.meta.url));
+    const created = await createAttachment(db, config, {
+      appId: APP_ID, user: USER, taskId: TASK_ID,
+      // No type at all: what a browser sends when the system has no HEIC support.
+      file: { filename: "IMG_0412.HEIC", mimeType: "", data: heic },
+    });
+    expect(created.mime_type).toBe("image/jpeg");
+    expect(created.filename).toBe("IMG_0412.jpg");
+    expect(created.is_image).toBe(true);
+    expect(created.has_thumb).toBe(true);
+
+    const { absolutePath } = getAttachment(db, config, { appId: APP_ID, user: USER, id: created.id });
+    const meta = await sharp(readFileSync(absolutePath)).metadata();
+    expect(meta.format).toBe("jpeg");
+    expect([meta.width, meta.height]).toEqual([240, 320]);
+  });
+
+  it("still recognises a HEIC that is named and typed as a JPEG", async () => {
+    const heic = readFileSync(new URL("./test-support/fixtures/portrait.heic", import.meta.url));
+    const created = await createAttachment(db, config, {
+      appId: APP_ID, user: USER, taskId: TASK_ID,
+      file: { filename: "photo.jpg", mimeType: "image/jpeg", data: heic },
+    });
+    const { absolutePath } = getAttachment(db, config, { appId: APP_ID, user: USER, id: created.id });
+    expect((await sharp(readFileSync(absolutePath)).metadata()).format).toBe("jpeg");
+  });
+
+  it("previews AVIF and BMP images like any other picture", async () => {
+    const avif = await sharp({ create: { width: 64, height: 48, channels: 3, background: { r: 200, g: 120, b: 40 } } }).avif().toBuffer();
+    const created = await createAttachment(db, config, {
+      appId: APP_ID, user: USER, taskId: TASK_ID,
+      file: { filename: "sunset.avif", mimeType: "", data: avif },
+    });
+    expect(created.mime_type).toBe("image/avif");
+    expect(created.is_image).toBe(true);
+    expect(created.has_thumb).toBe(true);
+
+    const bmp = await createAttachment(db, config, {
+      appId: APP_ID, user: USER, taskId: TASK_ID,
+      file: { filename: "scan.bmp", mimeType: "image/bmp", data: Buffer.from("BM-not-really") },
+    });
+    // No thumbnail (the image library can't read BMP) — the row shows the
+    // picture itself instead, as it does for a GIF.
+    expect(bmp.is_image).toBe(true);
+    expect(bmp.has_thumb).toBe(false);
   });
 
   it("getStorageOverview returns used bytes + largest tasks", async () => {

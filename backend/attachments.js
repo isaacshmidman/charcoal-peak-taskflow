@@ -9,12 +9,13 @@
  * Slug is purely cosmetic — never read back; the random `attId` is
  * the actual lookup key.
  *
- * HEIC handling: sharp converts HEIC → JPEG when the underlying
- * libvips build includes libheif. The production Dockerfile installs
- * `libheif1` so this works fast (native). If you ever rebuild without
- * it, sharp's `convertHeicIfNeeded` will log and store the original
- * HEIC bytes — chip + lightbox will still render the file-icon
- * fallback but the image won't preview in non-Safari browsers.
+ * HEIC handling: a HEIC/HEIF photo is converted to JPEG on the way in,
+ * so every browser can show it. sharp is tried first (it can do it
+ * where its image library was built with an HEVC decoder); the prebuilt
+ * one it ships with cannot, so the conversion normally runs through
+ * lib/heic.js — libheif as WebAssembly, in a worker thread. Only if
+ * both fail is the original stored, and then the chip shows a file icon
+ * instead of a picture.
  *
  * When a task is deleted (store.js deleteEntityRecord), its files and
  * its subtasks' files go one of two ways:
@@ -41,6 +42,7 @@
  */
 import fs, { promises as fsp, createReadStream } from "node:fs";
 import sharp from "sharp";
+import { heicToJpeg } from "./lib/heic.js";
 import { log } from "./log.js";
 import { dirname, join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -73,6 +75,8 @@ const IMAGE_MIME_TYPES = new Set([
   "image/jpg",
   "image/webp",
   "image/gif",
+  "image/avif",
+  "image/bmp",
   "image/heic",
   "image/heif",
 ]);
@@ -84,8 +88,6 @@ const IMAGE_MIME_TYPES = new Set([
 // SVG file would run its scripts with the viewer's session.
 const INLINE_MIME_TYPES = new Set([
   ...IMAGE_MIME_TYPES,
-  "image/avif",
-  "image/bmp",
   "application/pdf",
   "text/plain",
 ]);
@@ -109,9 +111,69 @@ const THUMBNAILABLE_MIME_TYPES = new Set([
   "image/jpeg",
   "image/jpg",
   "image/webp",
+  "image/avif",
   "image/heic",
   "image/heif",
 ]);
+
+// What a file is when the browser didn't say. A browser only names a
+// type its operating system knows: a HEIC photo dragged into Chrome on
+// Windows, a .mov or .m4a on some Androids, a .md or .csv almost
+// anywhere arrive with no type at all, or as the catch-all
+// application/octet-stream. Stored like that, a photo got no preview and
+// a PDF or a song downloaded instead of opening. So when the type is
+// missing, the name decides.
+//
+// This widens nothing: what may open in place is still INLINE_MIME_TYPES,
+// served with nosniff and the sandbox — and an uploader could always
+// have claimed any of these types outright. HTML, SVG and XML are left
+// out on purpose (they are downloads whatever they are called).
+const MIME_BY_EXTENSION = {
+  // images
+  png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", jfif: "image/jpeg", gif: "image/gif",
+  webp: "image/webp", avif: "image/avif", bmp: "image/bmp", heic: "image/heic", heif: "image/heif",
+  tif: "image/tiff", tiff: "image/tiff",
+  // documents
+  pdf: "application/pdf", txt: "text/plain", log: "text/plain", md: "text/markdown", markdown: "text/markdown",
+  csv: "text/csv", tsv: "text/tab-separated-values", json: "application/json", rtf: "application/rtf",
+  ics: "text/calendar", vcf: "text/vcard",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ppt: "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  odt: "application/vnd.oasis.opendocument.text",
+  ods: "application/vnd.oasis.opendocument.spreadsheet",
+  odp: "application/vnd.oasis.opendocument.presentation",
+  pages: "application/vnd.apple.pages", numbers: "application/vnd.apple.numbers", key: "application/vnd.apple.keynote",
+  epub: "application/epub+zip",
+  // audio
+  mp3: "audio/mpeg", m4a: "audio/mp4", aac: "audio/aac", wav: "audio/wav", ogg: "audio/ogg", oga: "audio/ogg",
+  opus: "audio/opus", flac: "audio/flac", weba: "audio/webm",
+  // video
+  mp4: "video/mp4", m4v: "video/mp4", mov: "video/quicktime", webm: "video/webm", ogv: "video/ogg",
+  mkv: "video/x-matroska", avi: "video/x-msvideo",
+  // archives
+  zip: "application/zip", gz: "application/gzip", tar: "application/x-tar", "7z": "application/x-7z-compressed",
+  rar: "application/vnd.rar",
+};
+
+const GENERIC_MIME_TYPES = new Set(["", "application/octet-stream", "binary/octet-stream", "application/unknown"]);
+
+/**
+ * The type to store for an upload: the browser's, unless it gave none
+ * (or the catch-all), in which case the file's extension decides.
+ *
+ * @param {string} filename
+ * @param {string} declared
+ * @returns {string}
+ */
+export function resolveMimeType(filename, declared) {
+  const stated = String(declared || "").trim();
+  if (!GENERIC_MIME_TYPES.has(stated.split(";")[0].trim().toLowerCase())) return stated;
+  return MIME_BY_EXTENSION[fileExtension(filename)] || "application/octet-stream";
+}
 
 const THUMB_MAX_DIM = 400;
 const THUMB_QUALITY = 80;
@@ -157,20 +219,26 @@ function sniffIsHeic(buf) {
  */
 async function convertHeicIfNeeded(file) {
   const declared = /^image\/(heic|heif)/i.test(file.mimeType);
-  const sniffed = !declared && /^image\//i.test(file.mimeType) && sniffIsHeic(file.data);
+  // Sniffed for anything that isn't plainly sound or video (whose files
+  // share the same container format): a HEIC named .jpg, or one that
+  // arrived with no usable type or name at all, is still a HEIC.
+  const sniffed = !declared && !/^(audio|video)\//i.test(file.mimeType) && sniffIsHeic(file.data);
   if (!declared && !sniffed) return file;
 
   log.info(`[attachments] HEIC detected (${declared ? "declared" : "sniffed"}) for "${file.filename}" — converting`);
+  const converted = (/** @type {Buffer} */ jpegBuffer, /** @type {string} */ how) => {
+    log.info(`[attachments] HEIC converted (${how}): ${file.data.length} → ${jpegBuffer.length} bytes`);
+    return { data: jpegBuffer, filename: renameToJpg(file.filename), mimeType: "image/jpeg" };
+  };
   try {
-    const jpegBuffer = await sharp(file.data).rotate().jpeg({ quality: 90 }).toBuffer();
-    log.info(`[attachments] HEIC converted: ${file.data.length} → ${jpegBuffer.length} bytes`);
-    return {
-      data: jpegBuffer,
-      filename: renameToJpg(file.filename),
-      mimeType: "image/jpeg",
-    };
+    return converted(await sharp(file.data).rotate().jpeg({ quality: 90 }).toBuffer(), "sharp");
+  } catch {
+    // Expected with sharp's prebuilt library — see lib/heic.js.
+  }
+  try {
+    return converted(await heicToJpeg(file.data), "wasm");
   } catch (err) {
-    log.warn(`[attachments] HEIC conversion failed (sharp lacks libheif support?); storing original. err=${err?.message}`);
+    log.warn(`[attachments] HEIC conversion failed; storing original. err=${/** @type {any} */ (err)?.message}`);
     return file;
   }
 }
@@ -426,7 +494,10 @@ export async function createAttachment(db, config, { appId, user, taskId, file: 
 
   // HEIC → JPEG conversion happens BEFORE the size check so a 22 MB HEIC
   // re-encoded to a 6 MB JPEG counts against the quota at its real size.
-  const file = await convertHeicIfNeeded(rawFile);
+  const file = await convertHeicIfNeeded({
+    ...rawFile,
+    mimeType: resolveMimeType(rawFile.filename, rawFile.mimeType),
+  });
 
   const size = file.data.length;
   if (size > MAX_FILE_BYTES) {
