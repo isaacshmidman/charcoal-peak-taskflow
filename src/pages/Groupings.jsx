@@ -6,8 +6,8 @@ import { useOfflineMutation } from "@/hooks/useOfflineMutation";
 import { formatDeleteLabel, useDeleteWithUndo } from "@/hooks/useDeleteWithUndo";
 import { showDeleteToast } from "@/components/tasks/DeleteToast";
 import { Button } from "@/components/ui/button";
-import { AnimatedSearchInput } from "@/components/ui/animated-search-input";
-import { Plus, Search } from "lucide-react";
+import PageHeader, { PageSearch } from "@/components/PageHeader";
+import { Plus } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { addDays } from "date-fns/addDays";
@@ -249,36 +249,14 @@ export default function Groupings() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="ds-page-title">Groupings</h1>
-          <p className="ds-page-sub">{topLevel.length} task{topLevel.length !== 1 ? "s" : ""}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <AnimatedSearchInput
-            open={showSearch}
-            value={search}
-            onChange={setSearch}
-            onClose={() => setShowSearch(false)}
-            placeholder="Search title or tag..."
-          />
-          <Button aria-label={showSearch ? "Close search" : "Search"}
-            variant="ghost"
-            size="icon"
-            data-search-toggle
-            className="h-9 w-9 text-ink-400 dark:text-ink-500 hover:text-ink-700 dark:hover:text-ink-200"
-            onMouseDown={(e) => { if (showSearch) e.preventDefault(); }}
-            onClick={() => { if (showSearch) setSearch(""); setShowSearch((v) => !v); }}
-          >
-            <Search className="w-4 h-4" />
-          </Button>
-          <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} page="groupings" />
-          <Button onClick={() => { setEditingTask(null); setAddSubtaskParent(null); setShowForm(true); }} className="bg-primary hover:bg-[var(--primary-hover)] text-primary-foreground h-9 gap-1.5">
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">New Task</span>
-          </Button>
-        </div>
-      </div>
+      <PageHeader title="Groupings" sub={<>{topLevel.length} task{topLevel.length !== 1 ? "s" : ""}</>}>
+        <PageSearch open={showSearch} onOpenChange={setShowSearch} value={search} onChange={setSearch} placeholder="Search title or tag..." />
+        <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} page="groupings" />
+        <Button onClick={() => { setEditingTask(null); setAddSubtaskParent(null); setShowForm(true); }} className="bg-primary hover:bg-[var(--primary-hover)] text-primary-foreground h-9 gap-1.5">
+          <Plus className="w-4 h-4" />
+          <span className="hidden sm:inline">New Task</span>
+        </Button>
+      </PageHeader>
 
       {/* Date-based groups */}
       <h2 className="text-xs font-medium text-ink-500 dark:text-ink-400 mb-3">By date</h2>

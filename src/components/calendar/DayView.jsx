@@ -8,8 +8,8 @@ import MiniMiniTaskCard from "./MiniMiniTaskCard";
 import { parseTaskTime, compareTaskTime } from "@/lib/sort-helpers";
 import { layoutTimedTasks } from "@/lib/calendar-layout";
 import { toDateStr } from "@/lib/dates";
-import { useSplitPane } from "@/hooks/useSplitPane";
-import SplitDivider from "@/components/ui/split-divider";
+import TwoPane from "@/components/ui/two-pane";
+import { CALENDAR_PANEL_HEIGHT } from "./panel";
 import { useEmptySlotClick } from "./useEmptySlotClick";
 import SlotGhost from "./SlotGhost";
 import TimedEventBlock from "./TimedEventBlock";
@@ -59,7 +59,7 @@ function TimedDropZone({ dateStr, children }) {
   return (
     <div
       ref={setNodeRef}
-      className={cn("relative", isOver && "bg-blue-50 dark:bg-night-info")}
+      className={cn("relative", isOver && "bg-sun-100/60 dark:bg-sun-400/10")}
       style={{ height: HOURS.length * HOUR_HEIGHT }}
     >
       {children}
@@ -139,12 +139,12 @@ function MobileAllDayOverlay({
     8;
 
   return (
-    <div className="sticky top-0 z-30 bg-white dark:bg-night-sunken border-b border-ink-100 dark:border-night-line">
+    <div className="sticky top-0 z-30 bg-surface-card border-b border-ink-100 dark:border-night-line">
       <div className="flex" style={{ height }}>
         {/* No border-r: the cell beside it already draws a border-l, and
             the two together rendered this rule 2px thick — a pixel heavier
             than the week tab's. */}
-        <div className="w-12 shrink-0 bg-white dark:bg-night-sunken flex items-start justify-center pt-1">
+        <div className="w-12 shrink-0 bg-surface-card flex items-start justify-center pt-1">
           {/* Only offer the toggle when collapsing actually hides
               something — an arrow that expands nothing is a dead control. */}
           {collapsible && (
@@ -189,25 +189,13 @@ function AllDayColumn({ dateStr, allDayTasks, priorities, onTaskClick, onToggleD
       {...createHandlers}
       data-testid={`calendar-allday-${dateStr}`}
       className={cn(
-        "border border-ink-100 dark:border-night-line rounded-lg bg-white dark:bg-night-sunken p-2 h-full",
-        isOver && "bg-blue-50 dark:bg-night-info"
+        "min-h-0 flex-1 overflow-y-auto p-3",
+        isOver && "bg-sun-100 dark:bg-sun-400/15"
       )}
     >
-      <h3 className="text-xs font-semibold text-ink-700 dark:text-ink-200 mb-2">All day</h3>
+      <h3 className="text-xs font-medium text-ink-500 dark:text-ink-400 mb-2">All day</h3>
       {allDayTasks.length === 0 ? null : (
-        <div
-          className={cn(
-            "space-y-1 overflow-y-auto",
-            "[&::-webkit-scrollbar]:w-1",
-            "[&::-webkit-scrollbar-track]:bg-transparent",
-            "[&::-webkit-scrollbar-thumb]:bg-ink-200",
-            "dark:[&::-webkit-scrollbar-thumb]:bg-ink-700",
-            "[&::-webkit-scrollbar-thumb]:rounded-full",
-            "[&::-webkit-scrollbar-thumb:hover]:bg-ink-300",
-            "dark:[&::-webkit-scrollbar-thumb:hover]:bg-ink-600",
-          )}
-          style={{ maxHeight: "calc(70vh - 2.5rem)" }}
-        >
+        <div className="space-y-1">
           {allDayTasks.map((task) => (
             <MiniMiniTaskCard
               key={task.id}
@@ -247,22 +235,6 @@ export default function DayView({
   const timedSlot = useEmptySlotClick({ onCreate: createTimed, hourHeight: HOUR_HEIGHT });
   const useSideAllDay = useMediaQuery("(min-width: 640px)");
 
-  // The divider gesture (detents, hysteresis, glide) lives in
-  // useSplitPane so Notes uses the same one. fromEnd: the all-day column
-  // sits on the RIGHT, so dragging left grows it.
-  const {
-    size: allDayWidth,
-    containerRef,
-    startResize,
-    resetSplit,
-    snapped,
-    glide,
-  } = useSplitPane({
-    storageKey: ALLDAY_WIDTH_KEY,
-    minSize: MIN_ALLDAY_W,
-    defaultSize: 192,
-    fromEnd: true,
-  });
   const [allDayCollapsed, setAllDayCollapsed] = useState(() => {
     try {
       const stored = localStorage.getItem(ALLDAY_COLLAPSE_KEY);
@@ -317,13 +289,13 @@ export default function DayView({
   }, [dateStr]);
 
 
-  return (
-    <div ref={containerRef} className="flex items-stretch gap-0">
-      {/* Timed column */}
-      <div
-        ref={timedScrollRef}
-        className="flex-1 min-w-0 relative border border-ink-100 dark:border-night-line rounded-lg bg-white dark:bg-night-sunken overflow-y-auto max-h-[70vh]"
-      >
+  // Hours | all day: the app's one two-column block (ui/two-pane.jsx),
+  // the same as Notes. The all-day column is the sized one, on the right;
+  // it catches at 30 / 50 / 70% and double-click halves the view. On a
+  // phone there's no room for it, so all-day items fold into a strip at the
+  // top of the hours instead (MobileAllDayOverlay).
+  const timedColumn = (
+      <div ref={timedScrollRef} className="relative min-h-0 flex-1 overflow-y-auto">
         {!useSideAllDay && (
           <MobileAllDayOverlay
             dateStr={dateStr}
@@ -397,31 +369,20 @@ export default function DayView({
           </div>
         </TimedDropZone>
       </div>
+  );
 
-      {/* Splitter (desktop only). Drag with 30/50/70 detents; double-click
-          resets to 50/50. The handle pill grows + darkens while latched
-          so the detent reads as a tactile "click". */}
-      {useSideAllDay && (
-        <SplitDivider
-          onPointerDown={startResize}
-          onDoubleClick={resetSplit}
-          snapped={snapped}
-          title="Drag to resize — snaps at 30 / 50 / 70%. Double-click for 50/50."
-        />
-      )}
-
-      {/* All-day column — fixed width when there is room; mobile uses
-          sticky overlay above. `glide` enables a brief width transition
-          only around snap latch/unlatch/settle so the detent eases into
-          place; free drag stays transition-free (1:1 with the pointer). */}
-      {useSideAllDay && (
-        <div
-          className={cn(
-            "shrink-0 w-[var(--ad-w)]",
-            glide && "transition-[width] duration-100 ease-out"
-          )}
-          style={{ "--ad-w": `${allDayWidth}px` }}
-        >
+  return (
+    <TwoPane
+      className={CALENDAR_PANEL_HEIGHT}
+      storageKey={ALLDAY_WIDTH_KEY}
+      sized="end"
+      narrow="start"
+      minSize={MIN_ALLDAY_W}
+      defaultSize={192}
+      dividerTitle="Drag to resize — catches at 30 / 50 / 70%. Double-click for 50/50."
+      start={timedColumn}
+      end={
+        useSideAllDay ? (
           <AllDayColumn
             dateStr={dateStr}
             allDayTasks={allDayTasks}
@@ -430,8 +391,8 @@ export default function DayView({
             onToggleDone={onToggleDone}
             onCreate={createAllDay}
           />
-        </div>
-      )}
-    </div>
+        ) : null
+      }
+    />
   );
 }

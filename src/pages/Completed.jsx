@@ -2,14 +2,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
-import { Search, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { apiClient } from "@/api/apiClient";
 import { formatDeleteLabel, restoreDeletionSnapshots, useDeleteWithUndo } from "@/hooks/useDeleteWithUndo";
 import { useDeletedTasks } from "@/hooks/useDeletedTasks";
 import { useOfflineMutation } from "@/hooks/useOfflineMutation";
 import { buildCompletedItems, buildCompletedTaskItem, sortCompletedItems } from "@/lib/completedItems";
 import { Button } from "@/components/ui/button";
-import { AnimatedSearchInput } from "@/components/ui/animated-search-input";
+import PageHeader, { PageSearch } from "@/components/PageHeader";
 import { showDeleteToast } from "@/components/tasks/DeleteToast";
 import {
   Dialog,
@@ -166,65 +166,44 @@ export default function Completed() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="ds-page-title">Completed</h1>
-          <p className="ds-page-sub">{completedItems.length} task{completedItems.length !== 1 ? "s" : ""}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <AnimatedSearchInput
-            open={showSearch}
-            value={search}
-            onChange={setSearch}
-            onClose={() => setShowSearch(false)}
-          />
-          <Button aria-label={showSearch ? "Close search" : "Search"}
-            variant="ghost"
-            size="icon"
-            data-search-toggle
-            className="h-9 w-9 text-ink-400 dark:text-ink-500 hover:text-ink-700 dark:hover:text-ink-200"
-            onMouseDown={(event) => { if (showSearch) event.preventDefault(); }}
-            onClick={() => { if (showSearch) setSearch(""); setShowSearch((v) => !v); }}
-          >
-            <Search className="w-4 h-4" />
-          </Button>
-          <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} page="completed" />
-          {completedItems.length > 0 && (
-            <Dialog open={showDeleteAllDialog} onOpenChange={setShowDeleteAllDialog}>
-              <Button aria-label="Delete all completed"
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-night-danger"
-                title="Delete all completed"
-                onClick={() => setShowDeleteAllDialog(true)}
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Delete all completed tasks?</DialogTitle>
-                </DialogHeader>
-                <div className="flex flex-col gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => { deleteAll(); setShowDeleteAllDialog(false); }}
-                    className="w-full h-12 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-medium shadow-sm transition-colors"
-                  >
-                    Delete all
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowDeleteAllDialog(false)}
-                    className="w-full h-12 rounded-xl bg-ink-100 dark:bg-night-raised hover:bg-ink-200 dark:hover:bg-night-high text-ink-700 dark:text-ink-200 text-sm font-medium shadow-sm transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </DialogContent>
-            </Dialog>
-          )}
-        </div>
-      </div>
+      <PageHeader title="Completed" sub={<>{completedItems.length} task{completedItems.length !== 1 ? "s" : ""}</>}>
+        <PageSearch open={showSearch} onOpenChange={setShowSearch} value={search} onChange={setSearch} />
+        <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} page="completed" />
+        {completedItems.length > 0 && (
+          <Dialog open={showDeleteAllDialog} onOpenChange={setShowDeleteAllDialog}>
+            <Button aria-label="Delete all completed"
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-night-danger"
+              title="Delete all completed"
+              onClick={() => setShowDeleteAllDialog(true)}
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Delete all completed tasks?</DialogTitle>
+              </DialogHeader>
+              <div className="flex flex-col gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => { deleteAll(); setShowDeleteAllDialog(false); }}
+                  className="w-full h-12 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-medium shadow-sm transition-colors"
+                >
+                  Delete all
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteAllDialog(false)}
+                  className="w-full h-12 rounded-xl bg-ink-100 dark:bg-night-raised hover:bg-ink-200 dark:hover:bg-night-high text-ink-700 dark:text-ink-200 text-sm font-medium shadow-sm transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+      </PageHeader>
 
       {isLoading ? (
         <div className="ds-list">

@@ -3,10 +3,10 @@ import { forwardRef, useState, useMemo, useEffect } from "react";
 import { apiClient } from "@/api/apiClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
-import { ArrowLeft, Trash2, Search, RotateCcw, Check, NotebookPen } from "lucide-react";
+import { Trash2, RotateCcw, Check, NotebookPen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { AnimatedSearchInput } from "@/components/ui/animated-search-input";
+import PageHeader, { PageSearch } from "@/components/PageHeader";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AnimatePresence, motion } from "framer-motion";
 import { format } from "date-fns/format";
@@ -225,78 +225,56 @@ export default function RecentlyDeleted({ onBack } = {}) {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <button aria-label="Back"
-            onClick={() => {
-              if (onBack) {
-                onBack();
-                return;
-              }
-              if (window.history.length > 1) {
-                navigate(-1);
-              } else {
-                navigate("/Settings");
-              }
-            }}
-            className="flex items-center justify-center w-8 h-8 rounded-lg text-ink-400 dark:text-ink-500 hover:text-ink-900 dark:hover:text-ink-100 hover:bg-ink-100 dark:hover:bg-night-high transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </button>
-          <div>
-            <h1 className="ds-page-title">Recently Deleted</h1>
-            <p className="text-xs text-ink-400 dark:text-ink-500">
-              {displayedTasks.length + displayedNotes.length} item{displayedTasks.length + displayedNotes.length !== 1 ? "s" : ""}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <AnimatedSearchInput
-            open={searchOpen}
-            value={search}
-            onChange={setSearch}
-            onClose={() => setSearchOpen(false)}
-          />
-          <Button aria-label={searchOpen ? "Close search" : "Search"} variant="ghost" size="icon" data-search-toggle className="h-9 w-9 text-ink-400 dark:text-ink-500 hover:text-ink-700 dark:hover:text-ink-200" onMouseDown={(e) => e.preventDefault()} onClick={() => setSearchOpen(!searchOpen)}>
-            <Search className="w-4 h-4" />
-          </Button>
-          <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} page="deleted" />
-          {(userDeletedTasks.length > 0 || rawDeletedNotes.length > 0) && (
-            <Dialog open={showEmptyDialog} onOpenChange={setShowEmptyDialog}>
-              <Button aria-label="Empty recently deleted"
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-night-danger"
-                title="Empty recently deleted"
-                onClick={() => setShowEmptyDialog(true)}
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Permanently Delete everything in Recently Deleted?</DialogTitle>
-                </DialogHeader>
-                <div className="flex flex-col gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={handleEmptyRecentlyDeleted}
-                    className="w-full h-12 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-medium shadow-sm transition-colors"
-                  >
-                    Delete all
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowEmptyDialog(false)}
-                    className="w-full h-12 rounded-xl bg-ink-100 dark:bg-night-raised hover:bg-ink-200 dark:hover:bg-night-high text-ink-700 dark:text-ink-200 text-sm font-medium shadow-sm transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </DialogContent>
-            </Dialog>
-          )}
-        </div>
-      </div>
+      <PageHeader
+        title="Recently Deleted"
+        sub={<>{displayedTasks.length + displayedNotes.length} item{displayedTasks.length + displayedNotes.length !== 1 ? "s" : ""}</>}
+        backLabel="Back"
+        back={() => {
+          if (onBack) {
+            onBack();
+            return;
+          }
+          if (window.history.length > 1) navigate(-1);
+          else navigate("/Settings");
+        }}
+      >
+        <PageSearch open={searchOpen} onOpenChange={setSearchOpen} value={search} onChange={setSearch} />
+        <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} page="deleted" />
+        {(userDeletedTasks.length > 0 || rawDeletedNotes.length > 0) && (
+          <Dialog open={showEmptyDialog} onOpenChange={setShowEmptyDialog}>
+            <Button aria-label="Empty recently deleted"
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-night-danger"
+              title="Empty recently deleted"
+              onClick={() => setShowEmptyDialog(true)}
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Permanently Delete everything in Recently Deleted?</DialogTitle>
+              </DialogHeader>
+              <div className="flex flex-col gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleEmptyRecentlyDeleted}
+                  className="w-full h-12 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-medium shadow-sm transition-colors"
+                >
+                  Delete all
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowEmptyDialog(false)}
+                  className="w-full h-12 rounded-xl bg-ink-100 dark:bg-night-raised hover:bg-ink-200 dark:hover:bg-night-high text-ink-700 dark:text-ink-200 text-sm font-medium shadow-sm transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+      </PageHeader>
 
       {/* Retention setting */}
       <Card className="flex items-center gap-3 px-4 py-3">

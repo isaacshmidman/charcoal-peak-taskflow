@@ -1,12 +1,12 @@
 // @ts-nocheck
 /**
- * @file The draggable divider between two split panes. Pairs with
- * useSplitPane — one component so the Calendar and Notes dividers are
- * literally the same control rather than two that merely resemble
- * each other.
+ * @file The rule between two columns, and the handle that drags it.
+ * Used by TwoPane (ui/two-pane.jsx) with useSplitPane.
  *
- * The handle pill grows and darkens while latched so the detent reads as
- * a tactile "click".
+ * What you see is a hairline the full height of the surface, so the two
+ * columns are plainly two; what you grab is wider than that, and the small
+ * pill at its middle grows and darkens while the divider is held at a
+ * sticky point, so the catch reads as a click.
  */
 import { cn } from "@/lib/utils";
 
@@ -24,16 +24,16 @@ export default function SplitDivider({
       onPointerDown={onPointerDown}
       onDoubleClick={onDoubleClick}
       title={title}
-      className={cn("flex w-2 cursor-col-resize items-center justify-center group shrink-0", className)}
+      className={cn("group relative z-10 w-px shrink-0 cursor-col-resize touch-none bg-[var(--border-hairline)]", className)}
     >
-      <div
+      {/* The part you can grab: 6px either side of the line. */}
+      <span className="absolute inset-y-0 -left-1.5 -right-1.5" />
+      <span
         className={cn(
-          "w-0.5 rounded-full transition-all duration-150",
-          // Visible at rest: the old ink-200 / #222 vanished into the
-          // surface behind it, so the divider read as empty space.
+          "pointer-events-none absolute left-1/2 top-1/2 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full transition-all duration-150",
           snapped
             ? "h-12 bg-ink-500 dark:bg-ink-300"
-            : "h-8 bg-ink-300 dark:bg-night-line-strong group-hover:bg-ink-400 dark:group-hover:bg-ink-500"
+            : "h-8 bg-ink-300 dark:bg-night-line-bold group-hover:bg-ink-400 dark:group-hover:bg-ink-500"
         )}
       />
     </div>

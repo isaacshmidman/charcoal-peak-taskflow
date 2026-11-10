@@ -1,24 +1,16 @@
 // @ts-nocheck
 /**
- * @file Calendar page toolbar — top row (title + scope count +
- * connect-calendars hint + search + visibility dropdown + sort + new
- * task) and second row (range label + sync + view switcher + prev /
- * today / next nav).
+ * @file The top of the Calendar page: the shared page header (title,
+ * count, search, which calendars show, sort, New Task) with a second row
+ * under it — step back/forward, the range on show, Today, sync, and the
+ * view switch.
  *
  * Stateless: every interactive piece is driven by props from the parent
  * Calendar page.
  */
-import { useNavigate } from "react-router-dom";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Plus,
-  RefreshCw,
-  Search,
-  Settings as SettingsIcon,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { AnimatedSearchInput } from "@/components/ui/animated-search-input";
+import PageHeader, { PageSearch } from "@/components/PageHeader";
 import { cn } from "@/lib/utils";
 import MultiSortPanel from "@/components/tasks/MultiSortPanel";
 import CalendarVisibilityDropdown from "@/components/calendar/CalendarVisibilityDropdown";
@@ -39,7 +31,6 @@ export default function CalendarToolbar({
   calendarsList,
   hiddenCalendars,
   onHiddenCalendarsChange,
-  integrationsConnected,
   activeIntegration,
   online,
   syncing,
@@ -50,163 +41,97 @@ export default function CalendarToolbar({
   onToday,
   onNewTask,
 }) {
-  const navigate = useNavigate();
-
   return (
-    <>
-      {/* Top row: title + count + centered empty-state link + actions */}
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <div className="flex-1 min-w-0">
-          <h1 className="ds-page-title">Calendar</h1>
-          <p className="ds-page-sub">
-            {scopedCount} task{scopedCount !== 1 ? "s" : ""}
-          </p>
-        </div>
-        {!integrationsConnected && (
-          <div className={cn("hidden items-center shrink-0", showSearch ? "2xl:flex" : "lg:flex")}>
-            <span className="inline-flex items-center gap-1.5 text-xs text-ink-400 dark:text-ink-500 leading-none whitespace-nowrap">
-              Connect Calendars in
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() =>
-                  navigate("/Settings", {
-                    state: { scrollTo: "bottom" },
-                  })
-                }
-                className="h-7 px-2 gap-1 text-xs font-medium text-ink-900 dark:text-ink-100 hover:bg-ink-100 dark:hover:bg-night-high"
-              >
-                <SettingsIcon className="w-3.5 h-3.5" />
-                Settings
-              </Button>
-            </span>
-          </div>
-        )}
-        <div className="flex items-center gap-2 shrink-0">
-          <AnimatedSearchInput
-            open={showSearch}
-            value={search}
-            onChange={setSearch}
-            onClose={() => setShowSearch(false)}
-          />
-          <Button aria-label={showSearch ? "Close search" : "Search"}
-            variant="ghost"
-            size="icon"
-            data-search-toggle
-            className="h-9 w-9 text-ink-400 dark:text-ink-500 hover:text-ink-700 dark:hover:text-ink-200"
-            onMouseDown={(e) => { if (showSearch) e.preventDefault(); }}
-            onClick={() => {
-              if (showSearch) setSearch("");
-              setShowSearch((v) => !v);
-            }}
-          >
-            <Search className="w-4 h-4" />
-          </Button>
-          <CalendarVisibilityDropdown
-            calendars={calendarsList}
-            hidden={hiddenCalendars}
-            onChange={onHiddenCalendarsChange}
-          />
-          <MultiSortPanel sorts={sorts} onSortsChange={onSortsChange} page="calendar" />
-          <Button
-            onClick={onNewTask}
-            className="bg-primary hover:bg-[var(--primary-hover)] text-primary-foreground h-9 gap-1.5"
-          >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">New Task</span>
-          </Button>
-        </div>
-        {!integrationsConnected && !showSearch && (
-          <div className="basis-full min-w-0 lg:hidden">
-            <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs leading-5 text-ink-400 dark:text-ink-500">
-              Connect Calendars in
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() =>
-                  navigate("/Settings", {
-                    state: { scrollTo: "bottom" },
-                  })
-                }
-                className="h-7 px-2 gap-1 text-xs font-medium text-ink-900 dark:text-ink-100 hover:bg-ink-100 dark:hover:bg-night-high"
-              >
-                <SettingsIcon className="w-3.5 h-3.5" />
-                Settings
-              </Button>
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Second row: range label + tz / view switcher + nav arrows */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-baseline gap-2">
-          <span className="text-sm font-medium text-ink-900 dark:text-ink-100">{rangeLabel}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          {activeIntegration && (
-            <div className="inline-flex items-center gap-1.5 mr-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onSyncNow}
-                disabled={syncing || !online}
-                className="h-8 px-2 gap-1 text-xs text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-ink-100"
-                title={online ? "Sync calendars now" : "Calendar sync needs an internet connection"}
-              >
-                <RefreshCw className={cn("w-3.5 h-3.5", syncing && "animate-spin")} />
-                <span className="hidden sm:inline">Sync</span>
-              </Button>
-              <span className="text-[11px] text-ink-400 dark:text-ink-500 leading-none whitespace-nowrap hidden md:inline">
-                {syncing ? "Syncing…" : lastSyncedLabel}
-              </span>
-            </div>
-          )}
-          <div className="ds-seg">
-            {VIEWS.map((v) => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => onViewChange(v)}
-                aria-pressed={view === v}
-                className="ds-seg-item px-2.5 py-1 text-xs capitalize"
-              >
-                {v}
-              </button>
-            ))}
-          </div>
-          <div className="inline-flex items-center gap-0.5">
-            <Button aria-label="Previous"
+    <PageHeader
+      title="Calendar"
+      sub={<>{scopedCount} task{scopedCount !== 1 ? "s" : ""}</>}
+      below={
+        // Where you are and how you're looking at it. Left: step back and
+        // forward, the range, and a way home to today. Right: the view.
+        // On a phone the view switch drops to its own line, full width.
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          <div className="flex min-w-0 items-center gap-1">
+            <Button
+              aria-label="Previous"
+              title="Previous"
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-ink-400 dark:text-ink-500 hover:text-ink-700 dark:hover:text-ink-200"
+              className="-ml-2 h-8 w-8 shrink-0 text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-ink-100"
               onClick={onPrev}
-              title="Previous"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="h-4 w-4" />
             </Button>
-            <button
+            <Button
+              aria-label="Next"
+              title="Next"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0 text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-ink-100"
+              onClick={onNext}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <span className="ml-1 truncate text-[15px] font-semibold tabular-nums text-ink-900 dark:text-ink-100" data-testid="calendar-range">
+              {rangeLabel}
+            </span>
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
+              className="ml-2 h-7 shrink-0 px-2.5 text-xs"
               onClick={onToday}
-              className="text-xs font-medium text-ink-700 dark:text-ink-200 hover:text-ink-900 dark:hover:text-ink-100 px-2 py-1 rounded hover:bg-ink-50 dark:hover:bg-night-high"
               title="Jump to today"
             >
               Today
-            </button>
-            <Button aria-label="Next"
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-ink-400 dark:text-ink-500 hover:text-ink-700 dark:hover:text-ink-200"
-              onClick={onNext}
-              title="Next"
-            >
-              <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
+          <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end">
+            {activeIntegration && (
+              <div className="inline-flex items-center gap-1.5">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onSyncNow}
+                  disabled={syncing || !online}
+                  className="h-8 gap-1 px-2 text-xs text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-ink-100"
+                  title={online ? "Sync calendars now" : "Calendar sync needs an internet connection"}
+                >
+                  <RefreshCw className={cn("h-3.5 w-3.5", syncing && "animate-spin")} />
+                  <span className="hidden sm:inline">Sync</span>
+                </Button>
+                <span className="hidden whitespace-nowrap text-[11px] leading-none text-ink-400 dark:text-ink-500 md:inline">
+                  {syncing ? "Syncing…" : lastSyncedLabel}
+                </span>
+              </div>
+            )}
+            <div className="ds-seg ml-auto flex-1 sm:flex-none">
+              {VIEWS.map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => onViewChange(v)}
+                  aria-pressed={view === v}
+                  className="ds-seg-item flex-1 px-3 py-1 text-xs capitalize sm:flex-none"
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
-      </div>
-    </>
+      }
+    >
+      <PageSearch open={showSearch} onOpenChange={setShowSearch} value={search} onChange={setSearch} />
+      <CalendarVisibilityDropdown
+        calendars={calendarsList}
+        hidden={hiddenCalendars}
+        onChange={onHiddenCalendarsChange}
+      />
+      <MultiSortPanel sorts={sorts} onSortsChange={onSortsChange} page="calendar" />
+      <Button onClick={onNewTask} className="h-9 gap-1.5">
+        <Plus className="h-4 w-4" />
+        <span className="hidden sm:inline">New Task</span>
+      </Button>
+    </PageHeader>
   );
 }

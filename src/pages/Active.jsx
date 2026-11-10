@@ -6,8 +6,8 @@ import { useOfflineMutation } from "@/hooks/useOfflineMutation";
 import { formatDeleteLabel, useDeleteWithUndo } from "@/hooks/useDeleteWithUndo";
 import { showDeleteToast } from "@/components/tasks/DeleteToast";
 import { Button } from "@/components/ui/button";
-import { AnimatedSearchInput } from "@/components/ui/animated-search-input";
-import { Plus, Search } from "lucide-react";
+import PageHeader, { PageSearch } from "@/components/PageHeader";
+import { Plus } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import TaskCard from "@/components/tasks/TaskCard";
 import TaskForm from "@/components/tasks/TaskForm";
@@ -173,35 +173,14 @@ export default function Active() {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="ds-page-title">All Tasks</h1>
-          <p className="ds-page-sub">{activeTasks.length} task{activeTasks.length !== 1 ? "s" : ""}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <AnimatedSearchInput
-            open={showSearch}
-            value={search}
-            onChange={setSearch}
-            onClose={() => setShowSearch(false)}
-          />
-          <Button aria-label={showSearch ? "Close search" : "Search"}
-            variant="ghost"
-            size="icon"
-            data-search-toggle
-            className="h-9 w-9 text-ink-400 dark:text-ink-500 hover:text-ink-700 dark:hover:text-ink-200"
-            onMouseDown={(e) => { if (showSearch) e.preventDefault(); }}
-            onClick={() => { if (showSearch) setSearch(""); setShowSearch((v) => !v); }}
-          >
-            <Search className="w-4 h-4" />
-          </Button>
-          <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} page="active" />
-          <Button onClick={() => { setEditingTask(null); setAddSubtaskParent(null); setShowForm(true); }} className="bg-primary hover:bg-[var(--primary-hover)] text-primary-foreground h-9 gap-1.5">
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">New Task</span>
-          </Button>
-        </div>
-      </div>
+      <PageHeader title="All Tasks" sub={<>{activeTasks.length} task{activeTasks.length !== 1 ? "s" : ""}</>}>
+        <PageSearch open={showSearch} onOpenChange={setShowSearch} value={search} onChange={setSearch} />
+        <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} page="active" />
+        <Button onClick={() => { setEditingTask(null); setAddSubtaskParent(null); setShowForm(true); }} className="bg-primary hover:bg-[var(--primary-hover)] text-primary-foreground h-9 gap-1.5">
+          <Plus className="w-4 h-4" />
+          <span className="hidden sm:inline">New Task</span>
+        </Button>
+      </PageHeader>
 
       {/* Active tasks */}
       {isLoading ? (

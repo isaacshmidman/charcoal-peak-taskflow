@@ -19,22 +19,24 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { NotebookPen, Plus, Search } from "lucide-react";
+import { NotebookPen, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { AnimatedSearchInput } from "@/components/ui/animated-search-input";
+import PageHeader, { PageSearch } from "@/components/PageHeader";
 import { apiClient } from "@/api/apiClient";
 import { useOfflineEntityMutation } from "@/hooks/useOfflineEntityMutation";
 import { useOfflineMutation } from "@/hooks/useOfflineMutation";
 import { useShortcutEvent } from "@/hooks/useShortcutEvent";
 import { SHORTCUT_EVENTS } from "@/lib/shortcuts";
 import { showDeleteToast } from "@/components/tasks/DeleteToast";
-import { cn } from "@/lib/utils";
-import { useSplitPane } from "@/hooks/useSplitPane";
-import SplitDivider from "@/components/ui/split-divider";
+import TwoPane from "@/components/ui/two-pane";
 import TaskForm from "@/components/tasks/TaskForm";
 import NoteSidebar from "@/components/notes/NoteSidebar";
 import NoteCanvas from "@/components/notes/NoteCanvas";
 import { activeSchedule, scheduleSearchText } from "@/lib/schedule";
+
+// The list's divider has no sticky points. A constant, so the split hook
+// isn't rebuilt on every render.
+const NO_DETENTS = [];
 
 export default function Notes() {
   const [search, setSearch] = useState("");
@@ -44,28 +46,6 @@ export default function Notes() {
   // would bury the editor under the whole note list. Show one at a time
   // instead, the way Notes behaves on a phone.
   const [mobilePane, setMobilePane] = useState("list");
-
-  // Same divider the Calendar day view uses between its timed and all-day
-  // columns — one hook, so the two behave identically rather than merely
-  // looking alike. The sidebar is on the LEFT here, so dragging right
-  // grows it (fromEnd stays false).
-  const {
-    size: sidebarWidth,
-    containerRef,
-    startResize,
-    resetSplit,
-    snapped,
-    glide,
-  } = useSplitPane({
-    storageKey: "notes_sidebar_width",
-    minSize: 180,
-    defaultSize: 256,
-    // The list never takes more than half the page, and it drags freely —
-    // no detents, unlike the calendar's. Double-click parks it at 25/75.
-    maxFraction: 0.5,
-    snapFractions: [],
-    resetFraction: 0.25,
-  });
 
   // Task dialog state. `taskDraft` seeds a NEW task from a selection;
   // `editingTask` opens an existing one from its dot.
@@ -253,98 +233,73 @@ export default function Notes() {
           title + count on the left, search and the primary action on the
           right. Search and New note live here rather than inside the
           sidebar so the page reads like the rest of the app. */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="ds-page-title">Notes</h1>
-          <p className="ds-page-sub">
-            {notes.length} note{notes.length !== 1 ? "s" : ""}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <AnimatedSearchInput
-            open={showSearch}
-            value={search}
-            onChange={setSearch}
-            onClose={() => setShowSearch(false)}
+      <PageHeader title="Notes" sub={<>{notes.length} note{notes.length !== 1 ? "s" : ""}</>}>
+        <PageSearch open={showSearch} onOpenChange={setShowSearch} value={search} onChange={setSearch} label="Search notes" />
+        <Button
+          onClick={newNote}
+          data-testid="new-note-button"
+          className="bg-primary hover:bg-[var(--primary-hover)] text-primary-foreground h-9 gap-1.5"
+        >
+          <Plus className="w-4 h-4" />
+          <span className="hidden sm:inline">New note</span>
+        </Button>
+      </PageHeader>
+
+      {/* List | note: the app's one two-column block (ui/two-pane.jsx),
+          the same as the calendar's day view. On a phone the two can't sit
+          side by side, so one shows at a time, the way Notes behaves on a
+          phone anywhere. The list never takes more than half the page and
+          drags freely; double-click parks it at a quarter. */}
+      <TwoPane
+        className="h-[calc(100dvh-15.5rem)] sm:h-[calc(100dvh-12.5rem)]"
+        storageKey="notes_sidebar_width"
+        sized="start"
+        narrow={mobilePane === "editor" ? "end" : "start"}
+        minSize={200}
+        defaultSize={272}
+        maxFraction={0.5}
+        snapFractions={NO_DETENTS}
+        resetFraction={0.25}
+        dividerTitle="Drag to resize. Double-click for a 25/75 split."
+        start={
+          <NoteSidebar
+            notes={sortedNotes}
+            activeId={openNoteId}
+            onSelect={selectNote}
+            onDelete={deleteNote}
+            search={search}
+            isLoading={isLoading}
           />
-          <Button aria-label={showSearch ? "Close search" : "Search notes"}
-            variant="ghost"
-            size="icon"
-            data-search-toggle
-            className="h-9 w-9 text-ink-400 dark:text-ink-500 hover:text-ink-700 dark:hover:text-ink-200"
-            onMouseDown={(event) => { if (showSearch) event.preventDefault(); }}
-            onClick={() => { if (showSearch) setSearch(""); setShowSearch((v) => !v); }}
-          >
-            <Search className="w-4 h-4" />
-          </Button>
-          <Button
-            onClick={newNote}
-            data-testid="new-note-button"
-            className="bg-primary hover:bg-[var(--primary-hover)] text-primary-foreground h-9 gap-1.5"
-          >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">New note</span>
-          </Button>
-        </div>
-      </div>
-
-      <div
-        ref={containerRef}
-        className="flex min-h-0 flex-col rounded-xl border border-border-hairline bg-surface-card h-[calc(100vh-17rem)] sm:h-[calc(100vh-12rem)] sm:flex-row"
-      >
-      <NoteSidebar
-        // Fixed px width from the divider on desktop; full width on mobile,
-        // where the panes swap instead of sitting side by side.
-        style={{ "--notes-sb": `${sidebarWidth}px` }}
-        className={cn(
-          mobilePane === "editor" ? "hidden sm:flex" : "flex",
-          "sm:w-[var(--notes-sb)]",
-          glide && "sm:transition-[width] sm:duration-100 sm:ease-out"
-        )}
-        notes={sortedNotes}
-        activeId={openNoteId}
-        onSelect={selectNote}
-        onDelete={deleteNote}
-        search={search}
-        isLoading={isLoading}
+        }
+        end={
+          openNote ? (
+            <NoteCanvas
+              // Fresh editor + fresh autosave baseline per note. NOT keyed on
+              // anything that changes while the task dialog is open, so the
+              // note underneath survives it untouched.
+              key={openNote.id}
+              onBack={() => setMobilePane("list")}
+              onDelete={() => deleteNote(openNote)}
+              note={openNote}
+              onSave={saveNote}
+              taskStatusById={taskStatusById}
+              onMakeTask={handleMakeTask}
+              onOpenTask={handleOpenTask}
+              onEditorReady={(editor) => { editorRef.current = editor; }}
+              scrollRef={scrollRef}
+            />
+          ) : (
+            <section className="flex flex-1 items-center justify-center">
+              <div className="text-center">
+                <NotebookPen className="mx-auto mb-2 h-5 w-5 text-ink-300 dark:text-ink-600" />
+                <p className="text-sm text-ink-400 dark:text-ink-500">
+                  {search ? "Nothing matches." : "A quiet page. Write anything."}
+                </p>
+              </div>
+            </section>
+          )
+        }
       />
-
-      <SplitDivider
-        onPointerDown={startResize}
-        onDoubleClick={resetSplit}
-        snapped={snapped}
-        title="Drag to resize. Double-click for a 25/75 split."
-        className={cn("hidden sm:flex", mobilePane === "list" && "sm:flex")}
-      />
-
-      {openNote ? (
-        <NoteCanvas
-          // Fresh editor + fresh autosave baseline per note. NOT keyed on
-          // anything that changes while the task dialog is open, so the
-          // note underneath survives it untouched.
-          key={openNote.id}
-          className={mobilePane === "list" ? "hidden sm:flex" : "flex"}
-          onBack={() => setMobilePane("list")}
-          note={openNote}
-          onSave={saveNote}
-          taskStatusById={taskStatusById}
-          onMakeTask={handleMakeTask}
-          onOpenTask={handleOpenTask}
-          onEditorReady={(editor) => { editorRef.current = editor; }}
-          scrollRef={scrollRef}
-        />
-      ) : (
-        <section className={cn("flex-1 items-center justify-center", mobilePane === "list" ? "hidden sm:flex" : "flex")}>
-          <div className="text-center">
-            <NotebookPen className="mx-auto mb-2 h-5 w-5 text-ink-300 dark:text-ink-600" />
-            <p className="text-xs text-ink-400 dark:text-ink-500">
-              {search ? "Nothing matches." : "A quiet page. Write anything."}
-            </p>
-          </div>
-        </section>
-      )}
-
-      </div>
 
       <TaskForm
         open={taskFormOpen}

@@ -11,7 +11,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/api/apiClient";
 import { useOfflineMutation } from "@/hooks/useOfflineMutation";
@@ -355,7 +355,6 @@ export default function Calendar() {
         calendarsList={calendarsList}
         hiddenCalendars={hiddenCalendars}
         onHiddenCalendarsChange={setHiddenCalendars}
-        integrationsConnected={integrationsConnected}
         activeIntegration={activeIntegration}
         online={online}
         syncing={syncing}
@@ -456,11 +455,22 @@ export default function Calendar() {
         )}
       </DndContext>
 
-      {timezone && (
-        <p className="text-center text-xs text-ink-400 dark:text-ink-500 mt-4">
-          Time Zone: {timezone}
-        </p>
-      )}
+      {/* Under the calendar, out of the way: the time zone, and — until a
+          calendar is connected — where to connect one. That used to sit in
+          the header, where it pushed the buttons around as it came and went. */}
+      <p className="mt-4 text-center text-xs text-ink-400 dark:text-ink-500">
+        {timezone && <>Time Zone: {timezone}</>}
+        {timezone && !integrationsConnected && " · "}
+        {!integrationsConnected && (
+          <Link
+            to="/Settings"
+            state={{ scrollTo: "bottom" }}
+            className="underline underline-offset-2 hover:text-ink-600 dark:hover:text-ink-300"
+          >
+            Connect Google or Apple Calendar
+          </Link>
+        )}
+      </p>
 
       <TaskForm
         open={showForm}

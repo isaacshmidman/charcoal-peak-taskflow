@@ -108,14 +108,9 @@ export default function NoteSidebar({
   onDelete,
   search,
   isLoading,
-  className,
-  style,
 }) {
   return (
-    <aside
-      style={style}
-      className={cn("h-full min-h-0 w-full flex-col border-border-hairline sm:shrink-0", className)}
-    >
+    <aside className="flex min-h-0 flex-1 flex-col">
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
         {isLoading ? (
           <div className="space-y-1.5 px-1 pt-1">

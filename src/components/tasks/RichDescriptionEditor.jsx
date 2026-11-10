@@ -108,7 +108,9 @@ export default function RichDescriptionEditor({
       attributes: {
         // minHeight is baked in at creation — it never changes for a
         // given host (dialog vs full-page note), so this needs no reactivity.
-        class: `tiptap-prose focus:outline-none px-3 py-2`,
+        // A note is a page: roomier type, and its host sets the margins.
+        // A description is a field: compact, padded like one.
+        class: chromeless ? "tiptap-prose tiptap-page focus:outline-none" : "tiptap-prose focus:outline-none px-3 py-2",
         style: `min-height: ${minHeight}`,
       },
       handlePaste(view, event) {
@@ -199,8 +201,11 @@ export default function RichDescriptionEditor({
         chromeless
           ? "h-full"
           : cn(
-              "rounded-md border bg-white dark:bg-night-sunken",
-              showToolbar ? "border-ink-300 dark:border-night-line-bold" : "border-ink-200 dark:border-night-line-strong"
+              "rounded-lg border bg-surface-card dark:bg-night-sunken transition-[border-color,box-shadow]",
+              // Focused, it takes the same ring every other field does.
+              showToolbar
+                ? "border-ink-900 ring-[3px] ring-ink-900/10 dark:border-sun-400 dark:ring-sun-400/20"
+                : "border-border-strong"
             )
       )}
       // Keep the editor focused when interacting with the toolbar chrome.
@@ -214,8 +219,8 @@ export default function RichDescriptionEditor({
           role="status"
           data-testid="richtext-limit-notice"
           className={cn(
-            "px-3 pb-1.5 text-[11px] font-medium text-red-600 dark:text-red-400",
-            chromeless && "sticky bottom-0 bg-white/90 py-1 dark:bg-black/80"
+            "pb-1.5 text-[11px] font-medium text-red-600 dark:text-red-400",
+            chromeless ? "sticky bottom-0 bg-surface-card py-1" : "px-3"
           )}
         >
           {limitNotice.over === 1

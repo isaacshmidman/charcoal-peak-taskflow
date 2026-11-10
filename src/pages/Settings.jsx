@@ -36,7 +36,6 @@ import {
   Bell,
   Calendar,
   CheckSquare,
-  ChevronLeft,
   ChevronRight,
   Download,
   FolderOpen,
@@ -47,7 +46,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
-import { Button } from "@/components/ui/button";
+import PageHeader from "@/components/PageHeader";
 import { Card } from "@/components/ui/card";
 import {
   AlertDialog,
@@ -92,21 +91,9 @@ export const NAV_OPTIONS = [
 /** Sub-page chrome: back-arrow + title, then children. */
 function SubPage({ title, onBack, children }) {
   return (
-    <div className="space-y-4 max-w-xl mx-auto">
-      <div className="flex items-center gap-2">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-ink-100"
-          onClick={onBack}
-          aria-label="Back to Settings"
-        >
-          <ChevronLeft className="w-5 h-5" />
-        </Button>
-        <h1 className="ds-page-title">{title}</h1>
-      </div>
-      <div className="space-y-8">
+    <div className="max-w-xl mx-auto">
+      <PageHeader title={title} back={onBack} backLabel="Back to Settings" />
+      <div className="space-y-8 pt-3">
         {children}
       </div>
     </div>
@@ -130,6 +117,16 @@ function SettingsCard({ icon: Icon, label, subtitle, onClick, iconClassName }) {
       </div>
       <ChevronRight className="w-4 h-4 text-ink-300 dark:text-ink-600 shrink-0" />
     </button>
+  );
+}
+
+/** A labelled group of section rows, on one surface. */
+function SettingsGroup({ label, children }) {
+  return (
+    <section>
+      <h2 className="mb-2 px-1 text-xs font-medium text-ink-500 dark:text-ink-400">{label}</h2>
+      <div className="ds-list">{children}</div>
+    </section>
   );
 }
 
@@ -280,101 +277,106 @@ export default function Settings() {
     );
   }
 
-  // ── Main page (cards + quick toggles) ─────────────────────────
+  // ── Main page: quick toggles, then the sections in four groups ──
 
   return (
-    <div className="space-y-4 max-w-xl mx-auto">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h1 className="ds-page-title">Settings</h1>
-          <p className="ds-page-sub truncate">{user?.email || "..."}</p>
-        </div>
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2 text-red-500 dark:text-red-300 border-red-200 dark:border-red-900 hover:bg-red-50 dark:hover:bg-night-danger hover:text-red-600 dark:hover:text-red-200 hover:border-red-300 dark:hover:border-red-800 text-sm font-medium shrink-0"
-            >
-              <LogOut className="w-4 h-4" />
-              Log out
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={() => logout()}>Log out</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </div>
+    <div className="max-w-xl mx-auto">
+      <PageHeader title="Settings" sub={user?.email || "..."} />
 
-      {/* Quick toggles — two rows in one rounded card with a divider */}
-      <Card className="divide-y divide-[var(--border-hairline)]">
-        <QuickThemeToggle />
-        <QuickNotificationsToggle />
-      </Card>
+      <div className="space-y-6 pt-3">
+        {/* The two things changed most often, without opening a section. */}
+        <Card className="divide-y divide-[var(--border-hairline)]">
+          <QuickThemeToggle />
+          <QuickNotificationsToggle />
+        </Card>
 
-      {/* The sections, as one list */}
-      <div className="ds-list">
-        <SettingsCard
-          icon={Palette}
-          label="Appearance"
-          subtitle="Theme, default view, navigation order"
-          onClick={() => openSection("appearance")}
-        />
-        <SettingsCard
-          icon={CheckSquare}
-          label="Tasks and Notes"
-          subtitle="Shared priorities and tags"
-          onClick={() => openSection("tasks")}
-        />
-        <SettingsCard
-          icon={Calendar}
-          label="Calendars"
-          subtitle="Connected calendars and display"
-          onClick={() => openSection("calendars")}
-        />
-        <SettingsCard
-          icon={Plug}
-          label="Connected apps"
-          subtitle="AI apps that can read or change your tasks"
-          onClick={() => openSection("connected")}
-        />
-        <SettingsCard
-          icon={Bell}
-          label="Notifications"
-          subtitle="Reminders for tasks with due dates"
-          onClick={() => openSection("notifications")}
-        />
-        <SettingsCard
-          icon={FolderOpen}
-          label="Files"
-          subtitle="Search attachments and check storage"
-          onClick={() => openSection("files")}
-        />
-        <SettingsCard
-          icon={ShieldCheck}
-          label="Signed-in devices"
-          subtitle="Where your account is signed in"
-          onClick={() => openSection("devices")}
-        />
-        <SettingsCard
-          icon={Download}
-          label="Export & restore"
-          subtitle="Download everything as a .zip, or bring one back"
-          onClick={() => openSection("export")}
-        />
-        <SettingsCard
-          icon={Trash2}
-          iconClassName="text-red-400"
-          label="Recently Deleted"
-          onClick={() => openSection("recentlyDeleted")}
-        />
+        <SettingsGroup label="How it looks and works">
+          <SettingsCard
+            icon={Palette}
+            label="Appearance"
+            subtitle="Theme, default view, navigation order"
+            onClick={() => openSection("appearance")}
+          />
+          <SettingsCard
+            icon={CheckSquare}
+            label="Tasks and Notes"
+            subtitle="Shared priorities and tags"
+            onClick={() => openSection("tasks")}
+          />
+          <SettingsCard
+            icon={Bell}
+            label="Notifications"
+            subtitle="Reminders for tasks with due dates"
+            onClick={() => openSection("notifications")}
+          />
+        </SettingsGroup>
+
+        <SettingsGroup label="Connections">
+          <SettingsCard
+            icon={Calendar}
+            label="Calendars"
+            subtitle="Connected calendars and display"
+            onClick={() => openSection("calendars")}
+          />
+          <SettingsCard
+            icon={Plug}
+            label="Connected apps"
+            subtitle="AI apps that can read or change your tasks"
+            onClick={() => openSection("connected")}
+          />
+        </SettingsGroup>
+
+        <SettingsGroup label="Your data">
+          <SettingsCard
+            icon={FolderOpen}
+            label="Files"
+            subtitle="Search attachments and check storage"
+            onClick={() => openSection("files")}
+          />
+          <SettingsCard
+            icon={Download}
+            label="Export & restore"
+            subtitle="Download everything as a .zip, or bring one back"
+            onClick={() => openSection("export")}
+          />
+          <SettingsCard
+            icon={Trash2}
+            label="Recently Deleted"
+            subtitle="Bring back or clear what you've deleted"
+            onClick={() => openSection("recentlyDeleted")}
+          />
+        </SettingsGroup>
+
+        <SettingsGroup label="Account">
+          <SettingsCard
+            icon={ShieldCheck}
+            label="Signed-in devices"
+            subtitle="Where your account is signed in"
+            onClick={() => openSection("devices")}
+          />
+          {/* Log out is a row like the others, not a red button in the
+              header: it is the last thing here, and it asks first. */}
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <button
+                type="button"
+                className="w-full flex items-center gap-3 bg-surface-card px-4 py-3 hover:bg-ink-50 dark:hover:bg-night-raised transition-colors text-left"
+              >
+                <LogOut className="w-5 h-5 shrink-0 text-ink-500 dark:text-ink-400" />
+                <span className="flex-1 text-sm font-medium text-ink-900 dark:text-ink-100">Log out</span>
+              </button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Log out of Zephyrly?</AlertDialogTitle>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => logout()}>Log out</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </SettingsGroup>
       </div>
 
       <p className="mt-6 text-center text-xs text-ink-400 dark:text-ink-500" data-testid="settings-legal-links">

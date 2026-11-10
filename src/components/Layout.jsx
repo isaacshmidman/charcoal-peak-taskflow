@@ -180,7 +180,7 @@ export default function Layout() {
       </nav>
 
       {/* Main content */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-5 sm:pt-7 pb-28 sm:pb-10">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 pb-28 sm:pb-10">
         <Outlet />
       </main>
 

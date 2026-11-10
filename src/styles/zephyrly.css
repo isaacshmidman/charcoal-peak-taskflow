@@ -90,8 +90,8 @@
 
   /* ── The wash ─────────────────────────────────────────────────
      Stops are in px, not %, so the band of colour is the same depth
-     on a phone and a wide monitor, and so it still looks right where
-     a fixed background isn't honoured (iOS) and it scrolls away.
+     on a phone and a wide monitor. .ds-bar and .ds-page-head
+     (index.css) repeat these stops — change them together.
      index.html keeps a literal copy for the moment before this file
      loads — change both together. */
   --wash-top-light: #fff5a6;

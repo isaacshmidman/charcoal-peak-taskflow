@@ -7,6 +7,7 @@ import { isSameDay } from "date-fns/isSameDay";
 import { startOfWeek } from "date-fns/startOfWeek";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CALENDAR_PANEL_HEIGHT } from "./panel";
 import MiniMiniTaskCard from "./MiniMiniTaskCard";
 import { parseTaskTime, compareTaskTime } from "@/lib/sort-helpers";
 import { layoutTimedTasks } from "@/lib/calendar-layout";
@@ -253,16 +254,16 @@ export default function WeekView({
   return (
     <div
       ref={scrollRef}
-      className="border border-ink-100 dark:border-night-line rounded-lg bg-white dark:bg-night-sunken overflow-auto max-h-[75vh]"
+      className={cn("rounded-xl border border-border-hairline bg-surface-card overflow-auto", CALENDAR_PANEL_HEIGHT)}
     >
       <div className="min-w-full">
         {/* Sticky day-header row (on top) */}
-        <div className="sticky top-0 z-40 bg-white dark:bg-night-sunken border-b border-ink-100 dark:border-night-line">
+        <div className="sticky top-0 z-40 bg-surface-card border-b border-ink-100 dark:border-night-line">
           <div className="flex" style={{ height: DAY_HEADER_HEIGHT }}>
             {/* No border-r: the day column beside it already draws a
                 border-l, and the two together made this rule 2px thick —
                 visibly heavier than the day view's. */}
-            <div className="w-12 shrink-0 bg-white dark:bg-night-sunken" />
+            <div className="w-12 shrink-0 bg-surface-card" />
             {days.map((d) => (
               <DayHeader key={toDateStr(d)} date={d} onClick={onDayClick} />
             ))}
@@ -271,11 +272,11 @@ export default function WeekView({
 
         {/* Sticky all-day bar (directly below day headers) */}
         <div
-          className="sticky z-30 bg-white dark:bg-night-sunken border-b border-ink-100 dark:border-night-line"
+          className="sticky z-30 bg-surface-card border-b border-ink-100 dark:border-night-line"
           style={{ top: DAY_HEADER_HEIGHT }}
         >
           <div className="flex min-h-7">
-            <div className="w-12 shrink-0 bg-white dark:bg-night-sunken flex items-start justify-center pt-1">
+            <div className="w-12 shrink-0 bg-surface-card flex items-start justify-center pt-1">
               {/* Only offer the toggle when some day actually has enough
                   all-day tasks for collapsing to hide anything. */}
               {days.some((d) => canCollapseAllDay((byDay.get(toDateStr(d))?.allDay || []).length)) && (
@@ -315,7 +316,7 @@ export default function WeekView({
 
         {/* Timed grid */}
         <div className="flex">
-          <div className="w-12 shrink-0 bg-white dark:bg-night-sunken relative" style={{ height: HOURS.length * HOUR_HEIGHT }}>
+          <div className="w-12 shrink-0 bg-surface-card relative" style={{ height: HOURS.length * HOUR_HEIGHT }}>
             {/* Centred on the hour line rather than sitting under it, and
                 right-aligned so the gap to the grid is identical for
                 "1 AM" and "12 PM". Matches DayView. */}
