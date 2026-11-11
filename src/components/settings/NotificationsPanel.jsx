@@ -2,32 +2,29 @@
 /**
  * @file Notifications settings.
  *
- * Structure:
- *   1. Bell box: master "Notifications" toggle. When off the rest of
- *      the panel is hidden — same pattern as recurring-task options in
- *      TaskForm.
- *   2. (when on) Full-width Allow/Block button for the current device.
- *   3. (when on) Remind me box: timed-task offset, all-day reminder
- *      time, missed-reminder grace window, and an "include read-only
- *      Google/Apple calendar events" checkbox that's auto-disabled
- *      when no calendar integration is connected.
- *   4. (when on) "Advanced Notification Settings" trigger (chevron-
- *      right card, mirrors the Recently Deleted button). Opens a
- *      sub-page managed by Settings.jsx.
+ * Structure (rows on shared surfaces, like the rest of Settings):
+ *   1. The master "Notifications" switch. When off, the rest of the
+ *      panel is hidden.
+ *   2. (when on) "This device": allow reminders here, or turn them off.
+ *   3. (when on) "When to remind": timed-task offset, all-day reminder
+ *      time, missed-reminder grace window, and whether events from
+ *      connected calendars get reminders too (off and greyed when no
+ *      calendar is connected).
+ *   4. (when on) "Advanced": a row that opens a sub-page managed by
+ *      Settings.jsx.
  *
  * All settings auto-save on change (debounced ~500ms). No explicit
  * Save button. A small "Saved." status line appears after each commit.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, BellOff, ChevronRight, Loader2, ShieldOff, SlidersHorizontal } from "lucide-react";
+import { Bell, BellOff, Loader2, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import TimeInput from "@/components/tasks/TaskForm/TimeInput.jsx";
 import SettingsToggle from "@/components/settings/SettingsToggle";
+import { SettingRow, SettingsLink, SettingsSection, settingsHint } from "@/components/settings/parts";
 import { apiClient } from "@/api/apiClient";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useIntegrationsConnected } from "@/hooks/useIntegrations";
@@ -54,14 +51,6 @@ const TIMED_PRESETS = [
 
 function presetForOffset(offset) {
   return ["0", "-10", "-15", "-30", "-60"].includes(String(offset)) ? String(offset) : "custom";
-}
-
-function SettingBox({ children, className = "" }) {
-  return (
-    <Card className={cn("px-4 py-3", className)}>
-      {children}
-    </Card>
-  );
 }
 
 /**
@@ -192,17 +181,11 @@ export default function NotificationsPanel({ onOpenAdvanced }) {
   const unavailable = data ? !data.available : false;
   const deviceBusy = subscribeMutation.isPending || unsubscribeMutation.isPending;
 
-  // Trigger styles for the Select dropdowns in this panel — re-used by
-  // the all-day TimeInput so it visually matches the rest of the form.
-  const SELECT_TRIGGER_CLASS = "h-9 bg-white dark:bg-night-card dark:border-night-line-strong text-sm font-medium text-ink-900 dark:text-ink-100";
-
   return (
-    <section id="notifications" className="space-y-3">
-      <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-100">Notifications</h2>
-
+    <section id="notifications" className="space-y-6">
       {offline && (
         <p className="rounded-lg border border-amber-100 dark:border-night-warn-line bg-amber-50 dark:bg-night-warn px-3 py-2 text-xs text-amber-700 dark:text-amber-200">
-          Offline — notification settings will save when you reconnect.
+          Offline: notification settings will save when you reconnect.
         </p>
       )}
 
@@ -212,140 +195,111 @@ export default function NotificationsPanel({ onOpenAdvanced }) {
         </p>
       )}
 
-      {/* ── Master toggle ───────────────────────────────────────── */}
-      <SettingBox className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          {draft.enabled ? (
-            <Bell className="w-5 h-5 text-emerald-500 shrink-0" />
-          ) : (
-            <BellOff className="w-5 h-5 text-ink-400 dark:text-ink-500 shrink-0" />
-          )}
-          <p className="text-sm font-medium text-ink-900 dark:text-ink-100">
-            Notifications
-          </p>
+      {/* ── Master switch, and this device ──────────────────────── */}
+      <div className="ds-list">
+        <div className="flex min-h-[3.25rem] items-center justify-between gap-4 px-4 py-2.5">
+          <div className="flex min-w-0 items-center gap-3">
+            {draft.enabled ? (
+              <Bell className="h-5 w-5 shrink-0 text-ink-700 dark:text-ink-200" />
+            ) : (
+              <BellOff className="h-5 w-5 shrink-0 text-ink-400 dark:text-ink-500" />
+            )}
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-ink-900 dark:text-ink-100">Notifications</p>
+              <p className="mt-0.5 text-xs text-ink-500 dark:text-ink-400">Reminders for tasks with a date</p>
+            </div>
+          </div>
+          <SettingsToggle
+            label="Notifications"
+            checked={draft.enabled}
+            disabled={offline}
+            onChange={(next) => patchDraft({ enabled: next })}
+          />
         </div>
-        <SettingsToggle
-          label="Notifications"
-          checked={draft.enabled}
-          disabled={offline}
-          onChange={(next) => patchDraft({ enabled: next })}
-        />
-      </SettingBox>
 
-      {/* ── Device + Remind-me only visible when master is on ──── */}
+        {/* This device: one row, whose button depends on whether the
+            device is subscribed. A browser that can't do push, a server
+            with no keys, or a blocked permission says so instead. */}
+        {draft.enabled && (
+          !supported ? (
+            <p className="px-4 py-3 text-xs text-amber-600 dark:text-amber-300">
+              This browser doesn't support push notifications.
+            </p>
+          ) : unavailable ? (
+            <p className="px-4 py-3 text-xs text-amber-600 dark:text-amber-300">
+              {data?.reason || "Notifications aren't configured on this server."}
+            </p>
+          ) : permission === "denied" ? (
+            <p className="px-4 py-3 text-xs text-amber-600 dark:text-amber-300">
+              Notifications are blocked in this browser. Allow them in the browser's site settings to continue.
+            </p>
+          ) : (
+            <SettingRow
+              label="This device"
+              hint={deviceSubscribed ? "Gets your reminders" : "Doesn't get reminders yet"}
+            >
+              {deviceSubscribed ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-300 dark:hover:bg-night-danger dark:hover:text-red-200"
+                  disabled={deviceBusy || offline}
+                  onClick={() => unsubscribeMutation.mutate()}
+                >
+                  {unsubscribeMutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  Turn off here
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  size="sm"
+                  className="gap-1.5"
+                  disabled={deviceBusy || offline}
+                  onClick={() => subscribeMutation.mutate()}
+                >
+                  {subscribeMutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  Allow on this device
+                </Button>
+              )}
+            </SettingRow>
+          )
+        )}
+      </div>
+
+      {/* ── When, and what about: only while notifications are on ── */}
       {draft.enabled && (
         <>
-          {/* This device — one full-width button, label depends on
-              current subscription state. Hidden entirely if the browser
-              can't do push or the server hasn't been configured with
-              VAPID keys. */}
-          {supported && !unavailable && (
-            permission === "denied" ? (
-              <SettingBox>
-                <p className="text-xs text-amber-600 dark:text-amber-300">
-                  Notifications are blocked at the browser level — re-enable them in your browser's site settings to continue.
-                </p>
-              </SettingBox>
-            ) : deviceSubscribed ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="w-full h-11 gap-2 text-sm rounded-xl text-red-500 dark:text-red-300 border-red-200 dark:border-red-900 hover:bg-red-50 dark:hover:bg-night-danger hover:text-red-600 dark:hover:text-red-200 hover:border-red-300 dark:hover:border-red-800"
-                disabled={deviceBusy || offline}
-                onClick={() => unsubscribeMutation.mutate()}
-              >
-                {unsubscribeMutation.isPending ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <ShieldOff className="w-4 h-4" />
-                )}
-                Block notifications for this device
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="w-full h-11 gap-2 text-sm rounded-xl bg-white dark:bg-night-card border-ink-100 dark:border-night-line hover:border-ink-200 dark:hover:border-night-line-bold text-ink-900 dark:text-ink-100"
-                disabled={deviceBusy || offline}
-                onClick={() => subscribeMutation.mutate()}
-              >
-                {subscribeMutation.isPending ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Bell className="w-4 h-4" />
-                )}
-                Allow notifications for this device
-              </Button>
-            )
-          )}
-
-          {!supported && (
-            <SettingBox>
-              <p className="text-xs text-amber-600 dark:text-amber-300">
-                This browser doesn't support push notifications.
-              </p>
-            </SettingBox>
-          )}
-
-          {unavailable && supported && (
-            <SettingBox>
-              <p className="text-xs text-amber-600 dark:text-amber-300">
-                {data?.reason || "Notifications aren't configured on this server."}
-              </p>
-            </SettingBox>
-          )}
-
-          {/* Remind me — reminder timing options. */}
-          <SettingBox className="space-y-3">
-            <p className="text-sm font-medium text-ink-900 dark:text-ink-100">Adjust Notification Timing</p>
-
-            <div className="space-y-2">
-              <label className="block text-xs font-medium text-ink-600 dark:text-ink-300">Timed tasks</label>
-              <Select
-                value={timedMode}
-                disabled={offline}
-                onValueChange={(value) => {
-                  userTouchedRef.current = true;
-                  setStatusMessage("");
-                  setTimedMode(value);
-                  if (value !== "custom") {
-                    setDraft((current) => ({ ...current, timedOffsetMinutes: Number(value) }));
-                  }
-                }}
-              >
-                <SelectTrigger className={SELECT_TRIGGER_CLASS}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-white dark:bg-night-card dark:border-night-line-strong">
-                  {TIMED_PRESETS.map((preset) => (
-                    <SelectItem
-                      key={preset.value}
-                      value={preset.value}
-                      className="text-sm font-medium text-ink-900 dark:text-ink-100"
-                    >
-                      {preset.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <SettingsSection label="When to remind">
+            <div className="ds-list">
+              <SettingRow label="Timed tasks">
+                <Select
+                  value={timedMode}
+                  disabled={offline}
+                  onValueChange={(value) => {
+                    userTouchedRef.current = true;
+                    setStatusMessage("");
+                    setTimedMode(value);
+                    if (value !== "custom") {
+                      setDraft((current) => ({ ...current, timedOffsetMinutes: Number(value) }));
+                    }
+                  }}
+                >
+                  <SelectTrigger className="w-40" aria-label="When to remind about timed tasks">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TIMED_PRESETS.map((preset) => (
+                      <SelectItem key={preset.value} value={preset.value}>
+                        {preset.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </SettingRow>
 
               {timedMode === "custom" && (
-                <div className="grid grid-cols-[1fr_5rem_1fr] gap-2">
-                  <Select
-                    value={customParts.direction}
-                    disabled={offline}
-                    onValueChange={(direction) => updateCustomOffset({ direction })}
-                  >
-                    <SelectTrigger className="h-9 bg-white dark:bg-night-card dark:border-night-line-strong text-xs font-medium text-ink-900 dark:text-ink-100">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-white dark:bg-night-card dark:border-night-line-strong">
-                      <SelectItem value="before">Before</SelectItem>
-                      <SelectItem value="after">After</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="grid grid-cols-[4.5rem_1fr_1fr] gap-2 px-4 py-2.5">
                   <Input
                     type="number"
                     min="0"
@@ -353,110 +307,105 @@ export default function NotificationsPanel({ onOpenAdvanced }) {
                     value={customParts.amount}
                     disabled={offline}
                     onChange={(e) => updateCustomOffset({ amount: e.target.value })}
-                    className="h-9"
+                    aria-label="How long"
                   />
                   <Select
                     value={customParts.unit}
                     disabled={offline}
                     onValueChange={(unit) => updateCustomOffset({ unit })}
                   >
-                    <SelectTrigger className="h-9 bg-white dark:bg-night-card dark:border-night-line-strong text-xs font-medium text-ink-900 dark:text-ink-100">
+                    <SelectTrigger aria-label="Unit">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="bg-white dark:bg-night-card dark:border-night-line-strong">
+                    <SelectContent>
                       <SelectItem value="minutes">Minutes</SelectItem>
                       <SelectItem value="hours">Hours</SelectItem>
                       <SelectItem value="days">Days</SelectItem>
                     </SelectContent>
                   </Select>
+                  <Select
+                    value={customParts.direction}
+                    disabled={offline}
+                    onValueChange={(direction) => updateCustomOffset({ direction })}
+                  >
+                    <SelectTrigger aria-label="Before or after">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="before">Before</SelectItem>
+                      <SelectItem value="after">After</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
-            </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1 text-xs font-medium text-ink-600 dark:text-ink-300">
-                <span>All-day tasks</span>
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    checked={!!draft.allDayEnabled}
-                    disabled={offline}
-                    onCheckedChange={(on) => patchDraft({ allDayEnabled: on })}
-                    aria-label="Remind me about all-day tasks"
+              <SettingRow label="All-day tasks" hint={draft.allDayEnabled ? "A reminder on the day, at this time" : "No reminder"}>
+                <div className={cn((!draft.allDayEnabled || offline) && "pointer-events-none opacity-40")}>
+                  <TimeInput
+                    value={draft.allDayTime || "9:00AM"}
+                    onChange={(value) => patchDraft({ allDayTime: value })}
                   />
-                  <div className={cn("flex-1 min-w-0", (!draft.allDayEnabled || offline) && "opacity-50 pointer-events-none")}>
-                    <TimeInput
-                      value={draft.allDayTime || "9:00AM"}
-                      onChange={(value) => patchDraft({ allDayTime: value })}
-                      className="w-full"
-                      triggerClassName={SELECT_TRIGGER_CLASS}
-                    />
-                  </div>
                 </div>
-              </div>
+                <SettingsToggle
+                  label="Remind me about all-day tasks"
+                  checked={!!draft.allDayEnabled}
+                  disabled={offline}
+                  onChange={(on) => patchDraft({ allDayEnabled: on })}
+                />
+              </SettingRow>
 
-              <label className="space-y-1 text-xs font-medium text-ink-600 dark:text-ink-300">
-                <span>Missed reminders</span>
+              <SettingRow label="Missed reminders" hint="If this device was off when one was due">
                 <Select
                   value={String(draft.missedGraceMinutes)}
                   disabled={offline}
                   onValueChange={(value) => patchDraft({ missedGraceMinutes: Number(value) })}
                 >
-                  <SelectTrigger className={SELECT_TRIGGER_CLASS}>
+                  <SelectTrigger className="w-40" aria-label="Missed reminders">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-night-card dark:border-night-line-strong">
-                    <SelectItem value="0">Skip missed</SelectItem>
-                    <SelectItem value="30">Last 30 minutes</SelectItem>
-                    <SelectItem value="120">Last 2 hours</SelectItem>
-                    <SelectItem value="1440">Last 24 hours</SelectItem>
+                  <SelectContent>
+                    <SelectItem value="0">Skip them</SelectItem>
+                    <SelectItem value="30">Up to 30 min late</SelectItem>
+                    <SelectItem value="120">Up to 2 hours late</SelectItem>
+                    <SelectItem value="1440">Up to a day late</SelectItem>
                   </SelectContent>
                 </Select>
-              </label>
+              </SettingRow>
+
+              <SettingRow
+                label="Calendar events"
+                hint={
+                  calendarsConnected
+                    ? "Also remind me about events from Google and Apple calendars"
+                    : "Connect a calendar in Settings → Calendars to use this"
+                }
+                className={cn(!calendarsConnected && "opacity-60")}
+              >
+                <SettingsToggle
+                  label="Remind me about calendar events"
+                  checked={!!(draft.includeExternalEvents && calendarsConnected)}
+                  disabled={offline || !calendarsConnected}
+                  onChange={(on) => patchDraft({ includeExternalEvents: on })}
+                />
+              </SettingRow>
             </div>
+          </SettingsSection>
 
-            <label
-              className={cn(
-                "flex items-center gap-2 text-xs font-medium",
-                calendarsConnected
-                  ? "text-ink-700 dark:text-ink-200 cursor-pointer"
-                  : "text-ink-400 dark:text-ink-500 cursor-not-allowed"
-              )}
-              title={
-                calendarsConnected
-                  ? undefined
-                  : "Connect a Google or Apple calendar in Settings → Integrations to enable this."
-              }
-            >
-              <Checkbox
-                size="sm"
-                checked={!!(draft.includeExternalEvents && calendarsConnected)}
-                disabled={offline || !calendarsConnected}
-                onCheckedChange={(on) => patchDraft({ includeExternalEvents: on })}
-              />
-              Include read-only Google and Apple calendar events
-            </label>
-          </SettingBox>
-
-          {/* Advanced Notification Settings — same trigger pattern as
-              the Recently Deleted button in Settings.jsx. */}
           {onOpenAdvanced && (
-            <button
-              type="button"
-              onClick={onOpenAdvanced}
-              className="w-full flex items-center justify-between bg-white dark:bg-night-card border border-ink-100 dark:border-night-line rounded-xl px-4 py-3 hover:border-ink-200 dark:hover:border-night-line-bold transition-colors"
-            >
-              <span className="text-sm font-medium text-ink-900 dark:text-ink-100 flex items-center gap-2">
-                <SlidersHorizontal className="w-4 h-4 text-ink-500 dark:text-ink-400" />
-                Advanced Notification Settings
-              </span>
-              <ChevronRight className="w-4 h-4 text-ink-300 dark:text-ink-600" />
-            </button>
+            <div className="ds-list">
+              <SettingsLink
+                icon={SlidersHorizontal}
+                label="Advanced"
+                subtitle="Sound, vibration, and the buttons on a reminder"
+                onClick={onOpenAdvanced}
+              />
+            </div>
           )}
         </>
       )}
 
       {statusMessage && (
-        <p className="text-xs text-ink-500 dark:text-ink-400">{statusMessage}</p>
+        <p className={settingsHint}>{statusMessage}</p>
       )}
     </section>
   );

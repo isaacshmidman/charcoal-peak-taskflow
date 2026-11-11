@@ -13,7 +13,8 @@
  *      position.
  *
  * Sub-pages:
- *   - "appearance"            → AppearanceSection + DefaultsSection
+ *   - "appearance"            → DefaultsSection (theme, default view,
+ *                                navigation order)
  *   - "tasks"                 → PrioritiesSection + TagsSection
  *   - "calendars"             → IntegrationsPanel + Default Calendar
  *                                View + Calendar Order
@@ -67,7 +68,6 @@ import FilesSection from "@/components/settings/FilesSection";
 import ExportSection from "@/components/settings/ExportSection";
 import ConnectedAppsSection from "@/components/settings/ConnectedAppsSection";
 import SessionsSection from "@/components/settings/SessionsSection";
-import AppearanceSection from "@/components/settings/AppearanceSection";
 import DefaultsSection from "@/components/settings/DefaultsSection";
 import PrioritiesSection from "@/components/settings/PrioritiesSection";
 import TagsSection from "@/components/settings/TagsSection";
@@ -75,7 +75,7 @@ import DefaultCalendarViewSection from "@/components/settings/DefaultCalendarVie
 import CalendarOrderSection from "@/components/settings/CalendarOrderSection";
 import QuickThemeToggle from "@/components/settings/QuickThemeToggle";
 import QuickNotificationsToggle from "@/components/settings/QuickNotificationsToggle";
-import { cn } from "@/lib/utils";
+import { SettingsLink, SettingsSection } from "@/components/settings/parts";
 
 export const NAV_OPTIONS = [
   { value: "/Active", label: "All Tasks" },
@@ -89,10 +89,10 @@ export const NAV_OPTIONS = [
 // ── Tiny inline UI primitives used only inside this file ─────────
 
 /** Sub-page chrome: back-arrow + title, then children. */
-function SubPage({ title, onBack, children }) {
+function SubPage({ title, onBack, backLabel = "Back to Settings", children }) {
   return (
     <div className="max-w-xl mx-auto">
-      <PageHeader title={title} back={onBack} backLabel="Back to Settings" />
+      <PageHeader title={title} back={onBack} backLabel={backLabel} />
       <div className="space-y-8 pt-3">
         {children}
       </div>
@@ -100,33 +100,12 @@ function SubPage({ title, onBack, children }) {
   );
 }
 
-/** Top-level category card: icon + label/subtitle + chevron. */
-function SettingsCard({ icon: Icon, label, subtitle, onClick, iconClassName }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="w-full flex items-center gap-3 bg-surface-card px-4 py-3 hover:bg-ink-50 dark:hover:bg-night-raised transition-colors text-left"
-    >
-      <Icon className={cn("w-5 h-5 shrink-0", iconClassName || "text-ink-500 dark:text-ink-400")} />
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-ink-900 dark:text-ink-100">{label}</p>
-        {subtitle && (
-          <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5 truncate">{subtitle}</p>
-        )}
-      </div>
-      <ChevronRight className="w-4 h-4 text-ink-300 dark:text-ink-600 shrink-0" />
-    </button>
-  );
-}
-
-/** A labelled group of section rows, on one surface. */
+/** A labelled group of rows that lead to other pages, on one surface. */
 function SettingsGroup({ label, children }) {
   return (
-    <section>
-      <h2 className="mb-2 px-1 text-xs font-medium text-ink-500 dark:text-ink-400">{label}</h2>
+    <SettingsSection label={label}>
       <div className="ds-list">{children}</div>
-    </section>
+    </SettingsSection>
   );
 }
 
@@ -193,7 +172,6 @@ export default function Settings() {
   if (activeSection === "appearance") {
     return (
       <SubPage title="Appearance" onBack={returnToMain}>
-        <AppearanceSection />
         <DefaultsSection navOptions={NAV_OPTIONS} />
       </SubPage>
     );
@@ -231,7 +209,9 @@ export default function Settings() {
   if (activeSection === "advancedNotifications") {
     // Back-stack: Advanced → Notifications (not main).
     return (
-      <AdvancedNotificationSettings onBack={() => setActiveSection("notifications")} />
+      <SubPage title="Advanced notifications" onBack={() => setActiveSection("notifications")} backLabel="Back to Notifications">
+        <AdvancedNotificationSettings />
+      </SubPage>
     );
   }
 
@@ -239,10 +219,7 @@ export default function Settings() {
     return (
       <SubPage title="Files" onBack={returnToMain}>
         <FilesSection />
-        <div>
-          <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-100 mb-2">Storage</h2>
-          <StorageSection />
-        </div>
+        <StorageSection />
       </SubPage>
     );
   }
@@ -291,19 +268,19 @@ export default function Settings() {
         </Card>
 
         <SettingsGroup label="How it looks and works">
-          <SettingsCard
+          <SettingsLink
             icon={Palette}
             label="Appearance"
             subtitle="Theme, default view, navigation order"
             onClick={() => openSection("appearance")}
           />
-          <SettingsCard
+          <SettingsLink
             icon={CheckSquare}
             label="Tasks and Notes"
             subtitle="Shared priorities and tags"
             onClick={() => openSection("tasks")}
           />
-          <SettingsCard
+          <SettingsLink
             icon={Bell}
             label="Notifications"
             subtitle="Reminders for tasks with due dates"
@@ -312,13 +289,13 @@ export default function Settings() {
         </SettingsGroup>
 
         <SettingsGroup label="Connections">
-          <SettingsCard
+          <SettingsLink
             icon={Calendar}
             label="Calendars"
             subtitle="Connected calendars and display"
             onClick={() => openSection("calendars")}
           />
-          <SettingsCard
+          <SettingsLink
             icon={Plug}
             label="Connected apps"
             subtitle="AI apps that can read or change your tasks"
@@ -327,19 +304,19 @@ export default function Settings() {
         </SettingsGroup>
 
         <SettingsGroup label="Your data">
-          <SettingsCard
+          <SettingsLink
             icon={FolderOpen}
             label="Files"
             subtitle="Search attachments and check storage"
             onClick={() => openSection("files")}
           />
-          <SettingsCard
+          <SettingsLink
             icon={Download}
             label="Export & restore"
             subtitle="Download everything as a .zip, or bring one back"
             onClick={() => openSection("export")}
           />
-          <SettingsCard
+          <SettingsLink
             icon={Trash2}
             label="Recently Deleted"
             subtitle="Bring back or clear what you've deleted"
@@ -348,7 +325,7 @@ export default function Settings() {
         </SettingsGroup>
 
         <SettingsGroup label="Account">
-          <SettingsCard
+          <SettingsLink
             icon={ShieldCheck}
             label="Signed-in devices"
             subtitle="Where your account is signed in"

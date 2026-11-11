@@ -8,6 +8,8 @@
 import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Upload } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { settingsHint, settingsLabel } from "./parts";
 import { restoreFromExport } from "@/api/apiClient";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { Button } from "@/components/ui/button";
@@ -68,9 +70,9 @@ export default function RestoreSection() {
   };
 
   return (
-    <div className="space-y-3 border-t border-ink-100 pt-5 dark:border-night-line">
-      <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-100">Restore from an export</h2>
-      <p className="text-sm text-ink-600 dark:text-ink-300">
+    <div className="space-y-3 pt-5">
+      <h2 className={settingsLabel}>Restore from an export</h2>
+      <p className={cn(settingsHint, "!mt-1.5")}>
         Choose an export you downloaded (the .zip, or its data.json) to bring back anything that's missing. Nothing
         already here is changed or removed.
       </p>

@@ -5,7 +5,7 @@
  * change without diving into the Appearance sub-page.
  *
  * The full picker (with the explanatory "Default Appearance" header)
- * still lives in AppearanceSection on the Appearance sub-page; this is
+ * still lives on the Appearance sub-page (DefaultsSection); this is
  * the shortcut.
  */
 import { Monitor, Moon, Sun } from "lucide-react";

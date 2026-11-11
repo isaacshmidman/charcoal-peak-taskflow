@@ -52,9 +52,9 @@ export default function QuickNotificationsToggle() {
     <div className="flex items-center justify-between gap-3 px-4 py-3">
       <div className="flex items-center gap-3 min-w-0">
         {settings.enabled ? (
-          <Bell className="w-5 h-5 text-emerald-500 shrink-0" />
+          <Bell className="w-5 h-5 text-ink-500 dark:text-ink-400 shrink-0" />
         ) : (
-          <BellOff className="w-5 h-5 text-ink-400 dark:text-ink-500 shrink-0" />
+          <BellOff className="w-5 h-5 text-ink-500 dark:text-ink-400 shrink-0" />
         )}
         <span className="text-sm font-medium text-ink-900 dark:text-ink-100">
           Notifications

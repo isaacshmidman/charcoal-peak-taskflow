@@ -1,8 +1,8 @@
 // @ts-nocheck
 /**
- * @file Advanced notification options. Rendered as a sub-page of
- * Settings.jsx (same pattern as RecentlyDeleted) — Settings flips a
- * `showAdvancedNotifications` flag and early-returns to this component.
+ * @file Advanced notification options: the content of a Settings
+ * sub-page (Settings.jsx gives it the same header as every other one;
+ * its back arrow returns to Notifications).
  *
  * Each toggle auto-saves on change (debounced ~500ms via the same
  * mutation used by NotificationsPanel). Features the user's device
@@ -19,8 +19,6 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { apiClient } from "@/api/apiClient";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import {
@@ -29,17 +27,18 @@ import {
 } from "@/lib/notifications";
 import { cn } from "@/lib/utils";
 import SettingsToggle from "@/components/settings/SettingsToggle";
+import { settingsHint } from "@/components/settings/parts";
 
 /** A single toggle row in a SettingBox. Greys out when unsupported. */
 function OptionRow({ title, description, checked, onChange, disabled, supported = true }) {
   return (
     <div className={cn(
-      "flex items-start justify-between gap-3 py-2.5",
+      "flex items-center justify-between gap-4 px-4 py-2.5",
       !supported && "opacity-60"
     )}>
       <div className="min-w-0">
         <p className="text-sm font-medium text-ink-900 dark:text-ink-100">{title}</p>
-        <p className="text-xs text-ink-400 dark:text-ink-500 mt-0.5">
+        <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5">
           {!supported ? "Not supported on this device" : description}
         </p>
       </div>
@@ -73,10 +72,7 @@ function useNotificationCapabilities() {
   }, []);
 }
 
-/**
- * @param {{ onBack: () => void }} props
- */
-export default function AdvancedNotificationSettings({ onBack }) {
+export default function AdvancedNotificationSettings() {
   const queryClient = useQueryClient();
   const online = useOnlineStatus();
   const capabilities = useNotificationCapabilities();
@@ -124,27 +120,12 @@ export default function AdvancedNotificationSettings({ onBack }) {
   };
 
   return (
-    <div className="space-y-4 max-w-xl mx-auto">
-      <div className="flex items-center gap-2">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-ink-100"
-          onClick={onBack}
-          aria-label="Back to Settings"
-        >
-          <ChevronLeft className="w-5 h-5" />
-        </Button>
-        <div>
-          <h1 className="text-base font-semibold text-ink-900 dark:text-ink-100">Advanced Notification Settings</h1>
-          <p className="text-xs text-ink-400 dark:text-ink-500 mt-0.5">
-            Fine-tune how reminders behave on this account. Per-device limits show up in grey.
-          </p>
-        </div>
-      </div>
+    <div className="space-y-3">
+      <p className={settingsHint}>
+        How a reminder looks and behaves when it arrives. What this device can't do is greyed out.
+      </p>
 
-      <div className="rounded-xl border border-ink-100 dark:border-night-line bg-white dark:bg-night-card px-4 py-1 divide-y divide-ink-100 dark:divide-night-line">
+      <div className="ds-list">
         <OptionRow
           title="Persistence"
           description="Notifications stay visible until you dismiss them."
@@ -169,7 +150,7 @@ export default function AdvancedNotificationSettings({ onBack }) {
         />
         <OptionRow
           title="Mute sound"
-          description="Send notifications silently — no chime."
+          description="Send notifications silently, with no chime."
           checked={draft.silent}
           onChange={(next) => patch({ silent: next })}
           disabled={!online}

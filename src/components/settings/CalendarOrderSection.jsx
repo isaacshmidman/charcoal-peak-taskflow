@@ -17,7 +17,7 @@
  */
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { apiClient } from "@/api/apiClient";
 import { cn } from "@/lib/utils";
 import { deriveCalendars } from "@/components/calendar/CalendarVisibilityDropdown";
@@ -28,6 +28,7 @@ import {
   setCalendarOrder,
   setHiddenOnNonCalendarPages,
 } from "@/lib/calendar-order";
+import { ReorderButtons, SettingsSection } from "./parts";
 
 export default function CalendarOrderSection() {
   const { data: tasksForCalendars = [] } = useQuery({
@@ -68,65 +69,49 @@ export default function CalendarOrderSection() {
   if (orderedCalendars.length === 0) return null;
 
   return (
-    <section>
-      <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-100 mb-2">Calendar Order</h2>
-      <p className="text-xs text-ink-400 dark:text-ink-500 mb-2">
-        Reorder for sorting, and toggle visibility on non-Calendar pages
-        (Today, All Tasks, etc.). The Calendar page has its own filter.
-      </p>
-      <div className="space-y-2">
+    <SettingsSection
+      label="Calendar order"
+      footnote="The order used when you sort by calendar. The eye hides a calendar's tasks on Today, All Tasks and the other lists; the Calendar page has its own filter."
+    >
+      <div className="ds-list">
         {orderedCalendars.map((c, idx) => {
           const isHidden = calendarHiddenState.has(c.key);
           return (
-            <div
-              key={c.key}
-              className="flex items-center gap-3 bg-surface-card border border-border-hairline rounded-xl px-3 py-2.5 hover:border-ink-200 dark:hover:border-night-line-bold transition-colors"
-            >
-              <div className="flex flex-col gap-0.5">
-                <button
-                  onClick={() => moveCalendar(idx, -1)}
-                  disabled={idx === 0}
-                  className="disabled:opacity-20 text-ink-300 dark:text-ink-600 hover:text-ink-500 dark:hover:text-ink-400 transition-colors"
-                  aria-label="Move up"
-                >
-                  <ArrowUp className="w-3 h-3" />
-                </button>
-                <button
-                  onClick={() => moveCalendar(idx, 1)}
-                  disabled={idx === orderedCalendars.length - 1}
-                  className="disabled:opacity-20 text-ink-300 dark:text-ink-600 hover:text-ink-500 dark:hover:text-ink-400 transition-colors"
-                  aria-label="Move down"
-                >
-                  <ArrowDown className="w-3 h-3" />
-                </button>
-              </div>
-              {/* Solid round dot to mirror Priority Levels styling
-                  below — visual consistency. */}
+            <div key={c.key} className="flex min-h-[2.75rem] items-center gap-3 py-1.5 pl-4 pr-2">
               <span
-                className="inline-block w-3 h-3 rounded-full shrink-0"
+                className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
                 style={{ backgroundColor: c.color || "#94a3b8" }}
                 aria-hidden
               />
-              <span className="text-sm font-medium text-ink-900 dark:text-ink-100 flex-1 min-w-0 truncate">
+              <span className={cn("min-w-0 flex-1 truncate text-sm font-medium", isHidden ? "text-ink-400 dark:text-ink-500" : "text-ink-900 dark:text-ink-100")}>
                 {c.label}
               </span>
               <button
+                type="button"
                 onClick={() => toggleCalendarHidden(c.key)}
                 className={cn(
-                  "shrink-0 transition-colors",
+                  "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-ink-100 dark:hover:bg-night-high",
                   isHidden
-                    ? "text-ink-300 dark:text-ink-600 hover:text-ink-500 dark:hover:text-ink-400"
-                    : "text-emerald-500 hover:text-emerald-600"
+                    ? "text-ink-300 hover:text-ink-700 dark:text-ink-600 dark:hover:text-ink-200"
+                    : "text-ink-600 hover:text-ink-900 dark:text-ink-300 dark:hover:text-ink-100"
                 )}
-                title={isHidden ? "Hidden on non-Calendar pages" : "Visible on non-Calendar pages"}
-                aria-label={isHidden ? "Show on non-Calendar pages" : "Hide on non-Calendar pages"}
+                title={isHidden ? "Hidden on the list pages" : "Shown on the list pages"}
+                aria-label={isHidden ? `Show ${c.label} on the list pages` : `Hide ${c.label} on the list pages`}
+                aria-pressed={!isHidden}
               >
-                {isHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                {isHidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
+              <ReorderButtons
+                name={c.label}
+                onUp={() => moveCalendar(idx, -1)}
+                onDown={() => moveCalendar(idx, 1)}
+                first={idx === 0}
+                last={idx === orderedCalendars.length - 1}
+              />
             </div>
           );
         })}
       </div>
-    </section>
+    </SettingsSection>
   );
 }

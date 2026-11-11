@@ -22,6 +22,7 @@ import { isOnline } from "@/lib/offlineCache";
 import { PriorityOffline } from "@/lib/offlineEntityRegistry";
 import { isRecoverableConnectionError } from "@/lib/network";
 import PriorityRow from "./PriorityRow.jsx";
+import { SettingsSection } from "./parts";
 
 export default function PrioritiesSection() {
   const [newPriorityName, setNewPriorityName] = useState("");
@@ -137,10 +138,8 @@ export default function PrioritiesSection() {
   };
 
   return (
-    <section>
-      <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-100 mb-2">Priority Levels</h2>
-
-      <div className="space-y-2">
+    <SettingsSection label="Priorities" footnote="Double-click a priority to rename it or change its colour.">
+      <div className="ds-list">
         {sorted.map((p, idx) =>
           <PriorityRow
             key={p.id}
@@ -163,10 +162,10 @@ export default function PrioritiesSection() {
           value={newPriorityName}
           onChange={(e) => setNewPriorityName(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && addPriority()}
-          className="" />
+          aria-label="New priority name" />
 
         <Select value={newPriorityColor} onValueChange={setNewPriorityColor}>
-          <SelectTrigger className="w-28 h-9">
+          <SelectTrigger className="w-28 shrink-0" aria-label="New priority colour">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -183,6 +182,6 @@ export default function PrioritiesSection() {
           <Plus className="w-4 h-4" />
         </Button>
       </div>
-    </section>
+    </SettingsSection>
   );
 }

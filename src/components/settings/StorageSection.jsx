@@ -16,6 +16,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Database, FileText, Loader2 } from "lucide-react";
 import { apiClient } from "@/api/apiClient";
 import { cn } from "@/lib/utils";
+import { SettingsSection, settingsHint } from "./parts";
 
 /**
  * SI units (1 KB = 1000 bytes, 1 MB = 10^6, 1 GB = 10^9) so the
@@ -71,14 +72,15 @@ export default function StorageSection() {
         : "bg-ink-700 dark:bg-ink-300";
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-xl border border-border-hairline bg-surface-card px-4 py-4 space-y-3">
+    <div className="space-y-8">
+      <SettingsSection label="Storage">
+      <div className="rounded-xl border border-border-hairline bg-surface-card px-4 py-4 space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-sm font-medium text-ink-900 dark:text-ink-100">
               {formatBytes(used)} of {formatBytes(max)} used
             </p>
-            <p className="text-xs text-ink-400 dark:text-ink-500 mt-0.5">
+            <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5">
               {formatBytes(free)} free
             </p>
           </div>
@@ -95,24 +97,21 @@ export default function StorageSection() {
           />
         </div>
 
-        <p className="text-xs text-ink-400 dark:text-ink-500">
-          Attachments live alongside your tasks. Removing one frees its
-          space straight away. A deleted task keeps its files in Recently
-          Deleted, where they still count, until it's restored or
-          permanently deleted.
+        <p className="text-xs leading-5 text-ink-500 dark:text-ink-400">
+          Removing a file frees its space straight away. A deleted task
+          keeps its files in Recently Deleted, where they still count,
+          until it's restored or deleted for good.
         </p>
-      </section>
+      </div>
+      </SettingsSection>
 
-      <section>
-        <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-100 mb-2">
-          Largest tasks
-        </h2>
+      <SettingsSection label="Largest tasks">
         {biggestTasks.length === 0 ? (
-          <p className="text-xs text-ink-400 dark:text-ink-500 px-1">
-            No attachments yet. Drop a file into any task to see it here.
+          <p className={settingsHint}>
+            No files yet. Add one to any task and it shows up here.
           </p>
         ) : (
-          <ul className="rounded-xl border border-border-hairline bg-surface-card divide-y divide-ink-100 dark:divide-night-line overflow-hidden">
+          <ul className="ds-list">
             {biggestTasks.map((task) => (
               <li
                 key={`${task.task_id}:${task.in_recently_deleted ? "deleted" : "live"}`}
@@ -123,7 +122,7 @@ export default function StorageSection() {
                   <p className="text-sm font-medium text-ink-900 dark:text-ink-100 truncate" title={task.task_title}>
                     {task.task_title}
                   </p>
-                  <p className="text-xs text-ink-400 dark:text-ink-500 mt-0.5">
+                  <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5">
                     {task.file_count} file{task.file_count === 1 ? "" : "s"}
                     {task.in_recently_deleted && " · in Recently Deleted"}
                   </p>
@@ -135,7 +134,7 @@ export default function StorageSection() {
             ))}
           </ul>
         )}
-      </section>
+      </SettingsSection>
     </div>
   );
 }

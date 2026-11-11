@@ -1,17 +1,19 @@
 // @ts-nocheck
 /**
- * @file Default View + Navigation Order sections. Combined because both
- * read from / write to the same `navOrder` localStorage key — Default
- * View's dropdown lists items in navOrder order, so a single section
- * file lets them share state without a context.
+ * @file The Appearance page: theme and default view on one list, then
+ * the navigation order. Default view and the order are together because
+ * both read from / write to the same `navOrder` localStorage key — the
+ * dropdown lists pages in that order. The theme reads and writes through
+ * ThemeProvider (which owns the `appearance` key and the .dark class).
  *
  * Receives the canonical NAV_OPTIONS list from the parent (defined in
  * Settings.jsx and also consumed by lib/navigation.js).
  */
 import { useState } from "react";
-import { ArrowDown, ArrowUp } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DEFAULT_NAV_ORDER, sanitizeNavOrder, sanitizeNavRoute } from "@/lib/navigation";
+import { useTheme } from "@/lib/ThemeProvider";
+import { ReorderButtons, SettingRow, SettingsSection } from "./parts";
 
 const NAV_LABELS = {
   "/Active": "All Tasks",
@@ -31,6 +33,7 @@ function getSavedNavOrder() {
 }
 
 export default function DefaultsSection({ navOptions }) {
+  const { appearance, setAppearance } = useTheme();
   const [navOrder, setNavOrder] = useState(getSavedNavOrder);
   const [selectedDefaultNav, setSelectedDefaultNav] = useState(() => sanitizeNavRoute(localStorage.getItem("defaultNav")));
 
@@ -53,40 +56,52 @@ export default function DefaultsSection({ navOptions }) {
 
   return (
     <>
-      <section>
-        <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-100 mb-2">Default View</h2>
-        <Select value={selectedDefaultNav} onValueChange={saveDefaultNav}>
-          <SelectTrigger className="w-48 h-9 bg-white dark:bg-night-card dark:border-night-line-strong text-sm font-medium text-ink-900 dark:text-ink-100">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="bg-white dark:bg-night-card dark:border-night-line-strong">
-            {navOrder.map((path) => {
-              const opt = navOptions.find((o) => o.value === path);
-              return opt ? <SelectItem key={opt.value} value={opt.value} className="text-sm font-medium text-ink-900 dark:text-ink-100">{opt.label}</SelectItem> : null;
-            })}
-          </SelectContent>
-        </Select>
-      </section>
-
-      <section>
-        <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-100 mb-2">Navigation Order</h2>
-
-        <div className="space-y-2">
-          {navOrder.map((path, idx) =>
-            <div key={path} className="flex items-center gap-3 bg-surface-card border border-border-hairline rounded-xl px-3 py-2.5 hover:border-ink-200 dark:hover:border-night-line-bold transition-colors">
-              <div className="flex flex-col gap-0.5">
-                <button aria-label={`Move ${navOptions.find((o) => o.value === path)?.label || path} up`} onClick={() => moveNav(idx, -1)} disabled={idx === 0} className="disabled:opacity-20 text-ink-300 dark:text-ink-600 hover:text-ink-500 dark:hover:text-ink-400 transition-colors">
-                  <ArrowUp className="w-3 h-3" />
-                </button>
-                <button aria-label={`Move ${navOptions.find((o) => o.value === path)?.label || path} down`} onClick={() => moveNav(idx, 1)} disabled={idx === navOrder.length - 1} className="disabled:opacity-20 text-ink-300 dark:text-ink-600 hover:text-ink-500 dark:hover:text-ink-400 transition-colors">
-                  <ArrowDown className="w-3 h-3" />
-                </button>
-              </div>
-              <span className="text-sm font-medium text-ink-900 dark:text-ink-100 flex-1">{NAV_LABELS[path]}</span>
-            </div>
-          )}
+      <SettingsSection label="Look and start">
+        <div className="ds-list">
+          <SettingRow label="Theme">
+            <Select value={appearance} onValueChange={setAppearance}>
+              <SelectTrigger className="w-36" aria-label="Theme">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="system">System</SelectItem>
+                <SelectItem value="light">Light</SelectItem>
+                <SelectItem value="dark">Dark</SelectItem>
+              </SelectContent>
+            </Select>
+          </SettingRow>
+          <SettingRow label="Default view" hint="The page Zephyrly opens on">
+            <Select value={selectedDefaultNav} onValueChange={saveDefaultNav}>
+              <SelectTrigger className="w-36" aria-label="Default view">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {navOrder.map((path) => {
+                  const opt = navOptions.find((o) => o.value === path);
+                  return opt ? <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem> : null;
+                })}
+              </SelectContent>
+            </Select>
+          </SettingRow>
         </div>
-      </section>
+      </SettingsSection>
+
+      <SettingsSection label="Navigation order">
+        <div className="ds-list">
+          {navOrder.map((path, idx) => (
+            <div key={path} className="flex min-h-[2.75rem] items-center gap-3 py-1.5 pl-4 pr-2">
+              <span className="min-w-0 flex-1 text-sm font-medium text-ink-900 dark:text-ink-100">{NAV_LABELS[path]}</span>
+              <ReorderButtons
+                name={NAV_LABELS[path] || path}
+                onUp={() => moveNav(idx, -1)}
+                onDown={() => moveNav(idx, 1)}
+                first={idx === 0}
+                last={idx === navOrder.length - 1}
+              />
+            </div>
+          ))}
+        </div>
+      </SettingsSection>
     </>
   );
 }

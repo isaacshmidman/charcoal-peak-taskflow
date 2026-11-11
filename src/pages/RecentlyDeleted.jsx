@@ -293,7 +293,7 @@ export default function RecentlyDeleted({ onBack } = {}) {
 
       {displayedTasks.length === 0 && displayedNotes.length === 0 ? (
         <div className="py-14 text-center">
-          <p className="text-xs text-ink-400 dark:text-ink-500">Nothing here. The bin sits empty.</p>
+          <p className="text-xs text-ink-400 dark:text-ink-500">Nothing in Recently Deleted.</p>
         </div>
       ) : (
         <>

@@ -9,12 +9,12 @@
  */
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Tag, X } from "lucide-react";
+import { Plus, Tag } from "lucide-react";
 import { apiClient } from "@/api/apiClient";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { ClearButton } from "@/components/ui/clear-button";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { SettingsSection } from "./parts";
 import {
   isOnline,
 } from "@/lib/offlineCache";
@@ -89,25 +89,20 @@ export default function TagsSection() {
   });
 
   return (
-    <section>
-      <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-100 mb-2">Tags</h2>
-
-      <Card className="overflow-hidden">
+    <SettingsSection label="Tags">
+      <div className="ds-list">
         {savedTags.slice(-20).length === 0 ?
-          <p className="text-xs text-ink-400 px-4 py-3">No saved tags yet</p> :
+          <p className="px-4 py-3 text-xs text-ink-500 dark:text-ink-400">No saved tags yet</p> :
 
-          savedTags.slice(-20).map((tag, i, arr) =>
-            <div key={tag.id} className={cn("flex items-center justify-between px-4 py-2", i < arr.length - 1 && "border-b border-ink-50 dark:border-night-line")}>
-              <span className="text-sm font-medium text-ink-900 dark:text-ink-100 flex items-center gap-2 min-w-0 break-words whitespace-normal">
-                <Tag className="w-3 h-3 text-ink-900 dark:text-ink-100 shrink-0" /><span className="break-words whitespace-normal">{tag.name}</span>
-              </span>
-              <button aria-label={`Delete tag ${tag.name}`} onClick={() => deleteTagMutation.mutate(tag.id)} className="text-ink-300 dark:text-ink-600 hover:text-red-400 dark:hover:text-red-300 transition-colors">
-                <X className="w-3.5 h-3.5" />
-              </button>
+          savedTags.slice(-20).map((tag) =>
+            <div key={tag.id} className="flex min-h-[2.75rem] items-center gap-3 py-1.5 pl-4 pr-2">
+              <Tag className="h-3.5 w-3.5 shrink-0 text-ink-400 dark:text-ink-500" />
+              <span className="min-w-0 flex-1 break-words text-sm font-medium text-ink-900 dark:text-ink-100">{tag.name}</span>
+              <ClearButton label={`Delete tag ${tag.name}`} onClick={() => deleteTagMutation.mutate(tag.id)} className="h-7 w-7" />
             </div>
           )
         }
-      </Card>
+      </div>
 
       <div className="flex gap-2 mt-3">
         <Input
@@ -121,7 +116,7 @@ export default function TagsSection() {
               setNewTagName("");
             }
           }}
-          className="" />
+          aria-label="New tag" />
 
         <Button aria-label="Add tag"
           onClick={() => {
@@ -134,6 +129,6 @@ export default function TagsSection() {
           <Plus className="w-4 h-4" />
         </Button>
       </div>
-    </section>
+    </SettingsSection>
   );
 }

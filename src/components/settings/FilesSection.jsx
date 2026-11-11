@@ -22,6 +22,8 @@ import { useNavigate } from "react-router-dom";
 import { Download, FileText, Image as ImageIcon, ImageOff, Loader2, Search } from "lucide-react";
 import { apiClient } from "@/api/apiClient";
 import { Input } from "@/components/ui/input";
+import { ClearButton } from "@/components/ui/clear-button";
+import { settingsHint, settingsLabel } from "./parts";
 import { cn } from "@/lib/utils";
 import AttachmentLightbox from "@/components/tasks/AttachmentLightbox.jsx";
 
@@ -104,6 +106,7 @@ function FileResultRow({ att, onPreview, onOpenTask }) {
 export default function FilesSection() {
   const navigate = useNavigate();
   const [rawQuery, setRawQuery] = useState("");
+  const searchRef = useRef(null);
   const [debounced, setDebounced] = useState("");
   const [previewing, setPreviewing] = useState(null);
   const debounceRef = useRef(null);
@@ -136,12 +139,19 @@ export default function FilesSection() {
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400 dark:text-ink-500 pointer-events-none" />
         <Input
+          ref={searchRef}
           autoFocus
           value={rawQuery}
           onChange={(e) => setRawQuery(e.target.value)}
           placeholder="Search files by name…"
-          className="pl-9 h-10"
+          className={cn("pl-9 h-10", rawQuery && "pr-9")}
         />
+        {rawQuery ? (
+          <ClearButton
+            className="absolute right-2 top-1/2 -translate-y-1/2"
+            onClick={() => { setRawQuery(""); searchRef.current?.focus(); }}
+          />
+        ) : null}
       </div>
 
       {error ? (
@@ -151,7 +161,7 @@ export default function FilesSection() {
       ) : (
         <>
           <div className="flex items-center gap-2">
-            <h2 className="text-xs font-semibold text-ink-500 dark:text-ink-400">{heading}</h2>
+            <h2 className={settingsLabel}>{heading}</h2>
             {isFetching && <Loader2 className="w-3 h-3 animate-spin text-ink-400 dark:text-ink-500" />}
           </div>
 
@@ -161,13 +171,13 @@ export default function FilesSection() {
               Loading…
             </div>
           ) : results.length === 0 ? (
-            <p className="text-xs text-ink-400 dark:text-ink-500 px-1">
+            <p className={settingsHint}>
               {debounced
                 ? "No files match that name."
-                : "No attachments yet. Drop a file into any task to see it here."}
+                : "No files yet. Add one to any task and it shows up here."}
             </p>
           ) : (
-            <ul className="rounded-xl border border-ink-100 dark:border-night-line bg-white dark:bg-night-card divide-y divide-ink-100 dark:divide-night-line overflow-hidden">
+            <ul className="ds-list">
               {results.map((att) => (
                 <FileResultRow
                   key={att.id}

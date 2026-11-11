@@ -154,12 +154,11 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
         <DialogHeader className="min-w-0">
           <DialogTitle>Configure calendars</DialogTitle>
           <DialogDescription className="min-w-0 break-words">
-            Choose which calendars to sync with Zephyrly. The starred calendar
-            receives new tasks created in Zephyrly. Calendars set to Events
-            appear only in Calendar — set one to Tasks when you keep to-dos on
-            it, and its items can be completed and re-dated like any Zephyrly
-            task. Read-only calendars (Birthdays, Holidays, etc.) are always
-            events.
+            Switch on the calendars to sync. New tasks go to the starred one.
+            A calendar set to Events only shows on the Calendar page; set it
+            to Tasks if you keep to-dos on it, and its items can be ticked
+            off and moved like any other task. Read-only calendars
+            (Birthdays, Holidays) are always events.
           </DialogDescription>
         </DialogHeader>
 
@@ -282,8 +281,8 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
                       </p>
                       {c.primary ? (
                         <span
-                          title="Primary calendar — new tasks land here."
-                          className="shrink-0 inline-flex items-center text-amber-500"
+                          title="New tasks go to this calendar"
+                          className="shrink-0 inline-flex items-center text-sun-500 dark:text-sun-400"
                         >
                           <Star className="w-3 h-3 fill-current" />
                         </span>
@@ -294,7 +293,7 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
                           aria-label="Make primary"
                           onClick={() => setPrimary(c.external_calendar_id)}
                           disabled={offline || settingPrimary}
-                          className="shrink-0 inline-flex items-center text-ink-300 dark:text-ink-600 hover:text-amber-500 transition-colors disabled:opacity-50"
+                          className="shrink-0 inline-flex items-center text-ink-300 dark:text-ink-600 hover:text-sun-500 dark:hover:text-sun-400 transition-colors disabled:opacity-50"
                         >
                           <Star className="w-3 h-3" />
                         </button>
@@ -317,7 +316,7 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
                       <div
                         role="radiogroup"
                         aria-label={`What ${c.summary || "this calendar"} holds`}
-                        className="inline-flex rounded-lg border border-ink-200 dark:border-night-line p-0.5 gap-0.5"
+                        className="ds-seg"
                       >
                         {[
                           { value: "event", label: "Events" },
@@ -330,12 +329,8 @@ export default function ConfigureCalendarsModal({ open, onOpenChange, integratio
                             aria-checked={c.kind === opt.value}
                             disabled={offline}
                             onClick={() => setKind(c.external_calendar_id, opt.value)}
-                            className={
-                              "px-2 py-0.5 text-[11px] rounded-md transition-colors disabled:opacity-50 " +
-                              (c.kind === opt.value
-                                ? "bg-primary text-primary-foreground"
-                                : "text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-ink-100")
-                            }
+                            data-on={c.kind === opt.value}
+                            className="ds-seg-item px-2 py-0.5 text-[11px] disabled:opacity-50"
                           >
                             {opt.label}
                           </button>

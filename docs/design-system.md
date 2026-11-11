@@ -83,7 +83,10 @@ follows. Inside `cn()`, write `text-[11px]` instead.
 | A tick box | `ui/Checkbox` (pass `tone` for a priority-coloured ring). |
 | Buttons | `ui/Button`: `default` (ink in the light, sun in the dark), `outline`, `ghost`, `destructive`. Small square "add" buttons are `outline`. |
 | An on/off switch | `ui/Switch` (`checked`, `onChange`, `label`). |
-| A page's top | `components/PageHeader.jsx` — title, sub-line, actions; it stays put while the page scrolls. `PageSearch` is its search button. |
+| A page's top | `components/PageHeader.jsx` — title, sub-line, actions; it stays put while the page scrolls. `PageSearch` is its search button. Every quiet icon button in a header takes `headerIconButton` from the same file, so search, sort and the rest are one grey. |
+| The x that empties a box or removes a row | `ui/clear-button.jsx`: `ClearButton` (faint, red under the pointer). Every search box shows one once something is typed. |
+| A page inside Settings | `settings/parts.jsx`: `SettingsSection` (a quiet label over one surface), `SettingRow` (name left, control right) and `SettingsLink` on a `.ds-list`, `ReorderButtons`. Sentence-case labels; no card per row; no heading heavier than the label. |
+| A board that fills the screen | `pages/Groupings.jsx`: the page is exactly the screen's height, columns scroll inside themselves, and sideways wheel movement anywhere on the page is handed to the board (`useSidewaysScroll`). |
 | Two columns with a divider you can drag | `ui/TwoPane` (Notes, the calendar's day view). |
 | A form in a dialog | `tasks/TaskForm/parts.jsx`: `FormDialog` (quiet heading, a body that scrolls, a footer that stays), `Field` (one property per line: label left, control right), `DateField` (the date button and its pop-up). The task form and the subtask form are both built from these. |
 | A text box | `ui/Input`, `ui/Textarea`. 16px on phones (anything smaller makes iOS zoom the page), 14px from tablets up — the primitive does this, so don't set a size at the call site. No hand-rolled `<input>` borders, no native tick boxes: `ui/Checkbox` and `ui/Switch`. |

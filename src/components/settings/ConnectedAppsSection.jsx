@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Check, Copy } from "lucide-react";
+import { settingsHint, settingsLabel } from "./parts";
 import { apiClient } from "@/api/apiClient";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { setupSnippets, siriSetup } from "@/lib/ai-setup";
@@ -32,6 +33,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { cn } from "@/lib/utils";
 
 const browserTimeZone = () => {
   try {
@@ -369,14 +371,14 @@ export default function ConnectedAppsSection() {
   return (
     <>
       <div className="space-y-3">
-        <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-100">AI apps</h2>
-        <p className="text-sm text-ink-600 dark:text-ink-300">
+        <h2 className={settingsLabel}>AI apps</h2>
+        <p className={cn(settingsHint, "!mt-1.5")}>
           Let Claude, ChatGPT and other AI apps read your tasks and notes, and change them only if you allow it. They can't
           change events from your calendars or delete anything for good, and you can undo what they change.
         </p>
         {!online && <p className="text-xs text-ink-400 dark:text-ink-500">You're offline. Connected apps need a connection.</p>}
         {loadError && <p className="text-xs text-red-600 dark:text-red-400">{loadError}</p>}
-        {grants && grants.length === 0 && <p className="text-sm text-ink-400 dark:text-ink-500" data-testid="ai-no-grants">Nothing connected yet.</p>}
+        {grants && grants.length === 0 && <p className={settingsHint} data-testid="ai-no-grants">Nothing connected yet.</p>}
         {grants && grants.length > 0 && (
           <Card className="divide-y divide-ink-100 dark:divide-night-line" data-testid="ai-grants">
             {grants.map((grant) => (
@@ -386,9 +388,9 @@ export default function ConnectedAppsSection() {
         )}
       </div>
 
-      <div className="space-y-3 border-t border-ink-100 pt-5 dark:border-night-line">
-        <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-100">Connect an app with a token</h2>
-        <p className="text-sm text-ink-600 dark:text-ink-300">
+      <div className="space-y-3">
+        <h2 className={settingsLabel}>Connect an app with a token</h2>
+        <p className={cn(settingsHint, "!mt-1.5")}>
           For apps you set up yourself: Claude Code, Claude Desktop, Cursor, LM Studio, Gemini CLI, Open WebUI, scripts, and
           Siri through Shortcuts.
         </p>
@@ -416,10 +418,10 @@ export default function ConnectedAppsSection() {
         )}
       </div>
 
-      <div className="space-y-3 border-t border-ink-100 pt-5 dark:border-night-line">
-        <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-100">Recent changes by AI apps</h2>
+      <div className="space-y-3">
+        <h2 className={settingsLabel}>Recent changes by AI apps</h2>
         {activity.length === 0 ? (
-          <p className="text-sm text-ink-400 dark:text-ink-500">No changes yet.</p>
+          <p className={cn(settingsHint, "!mt-1.5")}>No changes yet.</p>
         ) : (
           byDay(activity).map((group) => (
             <div key={group.day} className="space-y-1.5">

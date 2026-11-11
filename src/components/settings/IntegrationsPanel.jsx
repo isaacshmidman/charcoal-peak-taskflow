@@ -4,7 +4,10 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useIntegrations } from "@/hooks/useIntegrations";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
-import { Loader2, AlertTriangle, Settings2, X, Star } from "lucide-react";
+import { Loader2, AlertTriangle } from "lucide-react";
+import { ClearButton } from "@/components/ui/clear-button";
+import { cn } from "@/lib/utils";
+import { SettingRow, SettingsSection, settingsTag } from "./parts";
 import ConfigureCalendarsModal from "./ConfigureCalendarsModal";
 import ConnectAppleModal from "./ConnectAppleModal";
 import { integrationNotices, providerLabel } from "@/lib/integrationNotices";
@@ -24,105 +27,84 @@ function ConnectedRow({
   settingDefault,
   offline,
 }) {
+  const notices = integrationNotices(integration);
   return (
-    // rounded-lg: 8px — the DS "small card" radius, not the 12px panel Card.
-    <div className="rounded-lg border border-border-hairline bg-surface-card p-3 space-y-1.5">
-      {/* Header row: provider title + Default badge on the left, disconnect X
-          on the far right. The title flex-shrinks via `truncate` so a long
-          provider/account name ellipses BEFORE pushing the badge into the X. */}
-      <div className="flex items-start gap-2">
-        <div className="flex-1 min-w-0">
+    <div className="px-4 py-3">
+      <div className="flex items-center gap-2">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            <p className="text-sm font-medium text-ink-900 dark:text-ink-100 truncate">
+            <p className="truncate text-sm font-medium text-ink-900 dark:text-ink-100">
               {providerLabel(integration.provider)}
             </p>
-            {integration.is_default && (
-              <span
-                className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-amber-50 dark:bg-night-warn px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300"
-                title="New tasks created in Zephyrly are pushed here."
-              >
-                <Star className="w-2.5 h-2.5 fill-current" /> Default
+            {integration.is_default && showDefaultControl && (
+              <span className={settingsTag} title="New tasks made in Zephyrly go to this calendar.">
+                Default
               </span>
             )}
           </div>
-          <p className="text-xs text-ink-400 dark:text-ink-500 truncate">
+          <p className="mt-0.5 truncate text-xs text-ink-500 dark:text-ink-400">
             {integration.external_account_email}
           </p>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="shrink-0 h-7 w-7 text-ink-400 dark:text-ink-500 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-night-danger"
-          onClick={() => onDisconnect(integration.id)}
-          disabled={isDisconnecting || offline}
-          title="Disconnect"
-          aria-label="Disconnect"
-        >
-          {isDisconnecting ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <X className="w-3.5 h-3.5" strokeWidth={2.5} />
-          )}
-        </Button>
-      </div>
-
-      {/* Action buttons span the full card width now that the X has moved up.
-          Configure is always shown; "Make default" only when there's >1 active
-          integration to choose between, and renders as a second full-width row. */}
-      <Button
-        variant="outline"
-        size="sm"
-        className="h-7 w-full text-xs gap-1"
-        onClick={() => onConfigure(integration)}
-        disabled={integration.status !== "active"}
-        title="Choose which calendars to sync"
-      >
-        <Settings2 className="w-3 h-3" />
-        Configure
-      </Button>
-      {showDefaultControl && !integration.is_default && (
+        {showDefaultControl && !integration.is_default && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="shrink-0 gap-1 px-2 text-xs text-ink-600 dark:text-ink-300"
+            onClick={() => onMakeDefault(integration.id)}
+            disabled={settingDefault || offline || integration.status !== "active"}
+            title="Send new tasks to this calendar"
+          >
+            {settingDefault && <Loader2 className="h-3 w-3 animate-spin" />}
+            Make default
+          </Button>
+        )}
         <Button
           variant="outline"
           size="sm"
-          className="h-7 w-full text-xs gap-1"
-          onClick={() => onMakeDefault(integration.id)}
-          disabled={settingDefault || offline || integration.status !== "active"}
-          title="Make this the default destination for new tasks"
+          className="shrink-0"
+          onClick={() => onConfigure(integration)}
+          disabled={integration.status !== "active"}
+          title="Choose which calendars to sync"
         >
-          {settingDefault ? (
-            <Loader2 className="w-3 h-3 animate-spin" />
-          ) : (
-            <Star className="w-3 h-3" />
-          )}
-          Make default
+          Configure
         </Button>
-      )}
+        {isDisconnecting ? (
+          <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center text-ink-400 dark:text-ink-500">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          </span>
+        ) : (
+          <ClearButton
+            label={`Disconnect ${providerLabel(integration.provider)}`}
+            onClick={() => { if (!offline) onDisconnect(integration.id); }}
+            className={cn("h-7 w-7", offline && "pointer-events-none opacity-40")}
+          />
+        )}
+      </div>
       {/* What's wrong, if anything, in words that say what to do about it
           (src/lib/integrationNotices.js). The server's own error text is for
           the log. */}
-      {integrationNotices(integration).map((notice) => (
-        <p
-          key={notice.kind}
-          data-testid={`integration-notice-${notice.kind}`}
-          className="flex items-start gap-1 pt-0.5 text-[11px] leading-snug text-amber-600 dark:text-amber-300"
-        >
-          {notice.kind === "reconnect" && <AlertTriangle className="mt-px h-3 w-3 shrink-0" />}
-          <span>{notice.text}</span>
-        </p>
-      ))}
+      {notices.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {notices.map((notice) => (
+            <p
+              key={notice.kind}
+              data-testid={`integration-notice-${notice.kind}`}
+              className="flex items-start gap-1.5 text-xs leading-5 text-amber-700 dark:text-amber-300"
+            >
+              {notice.kind === "reconnect" && <AlertTriangle className="mt-1 h-3 w-3 shrink-0" />}
+              <span>{notice.text}</span>
+            </p>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
 function ConnectCard({ provider, onConnect, connecting, disabled }) {
   return (
-    <div className="rounded-lg border border-border-hairline bg-surface-card p-3 flex items-center justify-between">
-      <div>
-        <p className="text-sm font-medium text-ink-900 dark:text-ink-100">{provider.label}</p>
-        <p className="text-xs text-ink-400 dark:text-ink-500">
-          Not connected
-        </p>
-      </div>
+    <SettingRow label={provider.label} hint="Not connected">
       <Button
         variant="outline"
         size="sm"
@@ -132,7 +114,7 @@ function ConnectCard({ provider, onConnect, connecting, disabled }) {
         {connecting ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
         Connect
       </Button>
-    </div>
+    </SettingRow>
   );
 }
 
@@ -190,18 +172,16 @@ export default function IntegrationsPanel() {
   };
 
   return (
-    <section id="calendar-integrations" className="space-y-3">
-      <div>
-        <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-100">Calendar Integrations</h2>
-        <p className="text-xs text-ink-400 dark:text-ink-500 mt-0.5">
-          Sync your tasks with Google Calendar or iCloud Calendar. Google uses OAuth; iCloud uses
-          an app-specific password encrypted on the backend.
-        </p>
-      </div>
+    <SettingsSection
+      id="calendar-integrations"
+      label="Connected calendars"
+      hint="Tasks with a date show up in your calendar, and your calendar's events show up here."
+    >
+      <div className="space-y-2.5">
       {offline && (
         <p className="rounded-lg border border-amber-100 dark:border-night-warn-line bg-amber-50 dark:bg-night-warn px-3 py-2 text-xs text-amber-700 dark:text-amber-200">
-          Offline: connected calendars are shown from cache. Connecting, disconnecting,
-          manual sync, and calendar configuration changes resume when you are online.
+          You're offline. This is the last list this device saw; connecting, disconnecting
+          and changing calendars need a connection.
         </p>
       )}
       {integrationError && (
@@ -211,15 +191,15 @@ export default function IntegrationsPanel() {
       )}
       {error && (
         <p className="text-xs text-amber-600 dark:text-amber-300">
-          Couldn't load integrations: {error.message || "network error"}
+          Couldn't load your calendars: {error.message || "network error"}
         </p>
       )}
       {isLoading ? (
-        <div className="flex items-center gap-2 text-xs text-ink-400 dark:text-ink-500">
+        <div className="flex items-center gap-2 px-1 text-xs text-ink-500 dark:text-ink-400">
           <Loader2 className="w-3 h-3 animate-spin" /> Loading…
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="ds-list">
           {googleRow ? (
             <ConnectedRow
               integration={googleRow}
@@ -260,6 +240,7 @@ export default function IntegrationsPanel() {
           )}
         </div>
       )}
+      </div>
       <ConfigureCalendarsModal
         open={!!configuring}
         onOpenChange={(open) => { if (!open) setConfiguring(null); }}
@@ -269,6 +250,6 @@ export default function IntegrationsPanel() {
         open={showAppleConnect}
         onOpenChange={setShowAppleConnect}
       />
-    </section>
+    </SettingsSection>
   );
 }

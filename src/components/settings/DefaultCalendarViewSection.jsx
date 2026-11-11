@@ -6,6 +6,7 @@
  */
 import { useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SettingRow, SettingsSection } from "./parts";
 
 const CALENDAR_VIEWS = ["day", "week", "month", "year"];
 
@@ -20,19 +21,22 @@ export default function DefaultCalendarViewSection() {
   };
 
   return (
-    <section>
-      <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-100 mb-2">Default Calendar View</h2>
-      <Select value={selected} onValueChange={save}>
-        <SelectTrigger className="w-48 h-9 bg-white dark:bg-night-card dark:border-night-line-strong text-sm font-medium text-ink-900 dark:text-ink-100">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent className="bg-white dark:bg-night-card dark:border-night-line-strong">
-          <SelectItem value="day" className="text-sm font-medium text-ink-900 dark:text-ink-100">Day</SelectItem>
-          <SelectItem value="week" className="text-sm font-medium text-ink-900 dark:text-ink-100">Week</SelectItem>
-          <SelectItem value="month" className="text-sm font-medium text-ink-900 dark:text-ink-100">Month</SelectItem>
-          <SelectItem value="year" className="text-sm font-medium text-ink-900 dark:text-ink-100">Year</SelectItem>
-        </SelectContent>
-      </Select>
-    </section>
+    <SettingsSection label="Display">
+      <div className="ds-list">
+        <SettingRow label="Default view" hint="How the Calendar page opens">
+          <Select value={selected} onValueChange={save}>
+            <SelectTrigger className="w-36" aria-label="Default calendar view">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="day">Day</SelectItem>
+              <SelectItem value="week">Week</SelectItem>
+              <SelectItem value="month">Month</SelectItem>
+              <SelectItem value="year">Year</SelectItem>
+            </SelectContent>
+          </Select>
+        </SettingRow>
+      </div>
+    </SettingsSection>
   );
 }

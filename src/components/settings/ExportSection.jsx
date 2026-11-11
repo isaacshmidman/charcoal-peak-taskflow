@@ -18,6 +18,8 @@ import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import RestoreSection from "./RestoreSection";
+import { cn } from "@/lib/utils";
+import { settingsHint, settingsLabel } from "./parts";
 
 // Long enough to cover a double-tap and the server starting the stream;
 // the server refuses a second concurrent export anyway.
@@ -68,11 +70,14 @@ export default function ExportSection() {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-ink-600 dark:text-ink-300">
-        Download a copy of everything in Zephyrly as a single .zip file. Keep it as a backup, or open it anywhere.
-      </p>
+      <div>
+        <h2 className={settingsLabel}>Export</h2>
+        <p className={cn(settingsHint, "mt-1.5")}>
+          Download a copy of everything in Zephyrly as a single .zip file. Keep it as a backup, or open it anywhere.
+        </p>
+      </div>
 
-      <Card className="divide-y divide-ink-100 dark:divide-night-line">
+      <Card className="divide-y divide-[var(--border-hairline)]">
         {CONTENTS.map(({ icon: Icon, name, text }) => (
           <div key={name} className="flex items-start gap-3 px-4 py-3">
             <Icon className="mt-0.5 h-4 w-4 shrink-0 text-ink-400 dark:text-ink-500" />
@@ -84,7 +89,7 @@ export default function ExportSection() {
         ))}
       </Card>
 
-      <p className="flex items-start gap-2 text-xs text-ink-500 dark:text-ink-400">
+      <p className="flex items-start gap-2 px-1 text-xs text-ink-500 dark:text-ink-400">
         <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
         Passwords and calendar sign-ins are never included.
       </p>

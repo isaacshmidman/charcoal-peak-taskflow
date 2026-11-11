@@ -70,12 +70,12 @@ export default function ConnectAppleModal({ open, onOpenChange }) {
         <DialogHeader>
           <DialogTitle>Connect iCloud Calendar</DialogTitle>
           <DialogDescription>
-            Sync your iCloud calendars two-way using an app-specific password.
+            iCloud needs a password made just for Zephyrly, not your Apple ID password.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="rounded-md border border-ink-100 dark:border-night-line bg-ink-50 dark:bg-night-raised p-2.5 text-xs text-ink-600 dark:text-ink-300 space-y-1.5">
+          <div className="rounded-lg border border-border-hairline bg-ink-50 dark:bg-night-raised p-3 text-xs text-ink-600 dark:text-ink-300 space-y-1.5">
             <p className="font-medium text-ink-700 dark:text-ink-200">How to get an app-specific password</p>
             <ol className="list-decimal list-inside space-y-0.5">
               <li>
@@ -124,7 +124,7 @@ export default function ConnectAppleModal({ open, onOpenChange }) {
               className="font-mono"
             />
             <p className="text-[11px] text-ink-400 dark:text-ink-500">
-              Your password is encrypted at rest and only used for CalDAV calls to iCloud.
+              Stored encrypted, and only ever used to reach your iCloud calendars.
             </p>
           </div>
 
