@@ -26,6 +26,21 @@ export const queryClientInstance = new QueryClient({
 	},
 });
 
+/**
+ * Put a list saved on this device into the query cache as OLD data: shown at
+ * once, and still fetched the moment a page asks for it.
+ *
+ * `updatedAt: 0` is the point. Without it the saved copy counts as fetched
+ * just now, and a query that trusts its data for a while (connected calendars:
+ * 10 seconds) doesn't ask the server at all. Settings → Calendars, opened
+ * within 10 seconds of the page loading, showed the saved copy — or, on a
+ * device with none, "Not connected" for a calendar that was connected — until
+ * the half-minute poll came round.
+ */
+function seed(key, data) {
+	queryClientInstance.setQueryData([key], data, { updatedAt: 0 });
+}
+
 export function syncOfflineQueryCache() {
 	for (const key of SEED_KEYS) {
 		try {
@@ -34,14 +49,14 @@ export function syncOfflineQueryCache() {
 				if (EMPTY_CACHE_VALUES[key] === undefined) {
 					queryClientInstance.removeQueries({ queryKey: [key] });
 				} else {
-					queryClientInstance.setQueryData([key], EMPTY_CACHE_VALUES[key]);
+					seed(key, EMPTY_CACHE_VALUES[key]);
 				}
 				continue;
 			}
-			queryClientInstance.setQueryData([key], data ?? EMPTY_CACHE_VALUES[key]);
+			seed(key, data);
 		} catch {
 			if (EMPTY_CACHE_VALUES[key] === undefined) continue;
-			queryClientInstance.setQueryData([key], EMPTY_CACHE_VALUES[key]);
+			seed(key, EMPTY_CACHE_VALUES[key]);
 		}
 	}
 }
