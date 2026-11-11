@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Sliders, X, Plus, ChevronRight, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { headerIconButton } from "@/components/PageHeader";
 
 /**
  * @typedef {{ value: string, label: string, scope?: string, hideOnScope?: string[], group?: string }} SortOption
@@ -112,7 +113,7 @@ export default function MultiSortPanel({ sorts, onSortsChange, page = "default" 
         <Button aria-label="Multi-level sorting"
           variant="ghost"
           size="icon"
-          className="h-9 w-9 text-ink-400 dark:text-ink-500 hover:text-ink-700 dark:hover:text-ink-200"
+          className={headerIconButton}
           title="Multi-level sorting"
         >
           <Sliders className="w-4 h-4" />

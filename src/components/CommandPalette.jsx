@@ -31,6 +31,7 @@ import {
   Sun,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { ClearButton } from "@/components/ui/clear-button";
 import { SHORTCUT_EVENTS, emitShortcut } from "@/lib/shortcuts";
 import { fuzzyFilter } from "@/lib/fuzzy";
 import { excludeExternalEvents } from "@/lib/task-filters";
@@ -185,12 +186,13 @@ export default function CommandPalette({ open, onOpenChange }) {
         data-testid="command-palette"
       >
         <DialogTitle className="sr-only">Command palette</DialogTitle>
+        <div className="relative">
         <input
           ref={inputRef}
           value={query}
           data-testid="command-palette-input"
           placeholder="Type a command or search tasks…"
-          className="w-full h-12 px-4 bg-transparent text-base md:text-sm text-ink-900 dark:text-ink-100 placeholder:text-ink-400 dark:placeholder:text-ink-500 outline-none border-b border-ink-100 dark:border-night-line"
+          className="w-full h-12 pl-4 pr-10 bg-transparent text-base md:text-sm text-ink-900 dark:text-ink-100 placeholder:text-ink-400 dark:placeholder:text-ink-500 outline-none border-b border-ink-100 dark:border-night-line"
           onChange={(e) => {
             setQuery(e.target.value);
             setActiveIndex(0);
@@ -208,6 +210,14 @@ export default function CommandPalette({ open, onOpenChange }) {
             }
           }}
         />
+        {query ? (
+          <ClearButton
+            label="Clear"
+            className="absolute right-3 top-1/2 -translate-y-1/2"
+            onClick={() => { setQuery(""); setActiveIndex(0); inputRef.current?.focus(); }}
+          />
+        ) : null}
+        </div>
         <div ref={listRef} className="max-h-72 overflow-y-auto py-1.5">
           {flat.length === 0 ? (
             <p className="px-4 py-6 text-center text-xs text-ink-400 dark:text-ink-500">

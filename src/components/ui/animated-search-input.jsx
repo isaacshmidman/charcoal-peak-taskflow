@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
+import { ClearButton } from "@/components/ui/clear-button";
 import { cn } from "@/lib/utils";
 
 /**
@@ -12,6 +13,9 @@ import { cn } from "@/lib/utils";
  *   - Blurring the empty input.
  *   - Clicking/tapping anywhere outside the input AND outside any element marked
  *     `data-search-toggle` (so the toggle button can own its own close path).
+ *
+ * Once something is typed, an x at the right edge empties the box and
+ * leaves it open with the caret in it.
  *
  * @param {{
  *   open: boolean,
@@ -54,7 +58,7 @@ export function AnimatedSearchInput({ open, value, onChange, onClose, placeholde
     <div
       ref={wrapperRef}
       className={cn(
-        "transition-all duration-200 ease-out",
+        "relative transition-all duration-200 ease-out",
         open
           ? "w-[min(15rem,calc(100vw-14rem))] sm:w-60 opacity-100"
           : "w-0 opacity-0"
@@ -69,9 +73,16 @@ export function AnimatedSearchInput({ open, value, onChange, onClose, placeholde
         className={cn(
           "h-9 w-full bg-white dark:bg-night-sunken border-ink-100 dark:border-night-line whitespace-nowrap",
           open ? "px-3" : "p-0 border-0",
+          open && value && "pr-8",
           className
         )}
       />
+      {open && value ? (
+        <ClearButton
+          className="absolute right-1.5 top-1/2 -translate-y-1/2"
+          onClick={() => { onChange(""); inputRef.current?.focus(); }}
+        />
+      ) : null}
     </div>
   );
 }

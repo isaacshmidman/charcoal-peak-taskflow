@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { headerIconButton } from "@/components/PageHeader";
 
 /** @typedef {import("@/types/tasks").TaskRecord & { parent_id?: string | null, source_calendar_id?: string | null, source_provider?: string | null, source_calendar_name?: string | null, source_color_hex?: string | null }} TaskRecord */
 /**
@@ -53,8 +54,9 @@ export default function CalendarVisibilityDropdown({ calendars, hidden, onChange
           variant="ghost"
           size="icon"
           className={cn(
-            "h-9 w-9 text-ink-400 dark:text-ink-500 hover:text-ink-700 dark:hover:text-ink-200",
-            !allShown && "text-ink-700 dark:text-ink-200"
+            headerIconButton,
+            // Something is hidden: the icon says so by standing out.
+            !allShown && "text-ink-900 dark:text-ink-100"
           )}
           title="Show / hide calendars"
           aria-label="Show / hide calendars"
