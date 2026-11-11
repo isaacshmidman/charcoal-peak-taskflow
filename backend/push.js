@@ -6,12 +6,9 @@
  * import keeps resolving unchanged.
  *
  * See `backend/push/index.js` for the canonical export surface
- * (5 public symbols).
+ * (7 public symbols).
  *
- * Singletons (suppressUntil Map, pushQueue Array, debounceTimers Map,
- * rate-limit state) live ONLY in `backend/push/state.js`. Every other
- * sub-module imports the helpers there rather than declaring its own
- * copies — otherwise suppressPush() called from sync.js wouldn't be
- * visible to runPush()'s isSuppressed() check (loop-prevention bug).
+ * Singletons (pushQueue Array, debounceTimers Map, rate-limit state) live
+ * ONLY in `backend/push/state.js`.
  */
 export * from "./push/index.js";

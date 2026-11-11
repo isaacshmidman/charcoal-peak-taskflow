@@ -5,10 +5,11 @@
  * consumer's existing `from "./push.js"` import keeps resolving
  * unchanged.
  *
- * 5 public exports — verify after changes with
+ * 7 public exports — verify after changes with
  *   node -e "import('./backend/push.js').then(m =>
  *   console.log(Object.keys(m).sort().join('\n')))"
  */
-export { suppressPush, getPushQueueState, waitForPushIdle } from "./state.js";
-export { enqueueTaskPush } from "./enqueue.js";
+export { getPushQueueState, waitForPushIdle } from "./state.js";
+export { enqueueTaskPush, retryDuePushes } from "./enqueue.js";
+export { pushIsWaiting, waitingChanges } from "./outbox.js";
 export { taskToEventBody } from "./shape.js";

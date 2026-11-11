@@ -79,19 +79,41 @@ export function createGrant(db, { appId, userId, kind, label, clientId = null, c
 }
 
 /**
- * Mint a secret for a grant. Returns the secret — the only time it exists
- * outside the caller's hands.
+ * Make a token for a grant and return it (only its hash is stored).
+ * `parent` is the hash of the refresh token, or the name of the sign-in
+ * code, it was issued for: see oauth.js on telling a repeated request from
+ * a leaked token.
  *
  * @param {any} db
- * @param {{ grantId: string, kind: "personal" | "access" | "refresh", ttlMs?: number | null }} input
+ * @param {{ grantId: string, kind: "personal" | "access" | "refresh", ttlMs?: number | null, parent?: string | null }} input
  */
-export function issueToken(db, { grantId, kind, ttlMs = null }) {
+export function issueToken(db, { grantId, kind, ttlMs = null, parent = null }) {
   const token = `${TOKEN_PREFIXES[kind]}${createOpaqueToken(32)}`;
   const now = Date.now();
   db.prepare(
-    `INSERT INTO ai_tokens (token_hash, grant_id, kind, expires_at, created_date) VALUES (?, ?, ?, ?, ?)`
-  ).run(sha256(token), grantId, kind, ttlMs ? new Date(now + ttlMs).toISOString() : null, new Date(now).toISOString());
+    `INSERT INTO ai_tokens (token_hash, grant_id, kind, expires_at, created_date, parent_hash) VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(sha256(token), grantId, kind, ttlMs ? new Date(now + ttlMs).toISOString() : null, new Date(now).toISOString(), parent);
   return token;
+}
+
+/**
+ * Note that a token has been used, the first time it is. What matters is
+ * the mark it leaves on the refresh token it came from: "the app received
+ * what this was exchanged for".
+ *
+ * @param {any} db
+ * @param {{ token_hash: string, parent_hash?: string | null, used_at?: string | null }} tokenRow
+ */
+export function markTokenUsed(db, tokenRow) {
+  if (tokenRow.used_at) return;
+  const now = new Date().toISOString();
+  db.prepare(`UPDATE ai_tokens SET used_at = ? WHERE token_hash = ? AND used_at IS NULL`).run(now, tokenRow.token_hash);
+  if (tokenRow.parent_hash) {
+    db.prepare(`UPDATE ai_tokens SET successor_used_at = ? WHERE token_hash = ? AND successor_used_at IS NULL`).run(
+      now,
+      tokenRow.parent_hash
+    );
+  }
 }
 
 /**
@@ -137,7 +159,9 @@ export function findGrantForToken(db, appId, token) {
   if (!token || !/^zeph_(pat|at)_/.test(token)) return null;
   const row = db
     .prepare(
-      `SELECT ai_tokens.kind AS token_kind, ai_tokens.expires_at AS token_expires_at, ai_grants.*
+      `SELECT ai_tokens.kind AS token_kind, ai_tokens.expires_at AS token_expires_at,
+              ai_tokens.token_hash AS token_hash, ai_tokens.parent_hash AS token_parent_hash,
+              ai_tokens.used_at AS token_used_at, ai_grants.*
        FROM ai_tokens JOIN ai_grants ON ai_grants.id = ai_tokens.grant_id
        WHERE ai_tokens.token_hash = ? AND ai_grants.app_id = ?`
     )
@@ -149,6 +173,9 @@ export function findGrantForToken(db, appId, token) {
   if (!userRow) return null;
   const user = buildUserPayload(userRow);
   if (!user || !aiAccessAllowed(user)) return null;
+  if (row.token_kind === "access") {
+    markTokenUsed(db, { token_hash: row.token_hash, parent_hash: row.token_parent_hash, used_at: row.token_used_at });
+  }
   return { grant: row, user };
 }
 
@@ -242,9 +269,12 @@ export function revokeGrantById(db, grantId) {
 export function purgeExpiredAiRecords(db) {
   const now = new Date();
   db.prepare(`DELETE FROM ai_tokens WHERE expires_at IS NOT NULL AND expires_at <= ?`).run(now.toISOString());
-  db.prepare(`DELETE FROM ai_tokens WHERE kind = 'refresh' AND used_at IS NOT NULL AND used_at <= ?`).run(
-    new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()
-  );
+  // An exchanged refresh token is kept for a day once the app is known to
+  // have received what it was exchanged for. One whose answer may never
+  // have arrived is kept until it expires, so the app can ask again.
+  db.prepare(
+    `DELETE FROM ai_tokens WHERE kind = 'refresh' AND used_at IS NOT NULL AND used_at <= ? AND successor_used_at IS NOT NULL`
+  ).run(new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString());
   db.prepare(`DELETE FROM ai_activity WHERE created_date <= ?`).run(
     new Date(now.getTime() - ACTIVITY_RETENTION_MS).toISOString()
   );

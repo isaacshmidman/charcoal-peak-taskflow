@@ -5,12 +5,12 @@
  * shim that points here, so every consumer's existing import keeps
  * resolving unchanged.
  *
- * 10 public exports — verify after changes with
+ * 11 public exports — verify after changes with
  *   node -e "import('./backend/providers/apple-calendar.js').then(m =>
  *   console.log(Object.keys(m).sort().join('\n')))"
  */
 export { discoverAppleCalendars } from "./discovery.js";
-export { listEventsIncremental } from "./sync.js";
+export { listEventsIncremental, listEventsInWindow } from "./sync.js";
 export { parseVEvent, mapVEventToTaskInput } from "./events.js";
 export { buildVEvent } from "./ics.js";
 export {

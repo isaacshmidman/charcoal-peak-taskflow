@@ -13,6 +13,21 @@
  *      access token (1 hour) and a refresh token (90 days, replaced on
  *      every use).
  *
+ * A refresh token or code seen a SECOND time is the sign of a leak, and
+ * the answer to a leak is to end the connection. But it is also exactly
+ * what an honest app does when the answer to its first request never
+ * reached it (a dropped connection on the way back) or when two of its
+ * requests refresh at the same moment. Ending the connection for those
+ * meant Claude dropping out now and then for no visible reason, until the
+ * person connected it again. So a second showing is allowed when it can't
+ * be a thief profiting from it:
+ *
+ *   - nothing issued the first time was ever used (the app plainly never
+ *     got it): what was issued is cancelled and issued afresh; or
+ *   - it comes within a minute of the first (REFRESH_REUSE_GRACE_MS).
+ *
+ * Anything else still ends the connection, as before.
+ *
  * Public clients only: PKCE (S256) is required and there are no client
  * secrets. The only place Zephyrly redirects outside itself is back to a
  * redirect URI the app registered, matched exactly.
@@ -23,11 +38,17 @@
 import { createHash } from "node:crypto";
 import { HttpError, publicOrigin } from "../http.js";
 import { createOpaqueToken, sha256 } from "../auth.js";
-import { aiAccessAllowed, createGrant, issueToken, revokeGrantById } from "./grants.js";
+import { aiAccessAllowed, createGrant, issueToken, markTokenUsed, revokeGrantById } from "./grants.js";
 import { takeSlot } from "./rate-limit.js";
 
 export const ACCESS_TOKEN_TTL_MS = 60 * 60 * 1000;
 export const REFRESH_TOKEN_TTL_MS = 90 * 24 * 60 * 60 * 1000;
+/**
+ * For this long after a refresh token is exchanged, the same token is
+ * accepted again: an app running several requests at once often has two of
+ * them notice the expired access token and both ask for a new one.
+ */
+export const REFRESH_REUSE_GRACE_MS = 60 * 1000;
 const REQUEST_TTL_MS = 10 * 60 * 1000;
 const CODE_TTL_MS = 5 * 60 * 1000;
 const UNUSED_CLIENT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -364,16 +385,35 @@ export function decideRequest(db, config, { id, user, approve, canWrite, timeZon
 /**
  * @param {any} db
  * @param {string} grantId
+ * @param {string} parent  what these are issued for: a refresh token's hash, or `code:<request id>`
  */
-function issueTokens(db, grantId) {
+function issueTokens(db, grantId, parent) {
   const grant = db.prepare(`SELECT can_write FROM ai_grants WHERE id = ?`).get(grantId);
   return {
-    access_token: issueToken(db, { grantId, kind: "access", ttlMs: ACCESS_TOKEN_TTL_MS }),
+    access_token: issueToken(db, { grantId, kind: "access", ttlMs: ACCESS_TOKEN_TTL_MS, parent }),
     token_type: "Bearer",
     expires_in: ACCESS_TOKEN_TTL_MS / 1000,
-    refresh_token: issueToken(db, { grantId, kind: "refresh", ttlMs: REFRESH_TOKEN_TTL_MS }),
+    refresh_token: issueToken(db, { grantId, kind: "refresh", ttlMs: REFRESH_TOKEN_TTL_MS, parent }),
     scope: grant?.can_write ? "tasks.read tasks.write" : "tasks.read",
   };
+}
+
+/**
+ * Whether anything issued for `parent` has been used: the app received it.
+ * @param {any} db
+ * @param {string} parent
+ */
+function issueWasReceived(db, parent) {
+  return Boolean(db.prepare(`SELECT 1 FROM ai_tokens WHERE parent_hash = ? AND used_at IS NOT NULL LIMIT 1`).get(parent));
+}
+
+/**
+ * Cancel what was issued for `parent` and never used.
+ * @param {any} db
+ * @param {string} parent
+ */
+function cancelUnusedIssue(db, parent) {
+  db.prepare(`DELETE FROM ai_tokens WHERE parent_hash = ? AND used_at IS NULL`).run(parent);
 }
 
 /**
@@ -401,23 +441,36 @@ function exchangeCode(db, config, form) {
   if (!form.code || !form.code_verifier) throw new OAuthError(400, "invalid_request", "code and code_verifier are required.");
   const request = db.prepare(`SELECT * FROM oauth_requests WHERE code_hash = ? AND app_id = ?`).get(sha256(form.code), config.appId);
   if (!request) throw bad();
-  if (request.code_used_at) {
-    // A code presented twice may have been stolen: end what it started.
-    revokeGrantById(db, request.grant_id);
-    throw bad();
-  }
-  db.prepare(`UPDATE oauth_requests SET code_used_at = ? WHERE id = ?`).run(new Date().toISOString(), request.id);
-  if (request.expires_at <= new Date().toISOString()) throw bad();
-  if (form.client_id !== request.client_id) throw bad();
-  if (form.redirect_uri && form.redirect_uri !== request.redirect_uri) throw bad();
+  const parent = `code:${request.id}`;
   const verifierHash = createHash("sha256").update(form.code_verifier).digest("base64url");
-  if (verifierHash !== request.code_challenge) throw bad();
+  const sameAsker =
+    form.client_id === request.client_id &&
+    (!form.redirect_uri || form.redirect_uri === request.redirect_uri) &&
+    verifierHash === request.code_challenge;
+  if (request.code_used_at) {
+    // The app that was given this code (it holds the verifier nobody else
+    // has), asking again before using anything from the first answer: that
+    // answer never arrived. Issue it afresh. (A code used up by a failed
+    // attempt issued nothing, and stays used up.)
+    const issued = Boolean(db.prepare(`SELECT 1 FROM ai_tokens WHERE parent_hash = ? LIMIT 1`).get(parent));
+    const lostAnswer =
+      sameAsker && issued && request.expires_at > new Date().toISOString() && !issueWasReceived(db, parent);
+    if (!lostAnswer) {
+      // A code presented twice may have been stolen: end what it started.
+      revokeGrantById(db, request.grant_id);
+      throw bad();
+    }
+    cancelUnusedIssue(db, parent);
+  }
+  db.prepare(`UPDATE oauth_requests SET code_used_at = COALESCE(code_used_at, ?) WHERE id = ?`).run(new Date().toISOString(), request.id);
+  if (request.expires_at <= new Date().toISOString()) throw bad();
+  if (!sameAsker) throw bad();
   if (form.resource && form.resource.replace(/\/$/, "") !== resourceUrl(config)) {
     throw new OAuthError(400, "invalid_target", `The only resource here is ${resourceUrl(config)}.`);
   }
   const grant = db.prepare(`SELECT * FROM ai_grants WHERE id = ? AND revoked_at IS NULL`).get(request.grant_id);
   if (!grant) throw bad();
-  return issueTokens(db, grant.id);
+  return issueTokens(db, grant.id, parent);
 }
 
 /**
@@ -436,16 +489,27 @@ function exchangeRefresh(db, config, form) {
     )
     .get(sha256(form.refresh_token));
   if (!row || row.app_id !== config.appId || row.revoked_at) throw bad();
-  if (row.used_at) {
-    // Rotation: a refresh token works once. Seeing one again means two
-    // parties hold it, so neither keeps access.
-    revokeGrantById(db, row.grant_id);
-    throw bad();
-  }
   if (row.expires_at && row.expires_at <= new Date().toISOString()) throw bad();
   if (form.client_id && form.client_id !== row.client_id) throw bad();
+  if (row.used_at) {
+    // Rotation: a refresh token works once. See the top of this file for
+    // the two cases where the second showing is the app itself.
+    const received = Boolean(row.successor_used_at) || issueWasReceived(db, row.token_hash);
+    const justNow = Date.now() - Date.parse(row.used_at) <= REFRESH_REUSE_GRACE_MS;
+    if (received && !justNow) {
+      // Two parties hold it, so neither keeps access.
+      revokeGrantById(db, row.grant_id);
+      throw bad();
+    }
+    // Never received: cancel that issue, so one line of tokens continues.
+    // Received a moment ago: the app's other request holds it; leave it.
+    if (!received) cancelUnusedIssue(db, row.token_hash);
+    return issueTokens(db, row.grant_id, row.token_hash);
+  }
   db.prepare(`UPDATE ai_tokens SET used_at = ? WHERE token_hash = ?`).run(new Date().toISOString(), row.token_hash);
-  return issueTokens(db, row.grant_id);
+  // Exchanging a refresh token shows the app received it.
+  markTokenUsed(db, { token_hash: row.token_hash, parent_hash: row.parent_hash, used_at: null });
+  return issueTokens(db, row.grant_id, row.token_hash);
 }
 
 /**

@@ -1,21 +1,23 @@
 // @ts-check
 /**
  * @file Push-queue singletons. Every other backend/push/* sub-module
- * imports the helpers below — they MUST NOT declare their own Set/Map/
- * array, because if they did the suppression + rate-limit state would
- * fragment and suppressPush() from sync.js would no longer be visible
- * to runPush()'s isSuppressed() check (the loop-prevention bug).
+ * imports the helpers below — they MUST NOT declare their own Map/array,
+ * or two queues would run side by side and break the rate limit.
  *
  * State:
- *   suppressUntil    — taskId → expiry epoch ms. Drives isSuppressed().
  *   debounceTimers   — taskId → pending setTimeout handle.
  *   pushQueue        — FIFO of jobs to drain.
  *   queueRunning     — flag to prevent concurrent drains.
  *   lastPushAt       — epoch of most recent dispatch (rate-limit gate).
+ *
+ * There used to be a fifth: a 30-second "don't push this task" hold that
+ * sync placed on every task it touched, to stop its own writes echoing
+ * back to the calendar. Sync writes straight to the store and never
+ * reaches the push hook, so there was no echo to stop; all the hold ever
+ * did was throw away a real edit made within half a minute of a sync
+ * touching the same task. It is gone.
  */
 import { log } from "../log.js";
-
-export const SUPPRESS_MS = 30 * 1000;
 
 // Coalesce + rate-limit outbound writes per task. Google Calendar's per-user
 // quota is ~600 reads/min and far stricter on writes; bulk operations from
@@ -31,9 +33,6 @@ export const MAX_PUSH_PER_SEC = 4; // generous — Google allows much more, but 
                                    // keeps us safely under per-minute quota even
                                    // during a 20-task bulk update.
 
-/** @type {Map<string, number>} taskId → expiresAt epoch ms */
-const suppressUntil = new Map();
-
 /** @type {Map<string, NodeJS.Timeout>} taskId → pending debounce timer */
 export const debounceTimers = new Map();
 
@@ -41,31 +40,6 @@ export const debounceTimers = new Map();
 const pushQueue = [];
 let queueRunning = false;
 let lastPushAt = 0;
-
-/**
- * Called by the inbound sync after it applies a Google event to a task. The
- * subsequent `updateEntityRecord` triggers our push hook — we skip that push
- * so we don't echo the change back to Google.
- */
-export function suppressPush(taskId, ttlMs = SUPPRESS_MS) {
-  if (!taskId) return;
-  suppressUntil.set(taskId, Date.now() + ttlMs);
-  // Opportunistic cleanup of expired entries so the map doesn't grow.
-  if (suppressUntil.size > 256) {
-    const now = Date.now();
-    for (const [k, v] of suppressUntil) if (v <= now) suppressUntil.delete(k);
-  }
-}
-
-export function isSuppressed(taskId) {
-  const exp = suppressUntil.get(taskId);
-  if (!exp) return false;
-  if (exp <= Date.now()) {
-    suppressUntil.delete(taskId);
-    return false;
-  }
-  return true;
-}
 
 export function getPushQueueState() {
   return {

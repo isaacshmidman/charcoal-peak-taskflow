@@ -7,6 +7,7 @@
  * `null` (never a 403) if the row isn't owned by that user.
  */
 import { serializeIntegration, serializeIntegrationCalendar } from "./serialize.js";
+import { waitingChanges } from "../push/outbox.js";
 
 /** @typedef {import("node:sqlite").DatabaseSync} DB */
 
@@ -20,7 +21,12 @@ export function listIntegrationsForUser(db, { appId, userId }) {
       `SELECT * FROM calendar_integrations WHERE app_id = ? AND user_id = ? ORDER BY created_date ASC`
     )
     .all(appId, userId);
-  return rows.map(serializeIntegration);
+  return rows.map((row) => ({
+    ...serializeIntegration(row),
+    // Changes made here that this calendar hasn't taken yet and is still
+    // owed (backend/push/outbox.js). Settings shows the number.
+    waiting_changes: waitingChanges(db, /** @type {any} */ (row).id),
+  }));
 }
 
 /**

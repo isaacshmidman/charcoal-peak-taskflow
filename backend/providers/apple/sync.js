@@ -79,6 +79,48 @@ export async function listEventsIncremental(ctx, calendarUrl, syncToken) {
   }
 
   // ---- Path B: initial query (windowed) ----
+  const changes = await listEventsInWindow(ctx, calendarUrl);
+
+  // Now ask for a fresh sync-token so subsequent calls are incremental.
+  // We use an empty sync-token on a sync-collection REPORT — RFC 6578 says
+  // an empty token means "give me current state and a fresh token", which
+  // can be expensive on huge calendars but fine on personal accounts.
+  let nextSyncToken = null;
+  try {
+    const initBody = `<?xml version="1.0" encoding="utf-8"?>
+<D:sync-collection xmlns:D="${NS.D}" xmlns:C="${NS.C}">
+  <D:sync-token/>
+  <D:sync-level>1</D:sync-level>
+  <D:prop>
+    <D:getetag/>
+  </D:prop>
+</D:sync-collection>`;
+    const initResp = await caldavRequest(ctx, "REPORT", calendarUrl, {
+      headers: { Depth: "1" },
+      body: initBody,
+    });
+    const re = /<(?:[a-zA-Z][\w-]*:)?sync-token\b[^>]*>([\s\S]*?)<\/(?:[a-zA-Z][\w-]*:)?sync-token>/i;
+    const m = re.exec(initResp.text);
+    nextSyncToken = m ? m[1].trim() : null;
+  } catch {
+    // Server doesn't support sync-collection — we'll fall back to full
+    // calendar-query every tick. iCloud does support it, so this is a
+    // safety net rather than expected behavior.
+  }
+
+  return { changes, nextSyncToken, fullResync: false };
+}
+
+/**
+ * Every event in the 30-days-back, 90-days-ahead window, whether or not it
+ * changed lately. The first read of a calendar, and the daily full read
+ * (backend/sync/window.js).
+ *
+ * @param {{ email: string, password: string, origin: string }} ctx
+ * @param {string} calendarUrl
+ * @returns {Promise<Array<{ href: string, etag: string, ics: string, deleted: boolean }>>}
+ */
+export async function listEventsInWindow(ctx, calendarUrl) {
   const now = new Date();
   const start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const end = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
@@ -117,33 +159,5 @@ export async function listEventsIncremental(ctx, calendarUrl, syncToken) {
       deleted: false,
     });
   }
-
-  // Now ask for a fresh sync-token so subsequent calls are incremental.
-  // We use an empty sync-token on a sync-collection REPORT — RFC 6578 says
-  // an empty token means "give me current state and a fresh token", which
-  // can be expensive on huge calendars but fine on personal accounts.
-  let nextSyncToken = null;
-  try {
-    const initBody = `<?xml version="1.0" encoding="utf-8"?>
-<D:sync-collection xmlns:D="${NS.D}" xmlns:C="${NS.C}">
-  <D:sync-token/>
-  <D:sync-level>1</D:sync-level>
-  <D:prop>
-    <D:getetag/>
-  </D:prop>
-</D:sync-collection>`;
-    const initResp = await caldavRequest(ctx, "REPORT", calendarUrl, {
-      headers: { Depth: "1" },
-      body: initBody,
-    });
-    const re = /<(?:[a-zA-Z][\w-]*:)?sync-token\b[^>]*>([\s\S]*?)<\/(?:[a-zA-Z][\w-]*:)?sync-token>/i;
-    const m = re.exec(initResp.text);
-    nextSyncToken = m ? m[1].trim() : null;
-  } catch {
-    // Server doesn't support sync-collection — we'll fall back to full
-    // calendar-query every tick. iCloud does support it, so this is a
-    // safety net rather than expected behavior.
-  }
-
-  return { changes, nextSyncToken, fullResync: false };
+  return changes;
 }

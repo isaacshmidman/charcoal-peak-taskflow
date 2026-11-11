@@ -16,6 +16,7 @@ import { backfillGoogleEventMetadata } from "../google-metadata-backfill.js";
 import { log } from "../log.js";
 import { syncOneCalendar } from "./google-inbound.js";
 import { syncAppleIntegration } from "./apple-inbound.js";
+import { markSyncOutcome } from "./shared.js";
 
 /**
  * Sync one integration. Iterates each enabled calendar and pulls changes.
@@ -89,6 +90,8 @@ export async function syncIntegration(db, config, integrationRow) {
     );
   }
 
+  let failed = 0;
+  let firstError = "";
   for (const cal of calendars) {
     try {
       await syncOneCalendar(db, config, {
@@ -100,6 +103,8 @@ export async function syncIntegration(db, config, integrationRow) {
     } catch (err) {
       // Per-calendar failure shouldn't abort other calendars on the same
       // integration.
+      failed += 1;
+      firstError = firstError || String(err.message || "sync failed");
       markCalendarSyncResult(db, integrationRow.id, cal.external_calendar_id, {
         error: err.message,
       });
@@ -109,8 +114,5 @@ export async function syncIntegration(db, config, integrationRow) {
     }
   }
 
-  // Top-level integration last_synced_at updates whenever any of its
-  // calendars completed a tick. The per-calendar syncToken is what we
-  // actually use for incremental fetching.
-  markSyncResult(db, integrationRow.id, {});
+  markSyncOutcome(db, integrationRow.id, { calendars: calendars.length, failed, firstError });
 }

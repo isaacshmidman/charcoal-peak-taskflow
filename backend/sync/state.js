@@ -13,6 +13,7 @@
  */
 import { log } from "../log.js";
 import { syncIntegration } from "./coordinator.js";
+import { retryDuePushes } from "../push.js";
 
 // Ensure we don't run two sync cycles for the same integration simultaneously.
 const inFlight = new Set();
@@ -67,6 +68,13 @@ export function stopSyncLoop() {
 }
 
 async function runAllDueSyncs(db, config) {
+  // Changes a calendar didn't take earlier, or that were still queued when
+  // the server last stopped, go out again first (push/outbox.js).
+  try {
+    retryDuePushes(db, config);
+  } catch (err) {
+    log.warn("[push] retry sweep failed:", err.message);
+  }
   const rows = db
     .prepare(`SELECT * FROM calendar_integrations WHERE status = 'active'`)
     .all();

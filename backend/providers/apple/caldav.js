@@ -12,6 +12,7 @@
  * Everything here is stateless — no module-level mutable state.
  */
 import { HttpStatusError } from "../../lib/http-status-error.js";
+import { fetchWithTimeout, readText } from "../../lib/net.js";
 
 export const ICLOUD_CALDAV_ROOT = "https://caldav.icloud.com";
 
@@ -46,7 +47,7 @@ export async function caldavRequest(ctx, method, pathOrUrl, opts = {}) {
     if (opts.body && !headers["Content-Type"]) {
       headers["Content-Type"] = "application/xml; charset=utf-8";
     }
-    const resp = await fetch(target, {
+    const resp = await fetchWithTimeout("iCloud Calendar", target, {
       method,
       headers,
       body: opts.body,
@@ -60,7 +61,9 @@ export async function caldavRequest(ctx, method, pathOrUrl, opts = {}) {
       target = loc.startsWith("http") ? loc : new URL(loc, target).toString();
       continue;
     }
-    const text = await resp.text().catch(() => "");
+    // An answer that stops arriving part-way is a failed call, not an empty
+    // calendar: read as "" it would look like "nothing changed, no cursor".
+    const text = resp.ok ? await readText("iCloud Calendar", resp) : await resp.text().catch(() => "");
     if (resp.status === 401) {
       throw new HttpStatusError("Apple Calendar rejected the credentials. Check the Apple ID and app-specific password.", 401);
     }

@@ -4,6 +4,7 @@ import { HttpError } from "./http.js";
 import { ensureDefaultPrioritiesForUser, findUserByEmail } from "./store.js";
 import { getGoogleRedirectUrl } from "./config.js";
 import { log } from "./log.js";
+import { fetchWithTimeout } from "./lib/net.js";
 
 export function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
@@ -455,7 +456,17 @@ export async function completeGoogleLogin(db, config, request, { state, code }) 
     throw new HttpError(400, "Google sign-in state is invalid or expired.", "invalid_oauth_state");
   }
 
-  const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+  // Google not answering is "try again", not a fault of ours (lib/net.js
+  // turns a silent or unreachable server into an error with a number).
+  const askGoogle = async (/** @type {string} */ url, /** @type {RequestInit} */ init) => {
+    try {
+      return await fetchWithTimeout("Google", url, init);
+    } catch (error) {
+      log.warn(`[auth] Google sign-in: ${/** @type {any} */ (error)?.message}`);
+      throw new HttpError(502, "Google sign-in didn't complete. Please try again.", "google_sign_in_failed");
+    }
+  };
+  const tokenResponse = await askGoogle("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -477,7 +488,7 @@ export async function completeGoogleLogin(db, config, request, { state, code }) 
   }
 
   const tokenData = await tokenResponse.json();
-  const userInfoResponse = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
+  const userInfoResponse = await askGoogle("https://openidconnect.googleapis.com/v1/userinfo", {
     headers: {
       Authorization: `Bearer ${tokenData.access_token}`,
     },

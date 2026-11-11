@@ -20,6 +20,7 @@
 import { withTransaction } from "../db.js";
 import { createEntityRecord, deleteEntityRecord, updateEntityRecord, validateClientInput } from "../store.js";
 import { enqueueTaskPush } from "../push.js";
+import { recentlyDeletedRecord } from "../lib/recently-deleted.js";
 import { MAX_BEFORE_MINUTES, parseReminder } from "../reminders.js";
 import { getNextRecurringDueDate } from "../lib/recurrence.js";
 import { PRIORITY_COLORS } from "../priority-color.js";
@@ -642,37 +643,9 @@ function moveTaskToRecentlyDeleted(ctx, task) {
       .get(ctx.appId, ctx.user.id, task.id, ...subtasks.map((s) => s.id))?.n || 0
   );
   const priority = loadPriorities(ctx).find((p) => p.id === task.priority_id);
-  // useDeletedTasks.recordDeletion's snapshot. Retention is the server's
-  // setting; the app uses the same number unless changed on that device.
-  const record = {
-    task_id: task.id,
-    title: task.title,
-    description: task.description || "",
-    description_json: task.description_json || "",
-    priority_id: task.priority_id || "",
-    priority_color: priority?.color || "",
-    status: task.status || "todo",
-    task_type: task.task_type || "one_time",
-    recurrence: task.recurrence || "none",
-    recurrence_days: task.recurrence_days || [],
-    recurrence_end_date: task.recurrence_end_date || "",
-    due_date: task.due_date || "",
-    task_time: task.task_time || "",
-    task_end_time: task.task_end_time || "",
-    reminder: task.reminder || "",
-    tags: task.tags || [],
-    completed_at: task.completed_at || "",
-    deleted_at: new Date().toISOString(),
-    was_completed: task.status === "done",
-    subtasks: subtasks.map((s) => ({
-      id: s.id,
-      title: s.title,
-      status: s.status || "todo",
-      due_date: s.due_date || "",
-      task_time: s.task_time || "",
-      completed_at: s.completed_at || "",
-    })),
-  };
+  // Retention is the server's setting; the app uses the same number
+  // unless changed on that device.
+  const record = recentlyDeletedRecord(task, subtasks, priority?.color);
   validateClientInput("DeletedTask", record);
   spendWrite(ctx);
   const deleted = inTransaction(ctx.db, () => {

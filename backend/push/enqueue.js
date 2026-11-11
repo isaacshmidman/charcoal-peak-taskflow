@@ -4,11 +4,12 @@
  * after Task CRUD operations:
  *   - debounce repeated upserts on the same task into a single push
  *   - deletes bypass debounce (their snapshot is already gone)
- *   - check suppression up front to break inbound→outbound loops
  *   - fan out to provider runners (Google or Apple) per-integration
+ *   - every change is written to the outbox first and removed when it has
+ *     arrived, so one that fails (or is cut off by a restart) is sent
+ *     again later instead of being lost (push/outbox.js)
  */
 import {
-  isSuppressed,
   enqueueDrain,
   debounceTimers,
   PUSH_DEBOUNCE_MS,
@@ -16,6 +17,7 @@ import {
 import { log } from "../log.js";
 import { pushOneGoogle } from "./google.js";
 import { pushOneApple } from "./apple.js";
+import { duePushes, failPush, hasCalendarToPushTo, rememberPush, settlePush } from "./outbox.js";
 
 /** @typedef {import("node:sqlite").DatabaseSync} DB */
 
@@ -33,11 +35,8 @@ import { pushOneApple } from "./apple.js";
 export function enqueueTaskPush(db, config, payload) {
   if (!config.integrationsEnabled) return;
   if (!payload || !payload.taskSnapshot) return;
-  if (isSuppressed(payload.taskSnapshot.id)) return;
-  // Tasks created by the inbound sync (source_provider!=null) only need to
-  // be echoed back if the user later edited them — but the suppression
-  // window above already covers that. We don't push events at all back to
-  // Google's read-only calendars.
+  // Items that came from a calendar the person can't write to are never
+  // sent back to it.
   if (
     payload.taskSnapshot.source_provider &&
     payload.taskSnapshot.source_writable === false
@@ -46,11 +45,30 @@ export function enqueueTaskPush(db, config, payload) {
   }
 
   const taskId = payload.taskSnapshot.id;
+  // Nobody to tell: most people have no calendar connected.
+  if (!hasCalendarToPushTo(db, payload.appId, payload.taskSnapshot.created_by_id)) return;
+  // Written down first, so it survives a failed call or a restart. If the
+  // note itself can't be written, the change still goes out the old way:
+  // saving a task must never fail over this.
+  let token;
+  try {
+    token = rememberPush(db, payload);
+  } catch (err) {
+    log.warn(`[push] couldn't note task ${taskId} in the outbox: ${err?.message || err}`);
+  }
+  const queued = { ...payload, token };
 
   // Deletes need their own queue slot — they can't be debounced into a
   // subsequent upsert because the snapshot is already gone.
   if (payload.op === "delete") {
-    enqueueDrain(() => runPush(db, config, payload));
+    const pending = debounceTimers.get(taskId);
+    if (pending) {
+      // An edit still waiting out its debounce would otherwise go out
+      // AFTER this delete and put the event back.
+      clearTimeout(pending);
+      debounceTimers.delete(taskId);
+    }
+    enqueueDrain(() => runPush(db, config, queued));
     return;
   }
 
@@ -60,14 +78,35 @@ export function enqueueTaskPush(db, config, payload) {
   if (existing) clearTimeout(existing);
   const timer = setTimeout(() => {
     debounceTimers.delete(taskId);
-    enqueueDrain(() => runPush(db, config, payload));
+    enqueueDrain(() => runPush(db, config, queued));
   }, PUSH_DEBOUNCE_MS);
   // Don't keep the process alive just for this timer.
   timer.unref?.();
   debounceTimers.set(taskId, timer);
 }
 
-async function runPush(db, config, { op, appId, taskSnapshot }) {
+/**
+ * Send again whatever is due in the outbox: changes a calendar didn't take
+ * earlier, and changes that were queued when the server last stopped.
+ * Called on every sync tick.
+ *
+ * @param {DB} db
+ * @param {import("../config.js").backendConfig} config
+ * @returns {number} how many were put back in the queue
+ */
+export function retryDuePushes(db, config) {
+  if (!config.integrationsEnabled) return 0;
+  const due = duePushes(db);
+  for (const payload of due) enqueueDrain(() => runPush(db, config, payload));
+  return due.length;
+}
+
+/**
+ * @param {DB} db
+ * @param {import("../config.js").backendConfig} config
+ * @param {{ op: "upsert" | "delete", appId: string, taskSnapshot: any, token?: string, retry?: boolean }} payload
+ */
+async function runPush(db, config, { op, appId, taskSnapshot, token, retry = false }) {
   const integrations = /** @type {any[]} */ (
     db
       .prepare(
@@ -77,7 +116,10 @@ async function runPush(db, config, { op, appId, taskSnapshot }) {
       )
       .all(appId, taskSnapshot.created_by_id || "")
   );
-  if (integrations.length === 0) return;
+  if (integrations.length === 0) {
+    settlePush(db, taskSnapshot.id, token);
+    return;
+  }
 
   // If the task already has an existing event mapping on a given integration,
   // we always keep round-tripping it on that integration (the user expects
@@ -108,19 +150,24 @@ async function runPush(db, config, { op, appId, taskSnapshot }) {
     return !!integration.is_default;
   });
 
+  /** @type {{ integrationId: string, error: unknown } | null} */
+  let failure = null;
   for (const integration of eligible) {
     try {
-      await pushOne(db, config, { op, integration, taskSnapshot });
+      await pushOne(db, config, { op, integration, taskSnapshot, retry });
     } catch (err) {
-      // Per-integration failure already logged + marked; keep going.
+      // Marked on the connection already; the other calendars still get theirs.
+      failure = failure || { integrationId: integration.id, error: err };
       log.warn(
         `[push] integration ${integration.id} task ${taskSnapshot.id}: ${err.message}`
       );
     }
   }
+  if (failure) failPush(db, { taskId: taskSnapshot.id, token, ...failure });
+  else settlePush(db, taskSnapshot.id, token);
 }
 
-async function pushOne(db, config, { op, integration, taskSnapshot }) {
+async function pushOne(db, config, { op, integration, taskSnapshot, retry }) {
   // Don't push back at calendars the user can't write to (Birthdays, Holidays,
   // shared read-only calendars). Inbound sync still imports them as 'event'-
   // kind tasks marked source_writable=false.
@@ -133,5 +180,5 @@ async function pushOne(db, config, { op, integration, taskSnapshot }) {
     await pushOneApple(db, integration, taskSnapshot, op);
     return;
   }
-  await pushOneGoogle(db, config, { op, integration, taskSnapshot });
+  await pushOneGoogle(db, config, { op, integration, taskSnapshot, retry });
 }

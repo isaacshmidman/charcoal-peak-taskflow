@@ -1,20 +1,23 @@
 // @ts-check
 /**
  * @file Google Calendar inbound sync — per-calendar event pull + map
- * to Zephyrly tasks. Calls suppressPush() before each store mutation
- * to break the inbound→outbound echo loop.
+ * to Zephyrly tasks. Writes go straight to the store, which never reaches
+ * the push hook, so nothing here is echoed back to the calendar.
  */
 import { randomUUID } from "node:crypto";
 import { listEventsIncremental } from "../providers/google-calendar.js";
 import { clearCalendarSyncToken, markCalendarSyncResult } from "../integrations.js";
-import { createEntityRecord, updateEntityRecord, deleteEntityRecord } from "../store.js";
-import { suppressPush } from "../push.js";
+import { markWindowRead, windowIsDue } from "./window.js";
+import { createEntityRecord, updateEntityRecord } from "../store.js";
+import { pushIsWaiting } from "../push.js";
 import { parseRruleValueToTaskRecurrence } from "../recurrence-rrule.js";
 import { classifyCalendarItem } from "./classify.js";
 import { log } from "../log.js";
 import {
   findZephyrlyTaskForProviderEvent,
-  mappedInputForExistingZephyrlyTask,
+  inboundUpdateFor,
+  removeTaskForCalendarDelete,
+  storedTask,
   insertExternalEventMap,
   formatYmdInTz,
   formatTaskTimeInTz,
@@ -38,28 +41,43 @@ export async function syncOneCalendar(db, config, { integration, accessToken, us
     return;
   }
 
-  for (const event of result.events) {
-    try {
-      // Skip individual recurring instances; we represent the series by
-      // its master ('recurringEventId' is set on instances).
-      if (event.recurringEventId) continue;
-      await applyEventToTasks(db, config, {
-        integration,
-        user,
-        calendarRow,
-        event,
-      });
-    } catch (err) {
-      // Keep going — one bad event shouldn't break the cycle.
-      log.warn(
-        `[sync] event ${event?.id || "?"} on integration ${integration.id}: ${err.message}`
-      );
+  const apply = async (/** @type {any[]} */ events) => {
+    for (const event of events) {
+      try {
+        // Skip individual recurring instances; we represent the series by
+        // its master ('recurringEventId' is set on instances).
+        if (event.recurringEventId) continue;
+        await applyEventToTasks(db, config, {
+          integration,
+          user,
+          calendarRow,
+          event,
+        });
+      } catch (err) {
+        // Keep going — one bad event shouldn't break the cycle.
+        log.warn(
+          `[sync] event ${event?.id || "?"} on integration ${integration.id}: ${err.message}`
+        );
+      }
     }
-  }
+  };
+  await apply(result.events);
 
   markCalendarSyncResult(db, integration.id, externalCalendarId, {
     syncToken: result.nextSyncToken || null,
   });
+
+  // With no cursor, what we just read WAS the whole window. With one, we
+  // only heard about changes, so once a day read the window as well: an
+  // event that has come within range without being touched is in it
+  // (sync/window.js).
+  if (!calendarRow.sync_token) {
+    markWindowRead(db, integration.id, externalCalendarId);
+  } else if (windowIsDue(calendarRow)) {
+    const windowed = await listEventsIncremental(accessToken, externalCalendarId, null);
+    await apply(windowed.events);
+    markWindowRead(db, integration.id, externalCalendarId);
+  }
 }
 
 /**
@@ -76,19 +94,7 @@ async function applyEventToTasks(db, config, { integration, user, calendarRow, e
   // local copy.
   if (event.status === "cancelled") {
     if (existing) {
-      // Suppress outbound echo: the upcoming delete would otherwise try to
-      // re-DELETE this event at Google, which already sent us the cancel.
-      suppressPush(existing.task_id);
-      try {
-        deleteEntityRecord(db, {
-          entityName: "Task",
-          appId: integration.app_id,
-          user,
-          id: existing.task_id,
-        });
-      } catch {
-        // Task already gone; fine.
-      }
+      removeTaskForCalendarDelete(db, config, { integration, user, taskId: existing.task_id });
       db.prepare(`DELETE FROM external_event_map WHERE id = ?`).run(existing.id);
     }
     return;
@@ -102,21 +108,27 @@ async function applyEventToTasks(db, config, { integration, user, calendarRow, e
   if (existing) {
     // Skip if etag matches — nothing changed.
     if (event.etag && existing.etag === event.etag) return;
+    // A change made here is still on its way to the calendar: what the
+    // calendar holds is the older copy, about to be replaced. Leave ours.
+    if (pushIsWaiting(db, existing.task_id)) return;
 
-    // Suppress outbound echo of the inbound change.
-    suppressPush(existing.task_id);
+    const task = storedTask(db, integration.app_id, existing.task_id);
+    if (!task) {
+      // Deleted here since. Forget the link so we stop trying; the event
+      // stays at the calendar.
+      db.prepare(`DELETE FROM external_event_map WHERE id = ?`).run(existing.id);
+      return;
+    }
     try {
       updateEntityRecord(db, {
         entityName: "Task",
         appId: integration.app_id,
         user,
         id: existing.task_id,
-        input: mapped,
+        input: inboundUpdateFor(mapped, task),
       });
     } catch (err) {
       if (/not found/i.test(err.message)) {
-        // Local task was deleted by the user. Remove the map entry so we
-        // don't keep trying to update it. Event stays on Google.
         db.prepare(`DELETE FROM external_event_map WHERE id = ?`).run(existing.id);
         return;
       }
@@ -135,13 +147,12 @@ async function applyEventToTasks(db, config, { integration, user, calendarRow, e
     taskId: googleZephyrlyTaskId(event, integration.app_id),
   });
   if (linkedTask) {
-    suppressPush(linkedTask.id);
     updateEntityRecord(db, {
       entityName: "Task",
       appId: integration.app_id,
       user,
       id: linkedTask.id,
-      input: mappedInputForExistingZephyrlyTask(mapped, linkedTask),
+      input: inboundUpdateFor(mapped, linkedTask),
     });
     insertExternalEventMap(db, {
       appId: integration.app_id,
@@ -162,10 +173,6 @@ async function applyEventToTasks(db, config, { integration, user, calendarRow, e
     input: mapped,
     config,
   });
-  // The create above didn't route through server.js so our push hook isn't
-  // fired — but suppress anyway as a belt-and-suspenders in case something
-  // else tries to echo this task right back.
-  suppressPush(task.id);
 
   db.prepare(
     `INSERT INTO external_event_map (

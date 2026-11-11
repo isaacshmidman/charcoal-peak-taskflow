@@ -162,14 +162,18 @@ describe("managing connections", () => {
 });
 
 describe("housekeeping", () => {
-  it("drops expired access tokens, exchanged refresh tokens after a day, and activity past 30 days", () => {
+  it("drops expired access tokens, refresh tokens exchanged a day ago whose answer arrived, and activity past 30 days", () => {
     const grant = createGrant(db, { appId: APP_ID, userId: ME.id, kind: "oauth", label: "Claude", canWrite: false });
     const expired = issueToken(db, { grantId: grant.id, kind: "access", ttlMs: -1 });
     const live = issueToken(db, { grantId: grant.id, kind: "access", ttlMs: 60_000 });
     const oldRefresh = issueToken(db, { grantId: grant.id, kind: "refresh", ttlMs: 60_000 });
     const freshRefresh = issueToken(db, { grantId: grant.id, kind: "refresh", ttlMs: 60_000 });
     const dayAndABitAgo = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
-    db.prepare("UPDATE ai_tokens SET used_at = ? WHERE token_hash = ?").run(dayAndABitAgo, sha256(oldRefresh));
+    db.prepare("UPDATE ai_tokens SET used_at = ?, successor_used_at = ? WHERE token_hash = ?").run(dayAndABitAgo, dayAndABitAgo, sha256(oldRefresh));
+    // Exchanged just as long ago, but nothing it was exchanged for was ever
+    // used: the app may never have got the answer, and may ask again.
+    const unanswered = issueToken(db, { grantId: grant.id, kind: "refresh", ttlMs: 60_000 });
+    db.prepare("UPDATE ai_tokens SET used_at = ? WHERE token_hash = ?").run(dayAndABitAgo, sha256(unanswered));
     db.prepare("UPDATE ai_tokens SET used_at = ? WHERE token_hash = ?").run(new Date().toISOString(), sha256(freshRefresh));
     const activity = db.prepare(
       `INSERT INTO ai_activity (id, app_id, user_id, grant_id, tool, summary, created_date) VALUES (?, ?, ?, ?, 'x', 'x', ?)`
@@ -180,7 +184,7 @@ describe("housekeeping", () => {
     purgeExpiredAiRecords(db);
 
     const left = db.prepare("SELECT token_hash FROM ai_tokens").all().map((r) => r.token_hash).sort();
-    expect(left).toEqual([sha256(live), sha256(freshRefresh)].sort());
+    expect(left).toEqual([sha256(live), sha256(freshRefresh), sha256(unanswered)].sort());
     expect(left).not.toContain(sha256(expired));
     expect(db.prepare("SELECT id FROM ai_activity").all().map((r) => r.id)).toEqual(["new"]);
   });

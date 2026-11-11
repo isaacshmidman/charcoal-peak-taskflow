@@ -196,6 +196,31 @@ AI tokens only work on `/api/mcp` and `/api/v1`; a signed-in session doesn't wor
 Code lives in `backend/ai/` (tools, grants, OAuth, MCP) and
 `backend/routes/ai.js`.
 
+### Staying connected
+
+An access token lasts an hour; the app swaps its refresh token for a new
+pair each time, and each refresh token works once. One turning up a second
+time is how a leaked token shows itself, and the answer to that is to end
+the connection. But an honest app does the same thing in two ordinary
+situations, and ending the connection for those is what made Claude drop
+out now and then until it was connected again:
+
+- **The answer never arrived.** The app asked, the server issued the new
+  pair, and the reply was lost on the way back (the tunnel dropping for a
+  moment). The app, still holding the old token, asks again. If nothing
+  from the first answer was ever used, that is what happened: the first
+  pair is cancelled and a new one issued, however much later the app asks.
+- **Two requests at once.** Several tool calls notice the expired token
+  together and each asks for a new one. A second ask within a minute of the
+  first gets its own pair.
+
+Anything else (the old token again, more than a minute after the app has
+started using the new ones) still ends the connection. The same goes for
+the one-time sign-in code: the app it was issued to (it holds the PKCE
+verifier) may trade it again if nothing from the first trade was used.
+`backend/ai/oauth.js` has the reasoning; the tests are under "Sign in with
+Zephyrly" in `backend/server.test.js`.
+
 ### When something goes wrong
 
 - **401 `ai_token_required`**: the token is wrong, revoked, or an access

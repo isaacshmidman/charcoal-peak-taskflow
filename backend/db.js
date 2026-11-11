@@ -365,6 +365,28 @@ export function createDatabase(config = backendConfig) {
       PRIMARY KEY (app_id, user_id, entity, create_key)
     );
 
+    -- Changes on their way to a connected calendar (backend/push/outbox.js).
+    -- A row is written when a task changes and removed when every calendar
+    -- has it. A change a calendar didn't take stays here and is tried again
+    -- later, so a calendar being down, or the server restarting, doesn't
+    -- quietly leave the calendar showing the old thing. One row per task:
+    -- a newer change replaces an older one that hadn't gone out yet.
+    CREATE TABLE IF NOT EXISTS push_outbox (
+      task_id TEXT PRIMARY KEY,
+      app_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      op TEXT NOT NULL,                  -- 'upsert' | 'delete'
+      snapshot_json TEXT NOT NULL,       -- the task as it was when queued
+      token TEXT NOT NULL,               -- which queueing this row belongs to
+      attempts INTEGER NOT NULL DEFAULT 0,
+      next_attempt_at TEXT NOT NULL,
+      last_error TEXT,
+      failed_integration_id TEXT,        -- the calendar that last refused it
+      created_date TEXT NOT NULL,
+      updated_date TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_push_outbox_due ON push_outbox(next_attempt_at);
+
     -- AI apps (backend/ai/). A grant is one connected app for one user —
     -- a personal token, or later an OAuth sign-in. can_write is read on
     -- every request, so changing it in Settings takes effect at once.
@@ -391,7 +413,7 @@ export function createDatabase(config = backendConfig) {
       kind TEXT NOT NULL,                -- 'personal' | 'access' | 'refresh'
       expires_at TEXT,                   -- NULL: until revoked
       created_date TEXT NOT NULL,
-      used_at TEXT                       -- refresh: when it was exchanged
+      used_at TEXT                       -- refresh: when it was exchanged; access: when first used
     );
     CREATE INDEX IF NOT EXISTS idx_ai_tokens_grant ON ai_tokens(grant_id);
 
@@ -489,6 +511,25 @@ export function createDatabase(config = backendConfig) {
   );
   try {
     db.exec(`ALTER TABLE external_event_map ADD COLUMN zephyrly_metadata_synced_at TEXT`);
+  } catch {
+    // Column already exists — ignore
+  }
+  // AI tokens: which refresh token (or sign-in code) a token came from, and
+  // whether anything that came from a refresh token was ever used. Together
+  // they tell an app repeating a request whose answer it never got from a
+  // token that has leaked (backend/ai/oauth.js).
+  for (const column of ["parent_hash TEXT", "successor_used_at TEXT"]) {
+    try {
+      db.exec(`ALTER TABLE ai_tokens ADD COLUMN ${column}`);
+    } catch {
+      // Column already exists — ignore
+    }
+  }
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_ai_tokens_parent ON ai_tokens(parent_hash)`);
+  // When this calendar's whole 30-days-back, 90-days-ahead window was last
+  // read (sync/window.js). The usual sync only hears about changes.
+  try {
+    db.exec(`ALTER TABLE integration_calendars ADD COLUMN window_listed_at TEXT`);
   } catch {
     // Column already exists — ignore
   }

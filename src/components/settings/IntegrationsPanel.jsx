@@ -7,17 +7,12 @@ import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { Loader2, AlertTriangle, Settings2, X, Star } from "lucide-react";
 import ConfigureCalendarsModal from "./ConfigureCalendarsModal";
 import ConnectAppleModal from "./ConnectAppleModal";
+import { integrationNotices, providerLabel } from "@/lib/integrationNotices";
 
 const PROVIDERS = [
   { id: "google", label: "Google Calendar" },
   { id: "apple", label: "Apple Calendar" },
 ];
-
-function providerLabel(p) {
-  if (p === "google") return "Google Calendar";
-  if (p === "apple") return "iCloud Calendar";
-  return p;
-}
 
 function ConnectedRow({
   integration,
@@ -102,14 +97,19 @@ function ConnectedRow({
           Make default
         </Button>
       )}
-      {integration.status === "needs_reauth" && (
-        <p className="inline-flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-300 pt-0.5">
-          <AlertTriangle className="w-3 h-3" /> Needs reauth — reconnect to resume syncing.
+      {/* What's wrong, if anything, in words that say what to do about it
+          (src/lib/integrationNotices.js). The server's own error text is for
+          the log. */}
+      {integrationNotices(integration).map((notice) => (
+        <p
+          key={notice.kind}
+          data-testid={`integration-notice-${notice.kind}`}
+          className="flex items-start gap-1 pt-0.5 text-[11px] leading-snug text-amber-600 dark:text-amber-300"
+        >
+          {notice.kind === "reconnect" && <AlertTriangle className="mt-px h-3 w-3 shrink-0" />}
+          <span>{notice.text}</span>
         </p>
-      )}
-      {integration.last_error && (
-        <p className="text-[11px] text-amber-600 dark:text-amber-300 pt-0.5">{integration.last_error}</p>
-      )}
+      ))}
     </div>
   );
 }

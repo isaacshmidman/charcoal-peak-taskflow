@@ -20,6 +20,21 @@ export function markPushError(db, integrationId, err) {
 }
 
 /**
+ * Note the failure on the connection and hand the error back, to be thrown:
+ * the queue needs to know the change didn't arrive, so it can keep it and
+ * try again (push/outbox.js).
+ *
+ * @param {DB} db
+ * @param {string} integrationId
+ * @param {unknown} err
+ * @returns {Error}
+ */
+export function pushFailed(db, integrationId, err) {
+  markPushError(db, integrationId, err);
+  return err instanceof Error ? err : new Error(String(err || "push_failed"));
+}
+
+/**
  * @param {DB} db
  * @param {string} integrationId
  */
@@ -33,8 +48,10 @@ export function markPushOk(db, integrationId) {
 
 /**
  * Run an async fn with up to 2 retries on 429 / 5xx, with exponential
- * backoff. Anything else (4xx, network errors) propagates immediately so
- * the caller can mark the integration's last_error.
+ * backoff: the provider answered, and said "not now". Everything else
+ * propagates at once, a provider that couldn't be reached included (asking
+ * again immediately would only hold the queue up); the outbox tries the
+ * change again later.
  *
  * @template T
  * @param {() => Promise<T>} fn
@@ -47,7 +64,7 @@ export async function withRetry(fn) {
       return await fn();
     } catch (err) {
       const status = /** @type {any} */ (err)?.statusCode;
-      const retryable = status === 429 || (status >= 500 && status < 600);
+      const retryable = !(/** @type {any} */ (err)?.unreachable) && (status === 429 || (status >= 500 && status < 600));
       if (!retryable || attempt >= 2) throw err;
       const delay = 500 * Math.pow(2, attempt) + Math.random() * 200;
       await new Promise((r) => {

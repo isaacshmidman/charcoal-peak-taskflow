@@ -13,6 +13,7 @@ import { closeDatabase, createDatabase } from "./db.js";
 import { readZip } from "./test-support/readZip.js";
 import { createRequestHandler } from "./server.js";
 import { resetRateLimits } from "./ai/rate-limit.js";
+import { purgeExpiredAiRecords } from "./ai/grants.js";
 import { allTools } from "./ai/tools.js";
 import { changeEnd, newSchedule } from "./lib/schedule.js";
 import { createRequestHandler as makeHandler } from "./server.js";
@@ -2443,27 +2444,111 @@ describe("Sign in with Zephyrly (OAuth for AI apps)", () => {
     const u = await signIn("oauth-code3@example.com");
     expect((await trade(u, { redirect_uri: "https://claude.ai/other" })).body.error).toBe("invalid_grant");
 
+    // Once the app has used what the code gave it, the code turning up
+    // again is somebody else.
     const v = await signIn("oauth-code4@example.com");
     const first = await trade(v);
     expect(first.statusCode).toBe(200);
+    expect((await mcpList(first.body.access_token)).statusCode).toBe(200);
     const replay = await trade(v);
     expect(replay.body.error).toBe("invalid_grant");
     expect((await mcpList(first.body.access_token)).statusCode).toBe(401);
   });
 
-  it("refresh tokens rotate, and a reused one disconnects the app", async () => {
+  it("a code whose answer never arrived can be traded again by the same app, and only by it", async () => {
+    const s = await signIn("oauth-code-lost@example.com");
+    const lost = await trade(s);
+    expect(lost.statusCode).toBe(200);
+    // The app never saw that answer, so it asks again.
+    const again = await trade(s);
+    expect(again.statusCode).toBe(200);
+    expect(again.body.access_token).not.toBe(lost.body.access_token);
+    // Only one set of tokens exists: the lost ones were cancelled.
+    expect((await mcpList(lost.body.access_token)).statusCode).toBe(401);
+    expect((await mcpList(again.body.access_token)).statusCode).toBe(200);
+    expect((await session(s.person)("GET", "/ai/grants")).body.grants).toHaveLength(1);
+
+    // Without the verifier, the same code is still a replay.
+    const t = await signIn("oauth-code-lost2@example.com");
+    const firstT = await trade(t);
+    expect((await trade(t, { code_verifier: pkce().verifier })).body.error).toBe("invalid_grant");
+    expect((await mcpList(firstT.body.access_token)).statusCode).toBe(401);
+  });
+
+  const refresh = (s, token) =>
+    form("/api/oauth/token", { grant_type: "refresh_token", refresh_token: token, client_id: s.client.client_id });
+  /** Make every exchange so far look as if it happened `minutes` ago. */
+  const ageExchanges = (minutes) =>
+    db.prepare(`UPDATE ai_tokens SET used_at = ? WHERE kind = 'refresh' AND used_at IS NOT NULL`).run(
+      new Date(Date.now() - minutes * 60_000).toISOString()
+    );
+
+  it("refresh tokens rotate, and an old one turning up after the new ones are in use disconnects the app", async () => {
     const s = await signIn("oauth-refresh@example.com", { canWrite: true });
     const first = (await trade(s)).body;
     expect(first.scope).toBe("tasks.read tasks.write");
-    const second = await form("/api/oauth/token", { grant_type: "refresh_token", refresh_token: first.refresh_token, client_id: s.client.client_id });
+    const second = await refresh(s, first.refresh_token);
     expect(second.statusCode).toBe(200);
     expect(second.body.refresh_token).not.toBe(first.refresh_token);
     expect((await mcpList(second.body.access_token)).statusCode).toBe(200);
 
-    const stolen = await form("/api/oauth/token", { grant_type: "refresh_token", refresh_token: first.refresh_token, client_id: s.client.client_id });
+    ageExchanges(5);
+    const stolen = await refresh(s, first.refresh_token);
     expect(stolen.body.error).toBe("invalid_grant");
     expect((await mcpList(second.body.access_token)).statusCode).toBe(401);
     expect((await session(s.person)("GET", "/ai/grants")).body.grants).toEqual([]);
+  });
+
+  it("an app whose refresh answer never arrived can ask again, however much later, and stays connected", async () => {
+    const s = await signIn("oauth-refresh-lost@example.com");
+    const first = (await trade(s)).body;
+    expect((await mcpList(first.access_token)).statusCode).toBe(200);
+    // The answer to this one is lost on the way back.
+    const lost = await refresh(s, first.refresh_token);
+    expect(lost.statusCode).toBe(200);
+
+    ageExchanges(6 * 60);
+    purgeExpiredAiRecords(db);
+    const again = await refresh(s, first.refresh_token);
+    expect(again.statusCode).toBe(200);
+    expect((await mcpList(again.body.access_token)).statusCode).toBe(200);
+    // What was lost is cancelled, so it's no use to anyone who finds it.
+    expect((await mcpList(lost.body.access_token)).statusCode).toBe(401);
+    expect((await refresh(s, lost.body.refresh_token)).body.error).toBe("invalid_grant");
+    expect((await session(s.person)("GET", "/ai/grants")).body.grants).toHaveLength(1);
+
+    // From here on the app has its tokens, so the old one is finished.
+    ageExchanges(5);
+    expect((await refresh(s, first.refresh_token)).body.error).toBe("invalid_grant");
+    expect((await mcpList(again.body.access_token)).statusCode).toBe(401);
+  });
+
+  it("two requests refreshing at the same moment both get tokens that work", async () => {
+    const s = await signIn("oauth-refresh-twice@example.com");
+    const first = (await trade(s)).body;
+    const one = await refresh(s, first.refresh_token);
+    expect((await mcpList(one.body.access_token)).statusCode).toBe(200);
+    const two = await refresh(s, first.refresh_token);
+    expect(two.statusCode).toBe(200);
+    expect((await mcpList(one.body.access_token)).statusCode).toBe(200);
+    expect((await mcpList(two.body.access_token)).statusCode).toBe(200);
+    // Each line carries on by itself.
+    expect((await refresh(s, one.body.refresh_token)).statusCode).toBe(200);
+    expect((await refresh(s, two.body.refresh_token)).statusCode).toBe(200);
+  });
+
+  it("keeps an exchanged refresh token for a day once its answer is known to have arrived, and longer when it isn't", async () => {
+    const s = await signIn("oauth-refresh-purge@example.com");
+    const first = (await trade(s)).body;
+    const second = (await refresh(s, first.refresh_token)).body;
+    const firstHash = createHash("sha256").update(first.refresh_token).digest("hex");
+    const count = () => Number(db.prepare(`SELECT COUNT(*) AS n FROM ai_tokens WHERE token_hash = ?`).get(firstHash).n);
+    ageExchanges(25 * 60);
+    purgeExpiredAiRecords(db);
+    expect(count()).toBe(1);
+    await mcpList(second.access_token);
+    purgeExpiredAiRecords(db);
+    expect(count()).toBe(0);
   });
 
   it("signing the same app in again updates its one connection", async () => {

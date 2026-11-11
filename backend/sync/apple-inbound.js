@@ -7,6 +7,7 @@
 import { randomUUID } from "node:crypto";
 import {
   listEventsIncremental as listAppleEventsIncremental,
+  listEventsInWindow as listAppleEventsInWindow,
   parseVEvent,
   mapVEventToTaskInput,
 } from "../providers/apple-calendar.js";
@@ -18,12 +19,16 @@ import {
   clearCalendarSyncToken,
 } from "../integrations.js";
 import { buildUserForSync } from "../sync-user.js";
-import { createEntityRecord, updateEntityRecord, deleteEntityRecord } from "../store.js";
-import { suppressPush } from "../push.js";
+import { createEntityRecord, updateEntityRecord } from "../store.js";
+import { pushIsWaiting } from "../push.js";
 import { log } from "../log.js";
+import { markWindowRead, windowIsDue } from "./window.js";
 import {
   findZephyrlyTaskForProviderEvent,
-  mappedInputForExistingZephyrlyTask,
+  inboundUpdateFor,
+  markSyncOutcome,
+  removeTaskForCalendarDelete,
+  storedTask,
   insertExternalEventMap,
 } from "./shared.js";
 
@@ -65,6 +70,8 @@ export async function syncAppleIntegration(db, config, integrationRow) {
     throw err;
   }
 
+  let failed = 0;
+  let firstError = "";
   for (const cal of calendars) {
     try {
       await syncOneAppleCalendar(db, config, {
@@ -74,6 +81,8 @@ export async function syncAppleIntegration(db, config, integrationRow) {
         calendarRow: cal,
       });
     } catch (err) {
+      failed += 1;
+      firstError = firstError || String(err.message || "sync failed");
       markCalendarSyncResult(db, integrationRow.id, cal.external_calendar_id, {
         error: err.message,
       });
@@ -83,7 +92,7 @@ export async function syncAppleIntegration(db, config, integrationRow) {
     }
   }
 
-  markSyncResult(db, integrationRow.id, {});
+  markSyncOutcome(db, integrationRow.id, { calendars: calendars.length, failed, firstError });
 }
 
 async function syncOneAppleCalendar(db, config, { integration, creds, user, calendarRow }) {
@@ -95,24 +104,36 @@ async function syncOneAppleCalendar(db, config, { integration, creds, user, cale
     return;
   }
 
-  for (const change of result.changes) {
-    try {
-      await applyAppleChangeToTasks(db, config, {
-        integration,
-        user,
-        calendarRow,
-        change,
-      });
-    } catch (err) {
-      log.warn(
-        `[sync] apple event ${change.href || "?"} on integration ${integration.id}: ${err.message}`
-      );
+  const apply = async (/** @type {Array<{ href: string, etag: string, ics: string, deleted: boolean }>} */ changes) => {
+    for (const change of changes) {
+      try {
+        await applyAppleChangeToTasks(db, config, {
+          integration,
+          user,
+          calendarRow,
+          change,
+        });
+      } catch (err) {
+        log.warn(
+          `[sync] apple event ${change.href || "?"} on integration ${integration.id}: ${err.message}`
+        );
+      }
     }
-  }
+  };
+  await apply(result.changes);
 
   markCalendarSyncResult(db, integration.id, externalCalendarId, {
     syncToken: result.nextSyncToken || null,
   });
+
+  // As for Google (sync/window.js): once a day, read the whole window too.
+  if (!calendarRow.sync_token) {
+    markWindowRead(db, integration.id, externalCalendarId);
+  } else if (windowIsDue(calendarRow)) {
+    const windowed = await listAppleEventsInWindow(creds, externalCalendarId);
+    await apply(windowed);
+    markWindowRead(db, integration.id, externalCalendarId);
+  }
 }
 
 /**
@@ -138,17 +159,7 @@ async function applyAppleChangeToTasks(db, config, { integration, user, calendar
 
   if (change.deleted) {
     if (existing) {
-      suppressPush(existing.task_id);
-      try {
-        deleteEntityRecord(db, {
-          entityName: "Task",
-          appId: integration.app_id,
-          user,
-          id: existing.task_id,
-        });
-      } catch {
-        // already gone
-      }
+      removeTaskForCalendarDelete(db, config, { integration, user, taskId: existing.task_id });
       db.prepare(`DELETE FROM external_event_map WHERE id = ?`).run(existing.id);
     }
     return;
@@ -161,17 +172,7 @@ async function applyAppleChangeToTasks(db, config, { integration, user, calendar
   if (ev.recurrenceId) return;
   if (ev.status === "CANCELLED") {
     if (existing) {
-      suppressPush(existing.task_id);
-      try {
-        deleteEntityRecord(db, {
-          entityName: "Task",
-          appId: integration.app_id,
-          user,
-          id: existing.task_id,
-        });
-      } catch {
-        // already gone
-      }
+      removeTaskForCalendarDelete(db, config, { integration, user, taskId: existing.task_id });
       db.prepare(`DELETE FROM external_event_map WHERE id = ?`).run(existing.id);
     }
     return;
@@ -184,14 +185,23 @@ async function applyAppleChangeToTasks(db, config, { integration, user, calendar
 
   if (existing) {
     if (change.etag && existing.etag === change.etag) return;
-    suppressPush(existing.task_id);
+    // A change made here is still on its way to the calendar: what the
+    // calendar holds is the older copy, about to be replaced. Leave ours.
+    if (pushIsWaiting(db, existing.task_id)) return;
+    const task = storedTask(db, integration.app_id, existing.task_id);
+    if (!task) {
+      // Deleted here since. Forget the link so we stop trying; the event
+      // stays at the calendar.
+      db.prepare(`DELETE FROM external_event_map WHERE id = ?`).run(existing.id);
+      return;
+    }
     try {
       updateEntityRecord(db, {
         entityName: "Task",
         appId: integration.app_id,
         user,
         id: existing.task_id,
-        input: mapped,
+        input: inboundUpdateFor(mapped, task),
       });
     } catch (err) {
       if (/not found/i.test(err.message)) {
@@ -212,13 +222,12 @@ async function applyAppleChangeToTasks(db, config, { integration, user, calendar
     taskId: appleZephyrlyTaskId(ev.uid),
   });
   if (linkedTask) {
-    suppressPush(linkedTask.id);
     updateEntityRecord(db, {
       entityName: "Task",
       appId: integration.app_id,
       user,
       id: linkedTask.id,
-      input: mappedInputForExistingZephyrlyTask(mapped, linkedTask),
+      input: inboundUpdateFor(mapped, linkedTask),
     });
     insertExternalEventMap(db, {
       appId: integration.app_id,
@@ -239,7 +248,6 @@ async function applyAppleChangeToTasks(db, config, { integration, user, calendar
     input: mapped,
     config,
   });
-  suppressPush(task.id);
 
   // Stash the VEVENT UID alongside the href so push.js can rebuild PUT
   // bodies that match what iCloud expects on update.

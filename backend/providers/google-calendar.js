@@ -24,6 +24,11 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { getGoogleCalendarRedirectUrl } from "../config.js";
 import { HttpStatusError } from "../lib/http-status-error.js";
+import { fetchWithTimeout, readJson } from "../lib/net.js";
+
+const GOOGLE = "Google Calendar";
+/** Every call to Google goes through here, so none can hang (lib/net.js). */
+const call = (/** @type {string | URL} */ url, /** @type {RequestInit} */ init = {}) => fetchWithTimeout(GOOGLE, url, init);
 
 const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events";
 const CALENDAR_META_SCOPE = "https://www.googleapis.com/auth/calendar.calendars.readonly";
@@ -99,7 +104,7 @@ export function buildAuthUrl(config, { userId, appId, fromUrl }) {
  * }>}
  */
 export async function exchangeCode(config, { code, codeVerifier }) {
-  const resp = await fetch(TOKEN_URL, {
+  const resp = await call(TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -117,7 +122,7 @@ export async function exchangeCode(config, { code, codeVerifier }) {
     throw new Error(`Google token exchange failed (${resp.status}): ${redact(body)}`);
   }
 
-  const data = await resp.json();
+  const data = await readJson(GOOGLE, resp);
   if (!data.access_token) throw new Error("Google token response missing access_token");
 
   const scope = String(data.scope || "");
@@ -133,14 +138,14 @@ export async function exchangeCode(config, { code, codeVerifier }) {
   const expiresAt = new Date(Date.now() + Number(data.expires_in || 3600) * 1000).toISOString();
 
   // Look up identity (sub + email) so we can name the connection in Settings.
-  const userResp = await fetch(USERINFO_URL, {
+  const userResp = await call(USERINFO_URL, {
     headers: { Authorization: `Bearer ${data.access_token}` },
   });
   if (!userResp.ok) {
     const body = await userResp.text().catch(() => "");
     throw new Error(`Google userinfo failed (${userResp.status}): ${redact(body)}`);
   }
-  const userInfo = await userResp.json();
+  const userInfo = await readJson(GOOGLE, userResp);
 
   return {
     accessToken: data.access_token,
@@ -163,7 +168,7 @@ export async function exchangeCode(config, { code, codeVerifier }) {
  * @returns {Promise<{ accessToken: string, expiresAt: string, refreshToken: string | null }>}
  */
 export async function refreshAccessToken(config, refreshToken) {
-  const resp = await fetch(TOKEN_URL, {
+  const resp = await call(TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -181,7 +186,7 @@ export async function refreshAccessToken(config, refreshToken) {
     throw new HttpStatusError(`Google refresh failed (${resp.status}): ${redact(body)}`, resp.status);
   }
 
-  const data = await resp.json();
+  const data = await readJson(GOOGLE, resp);
   if (!data.access_token) throw new Error("Refresh response missing access_token");
 
   return {
@@ -202,7 +207,7 @@ export async function refreshAccessToken(config, refreshToken) {
 export async function revokeToken(token) {
   if (!token) return;
   try {
-    await fetch(REVOKE_URL, {
+    await call(REVOKE_URL, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ token }),
@@ -252,7 +257,7 @@ export async function listEventsIncremental(accessToken, calendarId, syncToken) 
     }
     if (pageToken) url.searchParams.set("pageToken", pageToken);
 
-    const resp = await fetch(url.toString(), {
+    const resp = await call(url.toString(), {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
 
@@ -265,7 +270,7 @@ export async function listEventsIncremental(accessToken, calendarId, syncToken) 
       throw new HttpStatusError(`Google events list failed (${resp.status}): ${redact(body)}`, resp.status);
     }
 
-    const data = await resp.json();
+    const data = await readJson(GOOGLE, resp);
     if (Array.isArray(data.items)) events.push(...data.items);
     pageToken = data.nextPageToken || null;
     if (data.nextSyncToken) nextSyncToken = data.nextSyncToken;
@@ -286,12 +291,12 @@ export async function listEventsIncremental(accessToken, calendarId, syncToken) 
  */
 export async function getCalendarMeta(accessToken, calendarId = "primary") {
   const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}`;
-  const resp = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+  const resp = await call(url, { headers: { Authorization: `Bearer ${accessToken}` } });
   if (!resp.ok) {
     const body = await resp.text().catch(() => "");
     throw new HttpStatusError(`Google calendar meta failed (${resp.status}): ${redact(body)}`, resp.status);
   }
-  const data = await resp.json();
+  const data = await readJson(GOOGLE, resp);
   return {
     id: String(data.id || calendarId),
     timeZone: String(data.timeZone || "UTC"),
@@ -317,12 +322,12 @@ export async function getCalendarMeta(accessToken, calendarId = "primary") {
  */
 export async function listCalendarList(accessToken) {
   const url = "https://www.googleapis.com/calendar/v3/users/me/calendarList?showHidden=true";
-  const resp = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+  const resp = await call(url, { headers: { Authorization: `Bearer ${accessToken}` } });
   if (!resp.ok) {
     const body = await resp.text().catch(() => "");
     throw new HttpStatusError(`Google calendarList failed (${resp.status}): ${redact(body)}`, resp.status);
   }
-  const data = await resp.json();
+  const data = await readJson(GOOGLE, resp);
   const items = Array.isArray(data.items) ? data.items : [];
   return items.map((c) => ({
     id: String(c.id || ""),
@@ -360,7 +365,7 @@ export async function setCalendarColor(accessToken, calendarId, hex) {
     throw err;
   }
   const url = `https://www.googleapis.com/calendar/v3/users/me/calendarList/${encodeURIComponent(calendarId)}?colorRgbFormat=true`;
-  const resp = await fetch(url, {
+  const resp = await call(url, {
     method: "PATCH",
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -389,7 +394,7 @@ export async function setCalendarColor(accessToken, calendarId, hex) {
  */
 export async function getEvent(accessToken, calendarId, eventId) {
   const url = `${EVENTS_URL(calendarId)}/${encodeURIComponent(eventId)}`;
-  const resp = await fetch(url, {
+  const resp = await call(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (resp.status === 404 || resp.status === 410) {
@@ -399,8 +404,35 @@ export async function getEvent(accessToken, calendarId, eventId) {
     const body = await resp.text().catch(() => "");
     throw new HttpStatusError(`Google event fetch failed (${resp.status}): ${redact(body)}`, resp.status);
   }
-  const data = await resp.json();
+  const data = await readJson(GOOGLE, resp);
   return { ...data, status: resp.status };
+}
+
+/**
+ * The event Zephyrly made for a task, found by the task id every such event
+ * carries (extendedProperties.private.zephyrlyTaskId). Null when there is
+ * none. Used before a second try at creating one, so a first try whose
+ * answer was lost doesn't end in two events.
+ *
+ * @param {string} accessToken
+ * @param {string} calendarId
+ * @param {string} taskId
+ * @returns {Promise<{ id: string, etag: string } | null>}
+ */
+export async function findEventForTask(accessToken, calendarId, taskId) {
+  const url = new URL(EVENTS_URL(calendarId));
+  url.searchParams.set("privateExtendedProperty", `zephyrlyTaskId=${taskId}`);
+  url.searchParams.set("singleEvents", "false");
+  url.searchParams.set("maxResults", "5");
+  const resp = await call(url.toString(), { headers: { Authorization: `Bearer ${accessToken}` } });
+  if (resp.status === 404 || resp.status === 410) return null;
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => "");
+    throw new HttpStatusError(`Google event lookup failed (${resp.status}): ${redact(body)}`, resp.status);
+  }
+  const data = await readJson(GOOGLE, resp);
+  const event = (Array.isArray(data.items) ? data.items : []).find((item) => item && item.id && item.status !== "cancelled");
+  return event ? { id: String(event.id), etag: String(event.etag || "") } : null;
 }
 
 /**
@@ -412,7 +444,7 @@ export async function getEvent(accessToken, calendarId, eventId) {
  * @returns {Promise<{ id: string, etag: string }>}
  */
 export async function createEvent(accessToken, calendarId, eventBody) {
-  const resp = await fetch(EVENTS_URL(calendarId), {
+  const resp = await call(EVENTS_URL(calendarId), {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -424,7 +456,7 @@ export async function createEvent(accessToken, calendarId, eventBody) {
     const body = await resp.text().catch(() => "");
     throw new HttpStatusError(`Google event create failed (${resp.status}): ${redact(body)}`, resp.status);
   }
-  const data = await resp.json();
+  const data = await readJson(GOOGLE, resp);
   return { id: String(data.id), etag: String(data.etag || "") };
 }
 
@@ -447,7 +479,7 @@ export async function updateEvent(accessToken, calendarId, eventId, patch, etag)
     "Content-Type": "application/json",
   };
   if (etag) headers["If-Match"] = etag;
-  const resp = await fetch(url, {
+  const resp = await call(url, {
     method: "PATCH",
     headers,
     body: JSON.stringify(patch),
@@ -465,7 +497,7 @@ export async function updateEvent(accessToken, calendarId, eventId, patch, etag)
     const body = await resp.text().catch(() => "");
     throw new HttpStatusError(`Google event update failed (${resp.status}): ${redact(body)}`, resp.status);
   }
-  const data = await resp.json();
+  const data = await readJson(GOOGLE, resp);
   return { id: String(data.id), etag: String(data.etag || ""), status: 200 };
 }
 
@@ -478,7 +510,7 @@ export async function updateEvent(accessToken, calendarId, eventId, patch, etag)
  */
 export async function deleteEvent(accessToken, calendarId, eventId) {
   const url = `${EVENTS_URL(calendarId)}/${encodeURIComponent(eventId)}`;
-  const resp = await fetch(url, {
+  const resp = await call(url, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${accessToken}` },
   });

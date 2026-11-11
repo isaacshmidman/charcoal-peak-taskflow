@@ -14,7 +14,7 @@ import {
 import { taskToRruleLine } from "../recurrence-rrule.js";
 import { lookupPriorityColor, colorNameToHex } from "../priority-color.js";
 import { parseTaskTime, addOneDay } from "./shape.js";
-import { markPushError, markPushOk, withRetry, isCalendarSyncDisabled } from "./errors.js";
+import { pushFailed, markPushOk, withRetry, isCalendarSyncDisabled } from "./errors.js";
 
 /** @typedef {import("node:sqlite").DatabaseSync} DB */
 
@@ -54,8 +54,7 @@ export async function pushOneApple(db, integration, taskSnapshot, op) {
   try {
     creds = getAppleCredentials(db, integration);
   } catch (err) {
-    markPushError(db, integration.id, err);
-    return;
+    throw pushFailed(db, integration.id, err);
   }
 
   if (op === "delete") {
@@ -63,8 +62,7 @@ export async function pushOneApple(db, integration, taskSnapshot, op) {
     try {
       await withRetry(() => deleteAppleEvent(creds, mapRow.external_event_id, mapRow.etag || undefined));
     } catch (err) {
-      markPushError(db, integration.id, err);
-      return;
+      throw pushFailed(db, integration.id, err);
     }
     db.prepare(`DELETE FROM external_event_map WHERE id = ?`).run(mapRow.id);
     markPushOk(db, integration.id);
@@ -77,8 +75,7 @@ export async function pushOneApple(db, integration, taskSnapshot, op) {
     try {
       await withRetry(() => deleteAppleEvent(creds, mapRow.external_event_id, mapRow.etag || undefined));
     } catch (err) {
-      markPushError(db, integration.id, err);
-      return;
+      throw pushFailed(db, integration.id, err);
     }
     db.prepare(`DELETE FROM external_event_map WHERE id = ?`).run(mapRow.id);
     markPushOk(db, integration.id);
@@ -124,8 +121,7 @@ export async function pushOneApple(db, integration, taskSnapshot, op) {
   try {
     result = await withRetry(() => putAppleEvent(creds, href, ics, mapRow?.etag || undefined));
   } catch (err) {
-    markPushError(db, integration.id, err);
-    return;
+    throw pushFailed(db, integration.id, err);
   }
 
   const now = new Date().toISOString();
