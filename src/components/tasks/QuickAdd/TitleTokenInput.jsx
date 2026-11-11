@@ -58,7 +58,10 @@ export default function TitleTokenInput({
       <textarea
         ref={inputRef}
         rows={1}
-        placeholder={placeholder}
+        // A thin space leads the hint. Without it the hint's first letter
+        // starts exactly where the caret blinks, and at this size the
+        // caret sits on top of the letter's first stroke.
+        placeholder={`\u2009${placeholder}`}
         aria-label="Title"
         value={value}
         autoFocus={autoFocus}
