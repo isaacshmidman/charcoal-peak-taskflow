@@ -110,6 +110,11 @@ export default function ShortcutsHelp({ open, onOpenChange }) {
             </p>
           </Section>
 
+          <Section title="Groupings">
+            <Row keys={["d"]} label="Board by date" />
+            <Row keys={["t"]} label="Board by tag" />
+          </Section>
+
           <Section title="Calendar">
             <Row keys={["d"]} label="Day view" />
             <Row keys={["w"]} label="Week view" />

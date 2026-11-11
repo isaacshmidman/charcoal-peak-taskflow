@@ -29,6 +29,7 @@ export const SHORTCUT_EVENTS = {
   calendarToday: "shortcut:calendar-today",
   calendarStep: "shortcut:calendar-step",   // detail: -1 | 1
   calendarSync: "shortcut:calendar-sync",
+  groupingsView: "shortcut:groupings-view", // detail: "date"|"tag"
 };
 
 /** `g` + letter → route. Gmail/Linear-style "go to" sequences. */

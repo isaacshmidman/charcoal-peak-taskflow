@@ -138,6 +138,15 @@ export function useGlobalShortcuts() {
         return;
       }
 
+      // ── Groupings-page-only keys: which board ──
+      if (pathRef.current === "/Groupings") {
+        const lower = key.toLowerCase?.() ?? key;
+        if (lower === "d" || lower === "t") {
+          emitShortcut(SHORTCUT_EVENTS.groupingsView, lower === "d" ? "date" : "tag");
+          return;
+        }
+      }
+
       // ── calendar-page-only keys ──
       if (pathRef.current === "/Calendar") {
         const view = CALENDAR_VIEW_KEYS[key.toLowerCase?.() ?? key];

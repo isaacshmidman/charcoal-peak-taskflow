@@ -1028,3 +1028,56 @@ test("undoing a delete brings the task back with its files", async ({ page }) =>
   await expect(page.getByRole("listitem").filter({ hasText: "Find the W-2" })).toContainText("1 file");
   await expect(page.getByRole("listitem").filter({ hasText: "in Recently Deleted" })).toHaveCount(0);
 });
+
+test("groupings: the page itself never scrolls, a sideways swipe always moves the board, and d / t switch boards", async ({ page }) => {
+  // Enough overdue tasks that the Past column is far taller than the
+  // screen, and enough columns that the board is wider than it.
+  const tasks = Array.from({ length: 60 }, (_, i) => ({
+    id: `grouped-${i}`,
+    title: `Grouped task ${i}`,
+    description: "",
+    priority_id: defaultPriority.id,
+    status: "todo",
+    task_type: "one_time",
+    recurrence: "none",
+    due_date: formatDateOffset(i < 50 ? -3 - (i % 20) : i - 50),
+    task_time: "",
+    tags: i % 2 ? ["home"] : ["work"],
+    completed_at: "",
+  }));
+  await installMockBackend(page, { tasks, priorities: [defaultPriority] });
+  await page.setViewportSize({ width: 900, height: 640 });
+  await page.goto("/Groupings");
+
+  const board = page.getByTestId("groupings-board");
+  const past = page.getByTestId("group-past");
+  await expect(past).toBeVisible();
+
+  // The page is exactly the screen: nothing to scroll but the columns.
+  const pageOverflow = () => page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight);
+  expect(await pageOverflow()).toBe(0);
+  const pastBox = (await past.boundingBox())!;
+  expect(pastBox.y + pastBox.height).toBeLessThanOrEqual(640);
+
+  // Up and down over a column scrolls that column, and only it.
+  const list = past.locator("> div");
+  await page.mouse.move(pastBox.x + pastBox.width / 2, pastBox.y + 160);
+  await page.mouse.wheel(0, 240);
+  await expect.poll(() => list.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+
+  // Sideways, straight after and with the pointer still over that list
+  // (the case that used to need a click first), moves the board.
+  const before = await board.evaluate((el) => el.scrollLeft);
+  await page.mouse.wheel(160, 6);
+  await expect.poll(() => board.evaluate((el) => el.scrollLeft)).toBeGreaterThan(before);
+
+  // t and d switch the board.
+  await page.mouse.move(2, 2);
+  await page.keyboard.press("t");
+  await expect(page.getByTestId("group-tag-home")).toBeVisible();
+  await expect(past).toHaveCount(0);
+  await page.keyboard.press("d");
+  await expect(past).toBeVisible();
+  expect(await pageOverflow()).toBe(0);
+});

@@ -62,12 +62,12 @@ function GroupColumn({ title, subtitle, tasks, priorities, priorityOrderMap, onT
       // it. From a tablet up, columns share the width when they all fit
       // and keep a readable minimum (so the board scrolls) when they don't.
       className={cn(
-        "flex w-[80vw] max-w-[19rem] shrink-0 snap-start flex-col overflow-hidden rounded-xl border border-border-hairline bg-surface-card",
+        "flex max-h-full w-[80vw] max-w-[19rem] shrink-0 snap-start flex-col overflow-hidden rounded-xl border border-border-hairline bg-surface-card",
         "sm:w-auto sm:max-w-[22rem] sm:flex-1",
         today ? "sm:min-w-[17rem]" : "sm:min-w-[15rem]"
       )}
     >
-      <header className={cn("border-b border-border-hairline px-3 py-2.5", today && "bg-sun-100 dark:bg-sun-400/[0.12]")}>
+      <header className={cn("shrink-0 border-b border-border-hairline px-3 py-2.5", today && "bg-sun-100 dark:bg-sun-400/[0.12]")}>
         <div className="flex items-baseline justify-between gap-2">
           <h3 className="min-w-0 truncate text-sm font-semibold text-ink-900 dark:text-ink-100" title={title}>{title}</h3>
           <span
@@ -82,9 +82,11 @@ function GroupColumn({ title, subtitle, tasks, priorities, priorityOrderMap, onT
         {subtitle ? <p className="mt-0.5 text-[11px] text-ink-500 dark:text-ink-400">{subtitle}</p> : null}
       </header>
       {/* An empty column keeps the height of a two-task one, so a board
-          with empty columns doesn't look ragged. A long one scrolls
-          inside itself, so the board never grows taller than the screen. */}
-      <div className="max-h-[max(14rem,calc(100dvh-23.5rem))] min-h-[4.75rem] flex-1 divide-y divide-[var(--border-hairline)] overflow-y-auto overscroll-contain sm:max-h-[max(14rem,calc(100dvh-19rem))]">
+          with empty columns doesn't look ragged. A long one is as tall as
+          the board (which is what's left of the screen) and scrolls inside
+          itself. Only up-and-down is held here: a sideways swipe over a
+          list has to reach the board. */}
+      <div className="min-h-[4.75rem] flex-1 divide-y divide-[var(--border-hairline)] overflow-y-auto overscroll-y-contain">
         {sorted.length === 0 ? null : (
           <AnimatePresence mode="popLayout">
             {list.shown.map(task => (
@@ -107,17 +109,56 @@ function GroupColumn({ title, subtitle, tasks, priorities, priorityOrderMap, onT
   );
 }
 
-/** The row of columns. Scrolls sideways when they don't all fit. */
+/**
+ * The row of columns. It takes what's left of the screen under the page
+ * header, and scrolls sideways when the columns don't all fit. It snaps
+ * to a column on a phone only: with a trackpad or wheel, snapping fights
+ * the hand.
+ */
 function Board({ scrollRef, children }) {
   return (
     <div
       ref={scrollRef}
       data-testid="groupings-board"
-      className="-mx-4 flex snap-x snap-proximity items-start gap-3 overflow-x-auto scroll-px-4 px-4 pb-4 sm:-mx-6 sm:scroll-px-6 sm:px-6"
+      className="-mx-4 mt-3 flex min-h-0 flex-1 snap-x snap-proximity items-start gap-3 overflow-x-auto overscroll-x-contain scroll-px-4 px-4 pb-4 sm:-mx-6 sm:snap-none sm:scroll-px-6 sm:px-6"
     >
       {children}
     </div>
   );
+}
+
+/**
+ * Sideways scrolling that always reaches the board.
+ *
+ * Left to the browser, a swipe belongs to whichever scrolling thing it
+ * started on, and stays with it until the pointer moves or clicks. A
+ * sideways swipe that began over a column's list (which scrolls up and
+ * down), or just after scrolling one, went nowhere: the board only moved
+ * after a click. So a wheel or trackpad movement that is more sideways
+ * than up-and-down, anywhere on the page, is handed to the board here.
+ * Up-and-down is left alone, so columns scroll as they always did.
+ */
+function useSidewaysScroll(pageRef, boardRef) {
+  useEffect(() => {
+    const page = pageRef.current;
+    if (!page) return undefined;
+    const onWheel = (event) => {
+      if (event.ctrlKey) return; // pinch to zoom
+      const board = boardRef.current;
+      if (!board || board.scrollWidth <= board.clientWidth) return;
+      // A mouse wheel with Shift held means sideways; some browsers
+      // report that as an up-and-down movement with the key down.
+      const shifted = event.shiftKey && event.deltaX === 0;
+      const sideways = shifted ? event.deltaY : event.deltaX;
+      const upDown = shifted ? 0 : event.deltaY;
+      if (Math.abs(sideways) <= Math.abs(upDown)) return;
+      event.preventDefault();
+      // deltaMode 1 counts lines, not pixels.
+      board.scrollLeft += event.deltaMode === 1 ? sideways * 16 : sideways;
+    };
+    page.addEventListener("wheel", onWheel, { passive: false });
+    return () => page.removeEventListener("wheel", onWheel);
+  }, [pageRef, boardRef]);
 }
 
 const VIEWS = [["date", "By date"], ["tag", "By tag"]];
@@ -148,12 +189,18 @@ export default function Groupings() {
   };
   const todayColRef = useRef(null);
   const scrollContainerRef = useRef(null);
+  const pageRef = useRef(null);
+  useSidewaysScroll(pageRef, scrollContainerRef);
 
   // Keyboard shortcuts (parsed centrally in useGlobalShortcuts).
   useShortcutEvent(SHORTCUT_EVENTS.newTask, () => {
     setEditingTask(null); setAddSubtaskParent(null); setShowForm(true);
   });
   useShortcutEvent(SHORTCUT_EVENTS.search, () => setShowSearch(true));
+  // d and t switch the board (By date / By tag).
+  useShortcutEvent(SHORTCUT_EVENTS.groupingsView, (next) => {
+    if (next === "date" || next === "tag") chooseView(next);
+  });
 
   const { createTask, updateTask, deleteTask, completeRecurringTask, skipRecurringTask } = useOfflineMutation();
   const deleteWithUndo = useDeleteWithUndo(deleteTask, createTask);
@@ -315,7 +362,17 @@ export default function Groupings() {
   };
 
   return (
-    <div>
+    // The page is exactly as tall as the screen: the header, then the
+    // board in what's left. Nothing scrolls up and down but the columns.
+    // (The heights are the screen less the top bar and, on a phone, the
+    // bottom bar; the margins cancel the padding the page shell adds for
+    // pages that do scroll. On a screen too short for that — a phone on
+    // its side — the page keeps a usable height and scrolls instead.)
+    <div
+      ref={pageRef}
+      data-testid="groupings-page"
+      className="-mb-[39px] flex h-[calc(100dvh-var(--header-height)-73px)] min-h-[24rem] flex-col sm:-mb-6 sm:h-[calc(100dvh-var(--header-height)-1rem)]"
+    >
       <PageHeader
         title="Groupings"
         sub={<>{topLevel.length} task{topLevel.length !== 1 ? "s" : ""}</>}
@@ -345,8 +402,7 @@ export default function Groupings() {
         </Button>
       </PageHeader>
 
-      <div className="mt-3">
-        {view === "date" ? (
+      {view === "date" ? (
           // Keyed, so each board is its own element and starts from its
           // own beginning rather than inheriting the other's scroll.
           <Board key="date" scrollRef={scrollContainerRef}>
@@ -367,13 +423,13 @@ export default function Groupings() {
             ))}
           </Board>
         ) : tagGroups.length > 0 ? (
-          <Board key="tag">
+          <Board key="tag" scrollRef={scrollContainerRef}>
             {tagGroups.map(({ tag, tasks: tagTasks }) => (
               <GroupColumn key={tag} testid={`group-tag-${tag}`} title={tag} tasks={tagTasks} {...columnProps} />
             ))}
           </Board>
         ) : (
-          <div className="rounded-xl border border-dashed border-border-strong px-6 py-12 text-center" data-testid="groupings-no-tags">
+          <div className="mt-3 rounded-xl border border-dashed border-border-strong px-6 py-12 text-center" data-testid="groupings-no-tags">
             <p className="text-sm font-medium text-ink-900 dark:text-ink-100">
               {search ? "No tagged tasks match your search" : "No tagged tasks yet"}
             </p>
@@ -382,7 +438,6 @@ export default function Groupings() {
             </p>
           </div>
         )}
-      </div>
 
       <TaskForm
         open={showForm}
