@@ -17,6 +17,7 @@ type ExpectFn = ((actual: any, message?: string) => any) & {
   objectContaining: (value: any) => any;
   arrayContaining: (value: any[]) => any;
   anything: () => any;
+  any: (constructor: any) => any;
 };
 
 export const describe: SuiteFn;

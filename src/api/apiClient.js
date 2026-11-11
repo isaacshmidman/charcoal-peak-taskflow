@@ -1,6 +1,6 @@
 import { appConfig, getStoredAccessToken, removeAccessToken, saveAccessToken } from "@/lib/app-config";
 import { createE2EApiClient } from "@/lib/mockBackend";
-import { loadFromCache, saveToCache } from "@/lib/offlineCache";
+import { loadFromCache, saveSnapshot, saveToCache } from "@/lib/offlineCache";
 
 /**
  * @typedef {{
@@ -16,7 +16,7 @@ import { loadFromCache, saveToCache } from "@/lib/offlineCache";
  *   list: (sort?: string, limit?: number, skip?: number, fields?: string[] | string) => Promise<any>,
  *   filter?: (query: Record<string, unknown>, sort?: string, limit?: number, skip?: number, fields?: string[] | string) => Promise<any>,
  *   get: (id: string) => Promise<any>,
- *   create: (data: any) => Promise<any>,
+ *   create: (data: any, options?: { createKey?: string }) => Promise<any>,
  *   update: (id: string, data: any) => Promise<any>,
  *   delete: (id: string) => Promise<any>,
  * }} EntityStore
@@ -132,10 +132,13 @@ const readCachedEntityList = (entityName) => {
   return cacheKey ? loadFromCache(cacheKey) : null;
 };
 
+/** List answers whose offline copy has been asked for already. */
+const offlineCopyAsked = new WeakSet();
+
 const writeCachedEntityList = (entityName, value) => {
   const cacheKey = ENTITY_CACHE_KEYS[entityName];
   if (!cacheKey) return;
-  saveToCache(cacheKey, value);
+  saveSnapshot(cacheKey, value);
 };
 
 const normalizeBaseUrl = (value) => (value || "").replace(/\/$/, "");
@@ -189,7 +192,11 @@ const parseResponseBody = async (response) => {
  * }} [options]
  */
 async function apiRequest(path, { method = "GET", body, headers = {}, query, raw = false } = {}) {
-  const response = await fetch(buildApiUrl(path, query), {
+  const url = buildApiUrl(path, query);
+  // What this address answered last time, if the server said how to ask
+  // "has it changed?" (see `unchanged` below).
+  const kept = method === "GET" && !raw ? unchanged.get(url) : undefined;
+  const response = await fetch(url, {
     method,
     credentials: "include",
     headers: {
@@ -198,6 +205,7 @@ async function apiRequest(path, { method = "GET", body, headers = {}, query, raw
       ...(appConfig.appId ? { "X-App-Id": String(appConfig.appId) } : {}),
       ...(currentToken ? { Authorization: `Bearer ${currentToken}` } : {}),
       ...(typeof window !== "undefined" ? { "X-Origin-URL": window.location.href } : {}),
+      ...(kept ? { "If-None-Match": kept.etag } : {}),
       ...headers,
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -206,6 +214,11 @@ async function apiRequest(path, { method = "GET", body, headers = {}, query, raw
   });
 
   if (raw) return response;
+
+  if (kept && response.status === 304) {
+    unchanged.remember(url, kept);
+    return kept.data;
+  }
 
   const data = await parseResponseBody(response);
   if (!response.ok) {
@@ -216,8 +229,46 @@ async function apiRequest(path, { method = "GET", body, headers = {}, query, raw
     });
   }
 
+  if (method === "GET") {
+    const etag = response.headers?.get?.("etag");
+    if (etag && data != null) unchanged.remember(url, { etag, data });
+    else unchanged.forget(url);
+  }
+
   return data;
 }
+
+/**
+ * The last answer to each GET, with the fingerprint (ETag) the server
+ * gave it. The next time the same address is asked, the fingerprint goes
+ * along; if nothing has changed the server answers 304 with no body, and
+ * the answer handed back is the very same object as last time.
+ *
+ * That matters most for the task list, which every page asks for when it
+ * opens and whenever the window is focused: unchanged, it is no longer
+ * downloaded, parsed, compared and written to the offline copy again —
+ * and because it is the same object, nothing that reads it re-renders.
+ *
+ * Only the most recent few addresses are remembered. The fingerprint is
+ * of the content itself, so an answer can never be handed to the wrong
+ * person: a different person's list has a different fingerprint. It is
+ * emptied on sign-in and sign-out all the same.
+ */
+const unchanged = (() => {
+  const LIMIT = 40;
+  /** @type {Map<string, { etag: string, data: any }>} */
+  const answers = new Map();
+  return {
+    get: (url) => answers.get(url),
+    remember(url, answer) {
+      answers.delete(url);
+      answers.set(url, answer);
+      if (answers.size > LIMIT) answers.delete(answers.keys().next().value);
+    },
+    forget: (url) => answers.delete(url),
+    clear: () => answers.clear(),
+  };
+})();
 
 function createEntityStore(entityName) {
   const basePath = `/apps/${appConfig.appId}/entities/${entityName}`;
@@ -233,7 +284,12 @@ function createEntityStore(entityName) {
             fields: Array.isArray(fields) ? fields.join(",") : fields,
           },
         });
-        writeCachedEntityList(entityName, result);
+        // An unchanged answer is the same object as last time (see
+        // `unchanged`), and its offline copy has already been asked for.
+        if (!offlineCopyAsked.has(result)) {
+          writeCachedEntityList(entityName, result);
+          if (result && typeof result === "object") offlineCopyAsked.add(result);
+        }
         return result;
       } catch (error) {
         if (isRecoverableReadError(error)) {
@@ -277,8 +333,19 @@ function createEntityStore(entityName) {
         throw error;
       }
     },
-    async create(data) {
-      return apiRequest(basePath, { method: "POST", body: data });
+    /**
+     * `createKey` names this create. Asked twice under one name — the
+     * first answer lost on the way back, then a retry — the server hands
+     * back the record the first ask made instead of making a second.
+     * @param {Record<string, any>} data
+     * @param {{ createKey?: string }} [options]
+     */
+    async create(data, { createKey } = {}) {
+      return apiRequest(basePath, {
+        method: "POST",
+        body: data,
+        headers: createKey ? { "Idempotency-Key": createKey } : {},
+      });
     },
     async update(id, data) {
       return apiRequest(`${basePath}/${id}`, { method: "PUT", body: data });
@@ -370,6 +437,7 @@ const liveApiClient = {
     },
     async logout(redirectUrl) {
       currentToken = null;
+      unchanged.clear();
       removeAccessToken();
 
       if (typeof window === "undefined") return;
@@ -388,6 +456,7 @@ const liveApiClient = {
       }
     },
     setToken(token, saveToStorage = true) {
+      if ((token || null) !== currentToken) unchanged.clear();
       currentToken = token || null;
       if (!token) {
         if (saveToStorage) {

@@ -59,7 +59,8 @@ export function useOfflineMutation() {
 
     if (isOnline()) {
       try {
-        const result = await apiClient.entities.Task.create(data);
+        // Named, so a retry after a lost answer can't make a second task.
+        const result = await apiClient.entities.Task.create(data, { createKey: optimisticId });
         if (deferInsert) applyToCache((current) => [result, ...current]);
         else applyToCache((current) => current.map(t => t.id === optimisticId
           // A restored task can come back with its files; the paperclip shows at once.

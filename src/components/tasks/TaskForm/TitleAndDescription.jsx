@@ -56,9 +56,15 @@ function PlainDescriptionFallback({ form, setForm }) {
 
 /** The editor's outline while its code is still arriving — the same
  * box, so nothing jumps when the real one takes its place. */
+/**
+ * Stands in for the editor while it loads, at exactly the editor's own
+ * height (82px): 6px taller, as it was, and everything below it in the
+ * form jumped up as the editor arrived — under the pointer, if you were
+ * quick.
+ */
 export function EditorPlaceholder() {
   return (
-    <div className="min-h-[5.5rem] rounded-lg border border-border-strong bg-surface-card px-3 py-2 text-sm text-ink-400 dark:bg-night-sunken dark:text-ink-500">
+    <div className="min-h-[5.125rem] rounded-lg border border-border-strong bg-surface-card px-3 py-2 text-sm text-ink-400 dark:bg-night-sunken dark:text-ink-500">
       Add details (optional)
     </div>
   );

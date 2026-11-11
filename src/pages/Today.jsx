@@ -2,6 +2,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { apiClient } from "@/api/apiClient";
 import { useQuery } from "@tanstack/react-query";
+import { useGrowingList } from "@/hooks/useGrowingList";
 import { useOfflineMutation } from "@/hooks/useOfflineMutation";
 import { formatDeleteLabel, useDeleteWithUndo } from "@/hooks/useDeleteWithUndo";
 import { showDeleteToast } from "@/components/tasks/DeleteToast";
@@ -160,6 +161,8 @@ export default function Today() {
       return 0;
     });
   }, [tasks, search, priorityOrderMap, todayStart, sorts, hiddenCalendars, calendarIndexByKey]);
+  // Drawn a couple of screens at a time; the rest as the page is scrolled.
+  const list = useGrowingList(todayAndPast);
 
   // Overdue tasks for the Overdue dialog, ordered by the same sort settings.
   // Hidden calendars drop out here exactly as they do for the list above —
@@ -216,7 +219,7 @@ export default function Today() {
       ) : (
         <div className="ds-list">
           <AnimatePresence mode="popLayout">
-            {todayAndPast.map(task => (
+            {list.shown.map(task => (
               <TaskCard
                 key={task.id}
                 task={task}
@@ -233,6 +236,7 @@ export default function Today() {
               />
             ))}
           </AnimatePresence>
+          {list.more && <div ref={list.markerRef} aria-hidden="true" className="h-px" data-testid="list-more" />}
         </div>
       )}
 

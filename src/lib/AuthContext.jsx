@@ -119,10 +119,16 @@ export const AuthProvider = ({ children }) => {
 
     try {
       syncStoredToken();
-      const [publicSettings, { currentUser, errorType }] = await Promise.all([
-        apiClient.getPublicSettings(),
-        checkUserAuth({ manageLoading: false }),
-      ]);
+      // Both are asked at once, but the sign-in check is always heard out
+      // before the settings are. With no connection both fail, and each
+      // failure sets what the app shows: if the settings failed first, the
+      // "work offline from this device's copy" below was then overwritten
+      // by the sign-in check's "offline" error, and the app opened on
+      // "Couldn't load Zephyrly" instead of on the copy it had.
+      const settingsRequest = apiClient.getPublicSettings();
+      settingsRequest.catch(() => {});
+      const { currentUser, errorType } = await checkUserAuth({ manageLoading: false });
+      const publicSettings = await settingsRequest;
       setAppPublicSettings(publicSettings);
       if (!currentUser && errorType === "offline") {
         const cachedSession = getStoredLocalSession();

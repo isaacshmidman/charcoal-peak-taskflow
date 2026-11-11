@@ -2,6 +2,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { apiClient } from "@/api/apiClient";
 import { useQuery } from "@tanstack/react-query";
+import { useGrowingList } from "@/hooks/useGrowingList";
 import { useOfflineMutation } from "@/hooks/useOfflineMutation";
 import { formatDeleteLabel, useDeleteWithUndo } from "@/hooks/useDeleteWithUndo";
 import { showDeleteToast } from "@/components/tasks/DeleteToast";
@@ -49,6 +50,8 @@ function GroupColumn({ title, subtitle, tasks, priorities, priorityOrderMap, onT
       return 0;
     });
   }, [tasks, sorts, priorityOrderMap, calendarIndexByKey]);
+  // Drawn a couple of screens at a time; the rest as the page is scrolled.
+  const list = useGrowingList(sorted);
 
   return (
     <section
@@ -84,7 +87,7 @@ function GroupColumn({ title, subtitle, tasks, priorities, priorityOrderMap, onT
       <div className="max-h-[max(14rem,calc(100dvh-23.5rem))] min-h-[4.75rem] flex-1 divide-y divide-[var(--border-hairline)] overflow-y-auto overscroll-contain sm:max-h-[max(14rem,calc(100dvh-19rem))]">
         {sorted.length === 0 ? null : (
           <AnimatePresence mode="popLayout">
-            {sorted.map(task => (
+            {list.shown.map(task => (
               <CompactTaskCard
                 key={task.id}
                 task={task}
@@ -98,6 +101,7 @@ function GroupColumn({ title, subtitle, tasks, priorities, priorityOrderMap, onT
             ))}
           </AnimatePresence>
         )}
+        {list.more && <div ref={list.markerRef} aria-hidden="true" className="h-px !border-0" data-testid="list-more" />}
       </div>
     </section>
   );

@@ -12,6 +12,12 @@
  * localStorage. That's what makes the storage-key invariant meaningful —
  * users have queued-but-unsynced mutations sitting under those exact keys
  * from before the deploy, and replay must keep consuming them.
+ *
+ * One deliberate change since (2026-11): a replayed create now passes its
+ * offline id alongside the record (`{ createKey }`), so a create whose
+ * answer was lost can't be made twice. The RECORD sent is what it always
+ * was; the four assertions on it gained that second argument and nothing
+ * else here moved.
  */
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -131,9 +137,9 @@ describe("offline replay characterization", () => {
 
       await replay(queryClient);
 
-      expect(taskCreate).toHaveBeenNthCalledWith(1, { title: "parent" });
+      expect(taskCreate).toHaveBeenNthCalledWith(1, { title: "parent" }, { createKey: "offline_p" });
       // The child's parent_id was rewritten to the parent's REAL id.
-      expect(taskCreate).toHaveBeenNthCalledWith(2, { title: "child", parent_id: "server_parent" });
+      expect(taskCreate).toHaveBeenNthCalledWith(2, { title: "child", parent_id: "server_parent" }, { createKey: "offline_c" });
       const cached = queryClient.getQueryData(["tasks"]);
       expect(cached).toEqual([
         { id: "server_parent", title: "parent" },
@@ -187,7 +193,7 @@ describe("offline replay characterization", () => {
 
       await replay(queryClient);
 
-      expect(priorityCreate).toHaveBeenCalledWith({ name: "Urgent", color: "red", order: 0 });
+      expect(priorityCreate).toHaveBeenCalledWith({ name: "Urgent", color: "red", order: 0 }, { createKey: "offline_pr" });
       expect(queryClient.getQueryData(["priorities"])).toEqual([{ id: "server_pri", name: "Urgent" }]);
       expect(priorityUpdate).toHaveBeenCalledWith("server_pri", { name: "Urgent!" });
       expect(priorityDelete).toHaveBeenCalledWith("server_other");
@@ -236,7 +242,7 @@ describe("offline replay characterization", () => {
 
       await replay(queryClient);
 
-      expect(deletedCreate).toHaveBeenCalledWith({ task_id: "t1", title: "gone" });
+      expect(deletedCreate).toHaveBeenCalledWith({ task_id: "t1", title: "gone" }, { createKey: "offline_d" });
       expect(queryClient.getQueryData(["deletedTasks"])).toEqual([{ id: "server_del", title: "gone" }]);
       // The write-through is what keeps the trash correct across reloads.
       expect(loadFromCache("deletedTasks")).toEqual([{ id: "server_del", title: "gone" }]);

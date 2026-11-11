@@ -1,4 +1,4 @@
-const CACHE_NAME = 'zephyrly-v20';
+const CACHE_NAME = 'zephyrly-v21';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -90,15 +90,53 @@ if (isLocalhost) {
     })());
   });
 } else {
+  // Find a kept copy by its address alone. The server marks every answer
+  // "Vary: Origin, Accept-Encoding", and a plain lookup honours that: a
+  // font or script the page asks for carries an Origin header, the copy
+  // was fetched without one, and so the copy "didn't match" and the file
+  // failed to load with no connection — though it was sitting right here.
+  // None of these files actually differs by who asks.
+  const kept = (request) => caches.match(request, { ignoreVary: true });
+
   const cacheResponse = async (request, response) => {
     if (!response || !response.ok || response.type === 'opaque') return;
     const cache = await caches.open(CACHE_NAME);
     await cache.put(request, response.clone());
   };
 
+  const HASHED_BUILD_ASSET = /^\/assets\/.+-[A-Za-z0-9_-]{8,}\.(?:js|css|woff2?|ttf|otf|png|jpg|jpeg|svg|webp|gif)$/;
+
+  // Keep a copy of every file of the current build (the build writes the
+  // list: /asset-list.json). Files are otherwise only kept as the page
+  // happens to ask for them, which left two holes offline: the very first
+  // visit (the page had loaded before this worker could see its requests)
+  // and anything that loads on first use, like the task form's text
+  // editor. Each file's name carries a fingerprint of its content, so one
+  // that is already here never needs fetching again.
+  const keepWholeBuild = async () => {
+    const listed = await fetch('/asset-list.json', { cache: 'no-store' });
+    if (!listed.ok) return;
+    const files = await listed.json();
+    if (!Array.isArray(files)) return;
+    const cache = await caches.open(CACHE_NAME);
+    await Promise.all(
+      files
+        .filter((file) => typeof file === 'string' && HASHED_BUILD_ASSET.test(file))
+        .map(async (file) => {
+          if (await cache.match(file, { ignoreVary: true })) return;
+          const response = await fetch(file);
+          if (response.ok) await cache.put(file, response);
+        })
+    );
+  };
+
   self.addEventListener('install', (event) => {
     event.waitUntil(
-      caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
+      caches.open(CACHE_NAME)
+        .then((cache) => cache.addAll(STATIC_ASSETS))
+        // Best effort: a failed download here must not stop the worker
+        // installing. It is tried again on the next page load.
+        .then(() => keepWholeBuild().catch(() => {}))
     );
     self.skipWaiting();
   });
@@ -146,10 +184,12 @@ if (isLocalhost) {
             const response = await fetch(request);
             if (response.ok) {
               cacheResponse('/index.html', response).catch(() => {});
+              // A page load is when a new build shows up.
+              event.waitUntil(keepWholeBuild().catch(() => {}));
             }
             return response;
           } catch {
-            const cached = await caches.match('/index.html');
+            const cached = await kept('/index.html');
             return cached || new Response('Offline', { status: 503, statusText: 'Offline' });
           }
         })()
@@ -161,11 +201,11 @@ if (isLocalhost) {
     // the hash in the filename guarantees the content never changes.
     // For other same-origin assets — network-first with cache fallback, so
     // unhashed resources (like icons or manifest.json) pick up updates.
-    const isHashedBuildAsset = /\/assets\/.+-[A-Za-z0-9]{8,}\.(?:js|css|woff2?|ttf|otf|png|jpg|jpeg|svg|webp|gif)$/.test(url.pathname);
+    const isHashedBuildAsset = HASHED_BUILD_ASSET.test(url.pathname);
 
     if (isHashedBuildAsset) {
       event.respondWith(
-        caches.match(request).then((cached) => {
+        kept(request).then((cached) => {
           if (cached) return cached;
           return fetch(request).then((response) => {
             if (response.ok) {
@@ -187,7 +227,7 @@ if (isLocalhost) {
           }
           return response;
         } catch {
-          const cached = await caches.match(request);
+          const cached = await kept(request);
           if (cached) return cached;
           throw new Error('Network unavailable and no cache entry');
         }

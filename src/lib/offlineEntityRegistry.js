@@ -140,6 +140,30 @@ export function registeredCacheKeys() {
 }
 
 /**
+ * A queued change the server has refused in a way that asking again
+ * can't fix. Kept in the queue it would be sent, and refused, every time
+ * the app wakes up, for ever.
+ *
+ * - 404 on an edit or a delete: the record is gone (deleted on another
+ *   device). There is nothing left to change, and nothing lost.
+ * - 400 / 413 / 422: the server won't take this data, now or later.
+ *
+ * Everything else stays queued: no answer at all, a server fault (5xx),
+ * being signed out (401), and 403 / 409 / 429, which can all be true
+ * now and false in a minute.
+ *
+ * @param {any} error
+ * @param {Record<string, any>} mutation
+ * @returns {"gone" | "refused" | null}
+ */
+export function permanentReplayFailure(error, mutation) {
+  const status = error?.status;
+  if (status === 404 && mutation.type !== "create") return "gone";
+  if (status === 400 || status === 413 || status === 422) return "refused";
+  return null;
+}
+
+/**
  * Replay every registered entity's queued mutations, in registration order.
  * Per-mutation try/catch retains failures; created ids are swapped into the
  * query cache; update/delete resolve through the entity's own in-run map and
@@ -147,14 +171,25 @@ export function registeredCacheKeys() {
  * entity can resolve cross-entity references via `remapFields`
  * (e.g. `{ task_id: "Task" }`).
  *
+ * Three things keep a shaky reconnection from losing or doubling work:
+ * - every create goes out under its offline id (`createKey`), so one whose
+ *   answer was lost and is sent again comes back as the same record;
+ * - the queue is not overwritten when the pass ends — only what this pass
+ *   settled is taken out, so a change queued while it ran is still there;
+ * - a change the server will never accept is dropped and reported
+ *   (`refused` in the result) instead of being retried for ever.
+ *
  * @param {import("@tanstack/react-query").QueryClient} queryClient
  * @param {Record<string, string>} [seedTaskRemap]  transitional: ids from a
  *   replay loop that still lives outside the registry, merged into the map
  *   named "Task" so `remapFields` resolves during the migration.
+ * @returns {Promise<{ refused: Array<{ entity: string, type: string, title: string, message: string }> }>}
  */
 export async function replayRegisteredEntities(queryClient, seedTaskRemap = {}) {
   /** entity name → { offlineId: realId } produced during THIS run */
   const remapsByEntity = { Task: { ...seedTaskRemap } };
+  /** @type {Array<{ entity: string, type: string, title: string, message: string }>} */
+  const refused = [];
 
   for (const handle of registry.values()) {
     const { def } = handle;
@@ -162,28 +197,32 @@ export async function replayRegisteredEntities(queryClient, seedTaskRemap = {}) 
     if (!pending.length) continue;
 
     const idRemap = remapsByEntity[def.name] || (remapsByEntity[def.name] = {});
-    const remaining = [];
+    /** Entries this pass is finished with, as they were read. */
+    const settled = [];
+
+    const remapped = (/** @type {Record<string, any>} */ data) => {
+      const out = { ...data };
+      delete out._offlineId;
+      // Cross-entity references (field → source entity's map).
+      for (const [field, sourceEntity] of Object.entries(def.remapFields || {})) {
+        const sourceMap = remapsByEntity[sourceEntity] || {};
+        if (out[field] && sourceMap[out[field]]) out[field] = sourceMap[out[field]];
+      }
+      // Self references (offline child → offline parent within this run).
+      for (const field of def.selfRemapFields || []) {
+        if (out[field] && idRemap[out[field]]) out[field] = idRemap[out[field]];
+      }
+      return out;
+    };
 
     for (const m of pending) {
       try {
         if (m.type === "create") {
-          const dataToSend = { ...m.data };
-          const offlineId = dataToSend._offlineId;
-          delete dataToSend._offlineId;
-          // Cross-entity references (field → source entity's map).
-          for (const [field, sourceEntity] of Object.entries(def.remapFields || {})) {
-            const sourceMap = remapsByEntity[sourceEntity] || {};
-            if (dataToSend[field] && sourceMap[dataToSend[field]]) {
-              dataToSend[field] = sourceMap[dataToSend[field]];
-            }
-          }
-          // Self references (offline child → offline parent within this run).
-          for (const field of def.selfRemapFields || []) {
-            if (dataToSend[field] && idRemap[dataToSend[field]]) {
-              dataToSend[field] = idRemap[dataToSend[field]];
-            }
-          }
-          const result = await apiClient.entities[def.name].create(dataToSend);
+          const offlineId = m.data?._offlineId;
+          const dataToSend = remapped(m.data);
+          const result = offlineId
+            ? await apiClient.entities[def.name].create(dataToSend, { createKey: offlineId })
+            : await apiClient.entities[def.name].create(dataToSend);
           if (result?.id && offlineId) {
             idRemap[offlineId] = result.id;
             if (def.applyIdSwap) {
@@ -207,14 +246,57 @@ export async function replayRegisteredEntities(queryClient, seedTaskRemap = {}) 
             await apiClient.entities[def.name].delete(resolvedId);
           }
         }
-      } catch {
-        remaining.push(m);
+        settled.push(m);
+      } catch (error) {
+        const why = permanentReplayFailure(error, m);
+        if (!why) continue; // stays queued for the next pass
+        settled.push(m);
+        if (why === "refused") {
+          refused.push({
+            entity: def.name,
+            type: m.type,
+            title: String(m.data?.title || m.data?.name || ""),
+            message: String(/** @type {any} */ (error)?.message || ""),
+          });
+        }
+      }
+    }
+
+    // Take out what this pass settled — and only that. The queue is read
+    // again because it may have changed while requests were in flight.
+    const settledCounts = new Map();
+    for (const m of settled) {
+      const key = JSON.stringify(m);
+      settledCounts.set(key, (settledCounts.get(key) || 0) + 1);
+    }
+    const remaining = [];
+    for (const entry of handle.getPending()) {
+      const key = JSON.stringify(entry);
+      const count = settledCounts.get(key) || 0;
+      if (count > 0) {
+        settledCounts.set(key, count - 1);
+        continue;
+      }
+      const realId = entry.type === "create" ? idRemap[entry.data?._offlineId] : undefined;
+      if (!realId) {
+        remaining.push(entry);
+        continue;
+      }
+      // A create that went out in this pass and was edited before its
+      // answer came back: the record exists, so the edit is an update.
+      const update = { type: "update", id: realId, data: remapped(entry.data), queuedAt: entry.queuedAt };
+      try {
+        await apiClient.entities[def.name].update(realId, update.data);
+      } catch (error) {
+        if (!permanentReplayFailure(error, update)) remaining.push(update);
       }
     }
 
     handle.setPending(remaining);
     queryClient.invalidateQueries({ queryKey: [def.cacheKey] });
   }
+
+  return { refused };
 }
 
 /* ── Registrations (module load — before any cache read) ───────────

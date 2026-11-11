@@ -4,7 +4,7 @@
  * Task mutations trigger the outbound push hook (enqueueTaskPush) so
  * changes echo to connected calendar providers.
  */
-import { HttpError, readJsonBody, sendJson } from "../http.js";
+import { HttpError, acceptsGzip, readJsonBody, sendJson, sendJsonText } from "../http.js";
 import { requireAuthenticatedUser } from "../auth.js";
 import {
   createEntityRecord,
@@ -39,9 +39,7 @@ export async function handleEntitiesRoute(request, response, { config, db, url, 
   }
 
   if (request.method === "GET" && entityName && !entityId) {
-    sendJson(
-      response,
-      200,
+    const list = () =>
       listEntityRecords(db, {
         entityName,
         appId,
@@ -52,8 +50,18 @@ export async function handleEntitiesRoute(request, response, { config, db, url, 
         fields: url.searchParams.get("fields") || undefined,
         query: parseQueryFilter(url.searchParams),
         config,
-      })
-    );
+      });
+    if (!KEPT_LISTS.has(entityName)) {
+      sendJson(response, 200, list());
+      return true;
+    }
+    // The same question asked while nothing in the database has changed
+    // has the same answer, so the answer is kept (see keptAnswer).
+    const answer = keptAnswer(db, `${appId}\n${user.id}\n${String(user.email).toLowerCase()}\n${entityName}\n${url.search}`, list);
+    // A long answer is kept only compressed; the rare client that can't
+    // read that gets it written out again.
+    const text = answer.text === null && !acceptsGzip(request) ? JSON.stringify(list()) : answer.text;
+    sendJsonText(response, 200, text ?? "", {}, answer);
     return true;
   }
 
@@ -65,6 +73,27 @@ export async function handleEntitiesRoute(request, response, { config, db, url, 
   if (request.method === "POST" && entityName && !entityId) {
     const body = (await readJsonBody(request, { maxBytes: MAX_ENTITY_BODY_BYTES })) || {};
     validateClientInput(entityName, body);
+    // The app names each thing it creates. If it asks again under the
+    // same name — because the first answer never arrived — it gets the
+    // record that ask made, not a second one.
+    const createKey = createKeyOf(request);
+    if (createKey) {
+      const earlier = db
+        .prepare("SELECT record_id FROM created_once WHERE app_id = ? AND user_id = ? AND entity = ? AND create_key = ?")
+        .get(appId, user.id, entityName, createKey);
+      if (earlier) {
+        let record;
+        try {
+          record = getEntityRecord(db, { entityName, appId, user, id: earlier.record_id, config });
+        } catch {
+          // Made, and deleted since. It stays deleted; the app is told
+          // which record it was so it can stop asking.
+          record = { id: earlier.record_id, gone: true };
+        }
+        sendJson(response, 200, record, { "Idempotent-Replayed": "true" });
+        return true;
+      }
+    }
     const created = createEntityRecord(db, {
       entityName,
       appId,
@@ -75,6 +104,11 @@ export async function handleEntitiesRoute(request, response, { config, db, url, 
       // brings back, so that task's files come back on it.
       restoresTaskId: restoredTaskId(entityName, body),
     });
+    if (createKey && created?.id) {
+      db.prepare(
+        "INSERT OR REPLACE INTO created_once (app_id, user_id, entity, create_key, record_id, created_date) VALUES (?, ?, ?, ?, ?, ?)"
+      ).run(appId, user.id, entityName, createKey, String(created.id), new Date().toISOString());
+    }
     if (entityName === "Task") {
       enqueueTaskPush(db, config, { op: "upsert", appId, taskSnapshot: created });
     }
@@ -115,6 +149,91 @@ export async function handleEntitiesRoute(request, response, { config, db, url, 
   }
 
   throw new HttpError(404, "Route not found.", "not_found");
+}
+
+/**
+ * The name the app gave this create (the Idempotency-Key header), or ""
+ * when it gave none or one that isn't a plain short name.
+ * @param {import("node:http").IncomingMessage} request
+ */
+function createKeyOf(request) {
+  const key = String(request.headers?.["idempotency-key"] || "").trim();
+  return /^[\w.:-]{8,120}$/.test(key) ? key : "";
+}
+
+/** Names older than this are forgotten: no app is still waiting on them. */
+const CREATE_KEY_DAYS = 30;
+
+/** @param {any} db */
+export function purgeOldCreateKeys(db) {
+  const before = new Date(Date.now() - CREATE_KEY_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  db.prepare("DELETE FROM created_once WHERE created_date <= ?").run(before);
+}
+
+/**
+ * Lists whose answer depends only on what is in the database. Not the
+ * Recently Deleted ones: listing those also throws out whatever has
+ * expired, so their answer depends on the clock.
+ */
+const KEPT_LISTS = new Set(["Task", "Note", "Priority", "SavedTag"]);
+const MAX_KEPT_ANSWERS = 200;
+const KEEP_TEXT_UNDER = 64 * 1024;
+
+/**
+ * @typedef {{ version: string, text: string | null, etag?: string, gzipped?: Buffer | null }} KeptAnswer
+ * @type {WeakMap<object, { answers: Map<string, KeptAnswer>, changes: any, dataVersion: any }>}
+ */
+const keptByDatabase = new WeakMap();
+
+/**
+ * The answer to a list request, worked out at most once per state of the
+ * database.
+ *
+ * Listing tasks reads every one of the person's rows, turns each into a
+ * record, sorts them and writes them out as JSON — tens of milliseconds
+ * on a laptop for a few thousand tasks, several times that on the home
+ * server, and nothing else is answered while it runs. The app asks for
+ * that list whenever a page opens. So the answer is kept, along with the
+ * state of the database it was made from, and reused until that changes.
+ *
+ * "State of the database" is exact, not a guess: `total_changes()` counts
+ * every row this connection has inserted, updated or deleted, and
+ * `PRAGMA data_version` moves when any other connection commits. If
+ * either has moved — any write at all, to any table — every kept answer
+ * is stale and is worked out again. (All writes here are synchronous, so
+ * a list is never read half-way through a transaction.)
+ *
+ * @param {any} db
+ * @param {string} key   who is asking, and exactly what for
+ * @param {() => unknown} compute
+ * @returns {KeptAnswer}
+ */
+function keptAnswer(db, key, compute) {
+  let kept = keptByDatabase.get(db);
+  if (!kept) {
+    kept = {
+      answers: new Map(),
+      changes: db.prepare("SELECT total_changes() AS n"),
+      dataVersion: db.prepare("PRAGMA data_version"),
+    };
+    keptByDatabase.set(db, kept);
+  }
+  const version = `${kept.changes.get().n}:${kept.dataVersion.get().data_version}`;
+  const found = kept.answers.get(key);
+  if (found && found.version === version) {
+    // Once the compressed copy exists, a long answer's text is dead weight.
+    if (found.gzipped && found.text && found.text.length > KEEP_TEXT_UNDER) found.text = null;
+    // Most recently used goes to the back; the front is what gets dropped.
+    kept.answers.delete(key);
+    kept.answers.set(key, found);
+    return found;
+  }
+  /** @type {KeptAnswer} */
+  const answer = { version, text: JSON.stringify(compute()), gzipped: null };
+  kept.answers.delete(key);
+  kept.answers.set(key, answer);
+  if (kept.answers.size > MAX_KEPT_ANSWERS) kept.answers.delete(kept.answers.keys().next().value);
+  return answer;
 }
 
 /**

@@ -51,6 +51,28 @@ function createEmbeddedBackendPlugin({ appId }) {
   };
 }
 
+/**
+ * Writes `asset-list.json` next to the built page: every script, style
+ * and font the build produced. The service worker (public/sw.js) reads it
+ * and keeps a copy of each, so the whole app is on the device after one
+ * visit — including the parts that only load when they're first used,
+ * like the text editor in the task form. Without it those parts were
+ * kept only once someone had happened to open them while online.
+ */
+function assetListPlugin() {
+  return {
+    name: "taskflow-asset-list",
+    apply: "build",
+    generateBundle(_options, bundle) {
+      const files = Object.keys(bundle)
+        .filter((file) => /^assets\/.+\.(?:js|css|woff2?)$/.test(file))
+        .sort()
+        .map((file) => `/${file}`);
+      this.emitFile({ type: "asset", fileName: "asset-list.json", source: JSON.stringify(files) });
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const useEmbeddedApi = mode !== "e2e" && env.TASKFLOW_USE_EMBEDDED_BACKEND !== "0";
@@ -95,6 +117,7 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [
       react(),
+      assetListPlugin(),
       ...(useEmbeddedApi ? [createEmbeddedBackendPlugin({ appId: env.VITE_APP_ID })] : []),
     ],
   };

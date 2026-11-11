@@ -273,6 +273,47 @@ function mapFieldNameFromDb(entityName, fieldName) {
   return inverse ? inverse[0] : fieldName;
 }
 
+const PLAIN = 0;
+const JSON_LIST = 1;
+const BOOLEAN = 2;
+const JSON_OBJECT = 3;
+
+/**
+ * What to do with each database column of an entity when turning a row
+ * into a record: its name in the record, and how to read its value.
+ *
+ * Worked out once per column and remembered. It used to be worked out
+ * again for every field of every row — a search through the entity's
+ * field map each time — and that search was most of the cost of listing
+ * tasks: a few thousand rows of ~35 columns is over a hundred thousand of
+ * them per request.
+ *
+ * @type {Map<string, Map<string, { name: string, kind: number }>>}
+ */
+const columnPlans = new Map();
+
+function columnPlan(entityName, definition, dbField) {
+  let plan = columnPlans.get(entityName);
+  if (!plan) {
+    plan = new Map();
+    columnPlans.set(entityName, plan);
+  }
+  let column = plan.get(dbField);
+  if (!column) {
+    const name = mapFieldNameFromDb(entityName, dbField);
+    const kind = definition.jsonColumns.includes(name)
+      ? JSON_LIST
+      : definition.booleanColumns.includes(name)
+        ? BOOLEAN
+        : name === "preferences"
+          ? JSON_OBJECT
+          : PLAIN;
+    column = { name, kind };
+    plan.set(dbField, column);
+  }
+  return column;
+}
+
 /**
  * @param {string} entityName
  * @param {Record<string, unknown> | null | undefined} row
@@ -285,21 +326,14 @@ export function hydrateRecord(entityName, row) {
   /** @type {Record<string, unknown>} */
   const record = {};
 
-  for (const [dbField, value] of Object.entries(row)) {
-    const outputField = mapFieldNameFromDb(entityName, dbField);
-    if (definition.jsonColumns.includes(outputField)) {
-      record[outputField] = parseJsonColumn(value, []);
-      continue;
-    }
-    if (definition.booleanColumns.includes(outputField)) {
-      record[outputField] = toBoolean(value);
-      continue;
-    }
-    if (outputField === "preferences") {
-      record[outputField] = parseJsonColumn(value, {});
-      continue;
-    }
-    record[outputField] = value;
+  for (const dbField in row) {
+    if (!Object.hasOwn(row, dbField)) continue;
+    const value = row[dbField];
+    const { name, kind } = columnPlan(entityName, definition, dbField);
+    if (kind === PLAIN) record[name] = value;
+    else if (kind === JSON_LIST) record[name] = parseJsonColumn(value, []);
+    else if (kind === BOOLEAN) record[name] = toBoolean(value);
+    else record[name] = parseJsonColumn(value, {});
   }
 
   return record;
@@ -323,13 +357,22 @@ function authWhereClause(entityName) {
   };
 }
 
-function compareValues(left, right) {
+const textOrder = new Intl.Collator(undefined, { sensitivity: "base" });
+
+/** A string's value as a date, or NaN — what compareValues tries first. */
+const asDate = (value) => (typeof value === "string" ? Date.parse(value) : Number.NaN);
+
+/**
+ * The one ordering rule: nothing sorts first; two dates by time; two
+ * numbers by size; anything else as text, ignoring case and accents.
+ * `leftDate` / `rightDate` are asDate() of each side, passed in so a sort
+ * can work them out once per record instead of twice per comparison.
+ */
+function compareWithDates(left, right, leftDate, rightDate) {
   if (left == null && right == null) return 0;
   if (left == null) return -1;
   if (right == null) return 1;
 
-  const leftDate = typeof left === "string" ? Date.parse(left) : Number.NaN;
-  const rightDate = typeof right === "string" ? Date.parse(right) : Number.NaN;
   if (!Number.isNaN(leftDate) && !Number.isNaN(rightDate)) {
     return leftDate - rightDate;
   }
@@ -338,7 +381,11 @@ function compareValues(left, right) {
     return left - right;
   }
 
-  return String(left).localeCompare(String(right), undefined, { sensitivity: "base" });
+  return textOrder.compare(String(left), String(right));
+}
+
+function compareValues(left, right) {
+  return compareWithDates(left, right, asDate(left), asDate(right));
 }
 
 function sortRecords(records, sortParam) {
@@ -350,17 +397,26 @@ function sortRecords(records, sortParam) {
 
   if (sortFields.length === 0) return [...records];
 
-  return [...records].sort((left, right) => {
-    for (const sortField of sortFields) {
-      const descending = sortField.startsWith("-");
-      const field = descending ? sortField.slice(1) : sortField;
-      const result = compareValues(left[field], right[field]);
-      if (result !== 0) {
-        return descending ? -result : result;
-      }
+  const keys = sortFields.map((sortField) => {
+    const descending = sortField.startsWith("-");
+    return { field: descending ? sortField.slice(1) : sortField, descending };
+  });
+  // Each record's sort values, and their dates, read once. Sorting a few
+  // thousand tasks by date makes ~50,000 comparisons, and parsing both
+  // dates inside every one of them was the rest of the cost of a list.
+  const decorated = records.map((record) => ({
+    record,
+    values: keys.map(({ field }) => record[field]),
+    dates: keys.map(({ field }) => asDate(record[field])),
+  }));
+  decorated.sort((left, right) => {
+    for (let i = 0; i < keys.length; i += 1) {
+      const result = compareWithDates(left.values[i], right.values[i], left.dates[i], right.dates[i]);
+      if (result !== 0) return keys[i].descending ? -result : result;
     }
     return 0;
   });
+  return decorated.map((entry) => entry.record);
 }
 
 function arrayContains(haystack, needle) {

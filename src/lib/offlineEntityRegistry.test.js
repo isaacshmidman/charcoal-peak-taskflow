@@ -58,7 +58,8 @@ describe("offlineEntityRegistry", () => {
 
     await replayRegisteredEntities(queryClient, {});
 
-    expect(apiClient.entities.Note.create).toHaveBeenCalledWith({ title: "draft" }); // _offlineId stripped
+    // _offlineId stripped from the record, and sent as the name of this create
+    expect(apiClient.entities.Note.create).toHaveBeenCalledWith({ title: "draft" }, { createKey: "offline_1" });
     expect(queryClient.getQueryData(["notes"])).toEqual([{ id: "note_real_1", title: "draft" }]);
     expect(NoteOffline.getPending()).toEqual([]);
   });
@@ -86,7 +87,7 @@ describe("offlineEntityRegistry", () => {
 
     await replayRegisteredEntities(queryClient, { offline_task_9: "task_real_9" });
 
-    expect(apiClient.entities.Linked.create).toHaveBeenCalledWith({ task_id: "task_real_9", label: "ref" });
+    expect(apiClient.entities.Linked.create).toHaveBeenCalledWith({ task_id: "task_real_9", label: "ref" }, { createKey: "offline_l1" });
   });
 
   it("retains failed mutations for the next pass", async () => {
@@ -101,6 +102,57 @@ describe("offlineEntityRegistry", () => {
     expect(pending).toHaveLength(1);
     expect(pending[0].data._offlineId).toBe("offline_f");
     expect(apiClient.entities.Note.update).toHaveBeenCalled(); // failure didn't block the rest
+  });
+
+  it("keeps a change that was queued while the replay was running", async () => {
+    NoteOffline.queueMutation({ type: "update", id: "note_1", data: { title: "first" } });
+    apiClient.entities.Note.update.mockImplementation(async () => {
+      // The connection drops again mid-replay, and another edit is made.
+      NoteOffline.queueMutation({ type: "update", id: "note_2", data: { title: "made during the replay" } });
+      return {};
+    });
+
+    await replayRegisteredEntities(queryClient, {});
+
+    const pending = NoteOffline.getPending();
+    expect(pending).toHaveLength(1);
+    expect(pending[0]).toMatchObject({ type: "update", id: "note_2", data: { title: "made during the replay" } });
+  });
+
+  it("an offline record edited while its create was in flight gets the edit as an update", async () => {
+    NoteOffline.queueMutation({ type: "create", data: { title: "v1", _offlineId: "offline_edit" } });
+    apiClient.entities.Note.create.mockImplementation(async () => {
+      NoteOffline.updateQueuedCreate("offline_edit", { title: "v2" });
+      return { id: "note_real" };
+    });
+    apiClient.entities.Note.update.mockResolvedValue({});
+
+    await replayRegisteredEntities(queryClient, {});
+
+    expect(apiClient.entities.Note.create).toHaveBeenCalledTimes(1);
+    expect(apiClient.entities.Note.update).toHaveBeenCalledWith("note_real", { title: "v2" });
+    expect(NoteOffline.getPending()).toEqual([]);
+  });
+
+  it("drops a change the server will never accept, and reports it — but keeps one that only failed for now", async () => {
+    const refusal = (status, message) => Object.assign(new Error(message), { status });
+    NoteOffline.queueMutation({ type: "update", id: "note_gone", data: { title: "edit of a deleted note" } });
+    NoteOffline.queueMutation({ type: "delete", id: "note_gone_too" });
+    NoteOffline.queueMutation({ type: "create", data: { title: "Too long", _offlineId: "offline_bad" } });
+    NoteOffline.queueMutation({ type: "update", id: "note_busy", data: { title: "server hiccup" } });
+    NoteOffline.queueMutation({ type: "update", id: "note_signed_out", data: { title: "signed out" } });
+    apiClient.entities.Note.update
+      .mockRejectedValueOnce(refusal(404, "Not found."))
+      .mockRejectedValueOnce(refusal(503, "Unavailable"))
+      .mockRejectedValueOnce(refusal(401, "Sign in"));
+    apiClient.entities.Note.delete.mockRejectedValueOnce(refusal(404, "Not found."));
+    apiClient.entities.Note.create.mockRejectedValueOnce(refusal(400, "title is too long."));
+
+    const result = await replayRegisteredEntities(queryClient, {});
+
+    // Gone on the server already: nothing to say. Refused: said.
+    expect(result.refused).toEqual([{ entity: "Note", type: "create", title: "Too long", message: "title is too long." }]);
+    expect(NoteOffline.getPending().map((m) => m.id)).toEqual(["note_busy", "note_signed_out"]);
   });
 
   it("folds edits and deletes into a queued create", () => {
@@ -152,7 +204,7 @@ describe("registry capabilities for legacy entities", () => {
 
     await replayRegisteredEntities(queryClient, {});
 
-    expect(apiClient.entities.SelfRef.create).toHaveBeenNthCalledWith(2, { title: "c", parent_id: "real_parent" });
+    expect(apiClient.entities.SelfRef.create).toHaveBeenNthCalledWith(2, { title: "c", parent_id: "real_parent" }, { createKey: "offline_c" });
   });
 
   it("applyIdSwap replaces the default cache swap", async () => {

@@ -43,7 +43,7 @@ export function useOfflineEntityMutation(entityName) {
     applyToCache((current) => [optimistic, ...current]);
     if (isOnline()) {
       try {
-        const result = await apiClient.entities[entityName].create(data);
+        const result = await apiClient.entities[entityName].create(data, { createKey: optimisticId });
         applyToCache((current) => current.map((r) => (r.id === optimisticId ? { ...r, ...result } : r)));
         return result;
       } catch (error) {

@@ -1,5 +1,7 @@
 // @ts-check
+import { createHash } from "node:crypto";
 import { URL } from "node:url";
+import { gzip } from "node:zlib";
 import { log } from "./log.js";
 import { MAX_JSON_BODY_BYTES } from "./limits.js";
 
@@ -168,6 +170,40 @@ export function sameOriginUrl(target, publicAppUrl, fallbackPath = "/") {
   return new URL(fallbackPath, base).toString();
 }
 
+/** Below this a response isn't worth compressing: it fits in one packet. */
+const MIN_COMPRESS_BYTES = 1024;
+
+/**
+ * True when the request says it can read gzip.
+ * @param {import("node:http").IncomingMessage | undefined | null} request
+ */
+export function acceptsGzip(request) {
+  const header = String(request?.headers?.["accept-encoding"] || "");
+  return /(^|,)\s*(gzip|\*)\s*(;\s*q=(?!0(\.0*)?\s*(,|$))[^,]*)?\s*(,|$)/i.test(header);
+}
+
+/**
+ * A fingerprint of a response body. Weak (`W/`): it names the content,
+ * not its exact bytes, so it stays true whether or not the body goes out
+ * compressed.
+ * @param {string} text
+ */
+export function etagFor(text) {
+  return `W/"${createHash("sha1").update(text).digest("base64url")}"`;
+}
+
+/**
+ * @param {unknown} header  the request's If-None-Match
+ * @param {string} etag
+ */
+function sameEtag(header, etag) {
+  if (!header) return false;
+  const bare = etag.replace(/^W\//, "");
+  return String(header)
+    .split(",")
+    .some((candidate) => candidate.trim().replace(/^W\//, "") === bare || candidate.trim() === "*");
+}
+
 /**
  * @param {import("node:http").ServerResponse} response
  * @param {number} status
@@ -175,12 +211,79 @@ export function sameOriginUrl(target, publicAppUrl, fallbackPath = "/") {
  * @param {Record<string, string | string[]>} [headers]
  */
 export function sendJson(response, status, data, headers = {}) {
-  response.writeHead(status, {
+  sendJsonText(response, status, JSON.stringify(data), headers);
+}
+
+/**
+ * Send JSON that is already text. Two things happen here that used not to:
+ *
+ *  - A GET carries an ETag, and a client that sends it back
+ *    (If-None-Match) gets a bodiless 304 when nothing has changed. The app
+ *    asks for its whole task list every time a page opens or the window
+ *    is focused; almost every time the answer is the one it already has.
+ *  - Anything over a kilobyte goes out gzipped when the client can read
+ *    it. A task list shrinks about thirty-fold, and the slow leg of the
+ *    trip — out of the house, up to Cloudflare — is the one that carried
+ *    it uncompressed. Compression runs off the main thread.
+ *
+ * `prepared` lets a caller that keeps answers (the entity list cache)
+ * hand over the ETag and the compressed bytes it already has; a freshly
+ * compressed body is stored back on it.
+ *
+ * @param {import("node:http").ServerResponse} response
+ * @param {number} status
+ * @param {string | undefined} text
+ * @param {Record<string, string | string[]>} [headers]
+ * @param {{ etag?: string, gzipped?: Buffer | null }} [prepared]
+ */
+export function sendJsonText(response, status, text, headers = {}, prepared) {
+  /** @type {any} */
+  const head = {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
     ...headers,
+  };
+  const request = /** @type {import("node:http").IncomingMessage | undefined} */ (/** @type {any} */ (response).req);
+  const body = text ?? "";
+  // A kept answer may be down to its compressed copy and its ETag.
+  const ready = prepared?.gzipped && prepared.etag ? prepared.gzipped : null;
+
+  if (status === 200 && request?.method === "GET" && (body || ready)) {
+    const etag = prepared?.etag || etagFor(body);
+    if (prepared) prepared.etag = etag;
+    head.ETag = etag;
+    if (sameEtag(request.headers?.["if-none-match"], etag)) {
+      response.writeHead(304, head);
+      response.end();
+      return;
+    }
+  }
+
+  if (!acceptsGzip(request) || (!ready && body.length < MIN_COMPRESS_BYTES)) {
+    response.writeHead(status, head);
+    response.end(text);
+    return;
+  }
+
+  /** @param {Buffer} gzipped */
+  const sendCompressed = (gzipped) => {
+    response.writeHead(status, { ...head, "Content-Encoding": "gzip", "Content-Length": gzipped.length });
+    response.end(gzipped);
+  };
+  if (prepared?.gzipped) {
+    sendCompressed(prepared.gzipped);
+    return;
+  }
+  gzip(body, { level: 6 }, (error, gzipped) => {
+    if (response.destroyed || response.writableEnded) return;
+    if (error) {
+      response.writeHead(status, head);
+      response.end(body);
+      return;
+    }
+    if (prepared) prepared.gzipped = gzipped;
+    sendCompressed(gzipped);
   });
-  response.end(JSON.stringify(data));
 }
 
 /**

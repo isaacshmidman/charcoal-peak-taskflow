@@ -351,6 +351,20 @@ export function createDatabase(config = backendConfig) {
       PRIMARY KEY (app_id, user_id, entity, source_id)
     );
 
+    -- A record the app made under a name of its own choosing (routes/
+    -- entities.js). When the answer to "create this" is lost on the way
+    -- back, the app asks again under the same name; this is how the
+    -- second ask finds the first one's record instead of making a twin.
+    CREATE TABLE IF NOT EXISTS created_once (
+      app_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      entity TEXT NOT NULL,
+      create_key TEXT NOT NULL,
+      record_id TEXT NOT NULL,
+      created_date TEXT NOT NULL,
+      PRIMARY KEY (app_id, user_id, entity, create_key)
+    );
+
     -- AI apps (backend/ai/). A grant is one connected app for one user —
     -- a personal token, or later an OAuth sign-in. can_write is read on
     -- every request, so changing it in Settings takes effect at once.

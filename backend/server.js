@@ -1,11 +1,12 @@
 // @ts-check
 import http from "node:http";
-import { createReadStream, existsSync, statSync } from "node:fs";
+import { createReadStream, existsSync, readFile, statSync } from "node:fs";
+import { gzip } from "node:zlib";
 import { extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { backendConfig } from "./config.js";
 import { closeDatabase, getDatabase } from "./db.js";
-import { HttpError, getRequestUrl, publicOrigin, sendError, sendJson } from "./http.js";
+import { HttpError, acceptsGzip, getRequestUrl, publicOrigin, sendError, sendJson } from "./http.js";
 import { log } from "./log.js";
 import { anyPasswordAllowed, purgeExpiredAuthRecords } from "./auth.js";
 import { contentSecurityPolicy, scriptNonce, securityHeaders } from "./security-headers.js";
@@ -20,7 +21,7 @@ import { handleNotificationsRoute } from "./routes/notifications.js";
 import { handleScheduleDefaultsRoute } from "./routes/schedule-defaults.js";
 import { handleSessionsRoute } from "./routes/sessions.js";
 import { handleAttachmentsRoute } from "./routes/attachments.js";
-import { handleEntitiesRoute } from "./routes/entities.js";
+import { handleEntitiesRoute, purgeOldCreateKeys } from "./routes/entities.js";
 import { handleExportRoute } from "./routes/export.js";
 import { handleRestoreRoute } from "./routes/restore.js";
 import { handleAiRoute } from "./routes/ai.js";
@@ -118,10 +119,48 @@ function resolveStaticFile(requestPathname, distRoot) {
 
 function getCacheControl(filePath) {
   const name = filePath.split("/").pop() || "";
-  if (/sw\.js$|registerSW\.js$|\.html$/i.test(name)) {
+  // The page, the service worker, and the list of the build's files
+  // (which the service worker reads to find a new build) are never kept.
+  if (/sw\.js$|registerSW\.js$|\.html$|^asset-list\.json$/i.test(name)) {
     return "no-store";
   }
   return "public, max-age=31536000, immutable";
+}
+
+/** File types that shrink when compressed (images and fonts already are). */
+const COMPRESSIBLE = new Set([".html", ".css", ".js", ".mjs", ".json", ".svg"]);
+
+/**
+ * Compressed copies of the app's own files, made the first time each is
+ * asked for. The build is a handful of files that don't change while the
+ * server runs; a copy is redone if its file's size or date does.
+ * @type {Map<string, { stamp: string, gzipped: Buffer }>}
+ */
+const compressedFiles = new Map();
+
+/**
+ * @param {string} filePath
+ * @param {(gzipped: Buffer | null) => void} done  null: send it as it is
+ */
+function compressedCopy(filePath, done) {
+  let stamp = "";
+  try {
+    const stat = statSync(filePath);
+    if (stat.size < 1024) return done(null);
+    stamp = `${stat.size}:${stat.mtimeMs}`;
+  } catch {
+    return done(null);
+  }
+  const kept = compressedFiles.get(filePath);
+  if (kept && kept.stamp === stamp) return done(kept.gzipped);
+  readFile(filePath, (readError, contents) => {
+    if (readError) return done(null);
+    gzip(contents, { level: 9 }, (gzipError, gzipped) => {
+      if (gzipError) return done(null);
+      compressedFiles.set(filePath, { stamp, gzipped });
+      done(gzipped);
+    });
+  });
 }
 
 function serveStaticFile(response, filePath) {
@@ -137,8 +176,21 @@ function serveStaticFile(response, filePath) {
     // one script Cloudflare adds on the way to the browser.
     response.setHeader("Content-Security-Policy", contentSecurityPolicy(filePath, scriptNonce()));
   }
-  response.writeHead(200);
-  createReadStream(filePath).pipe(response);
+  if (!COMPRESSIBLE.has(ext) || !acceptsGzip(response.req)) {
+    response.writeHead(200);
+    createReadStream(filePath).pipe(response);
+    return;
+  }
+  compressedCopy(filePath, (gzipped) => {
+    if (response.destroyed || response.writableEnded) return;
+    if (!gzipped) {
+      response.writeHead(200);
+      createReadStream(filePath).pipe(response);
+      return;
+    }
+    response.writeHead(200, { "Content-Encoding": "gzip", "Content-Length": gzipped.length });
+    response.end(gzipped);
+  });
 }
 
 export function createTaskflowServer(config = backendConfig) {
@@ -200,11 +252,14 @@ export function createRequestHandler(config = backendConfig, db = getDatabase(co
     // matters only for a dev setup that points VITE_API_BASE_URL across
     // ports — which is exactly what publicAppUrl names.
     const requestOrigin = request.headers.origin || "";
-    response.setHeader("Vary", "Origin");
+    // The answer differs by who is asking (CORS) and by whether they can
+    // read a compressed one.
+    response.setHeader("Vary", "Origin, Accept-Encoding");
     if (requestOrigin && requestOrigin === publicOrigin(config)) {
       response.setHeader("Access-Control-Allow-Origin", requestOrigin);
       response.setHeader("Access-Control-Allow-Credentials", "true");
-      response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-App-Id, X-Origin-URL");
+      response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-App-Id, X-Origin-URL, If-None-Match, Idempotency-Key");
+      response.setHeader("Access-Control-Expose-Headers", "ETag");
       response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
     }
 
@@ -240,6 +295,7 @@ export function createRequestHandler(config = backendConfig, db = getDatabase(co
         purgeExpiredAuthRecords(db);
         purgeExpiredAiRecords(db);
         purgeExpiredOAuthRecords(db);
+        purgeOldCreateKeys(db);
         // Recently Deleted runs out on time, with its files, whether or not
         // anyone opens it. Housekeeping: never what decides health.
         try {

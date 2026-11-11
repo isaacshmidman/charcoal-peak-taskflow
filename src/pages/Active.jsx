@@ -2,6 +2,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { apiClient } from "@/api/apiClient";
 import { useQuery } from "@tanstack/react-query";
+import { useGrowingList } from "@/hooks/useGrowingList";
 import { useOfflineMutation } from "@/hooks/useOfflineMutation";
 import { formatDeleteLabel, useDeleteWithUndo } from "@/hooks/useDeleteWithUndo";
 import { showDeleteToast } from "@/components/tasks/DeleteToast";
@@ -169,6 +170,8 @@ export default function Active() {
       return 0;
     });
   }, [topLevelTasks, sorts, priorityOrderMap, search, hiddenCalendars, calendarIndexByKey]);
+  // Drawn a couple of screens at a time; the rest as the page is scrolled.
+  const list = useGrowingList(activeTasks);
 
   return (
     <div className="space-y-5">
@@ -198,7 +201,7 @@ export default function Active() {
       ) : (
         <div className="ds-list">
           <AnimatePresence mode="popLayout">
-            {activeTasks.map(task => (
+            {list.shown.map(task => (
               <TaskCard
                 key={task.id}
                 task={task}
@@ -215,6 +218,7 @@ export default function Active() {
               />
             ))}
           </AnimatePresence>
+          {list.more && <div ref={list.markerRef} aria-hidden="true" className="h-px" data-testid="list-more" />}
         </div>
       )}
 

@@ -202,7 +202,9 @@ describe("useOfflineMutation", () => {
         status: "done",
         task_type: "one_time",
         due_date: "2026-03-28",
-      })
+      }),
+      // The create's own name, so a retry can't make a second snapshot.
+      { createKey: expect.any(String) }
     );
 
     // Should advance the recurring task

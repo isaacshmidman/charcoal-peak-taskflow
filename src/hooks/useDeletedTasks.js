@@ -32,7 +32,7 @@ export function useDeletedTasks() {
 
     if (isOnline()) {
       try {
-        const result = await apiClient.entities.DeletedTask.create(record);
+        const result = await apiClient.entities.DeletedTask.create(record, { createKey: optimisticId });
         applyToCache(current => current.map(r => r.id === optimisticId ? { ...r, id: result.id } : r));
         return result.id;
       } catch (error) {

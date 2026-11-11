@@ -12,6 +12,7 @@ import { SHORTCUT_EVENTS } from "@/lib/shortcuts";
 
 let _setToast = null;
 
+/** @param {{ label: string, onUndo?: (() => void) | null, hideUndo?: boolean, duration?: number }} toast */
 export function showDeleteToast({ label, onUndo, hideUndo = false, duration = 3000 }) {
   if (_setToast) _setToast({ label, onUndo, hideUndo: hideUndo || !onUndo, duration, id: Date.now() });
 }

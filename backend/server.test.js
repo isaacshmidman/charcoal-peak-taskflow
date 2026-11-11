@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { validateHeaderValue } from "node:http";
 import { Readable } from "node:stream";
+import { gunzipSync } from "node:zlib";
+import { DatabaseSync } from "node:sqlite";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createHash, randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
@@ -106,6 +108,8 @@ function createMockResponse() {
 async function invokeRaw(path, init = {}) {
   const request = createMockRequest({ method: init.method || "GET", url: path, headers: init.headers || {}, body: undefined });
   const response = createMockResponse();
+  // A real response knows the request it answers.
+  /** @type {any} */ (response).req = request;
   await handler(request, response);
   return response.asBuffer();
 }
@@ -118,6 +122,7 @@ async function invoke(path, init = {}) {
     body: init.body,
   });
   const response = createMockResponse();
+  /** @type {any} */ (response).req = request;
   await handler(request, response);
   return response.asJson();
 }
@@ -839,7 +844,242 @@ describe("CORS", () => {
     const other = await invoke("/api/health", { headers: { Origin: "https://evil.example" } });
     expect(other.headers["Access-Control-Allow-Origin"]).toBeUndefined();
     expect(other.headers["Access-Control-Allow-Credentials"]).toBeUndefined();
-    expect(other.headers.Vary).toBe("Origin");
+    expect(other.headers.Vary).toBe("Origin, Accept-Encoding");
+  });
+});
+
+describe("answers that haven't changed, and smaller ones", () => {
+  const TASKS = "/api/apps/test-app/entities/Task?sort=-created_date&limit=5000";
+  const json = (token) => ({ Authorization: `Bearer ${token}`, "Content-Type": "application/json" });
+  const addTask = async (token, title) => {
+    const made = await invoke("/api/apps/test-app/entities/Task", {
+      method: "POST",
+      headers: json(token),
+      body: { title, due_date: "2026-11-10", description: "x".repeat(300) },
+    });
+    expect(made.statusCode).toBe(201);
+    return made.body;
+  };
+  /** The list as a browser asks for it: able to read gzip. */
+  const listZipped = async (token, extra = {}) => {
+    const result = await invokeRaw(TASKS, { headers: { ...json(token), "Accept-Encoding": "gzip, deflate, br", ...extra } });
+    const zipped = result.headers["Content-Encoding"] === "gzip";
+    const text = (zipped ? gunzipSync(result.body) : result.body).toString("utf8");
+    return { ...result, zipped, tasks: text ? JSON.parse(text) : null };
+  };
+
+  it("sends a long list compressed to a browser that can read it, and plain to one that can't", async () => {
+    const token = await login("zip@example.com");
+    for (const title of ["One", "Two", "Three", "Four", "Five"]) await addTask(token, title);
+
+    const plain = await invoke(TASKS, { headers: json(token) });
+    expect(plain.headers["Content-Encoding"]).toBeUndefined();
+    expect(plain.body.map((t) => t.title).sort()).toEqual(["Five", "Four", "One", "Three", "Two"]);
+
+    const zipped = await listZipped(token);
+    expect(zipped.zipped).toBe(true);
+    expect(zipped.headers["Content-Length"]).toBe(zipped.body.length);
+    expect(zipped.body.length).toBeLessThan(JSON.stringify(plain.body).length / 2);
+    expect(zipped.tasks).toEqual(plain.body);
+    // Asked again, the kept copy is the same list — compressed or not.
+    expect((await listZipped(token)).tasks).toEqual(plain.body);
+    expect((await invoke(TASKS, { headers: json(token) })).body).toEqual(plain.body);
+
+    // "gzip;q=0" is a browser saying it can't.
+    const refused = await invokeRaw(TASKS, { headers: { ...json(token), "Accept-Encoding": "gzip;q=0, identity" } });
+    expect(refused.headers["Content-Encoding"]).toBeUndefined();
+    expect(JSON.parse(refused.body.toString("utf8"))).toEqual(plain.body);
+
+    // A short answer isn't worth compressing.
+    const short = await invokeRaw("/api/health", { headers: { "Accept-Encoding": "gzip" } });
+    expect(short.headers["Content-Encoding"]).toBeUndefined();
+  });
+
+  it("answers \"nothing has changed\" without sending the list again, until something does", async () => {
+    const token = await login("etag@example.com");
+    const first = await addTask(token, "First");
+
+    const full = await listZipped(token);
+    const etag = String(full.headers.ETag);
+    expect(etag).toMatch(/^W\/"[\w-]+"$/);
+    expect(full.headers["Cache-Control"]).toBe("no-store");
+
+    const same = await listZipped(token, { "If-None-Match": etag });
+    expect(same.statusCode).toBe(304);
+    expect(same.body.length).toBe(0);
+    expect(same.headers.ETag).toBe(etag);
+    // The same answer whether or not it would have been compressed.
+    expect((await invokeRaw(TASKS, { headers: { ...json(token), "If-None-Match": etag } })).statusCode).toBe(304);
+
+    // A change through the app: the whole list comes back, with the change.
+    await invoke(`/api/apps/test-app/entities/Task/${first.id}`, { method: "PUT", headers: json(token), body: { title: "First, renamed" } });
+    const changed = await listZipped(token, { "If-None-Match": etag });
+    expect(changed.statusCode).toBe(200);
+    expect(changed.tasks.map((t) => t.title)).toEqual(["First, renamed"]);
+    expect(changed.headers.ETag).not.toBe(etag);
+
+    // A change made behind the routes' back — a calendar sync, a restore —
+    // is a change all the same.
+    db.prepare("UPDATE tasks SET title = ? WHERE id = ?").run("Renamed by a sync", first.id);
+    const synced = await listZipped(token, { "If-None-Match": String(changed.headers.ETag) });
+    expect(synced.statusCode).toBe(200);
+    expect(synced.tasks.map((t) => t.title)).toEqual(["Renamed by a sync"]);
+
+    // So is one made by another program with the database open.
+    const elsewhere = new DatabaseSync(config.dbFile);
+    elsewhere.prepare("UPDATE tasks SET title = ? WHERE id = ?").run("Renamed from outside", first.id);
+    elsewhere.close();
+    const outside = await listZipped(token, { "If-None-Match": String(synced.headers.ETag) });
+    expect(outside.statusCode).toBe(200);
+    expect(outside.tasks.map((t) => t.title)).toEqual(["Renamed from outside"]);
+
+    // A different question is a different answer.
+    const done = await invoke("/api/apps/test-app/entities/Task?sort=-created_date&limit=5000&q=%7B%22status%22%3A%22done%22%7D", { headers: json(token) });
+    expect(done.body).toEqual([]);
+
+    // Only a GET can be "unchanged": saving twice saves twice.
+    const again = await invoke(`/api/apps/test-app/entities/Task/${first.id}`, {
+      method: "PUT",
+      headers: { ...json(token), "If-None-Match": "*" },
+      body: { title: "Renamed from outside" },
+    });
+    expect(again.statusCode).toBe(200);
+    expect(again.headers.ETag).toBeUndefined();
+  });
+
+  it("never hands one person the list kept for another", async () => {
+    const mine = await login("kept-mine@example.com");
+    const theirs = await login("kept-theirs@example.com");
+    await addTask(mine, "Mine alone");
+
+    const myList = await listZipped(mine);
+    expect(myList.tasks.map((t) => t.title)).toEqual(["Mine alone"]);
+    // The same address, the same question, another person.
+    const theirList = await listZipped(theirs, { "If-None-Match": String(myList.headers.ETag) });
+    expect(theirList.statusCode).toBe(200);
+    expect(theirList.tasks).toEqual([]);
+    expect((await listZipped(mine)).tasks.map((t) => t.title)).toEqual(["Mine alone"]);
+    // And no list at all without signing in.
+    expect((await invokeRaw(TASKS, { headers: { "If-None-Match": String(myList.headers.ETag) } })).statusCode).toBe(401);
+  });
+
+  it("sends the app's own files compressed, and leaves pictures and small files as they are", async () => {
+    const script = `// the app\n${'console.log("a line of the app");\n'.repeat(200)}`;
+    const picture = randomBytes(4096);
+    mkdirSync(join(config.distRoot, "assets"), { recursive: true });
+    writeFileSync(join(config.distRoot, "assets", "big-91ab3c.js"), script);
+    writeFileSync(join(config.distRoot, "assets", "tiny-000001.js"), "1;\n");
+    writeFileSync(join(config.distRoot, "assets", "photo-77aa10.png"), picture);
+    const gzip = { "Accept-Encoding": "gzip, br" };
+
+    const zipped = await invokeRaw("/assets/big-91ab3c.js", { headers: gzip });
+    expect(zipped.statusCode).toBe(200);
+    expect(zipped.headers["Content-Encoding"]).toBe("gzip");
+    expect(zipped.headers["Content-Type"]).toBe("application/javascript; charset=utf-8");
+    expect(zipped.headers["Cache-Control"]).toBe("public, max-age=31536000, immutable");
+    expect(zipped.headers.Vary).toBe("Origin, Accept-Encoding");
+    expect(zipped.body.length).toBeLessThan(script.length / 10);
+    expect(gunzipSync(zipped.body).toString("utf8")).toBe(script);
+    // The second time it comes from the copy already made.
+    expect(gunzipSync((await invokeRaw("/assets/big-91ab3c.js", { headers: gzip })).body).toString("utf8")).toBe(script);
+
+    const plain = await invokeRaw("/assets/big-91ab3c.js");
+    expect(plain.headers["Content-Encoding"]).toBeUndefined();
+    expect(plain.body.toString("utf8")).toBe(script);
+
+    const tiny = await invokeRaw("/assets/tiny-000001.js", { headers: gzip });
+    expect(tiny.headers["Content-Encoding"]).toBeUndefined();
+    expect(tiny.body.toString("utf8")).toBe("1;\n");
+
+    const photo = await invokeRaw("/assets/photo-77aa10.png", { headers: gzip });
+    expect(photo.headers["Content-Encoding"]).toBeUndefined();
+    expect(photo.body.equals(picture)).toBe(true);
+
+    // The list of the build's files is how a new build is noticed, so it
+    // is never kept by a browser.
+    writeFileSync(join(config.distRoot, "asset-list.json"), JSON.stringify(["/assets/big-91ab3c.js"]));
+    const list = await invokeRaw("/asset-list.json");
+    expect(list.headers["Cache-Control"]).toBe("no-store");
+    expect(JSON.parse(list.body.toString("utf8"))).toEqual(["/assets/big-91ab3c.js"]);
+
+    // A new build under the same name is never answered with the old copy.
+    const rebuilt = script.replace("// the app", "// the app, rebuilt");
+    writeFileSync(join(config.distRoot, "assets", "big-91ab3c.js"), rebuilt);
+    expect(gunzipSync((await invokeRaw("/assets/big-91ab3c.js", { headers: gzip })).body).toString("utf8")).toBe(rebuilt);
+  });
+});
+
+describe("a create asked for twice", () => {
+  const json = (token, key) => ({
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+    ...(key ? { "Idempotency-Key": key } : {}),
+  });
+  const TASKS = "/api/apps/test-app/entities/Task";
+  const titles = async (token) => (await invoke(TASKS, { headers: json(token) })).body.map((t) => t.title).sort();
+
+  it("makes one record when the app repeats a create under the same name", async () => {
+    const token = await login("once@example.com");
+    const key = "offline_1731200000000_ab12cd";
+
+    const first = await invoke(TASKS, { method: "POST", headers: json(token, key), body: { title: "Sent twice", due_date: "2026-11-10" } });
+    expect(first.statusCode).toBe(201);
+    // The answer never arrived; the app sends it again.
+    const second = await invoke(TASKS, { method: "POST", headers: json(token, key), body: { title: "Sent twice", due_date: "2026-11-10" } });
+    expect(second.statusCode).toBe(200);
+    expect(second.headers["Idempotent-Replayed"]).toBe("true");
+    expect(second.body.id).toBe(first.body.id);
+    expect(second.body.title).toBe("Sent twice");
+    expect(await titles(token)).toEqual(["Sent twice"]);
+
+    // Another name, or none, is another task.
+    await invoke(TASKS, { method: "POST", headers: json(token, "offline_1731200000001_zz99zz"), body: { title: "A different one" } });
+    await invoke(TASKS, { method: "POST", headers: json(token), body: { title: "Sent twice" } });
+    expect(await titles(token)).toEqual(["A different one", "Sent twice", "Sent twice"]);
+
+    // A name that isn't a plain short one is ignored, not trusted.
+    for (const bad of ["x", "has spaces in it", "a".repeat(200)]) {
+      const made = await invoke(TASKS, { method: "POST", headers: json(token, bad), body: { title: "Odd name" } });
+      expect(made.statusCode).toBe(201);
+    }
+    expect((await titles(token)).filter((t) => t === "Odd name")).toHaveLength(3);
+  });
+
+  it("keeps names apart by person and by kind of record", async () => {
+    const mine = await login("once-mine@example.com");
+    const theirs = await login("once-theirs@example.com");
+    const key = "offline_1731200000002_shared";
+
+    const myTask = await invoke(TASKS, { method: "POST", headers: json(mine, key), body: { title: "Mine" } });
+    const theirTask = await invoke(TASKS, { method: "POST", headers: json(theirs, key), body: { title: "Theirs" } });
+    expect(theirTask.statusCode).toBe(201);
+    expect(theirTask.body.id).not.toBe(myTask.body.id);
+    expect(await titles(theirs)).toEqual(["Theirs"]);
+
+    const myNote = await invoke("/api/apps/test-app/entities/Note", { method: "POST", headers: json(mine, key), body: { title: "A note under the same name" } });
+    expect(myNote.statusCode).toBe(201);
+    expect(myNote.body.id).not.toBe(myTask.body.id);
+  });
+
+  it("leaves a record deleted since deleted, and says which it was", async () => {
+    const token = await login("once-gone@example.com");
+    const key = "offline_1731200000003_gone01";
+    const made = await invoke(TASKS, { method: "POST", headers: json(token, key), body: { title: "Made, then deleted" } });
+    await invoke(`${TASKS}/${made.body.id}`, { method: "DELETE", headers: json(token) });
+
+    const again = await invoke(TASKS, { method: "POST", headers: json(token, key), body: { title: "Made, then deleted" } });
+    expect(again.statusCode).toBe(200);
+    expect(again.body).toEqual({ id: made.body.id, gone: true });
+    expect(await titles(token)).toEqual([]);
+  });
+
+  it("forgets names after a month", async () => {
+    const token = await login("once-old@example.com");
+    const key = "offline_1731200000004_old001";
+    await invoke(TASKS, { method: "POST", headers: json(token, key), body: { title: "Long ago" } });
+    db.prepare("UPDATE created_once SET created_date = ? WHERE create_key = ?").run("2026-01-01T00:00:00.000Z", key);
+    await invoke("/api/health");
+    expect(db.prepare("SELECT COUNT(*) AS n FROM created_once WHERE create_key = ?").get(key).n).toBe(0);
   });
 });
 

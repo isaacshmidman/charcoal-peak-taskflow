@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
+import { useGrowingList } from "@/hooks/useGrowingList";
 import { Trash2 } from "lucide-react";
 import { apiClient } from "@/api/apiClient";
 import { formatDeleteLabel, restoreDeletionSnapshots, useDeleteWithUndo } from "@/hooks/useDeleteWithUndo";
@@ -57,7 +58,9 @@ export default function Completed() {
 
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ["tasks"],
-    queryFn: () => apiClient.entities.Task.list("-completed_at", 5000),
+    // Asked for exactly as every other page asks, so they all share one
+    // answer; this page puts its own order on it below.
+    queryFn: () => apiClient.entities.Task.list("-created_date", 5000),
     // Calendar-imported events live only on /Calendar.
     select: excludeExternalEvents,
   });
@@ -109,6 +112,8 @@ export default function Completed() {
       calendarIndexByKey
     );
   }, [priorityOrderMap, search, sorts, tasks, undoingItems, hiddenCalendars, calendarIndexByKey]);
+  // Drawn a couple of screens at a time; the rest as the page is scrolled.
+  const list = useGrowingList(completedItems);
 
   const handleToggleDone = (task) => {
     // Subtask: toggle its status independently — do not touch parent.
@@ -216,7 +221,7 @@ export default function Completed() {
       ) : (
         <div className="ds-list">
           <AnimatePresence mode="popLayout">
-            {completedItems.map((item) => {
+            {list.shown.map((item) => {
               return (
                 <TaskCard
                   key={item.id}
@@ -234,6 +239,7 @@ export default function Completed() {
               );
             })}
           </AnimatePresence>
+          {list.more && <div ref={list.markerRef} aria-hidden="true" className="h-px" data-testid="list-more" />}
         </div>
       )}
 
