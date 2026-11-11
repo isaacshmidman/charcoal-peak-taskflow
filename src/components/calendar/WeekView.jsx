@@ -314,6 +314,16 @@ export default function WeekView({
           </div>
         </div>
 
+        {/* A little room above midnight, so the "12 AM" label — centred on
+            its line like every other hour — isn't cut in half by the day
+            headers. The cells carry the lines between days up to them. */}
+        <div aria-hidden="true" className="flex h-2.5">
+          <div className="w-12 shrink-0 bg-surface-card" />
+          {days.map((d) => (
+            <div key={toDateStr(d)} className="min-w-0 flex-1 border-l border-ink-100 dark:border-night-line" />
+          ))}
+        </div>
+
         {/* Timed grid */}
         <div className="flex">
           <div className="w-12 shrink-0 bg-surface-card relative" style={{ height: HOURS.length * HOUR_HEIGHT }}>

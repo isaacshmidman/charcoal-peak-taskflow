@@ -309,6 +309,13 @@ export default function DayView({
             onCreate={createAllDay}
           />
         )}
+        {/* A little room above midnight, so the "12 AM" label — centred on
+            its line like every other hour — isn't cut in half by the top
+            of the grid. It carries the gutter's rule so that still runs
+            unbroken to the top. */}
+        <div aria-hidden="true" className="relative h-2.5">
+          <div className="absolute inset-y-0 left-12 w-px bg-ink-100 dark:bg-night-line" />
+        </div>
         <TimedDropZone dateStr={dateStr}>
           {/* The vertical rule sits at the gutter's edge, lining up with
               the one MobileAllDayOverlay already draws beside its expand

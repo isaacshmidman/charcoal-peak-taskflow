@@ -2,7 +2,7 @@
 /**
  * @file The top of the Calendar page: the shared page header (title,
  * count, search, which calendars show, sort, New Task) with a second row
- * under it — step back/forward, the range on show, Today, sync, and the
+ * under it — Today, step back/forward, the range on show, sync, and the
  * view switch.
  *
  * Stateless: every interactive piece is driven by props from the parent
@@ -10,7 +10,7 @@
  */
 import { ChevronLeft, ChevronRight, Plus, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import PageHeader, { PageSearch } from "@/components/PageHeader";
+import PageHeader, { PageSearch, headerIconButton } from "@/components/PageHeader";
 import { cn } from "@/lib/utils";
 import MultiSortPanel from "@/components/tasks/MultiSortPanel";
 import CalendarVisibilityDropdown from "@/components/calendar/CalendarVisibilityDropdown";
@@ -46,17 +46,28 @@ export default function CalendarToolbar({
       title="Calendar"
       sub={<>{scopedCount} task{scopedCount !== 1 ? "s" : ""}</>}
       below={
-        // Where you are and how you're looking at it. Left: step back and
-        // forward, the range, and a way home to today. Right: the view.
+        // Where you are and how you're looking at it. Left, in the order
+        // every calendar uses: Today, back and forward, then the range
+        // they act on. Right: the view.
         // On a phone the view switch drops to its own line, full width.
         <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
           <div className="flex min-w-0 items-center gap-1">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mr-1 h-8 shrink-0 rounded-full px-3.5 text-xs"
+              onClick={onToday}
+              title="Jump to today"
+            >
+              Today
+            </Button>
             <Button
               aria-label="Previous"
               title="Previous"
               variant="ghost"
               size="icon"
-              className="-ml-2 h-8 w-8 shrink-0 text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-ink-100"
+              className={cn(headerIconButton, "h-8 w-8 shrink-0")}
               onClick={onPrev}
             >
               <ChevronLeft className="h-4 w-4" />
@@ -66,24 +77,14 @@ export default function CalendarToolbar({
               title="Next"
               variant="ghost"
               size="icon"
-              className="h-8 w-8 shrink-0 text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-ink-100"
+              className={cn(headerIconButton, "h-8 w-8 shrink-0")}
               onClick={onNext}
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
-            <span className="ml-1 truncate text-[15px] font-semibold tabular-nums text-ink-900 dark:text-ink-100" data-testid="calendar-range">
+            <span className="ml-1.5 truncate text-[15px] font-semibold tabular-nums text-ink-900 dark:text-ink-100" data-testid="calendar-range">
               {rangeLabel}
             </span>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="ml-2 h-7 shrink-0 px-2.5 text-xs"
-              onClick={onToday}
-              title="Jump to today"
-            >
-              Today
-            </Button>
           </div>
           <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end">
             {activeIntegration && (

@@ -1081,3 +1081,38 @@ test("groupings: the page itself never scrolls, a sideways swipe always moves th
   await expect(past).toBeVisible();
   expect(await pageOverflow()).toBe(0);
 });
+
+test("calendar: Today and the arrows sit before the date, and midnight's label is whole", async ({ page }) => {
+  await installMockBackend(page, { tasks: [], priorities: [defaultPriority] });
+  await page.addInitScript(() => window.localStorage.setItem("defaultCalendarView", "week"));
+  await page.goto("/Calendar");
+
+  const left = async (locator: Locator) => (await locator.boundingBox())!.x;
+  const today = page.getByRole("button", { name: "Today", exact: true });
+  const previous = page.getByRole("button", { name: "Previous" });
+  const next = page.getByRole("button", { name: "Next", exact: true });
+  const range = page.getByTestId("calendar-range");
+  await expect(range).toBeVisible();
+  expect(await left(today)).toBeLessThan(await left(previous));
+  expect(await left(previous)).toBeLessThan(await left(next));
+  expect(await left(next)).toBeLessThan(await left(range));
+
+  // Scrolled to the very top, "12 AM" is fully inside the grid: its top
+  // edge is below the bottom of the day headers.
+  for (const view of ["w", "d"]) {
+    await page.keyboard.press(view);
+    const label = page.getByText("12 AM", { exact: true }).first();
+    await expect(label).toBeVisible();
+    const clipped = await label.evaluate((el) => {
+      let scroller: HTMLElement | null = el.parentElement;
+      while (scroller && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)) scroller = scroller.parentElement;
+      if (!scroller) return "no scroller";
+      scroller.scrollTop = 0;
+      const top = el.getBoundingClientRect().top;
+      const sticky = scroller.querySelector(".sticky");
+      const limit = Math.max(scroller.getBoundingClientRect().top, sticky ? sticky.getBoundingClientRect().bottom : 0);
+      return top >= limit ? "" : `label top ${top} is above ${limit}`;
+    });
+    expect(clipped).toBe("");
+  }
+});
