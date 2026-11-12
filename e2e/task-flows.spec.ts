@@ -1099,21 +1099,29 @@ test("calendar: Today and the arrows sit before the date, and midnight's label i
 
   // Scrolled to the very top, "12 AM" is fully inside the grid: its top
   // edge is below the bottom of the day headers.
-  for (const view of ["w", "d"]) {
-    await page.keyboard.press(view);
+  for (const [key, columns] of [["w", 7], ["d", 1]] as const) {
+    await page.keyboard.press(key);
+    // The view has really changed: a week has seven day columns, a day one.
+    await expect(page.locator('[data-testid^="calendar-timed-"]')).toHaveCount(columns);
     const label = page.getByText("12 AM", { exact: true }).first();
     await expect(label).toBeVisible();
-    const clipped = await label.evaluate((el) => {
-      let scroller: HTMLElement | null = el.parentElement;
-      while (scroller && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)) scroller = scroller.parentElement;
-      if (!scroller) return "no scroller";
-      scroller.scrollTop = 0;
-      const top = el.getBoundingClientRect().top;
-      const sticky = scroller.querySelector(".sticky");
-      const limit = Math.max(scroller.getBoundingClientRect().top, sticky ? sticky.getBoundingClientRect().bottom : 0);
-      return top >= limit ? "" : `label top ${top} is above ${limit}`;
-    });
-    expect(clipped).toBe("");
+    // Asked again until it holds: the grid is redrawn as the calendar's
+    // data arrives, and a label measured just as it is replaced is no
+    // longer inside anything.
+    await expect
+      .poll(() =>
+        label.evaluate((el) => {
+          let scroller: HTMLElement | null = el.parentElement;
+          while (scroller && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)) scroller = scroller.parentElement;
+          if (!scroller) return "no scroller";
+          scroller.scrollTop = 0;
+          const top = el.getBoundingClientRect().top;
+          const sticky = scroller.querySelector(".sticky");
+          const limit = Math.max(scroller.getBoundingClientRect().top, sticky ? sticky.getBoundingClientRect().bottom : 0);
+          return top >= limit ? "" : `label top ${top} is above ${limit}`;
+        }),
+      )
+      .toBe("");
   }
 });
 
