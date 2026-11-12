@@ -1134,16 +1134,23 @@ test("search: an x appears once something is typed, and empties the box without 
   await expect(taskCardByTitle(page, "Water the plants")).toBeVisible();
 
   await page.keyboard.press("/");
+  // Wait for the box to be open with the caret in it: it opens a moment
+  // after the key, and letters typed before that go nowhere.
+  const box = page.getByPlaceholder("Search...");
+  await expect(box).toBeFocused();
   const clear = page.getByRole("button", { name: "Clear search" });
   await expect(clear).toHaveCount(0);
   await page.keyboard.type("zzz");
+  await expect(box).toHaveValue("zzz");
   await expect(taskCardByTitle(page, "Water the plants")).toHaveCount(0);
 
   await humanClick(page, clear);
   await expect(taskCardByTitle(page, "Water the plants")).toBeVisible();
   await expect(clear).toHaveCount(0);
   // Still open, caret still in it: typing goes on searching.
+  await expect(box).toBeFocused();
   await page.keyboard.type("water");
+  await expect(box).toHaveValue("water");
   await expect(taskCardByTitle(page, "Water the plants")).toBeVisible();
   await expect(page.getByRole("button", { name: "Clear search" })).toBeVisible();
 });
