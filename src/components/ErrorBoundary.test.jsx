@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ErrorBoundary from "./ErrorBoundary";
 import { resetErrorReports } from "@/lib/report-error";
+import { appConfig } from "@/lib/app-config";
 
 let broken = true;
 function Page() {
@@ -11,14 +12,21 @@ function Page() {
 
 describe("ErrorBoundary", () => {
   let fetchMock;
+  const appIdWas = appConfig.appId;
   beforeEach(() => {
+    // A machine with no app id set up (CI) would otherwise report nothing.
+    appConfig.appId = "test-app";
     broken = true;
     resetErrorReports();
     fetchMock = vi.fn(() => Promise.resolve({ ok: true }));
     vi.stubGlobal("fetch", fetchMock);
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
-  afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    appConfig.appId = appIdWas;
+  });
 
   it("shows a way out instead of a blank page, and tells the server", () => {
     render(<ErrorBoundary resetKey="/Today"><Page /></ErrorBoundary>);

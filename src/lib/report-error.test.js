@@ -1,15 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { reportError, resetErrorReports } from "./report-error";
+import { appConfig } from "./app-config";
 
 describe("reportError", () => {
   let fetchMock;
+  const appIdWas = appConfig.appId;
   beforeEach(() => {
+    // A machine with no app id set up (CI) would otherwise send nothing.
+    appConfig.appId = "test-app";
     resetErrorReports();
     fetchMock = vi.fn(() => Promise.resolve({ ok: true }));
     vi.stubGlobal("fetch", fetchMock);
     window.history.replaceState({}, "", "/Active?tag=private-thing");
   });
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    appConfig.appId = appIdWas;
+  });
 
   const sentBody = (call = 0) => JSON.parse(fetchMock.mock.calls[call][1].body);
 
@@ -26,6 +33,12 @@ describe("reportError", () => {
     expect(reportError("render", new Error("same"))).toBe(false);
     for (let i = 0; i < 10; i += 1) reportError("error", new Error(`different ${i}`));
     expect(fetchMock).toHaveBeenCalledTimes(5);
+  });
+
+  it("sends nothing from an app that doesn't know which app it is", () => {
+    appConfig.appId = "";
+    expect(reportError("render", new Error("no app id"))).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("stays quiet offline, and never throws when the report itself fails", () => {
