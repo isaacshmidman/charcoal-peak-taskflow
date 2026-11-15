@@ -1,8 +1,10 @@
 // @ts-nocheck
 /**
  * @file How this person arranged Home (backend/home-layout.js). Saved to
- * their account, so it is the same page on every device. Offline, the
- * last arrangement seen is used; with none ever seen, the starting one.
+ * their account, so it is the same page on every device. The last
+ * arrangement this device saw is shown at once while the server is asked
+ * (and is what there is offline); `isLoading` is true only on a device
+ * that has never seen one and hasn't had its answer yet.
  *
  * A change shows at once and is put back, with a line saying so, if it
  * couldn't be saved.
@@ -20,6 +22,14 @@ export function useHomeLayout() {
   const { data: saved = null, isLoading } = useQuery({
     queryKey: KEY,
     queryFn: () => apiClient.homeLayout.get(),
+    // The arrangement this device last saw is used straight away, marked
+    // as old so the server is still asked. Without it a page someone had
+    // arranged opened in the starting layout and then jumped into theirs.
+    initialData: () => {
+      const kept = apiClient.homeLayout.kept?.();
+      return kept ? kept.layout : undefined;
+    },
+    initialDataUpdatedAt: 0,
     staleTime: 60_000,
     retry: false,
   });

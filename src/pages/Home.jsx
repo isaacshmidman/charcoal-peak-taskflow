@@ -21,7 +21,8 @@ import { apiClient } from "@/api/apiClient";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import HomeBlock from "@/components/home/HomeBlock";
+import HomeBlock, { HomeBlockOutline } from "@/components/home/HomeBlock";
+import { awaitingFirstAnswer } from "@/lib/loading";
 import { DoneBlock, MonthBlock, NotesBlock, QuickAddBlock, ScheduleBlock, TagsBlock, TaskRows, WeekBlock } from "@/components/home/blocks";
 import { useTaskDialogs } from "@/components/tasks/useTaskDialogs";
 import { useCalendarOrderState } from "@/hooks/useCalendarOrder";
@@ -93,17 +94,24 @@ function ChoiceSetting({ block, name, value, choices, onChange }) {
   );
 }
 
+/** One empty list, the same one every time, so the page's sums don't rerun on each draw. */
+const NOTHING = [];
+
 export default function Home() {
   const [editing, setEditing] = useState(false);
-  const { layout, isCustom, save } = useHomeLayout();
+  const { layout, isCustom, isLoading: layoutLoading, save } = useHomeLayout();
   const todayStart = useTodayStart();
   const { hidden: hiddenCalendars } = useCalendarOrderState();
 
   // Everything, calendar events included: the Schedule block shows them.
-  const { data: everything = [], isLoading } = useQuery({
+  const tasksQuery = useQuery({
     queryKey: ["tasks"],
     queryFn: () => apiClient.entities.Task.list("-created_date", 5000),
   });
+  const everything = tasksQuery.data || NOTHING;
+  // Outlines until there is something true to show: the tasks, and how
+  // this person arranged the page.
+  const isLoading = layoutLoading || awaitingFirstAnswer(tasksQuery);
   const { data: priorities = [] } = useQuery({
     queryKey: ["priorities"],
     queryFn: () => apiClient.entities.Priority.list("order", 50),
@@ -324,9 +332,16 @@ export default function Home() {
       </PageHeader>
 
       {isLoading ? (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6" aria-hidden="true">
-          {["xl:col-span-3", "xl:col-span-3", "xl:col-span-2", "xl:col-span-2", "xl:col-span-2"].map((span, index) => (
-            <div key={index} className={`h-40 animate-pulse rounded-xl border border-border-hairline bg-surface-card ${span}`} />
+        // The page as it will be laid out, each block an outline of itself.
+        <div
+          role="status"
+          aria-label="Loading"
+          aria-busy="true"
+          data-testid="placeholder"
+          className="grid animate-pulse grid-cols-1 items-stretch gap-3 motion-reduce:animate-none sm:grid-cols-2 xl:grid-cols-6"
+        >
+          {layout.map((block) => (
+            <HomeBlockOutline key={block.id} size={block.size} rows={block.id === "quick" ? 1 : 3} />
           ))}
         </div>
       ) : layout.length === 0 && !editing ? (

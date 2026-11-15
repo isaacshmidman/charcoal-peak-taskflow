@@ -13,6 +13,7 @@ import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
 import { useSwipeToDelete } from "@/hooks/useSwipeToDelete";
 import { cn } from "@/lib/utils";
 import { activeSchedule, schedulePreview } from "@/lib/schedule";
+import { NoteRowsPlaceholder } from "@/components/ui/placeholders";
 
 /** First non-empty line of the body, for the preview row — or, for a schedule, its first slots. */
 function previewOf(note) {
@@ -113,11 +114,7 @@ export default function NoteSidebar({
     <aside className="flex min-h-0 flex-1 flex-col">
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
         {isLoading ? (
-          <div className="space-y-1.5 px-1 pt-1">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-14 animate-pulse rounded-lg bg-ink-100 dark:bg-night-raised" />
-            ))}
-          </div>
+          <NoteRowsPlaceholder />
         ) : notes.length === 0 ? (
           <p className="px-2 pt-6 text-center text-xs text-ink-400 dark:text-ink-500">
             {search ? "Nothing matches." : "A quiet page. Write anything."}

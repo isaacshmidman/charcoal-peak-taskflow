@@ -34,6 +34,7 @@ import TaskForm from "@/components/tasks/TaskForm";
 import NoteSidebar from "@/components/notes/NoteSidebar";
 import NoteCanvas from "@/components/notes/NoteCanvas";
 import { activeSchedule, scheduleSearchText } from "@/lib/schedule";
+import { awaitingFirstAnswer, NO_COUNT_YET } from "@/lib/loading";
 
 // The list's divider has no sticky points. A constant, so the split hook
 // isn't rebuilt on every render.
@@ -71,10 +72,11 @@ export default function Notes() {
   const deletedNoteMutation = useOfflineEntityMutation("DeletedNote");
   const { createTask, updateTask, deleteTask } = useOfflineMutation();
 
-  const { data: notes = [], isLoading } = useQuery({
+  const notesQuery = useQuery({
     queryKey: ["notes"],
     queryFn: () => apiClient.entities.Note.list("-updated_date", 500),
   });
+  const { data: notes = [], isLoading } = notesQuery;
 
   // Every task, including subtasks and calendar-sourced ones: a note can
   // link to anything with an id, and this only ever reads status.
@@ -249,7 +251,7 @@ export default function Notes() {
           title + count on the left, search and the primary action on the
           right. Search and New note live here rather than inside the
           sidebar so the page reads like the rest of the app. */}
-      <PageHeader title="Notes" sub={<>{notes.length} note{notes.length !== 1 ? "s" : ""}</>}>
+      <PageHeader title="Notes" sub={awaitingFirstAnswer(notesQuery) ? NO_COUNT_YET : <>{notes.length} note{notes.length !== 1 ? "s" : ""}</>}>
         <PageSearch open={showSearch} onOpenChange={setShowSearch} value={search} onChange={setSearch} label="Search notes" />
         <Button
           onClick={newNote}
@@ -285,7 +287,7 @@ export default function Notes() {
             onSelect={selectNote}
             onDelete={deleteNote}
             search={search}
-            isLoading={isLoading}
+            isLoading={awaitingFirstAnswer(notesQuery)}
           />
         }
         end={

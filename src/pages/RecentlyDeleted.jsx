@@ -29,6 +29,8 @@ import MultiSortPanel from "@/components/tasks/MultiSortPanel";
 import { colorCheck } from "@/lib/colors";
 import { compareDeletedNote, compareDeletedTask, sortTrash } from "@/lib/trash-sort";
 import { activeSchedule, schedulePreview, scheduleSearchText } from "@/lib/schedule";
+import { awaitingFirstAnswer, NO_COUNT_YET } from "@/lib/loading";
+import { TaskRowsPlaceholder } from "@/components/ui/placeholders";
 
 const RETENTION_OPTIONS = [
   { value: "7", label: "1 week" },
@@ -86,22 +88,26 @@ export default function RecentlyDeleted({ onBack } = {}) {
     ]);
   };
 
-  const { data: rawDeletedTasks = [] } = useQuery({
+  const deletedTasksQuery = useQuery({
     queryKey: ["deletedTasks"],
     queryFn: () => apiClient.entities.DeletedTask.list("-deleted_at", 500),
     // Calendar-imported events shouldn't reappear in the user's trash.
     select: excludeExternalEvents,
   });
+  const { data: rawDeletedTasks = [] } = deletedTasksQuery;
 
   const { data: priorities = [] } = useQuery({
     queryKey: ["priorities"],
     queryFn: () => apiClient.entities.Priority.list("order", 50),
   });
 
-  const { data: rawDeletedNotes = [] } = useQuery({
+  const deletedNotesQuery = useQuery({
     queryKey: ["deletedNotes"],
     queryFn: () => apiClient.entities.DeletedNote.list("-deleted_at", 500),
   });
+  const { data: rawDeletedNotes = [] } = deletedNotesQuery;
+  // "Nothing here" is only said once both lists have really answered.
+  const isLoading = awaitingFirstAnswer(deletedTasksQuery) || awaitingFirstAnswer(deletedNotesQuery);
   const noteMutation = useOfflineEntityMutation("Note");
   const deletedNoteMutation = useOfflineEntityMutation("DeletedNote");
 
@@ -227,7 +233,7 @@ export default function RecentlyDeleted({ onBack } = {}) {
     <div className="space-y-5">
       <PageHeader
         title="Recently Deleted"
-        sub={<>{displayedTasks.length + displayedNotes.length} item{displayedTasks.length + displayedNotes.length !== 1 ? "s" : ""}</>}
+        sub={isLoading && displayedTasks.length + displayedNotes.length === 0 ? NO_COUNT_YET : <>{displayedTasks.length + displayedNotes.length} item{displayedTasks.length + displayedNotes.length !== 1 ? "s" : ""}</>}
         backLabel="Back"
         back={() => {
           if (onBack) {
@@ -291,7 +297,9 @@ export default function RecentlyDeleted({ onBack } = {}) {
         </Select>
       </Card>
 
-      {displayedTasks.length === 0 && displayedNotes.length === 0 ? (
+      {displayedTasks.length === 0 && displayedNotes.length === 0 && isLoading ? (
+        <TaskRowsPlaceholder rows={4} />
+      ) : displayedTasks.length === 0 && displayedNotes.length === 0 ? (
         <div className="py-14 text-center">
           <p className="text-xs text-ink-400 dark:text-ink-500">Nothing in Recently Deleted.</p>
         </div>

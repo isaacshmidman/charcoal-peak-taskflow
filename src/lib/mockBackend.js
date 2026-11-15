@@ -73,6 +73,10 @@ export function createE2EApiClient() {
   backend.state.attachments ||= [];
   const createEntityStore = (key, createCounter, updateCounter, deleteCounter) => ({
     async list(sort) {
+      // A test can make lists arrive late (window.__TASKFLOW_E2E_LIST_DELAY__,
+      // in ms), to look at what a page shows while it waits.
+      const wait = Number(/** @type {any} */ (window).__TASKFLOW_E2E_LIST_DELAY__ || 0);
+      if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
       return clone(sortRecords(backend.state[key], sort));
     },
     async get(id) {

@@ -46,6 +46,7 @@ import { loadFromCache, saveSnapshot, saveToCache } from "@/lib/offlineCache";
  *     setSimilarTasks: (choice: "ask" | "merge" | "keep") => Promise<"ask" | "merge" | "keep">,
  *   },
  *   homeLayout: {
+ *     kept?: () => { layout: { id: string, size: string }[] | null } | null,
  *     get: () => Promise<{ id: string, size: string }[] | null>,
  *     set: (layout: { id: string, size: string }[] | null) => Promise<{ id: string, size: string }[] | null>,
  *   },
@@ -637,6 +638,11 @@ const liveApiClient = {
   // never arranged. The copy kept on this device is wrapped, so "none" can
   // be told from "nothing kept yet".
   homeLayout: {
+    /** The arrangement this device last saw: `{ layout }`, or null when it has never seen one. */
+    kept() {
+      const cached = loadFromCache(HOME_LAYOUT_CACHE_KEY);
+      return cached && typeof cached === "object" ? { layout: Array.isArray(cached.layout) ? cached.layout : null } : null;
+    },
     async get() {
       try {
         const result = await apiRequest(`/apps/${appConfig.appId}/home-layout`);

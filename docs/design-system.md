@@ -162,6 +162,19 @@ follows. Inside `cn()`, write `text-[11px]` instead.
 | Picking a date | `ui/Calendar`. The picked day is the only filled one; today is a small sun dot under its number. |
 | The logo | `components/Logo.jsx`. The PNG app icons are renders of `public/icon.svg`: `node scripts/render-icons.mjs`. |
 
+## While something loads
+
+- A page waiting for its list shows the **outline of the list**
+  (`ui/placeholders`): the same frame, rows the same height, bars where the
+  words will be. No spinner and no "Loading…". It breathes slowly and holds
+  still under "reduce motion".
+- **Never say "nothing here" before the answer is in.** A device with no
+  kept copy starts from an empty stand-in; `awaitingFirstAnswer`
+  (`lib/loading.js`) is what tells "empty" from "not known yet". The count
+  under a page's title is a blank until then (`NO_COUNT_YET`), not "0 tasks".
+- A kept copy with rows in it is shown at once. An outline is for having
+  nothing true to show.
+
 ## Dark mode
 
 Not an inversion. The page is a warm near-black (`night-base`), never pure

@@ -29,6 +29,8 @@ import { hasTag } from "@/lib/task-views";
 import { useCalendarOrderState } from "@/hooks/useCalendarOrder";
 import { useShortcutEvent } from "@/hooks/useShortcutEvent";
 import { SHORTCUT_EVENTS } from "@/lib/shortcuts";
+import { awaitingFirstAnswer, NO_COUNT_YET } from "@/lib/loading";
+import { TaskRowsPlaceholder } from "@/components/ui/placeholders";
 
 export default function Completed() {
   const navigate = useNavigate();
@@ -63,7 +65,7 @@ export default function Completed() {
   const { permanentlyDelete, permanentlyDeleteMany } = useDeletedTasks();
   const deleteWithUndo = useDeleteWithUndo(deleteTask, createTask);
 
-  const { data: tasks = [], isLoading } = useQuery({
+  const tasksQuery = useQuery({
     queryKey: ["tasks"],
     // Asked for exactly as every other page asks, so they all share one
     // answer; this page puts its own order on it below.
@@ -71,6 +73,8 @@ export default function Completed() {
     // Calendar-imported events live only on /Calendar.
     select: excludeExternalEvents,
   });
+  const { data: tasks = [] } = tasksQuery;
+  const isLoading = awaitingFirstAnswer(tasksQuery);
 
   const { data: priorities = [] } = useQuery({
     queryKey: ["priorities"],
@@ -181,7 +185,7 @@ export default function Completed() {
     <div className="space-y-5">
       <PageHeader
         title={tag || "Tasks"}
-        sub={<>{completedItems.length} completed{tag ? " with this tag" : ""}</>}
+        sub={isLoading ? NO_COUNT_YET : <>{completedItems.length} completed{tag ? " with this tag" : ""}</>}
         back={tag ? () => navigate("/Completed") : undefined}
         backLabel="All completed tasks"
         below={<div className="mt-3 flex"><TasksViewSwitch className="flex-1 sm:flex-none" /></div>}
@@ -225,9 +229,7 @@ export default function Completed() {
       </PageHeader>
 
       {isLoading ? (
-        <div className="ds-list">
-          {[1, 2, 3].map((i) => <div key={i} className="h-11 animate-pulse bg-surface-card" />)}
-        </div>
+        <TaskRowsPlaceholder />
       ) : completedItems.length === 0 ? (
         <div className="text-center py-14">
           <p className="text-xs text-ink-400 dark:text-ink-500">Nothing finished yet. Completed tasks settle here.</p>

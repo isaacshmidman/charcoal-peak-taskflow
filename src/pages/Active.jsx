@@ -25,6 +25,11 @@ import { useCalendarOrderState } from "@/hooks/useCalendarOrder";
 import { calendarKeyForTask } from "@/lib/calendar-order";
 import { useShortcutEvent } from "@/hooks/useShortcutEvent";
 import { SHORTCUT_EVENTS } from "@/lib/shortcuts";
+import { awaitingFirstAnswer, NO_COUNT_YET } from "@/lib/loading";
+import { TaskRowsPlaceholder } from "@/components/ui/placeholders";
+
+/** One empty list, the same one every time, so nothing downstream sees "new tasks" on each draw. */
+const NO_TASKS = [];
 
 export default function Active() {
   const navigate = useNavigate();
@@ -62,12 +67,14 @@ export default function Active() {
   const { createTask, updateTask, deleteTask, completeRecurringTask, skipRecurringTask } = useOfflineMutation();
   const deleteWithUndo = useDeleteWithUndo(deleteTask, createTask);
 
-  const { data: tasks = [], isLoading } = useQuery({
+  const tasksQuery = useQuery({
     queryKey: ["tasks"],
     queryFn: () => apiClient.entities.Task.list("-created_date", 5000),
     // Calendar-imported events live only on /Calendar.
     select: excludeExternalEvents,
   });
+  const tasks = tasksQuery.data || NO_TASKS;
+  const isLoading = awaitingFirstAnswer(tasksQuery);
 
   const { data: priorities = [] } = useQuery({
     queryKey: ["priorities"],
@@ -186,7 +193,7 @@ export default function Active() {
       {/* Header */}
       <PageHeader
         title={tag || "Tasks"}
-        sub={<>{activeTasks.length} task{activeTasks.length !== 1 ? "s" : ""}{tag ? " with this tag" : ""}</>}
+        sub={isLoading ? NO_COUNT_YET : <>{activeTasks.length} task{activeTasks.length !== 1 ? "s" : ""}{tag ? " with this tag" : ""}</>}
         back={tag ? () => navigate("/Active") : undefined}
         backLabel="All tasks"
         below={<div className="mt-3 flex"><TasksViewSwitch className="flex-1 sm:flex-none" /></div>}
@@ -201,9 +208,7 @@ export default function Active() {
 
       {/* Active tasks */}
       {isLoading ? (
-        <div className="ds-list">
-          {[1, 2, 3].map(i => <div key={i} className="h-11 animate-pulse bg-surface-card" />)}
-        </div>
+        <TaskRowsPlaceholder />
       ) : activeTasks.length === 0 ? (
         <div className="py-14 text-center">
           {tag ? (

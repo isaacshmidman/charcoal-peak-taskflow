@@ -1189,3 +1189,27 @@ test("calendar: a chip shows its tick box only under the pointer, and ticking it
   await page.mouse.move(2, 2);
   await expect(page.getByTestId("calendar-tick-chip-1").first()).toHaveCSS("opacity", "1");
 });
+
+test("while a list is on its way a page shows the outline of it, never \"nothing here\"", async ({ page }) => {
+  await installMockBackend(page, {
+    tasks: [{ id: "slow-1", title: "Arrives late", status: "todo", task_type: "one_time", recurrence: "none", due_date: formatDateOffset(0), task_time: "", tags: [], priority_id: defaultPriority.id }],
+    priorities: [defaultPriority],
+  });
+  await page.addInitScript(() => { (window as any).__TASKFLOW_E2E_LIST_DELAY__ = 1500; });
+  await page.goto("/Today");
+
+  // No copy on this device yet and no answer yet: an outline, a blank where
+  // the count will be, and none of the words for an empty day.
+  const outline = page.getByRole("status", { name: "Loading" });
+  await expect(outline).toBeVisible();
+  await expect(page.getByText("Clear skies")).toHaveCount(0);
+  await expect(page.getByText("0 tasks")).toHaveCount(0);
+
+  await expect(page.getByText("Arrives late")).toBeVisible();
+  await expect(outline).toHaveCount(0);
+  await expect(page.getByText("1 task", { exact: true })).toBeVisible();
+
+  // Opened again, the copy this device kept is shown at once: no outline.
+  await page.reload();
+  await expect(page.getByText("Arrives late")).toBeVisible({ timeout: 1000 });
+});

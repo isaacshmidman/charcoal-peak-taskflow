@@ -26,6 +26,11 @@ import { useShortcutEvent } from "@/hooks/useShortcutEvent";
 import { SHORTCUT_EVENTS } from "@/lib/shortcuts";
 import { isDueByToday, openTasks } from "@/lib/task-views";
 import { useTodayStart } from "@/hooks/useTodayStart";
+import { awaitingFirstAnswer, NO_COUNT_YET } from "@/lib/loading";
+import { TaskRowsPlaceholder } from "@/components/ui/placeholders";
+
+/** One empty list, the same one every time, so nothing downstream sees "new tasks" on each draw. */
+const NO_TASKS = [];
 
 export default function Today() {
   const [showForm, setShowForm] = useState(false);
@@ -73,12 +78,14 @@ export default function Today() {
   const { createTask, updateTask, deleteTask, completeRecurringTask, skipRecurringTask } = useOfflineMutation();
   const deleteWithUndo = useDeleteWithUndo(deleteTask, createTask);
 
-  const { data: tasks = [], isLoading } = useQuery({
+  const tasksQuery = useQuery({
     queryKey: ["tasks"],
     queryFn: () => apiClient.entities.Task.list("-created_date", 5000),
     // Calendar-imported events live only on /Calendar.
     select: excludeExternalEvents,
   });
+  const tasks = tasksQuery.data || NO_TASKS;
+  const isLoading = awaitingFirstAnswer(tasksQuery);
 
   const { data: priorities = [] } = useQuery({
     queryKey: ["priorities"],
@@ -175,7 +182,7 @@ export default function Today() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Today" sub={<>{todayAndPast.length} task{todayAndPast.length !== 1 ? "s" : ""}</>}>
+      <PageHeader title="Today" sub={isLoading ? NO_COUNT_YET : <>{todayAndPast.length} task{todayAndPast.length !== 1 ? "s" : ""}</>}>
         {overdueTasks.length > 0 && (
           <Button aria-label="Overdue tasks"
             variant="ghost"
@@ -197,9 +204,7 @@ export default function Today() {
       </PageHeader>
 
       {isLoading ? (
-        <div className="ds-list">
-          {[1, 2, 3].map(i => <div key={i} className="h-11 animate-pulse bg-surface-card" />)}
-        </div>
+        <TaskRowsPlaceholder />
       ) : todayAndPast.length === 0 ? (
         <div className="py-14 text-center">
           {tasks.some((t) => !t.parent_id && t.status !== "done") ? (

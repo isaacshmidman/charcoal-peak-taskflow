@@ -15,6 +15,7 @@ import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { ArrowLeft, ArrowRight, ChevronRight, GripVertical, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HOME_SIZES, HOME_SIZE_LABELS } from "@/lib/home-blocks";
+import { BlockRowsPlaceholder } from "@/components/ui/placeholders";
 
 /**
  * How many of the page's columns a width takes. One column on a phone
@@ -27,6 +28,22 @@ const SPAN = {
 };
 
 const SIZE_LETTER = { third: "S", half: "M", full: "L" };
+
+/**
+ * The outline of a block, for while the page's data is on the way: the
+ * same card in the same place, bars where its heading and rows will be.
+ * @param {{ size: string, rows?: number }} props
+ */
+export function HomeBlockOutline({ size, rows = 3 }) {
+  return (
+    <div className={cn("flex min-w-0 flex-col rounded-xl border border-border-hairline bg-surface-card", SPAN[size] || SPAN.third)}>
+      <div className="flex min-h-[2.5rem] items-center px-3.5 pt-1">
+        <span className="h-3.5 w-24 rounded bg-ink-100 dark:bg-night-raised" />
+      </div>
+      <BlockRowsPlaceholder rows={rows} />
+    </div>
+  );
+}
 
 const tool =
   "inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-500 transition-colors hover:bg-selected hover:text-ink-900 disabled:pointer-events-none disabled:opacity-30 dark:text-ink-400 dark:hover:text-ink-100";
