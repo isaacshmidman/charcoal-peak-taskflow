@@ -3,9 +3,8 @@
 Introduced November 2026. It replaces the system described in
 `design_handoff_zephyrly_site/`, which is kept only as a record.
 
-The idea in one line: **paper, ink, and one clean wash of sun.** Two
-colours carry the brand, there is a single gradient, and most of the
-screen is left alone.
+The idea in one line: **paper, ink, and a little sun.** Two colours
+carry the brand, the page is flat, and most of the screen is left alone.
 
 The values live in `src/styles/zephyrly.css` (CSS variables) and
 `tailwind.config.js` (the class names). `src/index.css` holds the shadcn
@@ -17,7 +16,7 @@ component.
 | Scale | What it is | Used for |
 | --- | --- | --- |
 | `ink-50 … ink-950` | A warm near-black and its greys | Text, lines, quiet fills, the primary button in the light |
-| `sun-50 … sun-950` | The brand lemon, pale to deep | The page wash (pale end), the accent (`sun-400`), text on a yellow tint (`sun-700+`) |
+| `sun-50 … sun-950` | The brand lemon, pale to deep | The accent (`sun-400`), a pale tint behind "today" (`sun-100`), text on a yellow tint (`sun-700+`) |
 | `night-*` | Dark-mode surfaces, warm like the ink | `base` page, `card`, `sunken` fields, `raised` hover, `line` hairlines |
 
 Rules:
@@ -39,15 +38,43 @@ Rules:
   a list they colour the tick box (`colorCheck`); on the calendar they tint
   the chip (`colorBg`). Rows and columns themselves stay plain.
 
-## The wash
+## The page
 
-One gradient: the top of the page is `sun`, fading down into paper within
-300px (`--wash-light`, `--wash-dark`). The top bar (`.ds-bar`) takes the
-same colour, so it has no edge. There are no other gradients on the page;
+Flat paper (`--surface-page`), edge to edge, in the sidebar and behind
+every page. Until November 2026 a wash of sun faded down from the top of
+each page; it went when the sidebar arrived, because a gradient across
+the top is what made the app look like a landing page. Yellow now only
+ever means something: done, now, or (in the dark) the main action.
 `bg-sun-gradient` exists for the logo tile and the rare badge.
 
-`index.html` carries a literal copy of the wash so it paints before the
-stylesheet loads. If you change one, change both.
+`index.html` carries a literal copy of the paper colours so the page
+paints before the stylesheet loads. If you change one, change both.
+
+## Getting around
+
+One map, in `src/lib/navigation.js`: Today, Calendar, Tasks, Notes. The
+board and Completed are views of Tasks (a switch at the top of each,
+`tasks/TasksViewSwitch.jsx`), not places of their own, though each keeps
+its address so links and Back land where they meant.
+
+- **From a tablet up: a sidebar** (`nav/Sidebar.jsx`). Name, search (the
+  command palette), the places in the person's order with a count beside
+  Today and Tasks, then tags, then Recently deleted and Settings at the
+  foot. On a wide screen it shows words and can be folded to a rail of
+  icons; between phone and laptop it is always the rail.
+- **On a phone: a tab bar** (`nav/PhoneTabs.jsx`). A word under every
+  icon. The first three places, adding in the middle, and More for the
+  rest. The page header's "New task" button is hidden on a phone: the
+  tab bar's + is the way to add.
+- **Tags are places too.** A tag in the sidebar opens Tasks narrowed to
+  it (`?tag=`), and stays chosen across List, Board and Completed.
+- **A count is the rows behind it.** The sidebar and the pages ask the
+  same questions (`src/lib/task-views.js`); don't count a second way.
+- **Width.** Pages you read down (lists, Settings) are a column
+  (`max-w-4xl`); pages you look across (the calendar, the board, Notes)
+  take the whole width. `Layout.jsx` decides, by address.
+- Nothing sits across the top of a page. A page starts with its own
+  `PageHeader`, which stays put while the page scrolls.
 
 ## Type
 
@@ -97,7 +124,7 @@ follows. Inside `cn()`, write `text-[11px]` instead.
 ## Dark mode
 
 Not an inversion. The page is a warm near-black (`night-base`), never pure
-black; cards are one step lighter; the wash is a deep olive-amber. The
+black; cards are one step lighter. The
 primary button becomes sun with ink text, which is where the brand shows
 most. Use the surface names (`bg-surface-card`, `border-border-hairline`)
 where you can — they swap by themselves — and `dark:` with a `night-*` name
@@ -130,3 +157,4 @@ These are what the redesign removed. Putting them back undoes it.
 - Shadows on resting cards; outlines doubled up with rings.
 - A second accent colour (purple for "repeats", blue for "today").
 - Pure black, or blue-grey, anywhere.
+- A gradient behind the page, and navigation centred across the top.

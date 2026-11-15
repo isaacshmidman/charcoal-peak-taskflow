@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { useState, useMemo, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { apiClient } from "@/api/apiClient";
 import { useQuery } from "@tanstack/react-query";
 import { useGrowingList } from "@/hooks/useGrowingList";
@@ -20,6 +21,9 @@ import { subDays } from "date-fns/subDays";
 import CompactTaskCard from "@/components/tasks/CompactTaskCard";
 import TaskForm from "@/components/tasks/TaskForm";
 import MultiSortPanel from "@/components/tasks/MultiSortPanel";
+import TasksViewSwitch from "@/components/tasks/TasksViewSwitch";
+import { useTagFilter } from "@/hooks/useTagFilter";
+import { hasTag } from "@/lib/task-views";
 import RecurringDeleteDialog from "@/components/tasks/RecurringDeleteDialog";
 import { compareTasks } from "@/lib/task-sort";
 import { excludeExternalEvents, taskMatchesSearch } from "@/lib/task-filters";
@@ -164,6 +168,9 @@ function useSidewaysScroll(pageRef, boardRef) {
 const VIEWS = [["date", "By date"], ["tag", "By tag"]];
 
 export default function Groupings() {
+  const navigate = useNavigate();
+  // Narrowed to one tag when the sidebar's tag link brought us here.
+  const onlyTag = useTagFilter();
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [addSubtaskParent, setAddSubtaskParent] = useState(null);
@@ -180,11 +187,13 @@ export default function Groupings() {
   const [showSearch, setShowSearch] = useState(false);
   const [recurringDeleteTask, setRecurringDeleteTask] = useState(null);
   // One board at a time — by date or by tag — remembered between visits.
-  const [view, setView] = useState(() => {
+  const [savedView, setSavedView] = useState(() => {
     try { return localStorage.getItem("groupings_view") === "tag" ? "tag" : "date"; } catch { return "date"; }
   });
+  // One tag's tasks are always laid out by date.
+  const view = onlyTag ? "date" : savedView;
   const chooseView = (next) => {
-    setView(next);
+    setSavedView(next);
     try { localStorage.setItem("groupings_view", next); } catch { /* private mode: just don't remember */ }
   };
   const todayColRef = useRef(null);
@@ -267,9 +276,10 @@ export default function Groupings() {
       if (t.parent_id || t.status === "done") return false;
       // Hide tasks belonging to user-hidden calendars (Settings → Calendar Order).
       if (hiddenCalendars.has(calendarKeyForTask(t))) return false;
+      if (onlyTag && !hasTag(t, onlyTag)) return false;
       return taskMatchesSearch(t, search);
     });
-  }, [tasks, search, hiddenCalendars]);
+  }, [tasks, search, hiddenCalendars, onlyTag]);
   const getDate = (t) => t.due_date ? new Date(t.due_date + "T00:00:00") : null;
 
   const groups = useMemo(() => {
@@ -374,31 +384,38 @@ export default function Groupings() {
       className="-mb-[39px] flex h-[calc(100dvh-var(--header-height)-73px)] min-h-[24rem] flex-col sm:-mb-6 sm:h-[calc(100dvh-var(--header-height)-1rem)]"
     >
       <PageHeader
-        title="Groupings"
-        sub={<>{topLevel.length} task{topLevel.length !== 1 ? "s" : ""}</>}
+        title={onlyTag || "Tasks"}
+        sub={<>{topLevel.length} task{topLevel.length !== 1 ? "s" : ""}{onlyTag ? " with this tag" : ""}</>}
+        back={onlyTag ? () => navigate("/Groupings") : undefined}
+        backLabel="All tasks"
         below={
-          <div className="mt-3 flex">
-            <div className="ds-seg flex-1 sm:flex-none">
-              {VIEWS.map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => chooseView(key)}
-                  aria-pressed={view === key}
-                  className="ds-seg-item flex-1 px-3 py-1 text-xs sm:flex-none"
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <TasksViewSwitch className="flex-1 sm:flex-none" />
+            {/* Columns by date or by tag. Within one tag there is only
+                the one way to divide it, so the choice goes away. */}
+            {!onlyTag && (
+              <div className="ds-seg flex-1 sm:flex-none" role="group" aria-label="Columns">
+                {VIEWS.map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => chooseView(key)}
+                    aria-pressed={view === key}
+                    className="ds-seg-item flex-1 px-3 py-1 text-xs sm:flex-none"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         }
       >
         <PageSearch open={showSearch} onOpenChange={setShowSearch} value={search} onChange={setSearch} placeholder="Search title or tag" />
         <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} page="groupings" />
-        <Button aria-label="New Task" onClick={() => { setEditingTask(null); setAddSubtaskParent(null); setShowForm(true); }} className="h-9 gap-1.5">
+        <Button aria-label="New Task" onClick={() => { setEditingTask(null); setAddSubtaskParent(null); setShowForm(true); }} className="hidden h-9 gap-1.5 sm:inline-flex">
           <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">New Task</span>
+          New task
         </Button>
       </PageHeader>
 

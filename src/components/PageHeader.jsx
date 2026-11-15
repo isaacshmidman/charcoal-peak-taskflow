@@ -5,8 +5,7 @@
  *
  * It stays put while the page scrolls (`.ds-page-head` in index.css): the
  * title doesn't leave with the content, and what scrolls passes under it.
- * It carries the page wash exactly as the page behind it does, so at rest
- * it has no visible edge.
+ * It is the same paper as the page behind it, so at rest it has no edge.
  *
  *   <PageHeader title="Today" sub="6 tasks">
  *     <PageSearch … />

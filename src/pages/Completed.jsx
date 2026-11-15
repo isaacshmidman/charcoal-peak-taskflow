@@ -22,11 +22,18 @@ import TaskCard from "@/components/tasks/TaskCard";
 import TaskForm from "@/components/tasks/TaskForm";
 import MultiSortPanel from "@/components/tasks/MultiSortPanel";
 import { excludeExternalEvents } from "@/lib/task-filters";
+import { useNavigate } from "react-router-dom";
+import TasksViewSwitch from "@/components/tasks/TasksViewSwitch";
+import { useTagFilter } from "@/hooks/useTagFilter";
+import { hasTag } from "@/lib/task-views";
 import { useCalendarOrderState } from "@/hooks/useCalendarOrder";
 import { useShortcutEvent } from "@/hooks/useShortcutEvent";
 import { SHORTCUT_EVENTS } from "@/lib/shortcuts";
 
 export default function Completed() {
+  const navigate = useNavigate();
+  // Narrowed to one tag when the sidebar's tag link brought us here.
+  const tag = useTagFilter();
   const [editingTask, setEditingTask] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [showDeleteAllDialog, setShowDeleteAllDialog] = useState(false);
@@ -105,13 +112,14 @@ export default function Completed() {
     });
     const liveIds = new Set(liveItems.map((item) => item.id));
     const visibleUndoingItems = undoingItems.filter((item) => !liveIds.has(item.id));
+    const all = [...liveItems, ...visibleUndoingItems];
     return sortCompletedItems(
-      [...liveItems, ...visibleUndoingItems],
+      tag ? all.filter((item) => item.task && hasTag(item.task, tag)) : all,
       sorts,
       priorityOrderMap,
       calendarIndexByKey
     );
-  }, [priorityOrderMap, search, sorts, tasks, undoingItems, hiddenCalendars, calendarIndexByKey]);
+  }, [priorityOrderMap, search, sorts, tasks, undoingItems, hiddenCalendars, calendarIndexByKey, tag]);
   // Drawn a couple of screens at a time; the rest as the page is scrolled.
   const list = useGrowingList(completedItems);
 
@@ -171,10 +179,16 @@ export default function Completed() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Completed" sub={<>{completedItems.length} task{completedItems.length !== 1 ? "s" : ""}</>}>
+      <PageHeader
+        title={tag || "Tasks"}
+        sub={<>{completedItems.length} completed{tag ? " with this tag" : ""}</>}
+        back={tag ? () => navigate("/Completed") : undefined}
+        backLabel="All completed tasks"
+        below={<div className="mt-3 flex"><TasksViewSwitch className="flex-1 sm:flex-none" /></div>}
+      >
         <PageSearch open={showSearch} onOpenChange={setShowSearch} value={search} onChange={setSearch} />
         <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} page="completed" />
-        {completedItems.length > 0 && (
+        {completedItems.length > 0 && !tag && (
           <Dialog open={showDeleteAllDialog} onOpenChange={setShowDeleteAllDialog}>
             <Button aria-label="Delete all completed"
               variant="ghost"

@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { useState, useMemo, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { apiClient } from "@/api/apiClient";
 import { useQuery } from "@tanstack/react-query";
 import { useGrowingList } from "@/hooks/useGrowingList";
@@ -12,10 +13,6 @@ import { computeOverdue } from "@/lib/reviewStats";
 import { Plus, Sunrise } from "lucide-react";
 import PageHeader, { PageSearch, headerIconButton } from "@/components/PageHeader";
 import { AnimatePresence } from "framer-motion";
-import { addDays } from "date-fns/addDays";
-import { isBefore } from "date-fns/isBefore";
-import { isToday } from "date-fns/isToday";
-import { startOfDay } from "date-fns/startOfDay";
 import TaskCard from "@/components/tasks/TaskCard";
 import TaskForm from "@/components/tasks/TaskForm";
 import SubtaskForm from "@/components/tasks/SubtaskForm";
@@ -27,6 +24,8 @@ import { useCalendarOrderState } from "@/hooks/useCalendarOrder";
 import { calendarKeyForTask } from "@/lib/calendar-order";
 import { useShortcutEvent } from "@/hooks/useShortcutEvent";
 import { SHORTCUT_EVENTS } from "@/lib/shortcuts";
+import { isDueByToday, openTasks } from "@/lib/task-views";
+import { useTodayStart } from "@/hooks/useTodayStart";
 
 export default function Today() {
   const [showForm, setShowForm] = useState(false);
@@ -45,6 +44,17 @@ export default function Today() {
   });
   useShortcutEvent(SHORTCUT_EVENTS.search, () => setShowSearch(true));
   useShortcutEvent(SHORTCUT_EVENTS.review, () => { if (overdueTasks.length) setShowReview(true); });
+
+  // The phone's + button, pressed on a page with no task form of its own
+  // (Settings, Completed), lands here asking for a new task.
+  const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (!location.state?.newTask) return;
+    setEditingTask(null); setAddSubtaskParent(null); setShowForm(true);
+    // Asked once: a reload or Back must not open the form again.
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.state, location.pathname, navigate]);
   const [sorts, setSorts] = useState(() => {
     try {
       const saved = localStorage.getItem("sorts_today");
@@ -119,16 +129,7 @@ export default function Today() {
     return map;
   }, [tasks]);
 
-  const [todayStart, setTodayStart] = useState(() => startOfDay(new Date()));
-
-  useEffect(() => {
-    const nextMidnight = startOfDay(addDays(new Date(), 1));
-    const timeout = setTimeout(() => {
-      setTodayStart(startOfDay(new Date()));
-    }, Math.max(1000, nextMidnight.getTime() - Date.now() + 1000));
-
-    return () => clearTimeout(timeout);
-  }, [todayStart]);
+  const todayStart = useTodayStart();
 
   // One comparator for every task list — see lib/task-sort.js.
 
@@ -137,20 +138,11 @@ export default function Today() {
     compareTasks(a, b, sortValue, { priorityOrderMap, calendarIndexByKey });
 
   const todayAndPast = useMemo(() => {
-    const base = tasks
-      .filter(t => !t.parent_id && t.status !== "done")
-      // User-hidden calendars (Settings → Calendar Order) drop out here.
-      // External events are already gone (excludeExternalEvents on the
-      // query select), so this only affects calendars whose tasks were
-      // visible by default — primarily Zephyrly + future task-style
-      // imports. Subtasks always inherit the parent's calendar via
-      // calendarKeyForTask falling back to "zephyrly".
-      .filter(t => !hiddenCalendars.has(calendarKeyForTask(t)))
-      .filter(t => {
-        if (!t.due_date) return false;
-        const d = startOfDay(new Date(t.due_date + "T00:00:00"));
-        return isToday(d) || isBefore(d, todayStart);
-      })
+    // Open tasks due today or earlier, less those on calendars hidden in
+    // Settings. The same two questions the sidebar's count asks
+    // (lib/task-views.js), so the number beside "Today" is this list.
+    const base = openTasks(tasks, hiddenCalendars)
+      .filter(t => isDueByToday(t, todayStart))
       .filter(t => taskMatchesSearch(t, search));
 
     return base.sort((a, b) => {
@@ -198,9 +190,9 @@ export default function Today() {
         )}
         <PageSearch open={showSearch} onOpenChange={setShowSearch} value={search} onChange={setSearch} />
         <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} page="today" />
-        <Button aria-label="New Task" onClick={() => { setEditingTask(null); setAddSubtaskParent(null); setShowForm(true); }} className="h-9 gap-1.5">
+        <Button aria-label="New Task" onClick={() => { setEditingTask(null); setAddSubtaskParent(null); setShowForm(true); }} className="hidden h-9 gap-1.5 sm:inline-flex">
           <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">New Task</span>
+          New task
         </Button>
       </PageHeader>
 

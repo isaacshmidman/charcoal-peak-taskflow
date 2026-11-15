@@ -60,7 +60,7 @@ function applyDarkClass(isDark) {
   if (isDark) root.classList.add("dark");
   else root.classList.remove("dark");
   const theme = document.querySelector('meta[name="theme-color"]');
-  if (theme) theme.setAttribute("content", isDark ? "#2e2a0e" : "#fff5a6");
+  if (theme) theme.setAttribute("content", isDark ? "#131311" : "#fafaf7");
 }
 
 const ThemeContext = createContext(/** @type {ThemeContextValue} */ ({

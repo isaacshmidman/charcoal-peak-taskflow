@@ -797,7 +797,10 @@ test("files in the task form: a mixed pick keeps the good ones, and a drop anywh
   // The form still saves with files picked.
   await page.getByTestId("task-form-submit").click();
   await expect(form).toBeHidden();
-  await expect(page.getByText("Trip paperwork")).toBeVisible();
+  // Exactly one, once things settle: for an instant after saving, the
+  // copy made on this device and the one the server sent back can both
+  // be on screen, and they must end up as a single row.
+  await expect(taskCardByTitle(page, "Trip paperwork")).toHaveCount(1);
 });
 
 // A person holds the mouse button down for a moment. Anything that changes

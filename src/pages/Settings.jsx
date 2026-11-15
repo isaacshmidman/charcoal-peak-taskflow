@@ -76,15 +76,9 @@ import CalendarOrderSection from "@/components/settings/CalendarOrderSection";
 import QuickThemeToggle from "@/components/settings/QuickThemeToggle";
 import QuickNotificationsToggle from "@/components/settings/QuickNotificationsToggle";
 import { SettingsLink, SettingsSection } from "@/components/settings/parts";
+import { NAV_LABELS, VALID_DEFAULT_ROUTES } from "@/lib/navigation";
 
-export const NAV_OPTIONS = [
-  { value: "/Active", label: "All Tasks" },
-  { value: "/Today", label: "Today" },
-  { value: "/Groupings", label: "Groupings" },
-  { value: "/Calendar", label: "Calendar" },
-  { value: "/Completed", label: "Completed" },
-  { value: "/Notes", label: "Notes" },
-];
+export const NAV_OPTIONS = VALID_DEFAULT_ROUTES.map((value) => ({ value, label: NAV_LABELS[value] }));
 
 // ── Tiny inline UI primitives used only inside this file ─────────
 

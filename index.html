@@ -11,7 +11,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Zephyrly" />
-    <meta name="theme-color" content="#fff5a6" />
+    <meta name="theme-color" content="#fafaf7" />
     <meta name="color-scheme" content="light dark" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="manifest" href="/manifest.json" />
@@ -32,23 +32,23 @@
           if (dark) {
             document.documentElement.classList.add("dark");
             var theme = document.querySelector('meta[name="theme-color"]');
-            if (theme) theme.setAttribute("content", "#2e2a0e");
+            if (theme) theme.setAttribute("content", "#131311");
           }
         } catch (_) {}
       })();
     </script>
     <style>
-      /* Paints the page wash before any stylesheet loads, so these MUST
-         stay literal hex. The real values are --wash-light / --wash-dark
-         in src/styles/zephyrly.css — change both together. */
+      /* Paints the page's paper before any stylesheet loads, so these
+         MUST stay literal hex. The real values are --ink-50 and
+         --night-base in src/styles/zephyrly.css: change both together. */
       html {
         min-height: 100%;
-        background: #fff5a6;
+        background: #fafaf7;
         color-scheme: light;
       }
 
       html.dark {
-        background: #2e2a0e;
+        background: #131311;
         color-scheme: dark;
       }
 
@@ -59,11 +59,11 @@
 
       body {
         margin: 0;
-        background: #fafaf7 linear-gradient(180deg, #fff5a6 0, #fffad8 110px, #fafaf7 300px) no-repeat;
+        background: #fafaf7;
       }
 
       html.dark body {
-        background: #131311 linear-gradient(180deg, #2e2a0e 0, #1e1c10 110px, #131311 300px) no-repeat;
+        background: #131311;
       }
     </style>
   </head>

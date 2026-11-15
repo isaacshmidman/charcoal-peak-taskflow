@@ -252,7 +252,7 @@ export default function Notes() {
           phone anywhere. The list never takes more than half the page and
           drags freely; double-click parks it at a quarter. */}
       <TwoPane
-        className="h-[calc(100dvh-15.5rem)] sm:h-[calc(100dvh-12.5rem)]"
+        className="h-[calc(100dvh-12rem)] sm:h-[calc(100dvh-9rem)]"
         storageKey="notes_sidebar_width"
         sized="start"
         narrow={mobilePane === "editor" ? "end" : "start"}

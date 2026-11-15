@@ -7,12 +7,11 @@
      ink   warm near-black and its greys. The neutral for text, lines
            and surfaces. Deliberately NOT a blue-grey: it shares the
            yellow's warmth, so the two sit together.
-     sun   the brand lemon, as a full scale. The pale end is the page
-           wash; 400 is the accent (ticks, the dark-mode primary
+     sun   the brand lemon, as a full scale. The pale end tints
+           "today"; 400 is the accent (ticks, the dark-mode primary
            button, "today"); the deep end is text on a yellow tint.
 
-   One gradient: a clean wash of sun fading down from the top of the
-   page into paper. No blobs, no glows.
+   The page is flat paper. No gradients behind it, no blobs, no glows.
 
    Tailwind exposes these as `ink-*`, `sun-*`, `night-*` and the
    surface/border names (tailwind.config.js). The shadcn names
@@ -88,17 +87,11 @@
   --brand-yellow: var(--sun-400);
   --brand-ink: var(--ink-900);
 
-  /* ── The wash ─────────────────────────────────────────────────
-     Stops are in px, not %, so the band of colour is the same depth
-     on a phone and a wide monitor. .ds-bar and .ds-page-head
-     (index.css) repeat these stops — change them together.
-     index.html keeps a literal copy for the moment before this file
-     loads — change both together. */
-  --wash-top-light: #fff5a6;
-  --wash-top-dark: #2e2a0e;
-  --wash-light: linear-gradient(180deg, #fff5a6 0, #fffad8 110px, #fafaf7 300px);
-  --wash-dark: linear-gradient(180deg, #2e2a0e 0, #1e1c10 110px, #131311 300px);
-  /* For a mark, a badge, an empty state: the same yellow, corner to corner. */
+  /* The page is flat paper. (Until November 2026 a wash of sun faded
+     down from the top of every page; it went when the sidebar arrived.)
+     index.html keeps a literal copy of the paper colours for the moment
+     before this file loads: change both together. */
+  /* For the logo mark and the rare badge: yellow, corner to corner. */
   --sun-gradient: linear-gradient(135deg, var(--sun-100) 0%, var(--sun-400) 100%);
 
   /* ── Surfaces & borders (light) ───────────────────────────── */
@@ -135,7 +128,9 @@
 
   /* ── Layout / control metrics ─────────────────────────────── */
   --container-max: 72rem;
-  --header-height: 56px;
+  /* Nothing sits above a page any more (the navigation is a sidebar, or
+     a bar along the bottom of a phone), so a page starts at the top. */
+  --header-height: 0px;
   --control-height: 36px;
   --control-height-lg: 44px;
 

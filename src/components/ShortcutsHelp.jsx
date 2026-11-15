@@ -56,12 +56,12 @@ export default function ShortcutsHelp({ open, onOpenChange }) {
 
         <div className="space-y-4">
           <Section title="Navigation">
-            <Row keys={["1"]} label="Jump to nav items (in your sidebar order, 1–6)" />
+            <Row keys={["1"]} label="Jump to a place (in your sidebar order, 1–4)" />
             <Row keys={["g", "t"]} label="Go to Today" />
-            <Row keys={["g", "a"]} label="Go to All Tasks" />
-            <Row keys={["g", "g"]} label="Go to Groupings" />
+            <Row keys={["g", "a"]} label="Go to Tasks" />
+            <Row keys={["g", "g"]} label="Go to the board" />
             <Row keys={["g", "c"]} label="Go to Calendar" />
-            <Row keys={["g", "d"]} label="Go to Completed" />
+            <Row keys={["g", "d"]} label="Go to completed tasks" />
             <Row keys={["g", "n"]} label="Go to Notes" />
             <Row keys={["g", "s"]} label="Go to Settings" />
           </Section>
@@ -110,7 +110,7 @@ export default function ShortcutsHelp({ open, onOpenChange }) {
             </p>
           </Section>
 
-          <Section title="Groupings">
+          <Section title="Tasks: board">
             <Row keys={["d"]} label="Board by date" />
             <Row keys={["t"]} label="Board by tag" />
           </Section>

@@ -129,9 +129,9 @@ export default function CalendarToolbar({
         onChange={onHiddenCalendarsChange}
       />
       <MultiSortPanel sorts={sorts} onSortsChange={onSortsChange} page="calendar" />
-      <Button aria-label="New Task" onClick={onNewTask} className="h-9 gap-1.5">
+      <Button aria-label="New Task" onClick={onNewTask} className="hidden h-9 gap-1.5 sm:inline-flex">
         <Plus className="h-4 w-4" />
-        <span className="hidden sm:inline">New Task</span>
+        New task
       </Button>
     </PageHeader>
   );

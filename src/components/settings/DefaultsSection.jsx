@@ -11,18 +11,10 @@
  */
 import { useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DEFAULT_NAV_ORDER, sanitizeNavOrder, sanitizeNavRoute } from "@/lib/navigation";
+import { DEFAULT_NAV_ORDER, NAV_LABELS, sanitizeNavOrder, sanitizeNavRoute } from "@/lib/navigation";
 import { useTheme } from "@/lib/ThemeProvider";
 import { ReorderButtons, SettingRow, SettingsSection } from "./parts";
 
-const NAV_LABELS = {
-  "/Active": "All Tasks",
-  "/Today": "Today",
-  "/Groupings": "Groupings",
-  "/Calendar": "Calendar",
-  "/Completed": "Completed",
-  "/Notes": "Notes",
-};
 
 function getSavedNavOrder() {
   try {
@@ -76,7 +68,8 @@ export default function DefaultsSection({ navOptions }) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {navOrder.map((path) => {
+                {/* The places in the sidebar's order, then the other two views of Tasks. */}
+                {[...navOrder, ...navOptions.map((o) => o.value).filter((value) => !navOrder.includes(value))].map((path) => {
                   const opt = navOptions.find((o) => o.value === path);
                   return opt ? <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem> : null;
                 })}

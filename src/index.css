@@ -80,22 +80,14 @@
 }
 
 @layer base {
-  /* The page: paper, with one clean wash of sun fading down from the
-     top (--wash-light / --wash-dark in src/styles/zephyrly.css).
-
-     The wash is a layer fixed to the screen (body::before), not a
-     background with `background-attachment: fixed` — iOS ignores that,
-     so there the wash would scroll away with the page while the bar and
-     page header, which carry the same wash, stayed. As a fixed layer it
-     behaves the same everywhere. <html> takes the top colour so the
-     space above the page, when it is pulled down on a phone, matches. */
+  /* The page: flat paper. <html> takes the same colour so the space
+     above the page, when it is pulled down on a phone, matches. */
   html {
-    background: var(--wash-top-light);
+    background: var(--surface-page);
     color-scheme: light;
   }
 
   html.dark {
-    background: var(--wash-top-dark);
     color-scheme: dark;
   }
 
@@ -105,28 +97,12 @@
 
   body {
     @apply text-foreground;
-    background: transparent;
+    background: var(--surface-page);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
     min-height: 100vh;
-  }
-
-  body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    z-index: -1;
-    background: var(--surface-page) var(--wash-light) no-repeat;
-  }
-
-  html.dark body {
-    background: transparent;
-  }
-
-  html.dark body::before {
-    background: var(--surface-page) var(--wash-dark) no-repeat;
   }
 
   #root {
@@ -167,37 +143,21 @@
     border-top: 1px solid var(--border-hairline);
   }
 
-  /* The bar across the top, and the page header that sits under it.
-     Both stay put while the page scrolls, and both paint the very same
-     wash the page has behind them — the bar its first 56px, the header
-     the stretch below that (the same gradient, started 56px higher) —
-     so neither has an edge, and what scrolls passes cleanly beneath. */
-  .ds-bar {
-    background: var(--wash-light);
-  }
-  .dark .ds-bar {
-    background: var(--wash-dark);
-  }
-
+  /* The top of a page (components/PageHeader.jsx). It stays put while
+     the page scrolls, on the page's own paper, so what scrolls passes
+     cleanly beneath it. */
   .ds-page-head {
     position: sticky;
     top: var(--header-height);
     z-index: 30;
     margin-inline: -1rem;
-    padding: 1.25rem 1rem 0.5rem;
-    background: var(--surface-page)
-      linear-gradient(180deg, #fff5a6 calc(0px - var(--header-height)), #fffad8 calc(110px - var(--header-height)), #fafaf7 calc(300px - var(--header-height)))
-      no-repeat;
-  }
-  .dark .ds-page-head {
-    background: var(--surface-page)
-      linear-gradient(180deg, #2e2a0e calc(0px - var(--header-height)), #1e1c10 calc(110px - var(--header-height)), #131311 calc(300px - var(--header-height)))
-      no-repeat;
+    padding: 1rem 1rem 0.5rem;
+    background: var(--surface-page);
   }
   @media (min-width: 640px) {
     .ds-page-head {
       margin-inline: -1.5rem;
-      padding: 1.75rem 1.5rem 0.5rem;
+      padding: 1.25rem 1.5rem 0.5rem;
     }
   }
 
@@ -246,10 +206,10 @@
 
   /* The title at the top of a page. */
   .ds-page-title {
-    font-size: 1.625rem;
-    line-height: 1.15;
+    font-size: 1.375rem;
+    line-height: 1.2;
     font-weight: 650;
-    letter-spacing: -0.025em;
+    letter-spacing: -0.02em;
     color: var(--text-body);
   }
   .ds-page-sub {

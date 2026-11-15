@@ -17,19 +17,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  ArrowRight,
-  CalendarDays,
-  CheckCircle2,
-  LayoutGrid,
-  ListTodo,
-  NotebookPen,
-  Plus,
-  RefreshCw,
-  Search,
-  Settings,
-  Sun,
-} from "lucide-react";
+import { ArrowRight, CalendarDays, CheckCircle2, LayoutGrid, ListTodo, NotebookPen, Plus, RefreshCw, Search, Settings, Sun, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ClearButton } from "@/components/ui/clear-button";
 import { SHORTCUT_EVENTS, emitShortcut } from "@/lib/shortcuts";
@@ -41,10 +29,11 @@ const RECENTS_KEY = "commandPaletteRecents";
 
 const NAV_COMMANDS = [
   { key: "nav:/Today", label: "Go to Today", icon: Sun, path: "/Today" },
-  { key: "nav:/Active", label: "Go to All Tasks", icon: ListTodo, path: "/Active" },
-  { key: "nav:/Groupings", label: "Go to Groupings", icon: LayoutGrid, path: "/Groupings" },
+  { key: "nav:/Active", label: "Go to Tasks", icon: ListTodo, path: "/Active" },
+  { key: "nav:/Groupings", label: "Go to Tasks: board", icon: LayoutGrid, path: "/Groupings" },
   { key: "nav:/Calendar", label: "Go to Calendar", icon: CalendarDays, path: "/Calendar" },
-  { key: "nav:/Completed", label: "Go to Completed", icon: CheckCircle2, path: "/Completed" },
+  { key: "nav:/Completed", label: "Go to Tasks: completed", icon: CheckCircle2, path: "/Completed" },
+  { key: "nav:/RecentlyDeleted", label: "Go to Recently deleted", icon: Trash2, path: "/RecentlyDeleted" },
   { key: "nav:/Notes", label: "Go to Notes", icon: NotebookPen, path: "/Notes" },
   { key: "nav:/Settings", label: "Go to Settings", icon: Settings, path: "/Settings" },
 ];

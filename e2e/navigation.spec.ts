@@ -1,0 +1,160 @@
+import { expect, test, type Page } from "@playwright/test";
+import { installMockBackend } from "./utils/mockBackend";
+
+/**
+ * Getting around: the sidebar on a wide screen, the tab bar on a phone,
+ * and the one place, Tasks, that is a list, a board and the finished
+ * ones.
+ */
+
+const priority = { id: "priority-1", name: "Medium", order: 1, color: "slate" };
+
+/** A day as the app writes it, counted from today on this machine's clock. */
+const day = (offset: number) => {
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+const task = (id: string, title: string, extra: Record<string, unknown> = {}) => ({
+  id,
+  title,
+  description: "",
+  priority_id: priority.id,
+  status: "todo",
+  task_type: "one_time",
+  recurrence: "none",
+  due_date: day(0),
+  task_time: "",
+  tags: [],
+  completed_at: "",
+  ...extra,
+});
+
+const tasks = [
+  task("a", "Send the invoice", { tags: ["work"] }),
+  task("b", "Water the plants", { tags: ["home"] }),
+  task("c", "Review the contract", { tags: ["work"], due_date: day(1) }),
+  task("d", "File the expenses", { tags: ["work"], status: "done", completed_at: new Date().toISOString(), due_date: day(-1) }),
+  task("e", "Sort the garage", { tags: ["home"], due_date: "" }),
+];
+
+const card = (page: Page, title: string) => page.locator(`[data-testid^="task-card-"][data-task-title="${title}"]`);
+
+test("sidebar: a count is the rows behind it, and a tag narrows every view of Tasks", async ({ page }) => {
+  await installMockBackend(page, { tasks, priorities: [priority], savedTags: [{ id: "s1", name: "someday" }] });
+  await page.goto("/Today");
+
+  const sidebar = page.getByTestId("sidebar");
+  await expect(card(page, "Send the invoice")).toBeVisible();
+
+  // Two tasks are due today; four are open altogether.
+  await expect(sidebar.getByTestId("nav-count-Today")).toHaveText("2");
+  await expect(sidebar.getByTestId("nav-count-Active")).toHaveText("4");
+  await expect(page.locator('[data-testid^="task-card-"]')).toHaveCount(2);
+  await expect(sidebar.getByRole("link", { name: "Today", exact: true })).toHaveAttribute("aria-current", "page");
+
+  // A saved tag with nothing on it is still listed; tags come from tasks too.
+  await expect(sidebar.getByRole("link", { name: "Tag someday" })).toBeVisible();
+
+  // A tag opens Tasks narrowed to it.
+  await sidebar.getByRole("link", { name: "Tag work" }).click();
+  await expect(page).toHaveURL(/\/Active\?tag=work$/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("work");
+  await expect(page.locator('[data-testid^="task-card-"]')).toHaveCount(2);
+  await expect(card(page, "Review the contract")).toBeVisible();
+  await expect(card(page, "Water the plants")).toHaveCount(0);
+  await expect(sidebar.getByRole("link", { name: "Tag work" })).toHaveAttribute("aria-current", "page");
+  await expect(sidebar.getByRole("link", { name: "Tasks", exact: true })).not.toHaveAttribute("aria-current", "page");
+
+  // The tag stays chosen across List, Board and Completed.
+  const views = page.getByRole("navigation", { name: "Task views" });
+  await views.getByRole("link", { name: "Board" }).click();
+  await expect(page).toHaveURL(/\/Groupings\?tag=work$/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("work");
+  await expect(page.getByText("Review the contract")).toBeVisible();
+  await expect(page.getByText("Water the plants")).toHaveCount(0);
+  // One tag has one way to be divided: the By date / By tag choice goes.
+  await expect(page.getByRole("group", { name: "Columns" })).toHaveCount(0);
+
+  await views.getByRole("link", { name: "Completed" }).click();
+  await expect(page).toHaveURL(/\/Completed\?tag=work$/);
+  await expect(page.getByText("File the expenses")).toBeVisible();
+
+  // Back to everything: the board and Completed belong to Tasks.
+  await page.getByRole("button", { name: "All completed tasks" }).click();
+  await expect(page).toHaveURL(/\/Completed$/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Tasks");
+  await expect(sidebar.getByRole("link", { name: "Tasks", exact: true })).toHaveAttribute("aria-current", "page");
+  await views.getByRole("link", { name: "Board" }).click();
+  await expect(page.getByRole("group", { name: "Columns" })).toBeVisible();
+  await expect(sidebar.getByRole("link", { name: "Tasks", exact: true })).toHaveAttribute("aria-current", "page");
+});
+
+test("sidebar: folding it to icons is remembered, and the page takes the room", async ({ page }) => {
+  await installMockBackend(page, { tasks, priorities: [priority] });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/Today");
+
+  const sidebar = page.getByTestId("sidebar");
+  const width = async () => Math.round((await sidebar.boundingBox())!.width);
+  const pageLeft = async () => Math.round((await page.getByRole("heading", { level: 1 }).boundingBox())!.x);
+  await expect(card(page, "Send the invoice")).toBeVisible();
+  expect(await width()).toBe(240);
+  const leftBefore = await pageLeft();
+
+  await page.getByRole("button", { name: "Fold the sidebar", exact: true }).click();
+  await expect.poll(width).toBe(64);
+  expect(await pageLeft()).toBeLessThan(leftBefore);
+  // Icons only, but every link keeps its name.
+  await expect(sidebar.getByRole("link", { name: "Calendar", exact: true })).toBeVisible();
+
+  await page.reload();
+  await expect(card(page, "Send the invoice")).toBeVisible();
+  expect(await width()).toBe(64);
+
+  await page.getByRole("button", { name: "Unfold the sidebar" }).click();
+  await expect.poll(width).toBe(240);
+});
+
+test("phone: tabs have words, + adds from anywhere, and More holds the rest", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installMockBackend(page, { tasks, priorities: [priority] });
+  await page.goto("/Today");
+
+  const tabs = page.getByTestId("phone-tabs");
+  await expect(page.getByTestId("sidebar")).toBeHidden();
+  for (const name of ["Today", "Calendar", "Tasks"]) {
+    await expect(tabs.getByRole("link", { name, exact: true })).toHaveText(name);
+  }
+  await expect(tabs.getByRole("link", { name: "Today", exact: true })).toHaveAttribute("aria-current", "page");
+
+  // + opens the page's own form…
+  await tabs.getByRole("button", { name: "New Task" }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+
+  // …and from a page without one, it goes to Today and opens there, once.
+  await tabs.getByRole("button", { name: "More" }).click();
+  await page.getByRole("link", { name: "Settings", exact: true }).click();
+  await expect(page).toHaveURL(/\/Settings$/);
+  await tabs.getByRole("button", { name: "New Task" }).click();
+  await expect(page).toHaveURL(/\/Today$/);
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.reload();
+  await expect(card(page, "Send the invoice")).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+
+  // More: the fourth place, tags, Recently deleted, Settings.
+  await tabs.getByRole("button", { name: "More" }).click();
+  await expect(page.getByRole("link", { name: "Notes", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Recently deleted" })).toBeVisible();
+  await page.getByRole("link", { name: "Tag home" }).click();
+  await expect(page).toHaveURL(/\/Active\?tag=home$/);
+  await expect(page.locator('[data-testid^="task-card-"]')).toHaveCount(2);
+  // Going somewhere closes More.
+  await expect(page.getByRole("link", { name: "Recently deleted" })).toHaveCount(0);
+});

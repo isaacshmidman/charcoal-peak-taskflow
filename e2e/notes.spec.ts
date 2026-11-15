@@ -178,7 +178,7 @@ test("search finds a note by what's in it, not just its title", async ({ page })
   await expect(page.getByTestId("note-row-b")).toHaveCount(0);
 });
 
-test("on a phone, tapping Notes in the nav goes back from a note to the list", async ({ page }) => {
+test("on a phone, choosing Notes in the nav goes back from a note to the list", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await installMockBackend(page, { tasks: [], priorities: [defaultPriority], notes: [note()] });
   await page.goto("/Notes");
@@ -186,6 +186,8 @@ test("on a phone, tapping Notes in the nav goes back from a note to the list", a
   await page.getByTestId("note-row-note-1").click();
   await expect(page.getByTestId("note-back")).toBeVisible();
 
+  // Notes is the fourth place, so on a phone it sits under More.
+  await page.getByRole("button", { name: "More", exact: true }).click();
   await page.getByRole("link", { name: "Notes", exact: true }).filter({ visible: true }).click();
   await expect(page.getByTestId("note-row-note-1")).toBeVisible();
   await expect(page.getByTestId("note-back")).toBeHidden();

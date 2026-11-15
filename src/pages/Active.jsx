@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { useEffect, useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { apiClient } from "@/api/apiClient";
 import { useQuery } from "@tanstack/react-query";
 import { useGrowingList } from "@/hooks/useGrowingList";
@@ -14,6 +15,9 @@ import TaskCard from "@/components/tasks/TaskCard";
 import TaskForm from "@/components/tasks/TaskForm";
 import SubtaskForm from "@/components/tasks/SubtaskForm";
 import MultiSortPanel from "@/components/tasks/MultiSortPanel";
+import TasksViewSwitch from "@/components/tasks/TasksViewSwitch";
+import { useTagFilter } from "@/hooks/useTagFilter";
+import { hasTag } from "@/lib/task-views";
 import RecurringDeleteDialog from "@/components/tasks/RecurringDeleteDialog";
 import { compareTasks } from "@/lib/task-sort";
 import { excludeExternalEvents, taskMatchesSearch } from "@/lib/task-filters";
@@ -23,6 +27,9 @@ import { useShortcutEvent } from "@/hooks/useShortcutEvent";
 import { SHORTCUT_EVENTS } from "@/lib/shortcuts";
 
 export default function Active() {
+  const navigate = useNavigate();
+  // Narrowed to one tag when the sidebar's tag link brought us here.
+  const tag = useTagFilter();
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [addSubtaskParent, setAddSubtaskParent] = useState(null);
@@ -160,6 +167,7 @@ export default function Active() {
       // Drop tasks belonging to a calendar the user has hidden in
       // Settings → Calendar Order.
       if (hiddenCalendars.has(calendarKeyForTask(t))) return false;
+      if (tag && !hasTag(t, tag)) return false;
       return taskMatchesSearch(t, search);
     });
     return filtered.sort((a, b) => {
@@ -169,19 +177,25 @@ export default function Active() {
       }
       return 0;
     });
-  }, [topLevelTasks, sorts, priorityOrderMap, search, hiddenCalendars, calendarIndexByKey]);
+  }, [topLevelTasks, sorts, priorityOrderMap, search, hiddenCalendars, calendarIndexByKey, tag]);
   // Drawn a couple of screens at a time; the rest as the page is scrolled.
   const list = useGrowingList(activeTasks);
 
   return (
     <div className="space-y-5">
       {/* Header */}
-      <PageHeader title="All Tasks" sub={<>{activeTasks.length} task{activeTasks.length !== 1 ? "s" : ""}</>}>
+      <PageHeader
+        title={tag || "Tasks"}
+        sub={<>{activeTasks.length} task{activeTasks.length !== 1 ? "s" : ""}{tag ? " with this tag" : ""}</>}
+        back={tag ? () => navigate("/Active") : undefined}
+        backLabel="All tasks"
+        below={<div className="mt-3 flex"><TasksViewSwitch className="flex-1 sm:flex-none" /></div>}
+      >
         <PageSearch open={showSearch} onOpenChange={setShowSearch} value={search} onChange={setSearch} />
         <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} page="active" />
-        <Button aria-label="New Task" onClick={() => { setEditingTask(null); setAddSubtaskParent(null); setShowForm(true); }} className="h-9 gap-1.5">
+        <Button aria-label="New Task" onClick={() => { setEditingTask(null); setAddSubtaskParent(null); setShowForm(true); }} className="hidden h-9 gap-1.5 sm:inline-flex">
           <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">New Task</span>
+          New task
         </Button>
       </PageHeader>
 
@@ -192,7 +206,9 @@ export default function Active() {
         </div>
       ) : activeTasks.length === 0 ? (
         <div className="py-14 text-center">
-          {topLevelTasks.length === 0 ? (
+          {tag ? (
+            <p className="text-xs text-ink-400 dark:text-ink-500">Nothing open with this tag.</p>
+          ) : topLevelTasks.length === 0 ? (
             <p className="text-xs text-ink-400 dark:text-ink-500">Clear skies. Add something when you're ready.</p>
           ) : (
             <p className="text-xs text-ink-400 dark:text-ink-500">Everything's in flow. Enjoy the stillness.</p>
