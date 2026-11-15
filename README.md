@@ -302,6 +302,10 @@ The database and attachments are stored on the host in the folder set by `TASKFL
 
 A server set up before this setting existed has the folder as a hand edit in `docker-compose.yml` instead. `scripts/move-data-dir-to-env.sh` moves it into `.env` safely: it reads the folder the running app actually uses, checks the database is there, and puts everything back if anything doesn't match. It never restarts anything.
 
+### Backups
+
+The server backs itself up once a day into `backups/` inside the data folder and keeps the last 14: the database as it was at one moment, plus every attached file. `docs/backups.md` says how to make one by hand, how to rehearse putting one back (`docker compose exec taskflow node backend/scripts/backup.js rehearse`), and the steps of a real restore. Two things they don't cover: the drive itself failing (copy the `backups` folder elsewhere now and then), and `.env` (keep a copy; calendar sign-ins can't be read without its key).
+
 ### Updating
 
 After pushing code changes to GitHub:

@@ -122,6 +122,12 @@ export const backendConfig = {
   // An answer slower than this many milliseconds gets a [slow] line in
   // the log (lib/timings.js).
   slowRequestMs: parseInteger(process.env.TASKFLOW_SLOW_REQUEST_MS, 500),
+  // A backup a day of the database and the stored files (backup.js): on
+  // for the real server, off while developing unless asked for.
+  backups: parseBoolean(process.env.TASKFLOW_BACKUPS, isProduction),
+  // How many are kept, and where (empty: a "backups" folder beside the data).
+  backupKeep: parseInteger(process.env.TASKFLOW_BACKUP_KEEP, 14),
+  backupDir: process.env.TASKFLOW_BACKUP_DIR || "",
   googleClientId,
   googleClientSecret,
   hasGoogleCredentials,

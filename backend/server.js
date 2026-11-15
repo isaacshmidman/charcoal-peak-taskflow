@@ -15,6 +15,7 @@ import { purgeExpiredOAuthRecords } from "./ai/oauth.js";
 import { purgeExpiredDeletedTasks } from "./store.js";
 import { startSyncLoop } from "./sync.js";
 import { createTimings } from "./lib/timings.js";
+import { startBackupLoop } from "./backup.js";
 import { startNotificationLoop } from "./notifications.js";
 import { handleAuthRoute } from "./routes/auth.js";
 import { handleIntegrationsRoute } from "./routes/integrations.js";
@@ -221,6 +222,8 @@ export function createTaskflowServer(config = backendConfig) {
   let syncHandle = null;
   /** @type {{ stop: () => void } | null} */
   let notificationHandle = null;
+  /** @type {{ stop: () => void } | null} */
+  let backupHandle = null;
 
   return {
     server,
@@ -236,6 +239,8 @@ export function createTaskflowServer(config = backendConfig) {
             );
           }
           syncHandle = startSyncLoop(db, config);
+          // A backup a day (backup.js).
+          backupHandle = startBackupLoop(db, config);
           notificationHandle = startNotificationLoop(db, config);
           resolveStart(server);
         });
@@ -247,6 +252,8 @@ export function createTaskflowServer(config = backendConfig) {
         syncHandle = null;
         notificationHandle?.stop();
         notificationHandle = null;
+        backupHandle?.stop();
+        backupHandle = null;
         server.close((error) => {
           if (error) {
             reject(error);

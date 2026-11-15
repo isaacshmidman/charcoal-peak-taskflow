@@ -36,6 +36,10 @@ services:
       - TASKFLOW_DELETED_TASK_RETENTION_DAYS=${TASKFLOW_DELETED_TASK_RETENTION_DAYS:-7}
       # An answer slower than this (milliseconds) gets a [slow] line in the log.
       - TASKFLOW_SLOW_REQUEST_MS=${TASKFLOW_SLOW_REQUEST_MS:-500}
+      # A backup a day into <data folder>/backups, keeping this many
+      # (docs/backups.md). TASKFLOW_BACKUPS=false turns them off.
+      - TASKFLOW_BACKUPS=${TASKFLOW_BACKUPS:-true}
+      - TASKFLOW_BACKUP_KEEP=${TASKFLOW_BACKUP_KEEP:-14}
       - TASKFLOW_SUPPORT_EMAIL=${TASKFLOW_SUPPORT_EMAIL:-}
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/api/health').then(r=>{if(!r.ok)throw 1})"]
