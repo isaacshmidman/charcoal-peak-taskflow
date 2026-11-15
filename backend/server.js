@@ -118,14 +118,31 @@ function resolveStaticFile(requestPathname, distRoot) {
   return null;
 }
 
+/**
+ * How long a browser may keep a file without asking again. Only a file
+ * whose name changes when its contents do can be kept for good.
+ * @param {string} filePath
+ */
 function getCacheControl(filePath) {
-  const name = filePath.split("/").pop() || "";
+  const parts = filePath.split("/");
+  const name = parts.pop() || "";
+  const folder = parts.pop() || "";
   // The page, the service worker, and the list of the build's files
   // (which the service worker reads to find a new build) are never kept.
   if (/sw\.js$|registerSW\.js$|\.html$|^asset-list\.json$/i.test(name)) {
     return "no-store";
   }
-  return "public, max-age=31536000, immutable";
+  // The build's own files: each carries a fingerprint of its contents in
+  // its name, so a changed file is a new address and the old one can be
+  // kept for a year.
+  if (folder === "assets") return "public, max-age=31536000, immutable";
+  // The typeface keeps one name but almost never changes: a week.
+  if (folder === "fonts") return "public, max-age=604800";
+  // Everything else keeps its name when it changes (the manifest, the
+  // icons, the logo). Kept for a year, a new icon or a changed manifest
+  // never reached an installed app. An hour is long enough to save the
+  // requests and short enough that a change arrives the same day.
+  return "public, max-age=3600";
 }
 
 /** File types that shrink when compressed (images and fonts already are). */

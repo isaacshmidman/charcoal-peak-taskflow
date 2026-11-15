@@ -1,4 +1,4 @@
-const CACHE_NAME = 'zephyrly-v26';
+const CACHE_NAME = 'zephyrly-v27';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -133,7 +133,10 @@ if (isLocalhost) {
   self.addEventListener('install', (event) => {
     event.waitUntil(
       caches.open(CACHE_NAME)
-        .then((cache) => cache.addAll(STATIC_ASSETS))
+        // Straight from the server, past the browser's own copy: these
+        // files keep their names when they change, and browsers that met
+        // them before November 2026 were told to keep them for a year.
+        .then((cache) => cache.addAll(STATIC_ASSETS.map((url) => new Request(url, { cache: 'reload' }))))
         // Best effort: a failed download here must not stop the worker
         // installing. It is tried again on the next page load.
         .then(() => keepWholeBuild().catch(() => {}))

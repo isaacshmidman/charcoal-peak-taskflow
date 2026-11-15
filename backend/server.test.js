@@ -1147,6 +1147,10 @@ describe("the built app, and the requests that never get it", () => {
     writeFileSync(join(config.distRoot, "index.html"), PAGE);
     writeFileSync(join(config.distRoot, "assets", "app-4f3a9c.js"), SCRIPT);
     writeFileSync(join(config.distRoot, ".DS_Store"), "left behind by Finder");
+    mkdirSync(join(config.distRoot, "fonts"), { recursive: true });
+    writeFileSync(join(config.distRoot, "fonts", "hanken-grotesk-latin.woff2"), "font");
+    writeFileSync(join(config.distRoot, "manifest.json"), '{"name":"Zephyrly"}\n');
+    writeFileSync(join(config.distRoot, "icon.svg"), "<svg/>\n");
   });
 
   const get = async (path) => {
@@ -1178,6 +1182,12 @@ describe("the built app, and the requests that never get it", () => {
       cache: "public, max-age=31536000, immutable",
       text: SCRIPT,
     });
+    // Only a file named after its contents is kept for good. The manifest
+    // and the icons keep their names when they change, so they are asked
+    // for again within the hour; the typeface within the week.
+    expect((await get("/manifest.json")).cache).toBe("public, max-age=3600");
+    expect((await get("/icon.svg")).cache).toBe("public, max-age=3600");
+    expect((await get("/fonts/hanken-grotesk-latin.woff2")).cache).toBe("public, max-age=604800");
     // A file that isn't there is a 404, as it always was — never the page.
     await expectNotFound("/package.json");
     await expectNotFound("/assets/app-000000.js");

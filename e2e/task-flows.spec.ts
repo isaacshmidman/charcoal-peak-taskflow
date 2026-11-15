@@ -2,11 +2,13 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import { installMockBackend } from "./utils/mockBackend";
 import { holdToast, toastSays } from "./utils/toast";
 
+// A day as the app writes it, in this machine's own time. (Read through
+// UTC, a local midnight east of Greenwich is still the day before.)
 const formatDateOffset = (offsetDays = 0) => {
   const date = new Date();
   date.setHours(0, 0, 0, 0);
   date.setDate(date.getDate() + offsetDays);
-  return date.toISOString().slice(0, 10);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 };
 
 const defaultPriority = {
