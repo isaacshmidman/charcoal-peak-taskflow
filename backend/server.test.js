@@ -681,6 +681,55 @@ describe("pinned schedule settings", () => {
   });
 });
 
+describe("the Home page's layout", () => {
+  it("is kept per person, cleaned, forgotten on request, and exported", async () => {
+    const token = await login("home@example.com");
+    const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+    // Never arranged: null, so the app shows its own starting layout.
+    expect((await invoke("/api/apps/test-app/home-layout", { headers })).body).toEqual({ layout: null });
+
+    const saved = await invoke("/api/apps/test-app/home-layout", {
+      method: "PUT",
+      headers,
+      body: {
+        layout: [
+          { id: "today", size: "half" },
+          { id: "tags", size: "enormous" },
+          { id: "today", size: "full" },
+          { id: "<script>", size: "half" },
+          "week",
+          { id: "week", size: "full", html: "<b>" },
+        ],
+      },
+    });
+    expect(saved.statusCode).toBe(200);
+    const kept = [
+      { id: "today", size: "half" },
+      { id: "tags", size: "third" },
+      { id: "week", size: "full" },
+    ];
+    expect(saved.body).toEqual({ layout: kept });
+    expect((await invoke("/api/apps/test-app/home-layout", { headers })).body).toEqual({ layout: kept });
+
+    // Someone else's is their own; signed out gets nothing.
+    const other = await login("home-other@example.com");
+    expect((await invoke("/api/apps/test-app/home-layout", { headers: { Authorization: `Bearer ${other}` } })).body.layout).toBeNull();
+    expect((await invoke("/api/apps/test-app/home-layout", {})).statusCode).toBe(401);
+
+    const zip = await invokeRaw("/api/apps/test-app/export", { headers: { Authorization: `Bearer ${token}` } });
+    const files = readZip(zip.body);
+    const data = JSON.parse(files.get([...files.keys()].find((n) => n.endsWith("/data.json"))).toString("utf8"));
+    expect(data.home_layout).toEqual(kept);
+
+    // Every block removed is a layout too, not "never arranged".
+    expect((await invoke("/api/apps/test-app/home-layout", { method: "PUT", headers, body: { layout: [] } })).body).toEqual({ layout: [] });
+    // Reset: forget it.
+    expect((await invoke("/api/apps/test-app/home-layout", { method: "PUT", headers, body: { layout: null } })).body).toEqual({ layout: null });
+    // The other settings on the row were left alone throughout.
+    expect((await invoke("/api/apps/test-app/schedule-defaults", { headers })).body).toEqual({ defaults: {}, similar_tasks: "ask" });
+  });
+});
+
 describe("registry entities: DeletedNote", () => {
   it("supports CRUD, defaults expiry from retention, and purges expired records lazily", async () => {
     const token = await login("isaac@example.com");

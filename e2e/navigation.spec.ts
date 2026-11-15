@@ -124,7 +124,7 @@ test("phone: tabs have words, + adds from anywhere, and More holds the rest", as
 
   const tabs = page.getByTestId("phone-tabs");
   await expect(page.getByTestId("sidebar")).toBeHidden();
-  for (const name of ["Today", "Calendar", "Tasks"]) {
+  for (const name of ["Home", "Today", "Calendar"]) {
     await expect(tabs.getByRole("link", { name, exact: true })).toHaveText(name);
   }
   await expect(tabs.getByRole("link", { name: "Today", exact: true })).toHaveAttribute("aria-current", "page");
@@ -148,8 +148,9 @@ test("phone: tabs have words, + adds from anywhere, and More holds the rest", as
   await expect(card(page, "Send the invoice")).toBeVisible();
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
-  // More: the fourth place, tags, Recently deleted, Settings.
+  // More: the places that didn't fit, tags, Recently deleted, Settings.
   await tabs.getByRole("button", { name: "More" }).click();
+  await expect(page.getByRole("link", { name: "Tasks", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Notes", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Recently deleted" })).toBeVisible();
   await page.getByRole("link", { name: "Tag home" }).click();

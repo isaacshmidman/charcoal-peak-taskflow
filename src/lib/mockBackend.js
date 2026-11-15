@@ -241,6 +241,18 @@ export function createE2EApiClient() {
         return { success: true, calendars: [] };
       },
     },
+    homeLayout: {
+      async get() {
+        const layout = /** @type {any} */ (backend.state).homeLayout;
+        return Array.isArray(layout) ? clone(layout) : null;
+      },
+      async set(layout) {
+        const state = /** @type {any} */ (backend.state);
+        state.homeLayout = Array.isArray(layout) ? clone(layout) : null;
+        persistBackend(backend);
+        return Array.isArray(state.homeLayout) ? clone(state.homeLayout) : null;
+      },
+    },
     scheduleDefaults: {
       async get() {
         return clone(/** @type {any} */ (backend.state).scheduleDefaults || {});

@@ -45,6 +45,10 @@ import { loadFromCache, saveSnapshot, saveToCache } from "@/lib/offlineCache";
  *     getSimilarTasks: () => Promise<"ask" | "merge" | "keep">,
  *     setSimilarTasks: (choice: "ask" | "merge" | "keep") => Promise<"ask" | "merge" | "keep">,
  *   },
+ *   homeLayout: {
+ *     get: () => Promise<{ id: string, size: string }[] | null>,
+ *     set: (layout: { id: string, size: string }[] | null) => Promise<{ id: string, size: string }[] | null>,
+ *   },
  *   notifications: {
  *     getSettings: () => Promise<any>,
  *     updateSettings: (settings: any) => Promise<any>,
@@ -113,6 +117,7 @@ const INTEGRATION_CALENDARS_CACHE_KEY = "integrationCalendars";
 const NOTIFICATION_SETTINGS_CACHE_KEY = "notificationSettings";
 const SCHEDULE_DEFAULTS_CACHE_KEY = "scheduleDefaults";
 const SCHEDULE_SIMILAR_CACHE_KEY = "scheduleSimilarTasks";
+const HOME_LAYOUT_CACHE_KEY = "homeLayout";
 const ENTITY_CACHE_KEYS = {
   Task: "tasks",
   Priority: "priorities",
@@ -626,6 +631,34 @@ const liveApiClient = {
       });
       saveToCache(SCHEDULE_SIMILAR_CACHE_KEY, result.similar_tasks || "ask");
       return result.similar_tasks || "ask";
+    },
+  },
+  // How the Home page is arranged (backend/home-layout.js). Null means
+  // never arranged. The copy kept on this device is wrapped, so "none" can
+  // be told from "nothing kept yet".
+  homeLayout: {
+    async get() {
+      try {
+        const result = await apiRequest(`/apps/${appConfig.appId}/home-layout`);
+        const layout = Array.isArray(result.layout) ? result.layout : null;
+        saveToCache(HOME_LAYOUT_CACHE_KEY, { layout });
+        return layout;
+      } catch (error) {
+        if (isRecoverableReadError(error)) {
+          const cached = loadFromCache(HOME_LAYOUT_CACHE_KEY);
+          if (cached) return cached.layout ?? null;
+        }
+        throw error;
+      }
+    },
+    async set(layout) {
+      const result = await apiRequest(`/apps/${appConfig.appId}/home-layout`, {
+        method: "PUT",
+        body: { layout },
+      });
+      const saved = Array.isArray(result.layout) ? result.layout : null;
+      saveToCache(HOME_LAYOUT_CACHE_KEY, { layout: saved });
+      return saved;
     },
   },
   notifications: {

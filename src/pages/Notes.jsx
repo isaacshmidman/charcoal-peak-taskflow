@@ -19,6 +19,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { NotebookPen, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PageHeader, { PageSearch } from "@/components/PageHeader";
@@ -114,6 +115,21 @@ export default function Notes() {
     setOpenNoteId(sortedNotes[0]?.id || null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notes.length, sortedNotes[0]?.id]);
+
+  // A link to one note (`/Notes?note=<id>`, from Home's pinned notes)
+  // opens it. The address is then tidied, so choosing another note isn't
+  // undone by a reload.
+  const [params, setParams] = useSearchParams();
+  const wanted = params.get("note");
+  useEffect(() => {
+    if (!wanted || isLoading) return;
+    if (notes.some((n) => n.id === wanted)) {
+      setOpenNoteId(wanted);
+      setMobilePane("editor");
+    }
+    setParams((current) => { const next = new URLSearchParams(current); next.delete("note"); return next; }, { replace: true });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wanted, isLoading]);
 
   const saveNote = useCallback((id, data) => noteMutation.update(id, data), [noteMutation]);
 

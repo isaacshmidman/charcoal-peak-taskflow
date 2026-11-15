@@ -20,6 +20,7 @@ import { resolve } from "node:path";
 import { listEntityRecords } from "./store.js";
 import { attachmentsRoot } from "./attachments.js";
 import { activeSchedule, cleanDefaults, formatRange } from "./lib/schedule.js";
+import { cleanHomeLayout } from "./home-layout.js";
 
 export const EXPORT_FORMAT = "zephyrly-export";
 export const EXPORT_VERSION = 1;
@@ -316,6 +317,8 @@ export async function buildExport(db, config, { appId, user, now = new Date() })
     notification_settings: preferences.notificationSettings ?? null,
     // Settings pinned so every new schedule starts with them.
     schedule_defaults: cleanDefaults(preferences.scheduleDefaults),
+    // How they arranged their Home page; null when they never did.
+    home_layout: cleanHomeLayout(preferences.homeLayout),
     tasks,
     notes,
     priorities,

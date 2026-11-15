@@ -34,6 +34,7 @@ export const SHORTCUT_EVENTS = {
 
 /** `g` + letter → route. Gmail/Linear-style "go to" sequences. */
 export const G_SEQUENCES = {
+  h: "/Home",
   t: "/Today",
   a: "/Active",
   g: "/Groupings",

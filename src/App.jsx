@@ -11,6 +11,7 @@ import PageNotFound from "./lib/PageNotFound";
 import Active from "@/pages/Active";
 import AuthCallback from "@/pages/AuthCallback.jsx";
 import Today from "@/pages/Today.jsx";
+import Home from "@/pages/Home.jsx";
 import Completed from "@/pages/Completed.jsx";
 import Groupings from "@/pages/Groupings.jsx";
 import Calendar from "@/pages/Calendar.jsx";
@@ -88,6 +89,7 @@ const AuthenticatedApp = () => {
       <Route path="/connect/:requestId" element={<Connect />} />
       <Route element={<Layout />}>
         <Route path="/" element={<DefaultRedirect />} />
+        <Route path="/Home" element={<Home />} />
         <Route path="/Active" element={<Active />} />
         <Route path="/Today" element={<Today />} />
         <Route path="/Completed" element={<Completed />} />

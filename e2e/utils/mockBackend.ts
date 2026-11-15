@@ -15,6 +15,8 @@ export interface MockState {
   aiGrants?: EntityRecord[];
   aiActivity?: EntityRecord[];
   aiConnectRequests?: Record<string, EntityRecord>;
+  /** How Home is arranged: [{ id, size }]. Left out = never arranged. */
+  homeLayout?: EntityRecord[] | null;
   currentUser?: EntityRecord | null;
 }
 
@@ -27,6 +29,7 @@ export interface MockController {
     notes: EntityRecord[];
     deletedNotes: EntityRecord[];
     attachments: EntityRecord[];
+    homeLayout: EntityRecord[] | null;
     currentUser: EntityRecord | null;
   }>;
   getMeta: () => Promise<{
@@ -86,6 +89,7 @@ export async function installMockBackend(page: Page, initialState: MockState = {
             aiGrants: state.aiGrants ?? [],
             aiActivity: state.aiActivity ?? [],
             aiConnectRequests: state.aiConnectRequests ?? {},
+            homeLayout: state.homeLayout ?? null,
             currentUser: state.currentUser === undefined ? defaultUser : state.currentUser,
           },
           counters: {

@@ -56,7 +56,8 @@ export default function ShortcutsHelp({ open, onOpenChange }) {
 
         <div className="space-y-4">
           <Section title="Navigation">
-            <Row keys={["1"]} label="Jump to a place (in your sidebar order, 1–4)" />
+            <Row keys={["1"]} label="Jump to a place (in your sidebar order, 1–5)" />
+            <Row keys={["g", "h"]} label="Go to Home" />
             <Row keys={["g", "t"]} label="Go to Today" />
             <Row keys={["g", "a"]} label="Go to Tasks" />
             <Row keys={["g", "g"]} label="Go to the board" />

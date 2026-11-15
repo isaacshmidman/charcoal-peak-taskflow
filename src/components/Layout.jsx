@@ -23,11 +23,21 @@ import OfflineStatus from "@/components/nav/OfflineStatus";
 import { useNavCounts, useNavItems } from "@/components/nav/useNav";
 import { emitShortcut, SHORTCUT_EVENTS } from "@/lib/shortcuts";
 
-/** Pages that use the whole width. The rest are a column a line of text can be read across. */
-const WIDE_PAGES = new Set(["/Calendar", "/Groupings", "/Notes"]);
+/**
+ * How wide a page may grow. Pages you look across (the calendar, the
+ * board, Notes) take the whole width; Home is a grid that stops before
+ * its blocks get too wide to read; the rest are a column a line of text
+ * can be read across.
+ */
+const PAGE_WIDTH = {
+  "/Calendar": "max-w-[100rem]",
+  "/Groupings": "max-w-[100rem]",
+  "/Notes": "max-w-[100rem]",
+  "/Home": "max-w-7xl",
+};
 
 /** Pages that open their own "new" form when asked (the others hand over to Today). */
-const ADDS_HERE = new Set(["/Today", "/Active", "/Groupings", "/Calendar", "/Notes"]);
+const ADDS_HERE = new Set(["/Home", "/Today", "/Active", "/Groupings", "/Calendar", "/Notes"]);
 
 function readCollapsed() {
   try {
@@ -80,7 +90,7 @@ export default function Layout() {
 
       {/* The left padding is the sidebar's width (nav/Sidebar.jsx). */}
       <main className={cn("min-w-0 pb-28 sm:pb-10 sm:pl-16", !collapsed && "lg:pl-60")}>
-        <div className={cn("mx-auto w-full px-4 sm:px-6", WIDE_PAGES.has(pathname) ? "max-w-[100rem]" : "max-w-4xl")}>
+        <div className={cn("mx-auto w-full px-4 sm:px-6", PAGE_WIDTH[pathname] || "max-w-4xl")}>
           <Outlet />
         </div>
       </main>

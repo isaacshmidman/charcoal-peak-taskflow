@@ -20,13 +20,15 @@ import { spacedTime } from "@/components/tasks/TaskForm/TimeInput";
  *   onEdit: (task: TaskRecord) => void,
  *   onUpdate: (task: TaskRecord, changes: Partial<TaskRecord>) => void,
  *   meta?: "date" | "time",
+ *   late?: boolean,
  * }} CompactTaskCardProps
  *
  * `meta` is what the right-hand end of the row says. "date" (the default)
  * is the due date. "time" is for a column that is already one day — the
  * date would be the same on every row, so the row shows its time of day
  * instead, or just a small calendar mark when it has none. Either way it
- * is the button that moves the task to another day.
+ * is the button that moves the task to another day. `late` writes the
+ * date in red, for a list of tasks whose day has passed.
  */
 
 // forwardRef so <AnimatePresence mode="popLayout"> in Groupings can measure
@@ -35,7 +37,7 @@ import { spacedTime } from "@/components/tasks/TaskForm/TimeInput";
 // forwardRef call, @param types nothing and props silently degrade to {}.
 /** @type {import("react").ForwardRefExoticComponent<CompactTaskCardProps & import("react").RefAttributes<HTMLDivElement>>} */
 const CompactTaskCard = forwardRef(function CompactTaskCard(
-  { task, priorities, onToggleDone, onEdit, onUpdate, meta = "date" },
+  { task, priorities, onToggleDone, onEdit, onUpdate, meta = "date", late = false },
   ref
 ) {
   const [optimisticDone, setOptimisticDone] = useState(false);
@@ -109,7 +111,10 @@ const CompactTaskCard = forwardRef(function CompactTaskCard(
             aria-label={`Change the date of ${task.title}${dateText ? ` (${dateText})` : ""}`}
             title="Change the date"
             className={cn(
-              "inline-flex h-6 min-w-6 items-center justify-center rounded px-1 text-[11px] tabular-nums leading-none text-ink-500 transition-colors hover:bg-selected hover:text-ink-900 dark:text-ink-400 dark:hover:text-ink-100",
+              "inline-flex h-6 min-w-6 items-center justify-center rounded px-1 text-[11px] tabular-nums leading-none transition-colors hover:bg-selected",
+              late
+                ? "text-red-600 dark:text-red-400"
+                : "text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-ink-100",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink-900/20 dark:focus-visible:ring-sun-400/40"
             )}
           >

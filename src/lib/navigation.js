@@ -1,14 +1,18 @@
 /**
- * The app's map. Four places in the sidebar; the board and the list of
+ * The app's map. Five places in the sidebar; the board and the list of
  * finished tasks are two more ways of looking at Tasks, not places of
  * their own, so they sit behind a switch at the top of the Tasks page.
  */
-export const VALID_NAV_ROUTES = ["/Today", "/Calendar", "/Active", "/Notes"];
+export const VALID_NAV_ROUTES = ["/Home", "/Today", "/Calendar", "/Active", "/Notes"];
+
+/** Where the app opens for someone who never chose a page. */
+export const FALLBACK_ROUTE = "/Home";
 
 export const DEFAULT_NAV_ORDER = [...VALID_NAV_ROUTES];
 
 /** What each page is called, wherever it is named. */
 export const NAV_LABELS = {
+  "/Home": "Home",
   "/Today": "Today",
   "/Calendar": "Calendar",
   "/Active": "Tasks",
@@ -62,7 +66,7 @@ export function safeInAppPath(raw, origin = window.location.origin) {
  * @param {unknown} route
  */
 export function sanitizeNavRoute(route) {
-  return typeof route === "string" && VALID_DEFAULT_ROUTES.includes(route) ? route : "/Today";
+  return typeof route === "string" && VALID_DEFAULT_ROUTES.includes(route) ? route : FALLBACK_ROUTE;
 }
 
 /**
@@ -73,11 +77,15 @@ export function sanitizeNavOrder(order) {
   const normalized = Array.isArray(order) ? order.filter((path) => VALID_NAV_ROUTES.includes(path)) : [];
   const deduped = [...new Set(normalized)];
 
-  for (const path of DEFAULT_NAV_ORDER) {
-    if (!deduped.includes(path)) {
-      deduped.push(path);
-    }
-  }
+  // A place added since the order was saved goes where it sits by
+  // default: straight after the place it follows there (first, if it
+  // leads). So Home, new in November 2026, arrives at the top of an
+  // order saved before it existed rather than at the bottom.
+  DEFAULT_NAV_ORDER.forEach((path, index) => {
+    if (deduped.includes(path)) return;
+    const after = index === 0 ? -1 : deduped.indexOf(DEFAULT_NAV_ORDER[index - 1]);
+    deduped.splice(after + 1, 0, path);
+  });
 
   return deduped;
 }

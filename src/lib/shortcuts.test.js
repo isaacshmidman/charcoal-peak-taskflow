@@ -72,8 +72,13 @@ describe("shortcuts core", () => {
         "navOrder",
         JSON.stringify(["/Calendar", "/Today", "/Active", "/Groupings", "/Completed"])
       );
+      // Home, added since this order was saved, leads; the rest is theirs.
+      expect(navPathForDigit("1")).toBe("/Home");
+      expect(navPathForDigit("2")).toBe("/Calendar");
+      expect(navPathForDigit("3")).toBe("/Today");
+      localStorage.setItem("navOrder", JSON.stringify(["/Calendar", "/Home", "/Today", "/Active", "/Notes"]));
       expect(navPathForDigit("1")).toBe("/Calendar");
-      expect(navPathForDigit("2")).toBe("/Today");
+      expect(navPathForDigit("2")).toBe("/Home");
       localStorage.removeItem("navOrder");
     });
   });
@@ -81,6 +86,7 @@ describe("shortcuts core", () => {
   describe("G_SEQUENCES", () => {
     it("covers every nav destination + settings", () => {
       expect(G_SEQUENCES).toEqual({
+        h: "/Home",
         t: "/Today",
         a: "/Active",
         g: "/Groupings",

@@ -52,7 +52,8 @@ paints before the stylesheet loads. If you change one, change both.
 
 ## Getting around
 
-One map, in `src/lib/navigation.js`: Today, Calendar, Tasks, Notes. The
+One map, in `src/lib/navigation.js`: Home, Today, Calendar, Tasks, Notes.
+The app opens on Home unless the person chose another page. The
 board and Completed are views of Tasks (a switch at the top of each,
 `tasks/TasksViewSwitch.jsx`), not places of their own, though each keeps
 its address so links and Back land where they meant.
@@ -72,9 +73,35 @@ its address so links and Back land where they meant.
   same questions (`src/lib/task-views.js`); don't count a second way.
 - **Width.** Pages you read down (lists, Settings) are a column
   (`max-w-4xl`); pages you look across (the calendar, the board, Notes)
-  take the whole width. `Layout.jsx` decides, by address.
+  take the whole width; Home's grid stops at `max-w-7xl`. `Layout.jsx`
+  decides, by address.
 - Nothing sits across the top of a page. A page starts with its own
   `PageHeader`, which stays put while the page scrolls.
+
+## Home
+
+`pages/Home.jsx`: a grid of blocks, each a small view of something
+another page shows in full. The person arranges it; nothing arranges
+itself.
+
+- **A block** is `home/HomeBlock.jsx`: a card with a quiet heading that
+  is the link to the full page, a count beside it, and the content from
+  `home/blocks.jsx`. Six columns on a laptop (a block is a third, a half
+  or the whole row), two on a tablet, one on a phone.
+- **The numbers** come from `src/lib/home-blocks.js`, plain functions
+  over the tasks and notes already loaded, tested on their own. Today
+  plus Overdue is exactly the Today page's list. Add a block there
+  (`HOME_BLOCKS`, a function for its data) and in `Home.jsx` (`parts`).
+- **Customize** turns the page into its own editor: each block gets
+  earlier / later, S M L, and remove; a tray at the foot lists the blocks
+  that are off the page. Content is held still while arranging. Every
+  change is saved at once to the account (`backend/home-layout.js`), so
+  it is the same page on every device. Reset forgets it.
+- **Colour.** Bars and dots are ink. Sun appears where it always means
+  something: today's bar and today's date (now), the progress bar (done).
+  An event's stripe in Schedule is its calendar's own colour.
+- **Quick add** reads `#tag` and `!priority` like the task form's title.
+  The day is the switch beside it. Words are never read for dates.
 
 ## Type
 

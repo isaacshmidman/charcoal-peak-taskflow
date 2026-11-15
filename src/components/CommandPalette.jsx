@@ -17,7 +17,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, CalendarDays, CheckCircle2, LayoutGrid, ListTodo, NotebookPen, Plus, RefreshCw, Search, Settings, Sun, Trash2 } from "lucide-react";
+import { ArrowRight, CalendarDays, CheckCircle2, House, LayoutGrid, ListTodo, NotebookPen, Plus, RefreshCw, Search, Settings, Sun, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ClearButton } from "@/components/ui/clear-button";
 import { SHORTCUT_EVENTS, emitShortcut } from "@/lib/shortcuts";
@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 const RECENTS_KEY = "commandPaletteRecents";
 
 const NAV_COMMANDS = [
+  { key: "nav:/Home", label: "Go to Home", icon: House, path: "/Home" },
   { key: "nav:/Today", label: "Go to Today", icon: Sun, path: "/Today" },
   { key: "nav:/Active", label: "Go to Tasks", icon: ListTodo, path: "/Active" },
   { key: "nav:/Groupings", label: "Go to Tasks: board", icon: LayoutGrid, path: "/Groupings" },
@@ -44,7 +45,7 @@ const ACTION_COMMANDS = [
     key: "action:new-task",
     label: "New task",
     icon: Plus,
-    routes: ["/Today", "/Active", "/Groupings", "/Calendar"],
+    routes: ["/Home", "/Today", "/Active", "/Groupings", "/Calendar"],
     run: () => emitShortcut(SHORTCUT_EVENTS.newTask),
   },
   {

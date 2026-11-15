@@ -6,15 +6,16 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarDays, ListTodo, NotebookPen, Sun } from "lucide-react";
+import { CalendarDays, House, ListTodo, NotebookPen, Sun } from "lucide-react";
 import { apiClient } from "@/api/apiClient";
-import { DEFAULT_NAV_ORDER, NAV_LABELS, sanitizeNavOrder, sanitizeNavRoute } from "@/lib/navigation";
+import { DEFAULT_NAV_ORDER, FALLBACK_ROUTE, NAV_LABELS, sanitizeNavOrder, sanitizeNavRoute } from "@/lib/navigation";
 import { excludeExternalEvents } from "@/lib/task-filters";
 import { isDueByToday, openTasks, tagCounts } from "@/lib/task-views";
 import { useCalendarOrderState } from "@/hooks/useCalendarOrder";
 import { useTodayStart } from "@/hooks/useTodayStart";
 
 const NAV_ICONS = {
+  "/Home": House,
   "/Today": Sun,
   "/Calendar": CalendarDays,
   "/Active": ListTodo,
@@ -33,7 +34,7 @@ function readDefaultNav() {
   try {
     return sanitizeNavRoute(localStorage.getItem("defaultNav"));
   } catch {
-    return "/Today";
+    return FALLBACK_ROUTE;
   }
 }
 
