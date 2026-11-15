@@ -17,7 +17,8 @@ import { listIntegrationsForUser } from "./integrations.js";
 import { fetchWithTimeout } from "./lib/net.js";
 import { enqueueTaskPush, pushIsWaiting, retryDuePushes, waitForPushIdle } from "./push.js";
 import { asChangeToExistingEvent } from "./push/google.js";
-import { RETRY_DELAYS_MS, failPush, rememberPush } from "./push/outbox.js";
+import { RETRY_DELAYS_MS, failPush, releaseHeldPushes, rememberPush } from "./push/outbox.js";
+import { disconnectIntegration } from "./integrations/disconnect.js";
 import { inboundUpdateFor } from "./sync/shared.js";
 import { syncIntegration } from "./sync.js";
 
@@ -472,6 +473,103 @@ describe("a change on its way to a calendar", () => {
     await settle();
 
     expect(sent).toEqual([{ method: "PATCH", summary: "Renamed here straight after" }]);
+  });
+
+  it("is kept while the calendar needs connecting again, and sent on the reconnect as the task is by then", async () => {
+    const { id } = seedIntegration("google");
+    db.prepare(`UPDATE calendar_integrations SET status = 'needs_reauth', last_error = 'invalid_grant' WHERE id = ?`).run(id);
+    const task = insertTask("task_held0", { title: "Written while signed out" });
+    const sent = [];
+    google({
+      onWrite: (method, _u, options) => {
+        if (method === "FIND") return json({ items: [] });
+        sent.push({ method, body: JSON.parse(String(options.body)) });
+        return json({ id: "ev_held", etag: "e1" });
+      },
+    });
+
+    enqueueTaskPush(db, config, { op: "upsert", appId: APP, taskSnapshot: task });
+    await settle();
+
+    // Nothing was sent, nothing was dropped, and no try was used up.
+    expect(sent).toEqual([]);
+    expect(outbox()).toEqual([expect.objectContaining({ task_id: "task_held0", attempts: 0, failed_integration_id: id, last_error: "needs_reconnect" })]);
+    // It waits for the reconnect, not for the clock.
+    expect(retryDuePushes(db, config)).toBe(0);
+    expect(Date.parse(outbox()[0].next_attempt_at)).toBeGreaterThan(Date.now() + 365 * 24 * 3600_000);
+    const listed = listIntegrationsForUser(db, { appId: APP, userId: "user_1" })[0];
+    expect(listed).toMatchObject({ held_changes: 1, waiting_changes: 0 });
+    // And while it waits, the calendar's older copy can't overwrite the task.
+    expect(pushIsWaiting(db, "task_held0")).toBe(true);
+
+    // Connected again (what the connect step does for a calendar already here).
+    db.prepare(`UPDATE tasks SET title = 'As it is now' WHERE id = 'task_held0'`).run();
+    db.prepare(`UPDATE calendar_integrations SET status = 'active', last_error = NULL WHERE id = ?`).run(id);
+    expect(releaseHeldPushes(db, id)).toBe(1);
+    expect(retryDuePushes(db, config)).toBe(1);
+    await settle();
+
+    expect(sent).toEqual([expect.objectContaining({ method: "POST", body: expect.objectContaining({ summary: "As it is now" }) })]);
+    expect(outbox()).toEqual([]);
+    expect(listIntegrationsForUser(db, { appId: APP, userId: "user_1" })[0].held_changes).toBe(0);
+  }, 20_000);
+
+  it("a sign-in the calendar refuses holds the change instead of counting down to dropping it", async () => {
+    const { id } = seedIntegration("google");
+    const task = insertTask("task_held1");
+    google({
+      onWrite: (method) => {
+        if (method === "FIND") return json({ items: [] });
+        return json({ error: { message: "Invalid Credentials" } }, 401);
+      },
+    });
+
+    enqueueTaskPush(db, config, { op: "upsert", appId: APP, taskSnapshot: task });
+    await settle();
+    const [row] = outbox();
+    expect(row).toMatchObject({ task_id: "task_held1", attempts: 0, failed_integration_id: id, last_error: "needs_reconnect" });
+    // Still counted as connected, so it is tried again now and then (hours, not minutes), for as long as it takes.
+    const wait = Date.parse(row.next_attempt_at) - Date.now();
+    expect(wait).toBeGreaterThan(5 * 3600_000);
+    expect(wait).toBeLessThan(7 * 3600_000);
+    for (let round = 0; round < RETRY_DELAYS_MS.length + 3; round += 1) {
+      makeDue();
+      retryDuePushes(db, config);
+      await settle();
+    }
+    expect(outbox()).toEqual([expect.objectContaining({ task_id: "task_held1", attempts: 0, last_error: "needs_reconnect" })]);
+  }, 30_000);
+
+  it("a delete made while the calendar needs connecting again is kept too, and disconnecting forgets what was kept", async () => {
+    const { id, calendarId } = seedIntegration("google");
+    db.prepare(`UPDATE calendar_integrations SET status = 'needs_reauth' WHERE id = ?`).run(id);
+    const task = insertTask("task_held2");
+    link("task_held2", id, "ev_2", calendarId);
+    google();
+
+    enqueueTaskPush(db, config, { op: "delete", appId: APP, taskSnapshot: task });
+    await settle();
+    expect(outbox()).toEqual([expect.objectContaining({ task_id: "task_held2", op: "delete", last_error: "needs_reconnect" })]);
+
+    await disconnectIntegration(db, { appId: APP, userId: "user_1", id });
+    expect(outbox()).toEqual([]);
+  }, 20_000);
+
+  it("keeps nothing for a change the calendar would never have been sent", async () => {
+    const { id } = seedIntegration("google");
+    db.prepare(`UPDATE calendar_integrations SET status = 'needs_reauth' WHERE id = ?`).run(id);
+    google();
+
+    // No date, no event: nothing to put on a calendar.
+    const undated = insertTask("task_held3", { due_date: "" });
+    enqueueTaskPush(db, config, { op: "upsert", appId: APP, taskSnapshot: undated });
+    // Deleted before it ever had an event.
+    const neverSent = insertTask("task_held4");
+    enqueueTaskPush(db, config, { op: "delete", appId: APP, taskSnapshot: neverSent });
+    await settle();
+
+    expect(outbox()).toEqual([]);
+    expect(listIntegrationsForUser(db, { appId: APP, userId: "user_1" })[0].held_changes).toBe(0);
   });
 
   it("writes nothing down for someone with no calendar connected", () => {

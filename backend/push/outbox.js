@@ -18,6 +18,12 @@
  *   - duePushes hands back what is due, read fresh: an edit is sent as the
  *     task is NOW, not as it was when the first try failed.
  *
+ * A calendar that needs connecting again (a revoked sign-in, a changed
+ * app-specific password) is not a failure to count down on: holdPush
+ * keeps the change, however long it takes, and releaseHeldPushes sends
+ * it the moment the calendar is connected again. Before this such a
+ * change was never noted, or was given up on after two days.
+ *
  * One row per task. A newer change replaces an older one still waiting,
  * and carries a new token; an older try finishing late can't remove or
  * reschedule the newer row because its token no longer matches.
@@ -34,11 +40,33 @@ export const RETRY_DELAYS_MS = [1, 5, 15, 60, 180, 360, 720, 1440].map((minutes)
 const IN_FLIGHT_HOLD_MS = 2 * 60_000;
 /** The calendar refused the change itself; sending it again changes nothing. */
 const REFUSED_FOR_GOOD = new Set([400, 413, 422]);
+/** `last_error` of a change kept for a calendar that must be connected again. */
+export const HELD_FOR_RECONNECT = "needs_reconnect";
+/** A held change waits for the reconnect, not for the clock. */
+const HELD_UNTIL = "9999-12-31T00:00:00.000Z";
+/**
+ * ...unless the calendar still counts as connected (iCloud refusing a
+ * password is only known from its answers): then it is tried again now
+ * and then, in case the refusal was passing.
+ */
+const HELD_RETRY_MS = 6 * 60 * 60_000;
 const iso = (/** @type {number} */ ms) => new Date(ms).toISOString();
 
 /**
- * Whether this person has a calendar a change could go to at all. Most
- * people don't, and for them nothing is written.
+ * Whether an error from a calendar means "sign in again", which no amount
+ * of trying later will fix.
+ * @param {unknown} error
+ */
+export function isSignInRefusal(error) {
+  const status = /** @type {any} */ (error)?.statusCode;
+  if (status === 401) return true;
+  return /invalid_grant|rejected the credentials|no refresh token|must reconnect/i.test(String(/** @type {any} */ (error)?.message || ""));
+}
+
+/**
+ * Whether this person has a calendar a change could go to at all, now or
+ * once it is connected again. Most people don't, and for them nothing is
+ * written.
  *
  * @param {DB} db
  * @param {string} appId
@@ -49,7 +77,7 @@ export function hasCalendarToPushTo(db, appId, userId) {
     db
       .prepare(
         `SELECT 1 FROM calendar_integrations
-         WHERE app_id = ? AND user_id = ? AND status = 'active' AND provider IN ('google', 'apple') LIMIT 1`
+         WHERE app_id = ? AND user_id = ? AND status IN ('active', 'needs_reauth') AND provider IN ('google', 'apple') LIMIT 1`
       )
       .get(appId, userId || "")
   );
@@ -146,6 +174,69 @@ export function failPush(db, { taskId, token, integrationId, error }, now = Date
 }
 
 /**
+ * Keep a change for a calendar that has to be connected again first. It
+ * doesn't use up tries and is never given up on: it goes when the person
+ * reconnects (releaseHeldPushes), or is forgotten if they disconnect.
+ *
+ * @param {DB} db
+ * @param {{ taskId: string, token: string | undefined, integrationId: string, stillConnected?: boolean }} held
+ * @param {number} [now]
+ * @returns {"held" | "superseded"}
+ */
+export function holdPush(db, { taskId, token, integrationId, stillConnected = false }, now = Date.now()) {
+  if (!token) return "superseded";
+  const result = db
+    .prepare(
+      `UPDATE push_outbox
+       SET next_attempt_at = ?, last_error = ?, failed_integration_id = ?, updated_date = ?
+       WHERE task_id = ? AND token = ?`
+    )
+    .run(stillConnected ? iso(now + HELD_RETRY_MS) : HELD_UNTIL, HELD_FOR_RECONNECT, integrationId, iso(now), taskId, token);
+  return Number(result.changes) > 0 ? "held" : "superseded";
+}
+
+/**
+ * The calendar is connected again: everything kept for it is due now.
+ *
+ * @param {DB} db
+ * @param {string} integrationId
+ * @param {number} [now]
+ * @returns {number} how many changes were released
+ */
+export function releaseHeldPushes(db, integrationId, now = Date.now()) {
+  const result = db
+    .prepare(
+      `UPDATE push_outbox SET next_attempt_at = ?, last_error = NULL, updated_date = ?
+       WHERE failed_integration_id = ? AND last_error = ?`
+    )
+    .run(iso(now), iso(now), integrationId, HELD_FOR_RECONNECT);
+  return Number(result.changes);
+}
+
+/**
+ * The calendar was disconnected: what was kept for it has nowhere to go.
+ *
+ * @param {DB} db
+ * @param {string} integrationId
+ */
+export function forgetHeldPushes(db, integrationId) {
+  db.prepare(`DELETE FROM push_outbox WHERE failed_integration_id = ? AND last_error = ?`).run(integrationId, HELD_FOR_RECONNECT);
+}
+
+/**
+ * How many changes are kept for a calendar until it is connected again.
+ *
+ * @param {DB} db
+ * @param {string} integrationId
+ */
+export function heldChanges(db, integrationId) {
+  const row = /** @type {any} */ (
+    db.prepare(`SELECT COUNT(*) AS n FROM push_outbox WHERE failed_integration_id = ? AND last_error = ?`).get(integrationId, HELD_FOR_RECONNECT)
+  );
+  return Number(row?.n || 0);
+}
+
+/**
  * The changes whose turn it is, each as it should be sent now. Handing
  * one out holds it back for a couple of minutes, so two sweeps can't both
  * send it.
@@ -208,7 +299,9 @@ export function pushIsWaiting(db, taskId) {
  */
 export function waitingChanges(db, integrationId) {
   const row = /** @type {any} */ (
-    db.prepare(`SELECT COUNT(*) AS n FROM push_outbox WHERE failed_integration_id = ? AND attempts > 0`).get(integrationId)
+    db
+      .prepare(`SELECT COUNT(*) AS n FROM push_outbox WHERE failed_integration_id = ? AND attempts > 0 AND COALESCE(last_error, '') != ?`)
+      .get(integrationId, HELD_FOR_RECONNECT)
   );
   return Number(row?.n || 0);
 }

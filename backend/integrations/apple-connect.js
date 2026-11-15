@@ -12,6 +12,7 @@ import { decryptSecret, encryptSecret } from "../crypto.js";
 import { discoverAppleCalendars } from "../providers/apple-calendar.js";
 import { ensureIntegrationsRuntimeReady } from "./runtime.js";
 import { ensureDefaultIntegration } from "./defaults.js";
+import { releaseHeldPushes } from "../push/outbox.js";
 
 /** @typedef {import("node:sqlite").DatabaseSync} DB */
 
@@ -103,6 +104,8 @@ export async function connectApple(db, config, { user, appId, email, password })
       now,
       existing.id
     );
+    // Connected again: what was changed here meanwhile goes out now.
+    releaseHeldPushes(db, existing.id);
   } else {
     integrationId = `intg_${randomUUID()}`;
     db.prepare(

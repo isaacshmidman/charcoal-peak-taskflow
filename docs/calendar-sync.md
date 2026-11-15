@@ -34,6 +34,7 @@ in Zephyrly came from.
 | Every change is written down before it is sent, and kept until it arrives | `push/outbox.js`, table `push_outbox` | The queue lived in memory and each change was tried once. A calendar that was unreachable, or a restart, lost the change for good. |
 | A change that fails is tried again: after 1 min, 5, 15, 1 h, 3, 6, 12, 24 | `RETRY_DELAYS_MS` | Nothing retried it. A change the calendar refuses as wrong (400/413/422) is dropped at once: trying again can't help. |
 | A retry sends the task as it is now | `duePushes` | n/a |
+| A change made while a calendar's sign-in is refused is kept, however long that lasts, and sent when the calendar is reconnected | `holdPush`, `releaseHeldPushes` in `push/outbox.js`; `runPush` in `push/enqueue.js` | A connection that needed reconnecting was skipped, and the change was recorded as sent. Everything done here in the meantime never reached the calendar. A refused sign-in is not counted as a failed try, so it never runs out of tries: Google's is held until Reconnect, iCloud's (which only shows as a refusal when asked) is asked again every 6 hours. Disconnecting the calendar forgets what was held for it. |
 | A second try at creating an event looks for the first one | `findEventForTask` in `providers/google-calendar.js` | n/a: with retries, a first try whose answer was lost would have made a twin. iCloud needs nothing: its events live at an address made from the task's id. |
 | A delete cancels an edit still waiting to go | `enqueueTaskPush` | Edit then delete within a third of a second: the delete went first, then the edit re-created the event for a task that no longer existed. |
 | An edit made just after sync touched the task still goes out | (the hold was removed) | Sync put a 30-second "don't send" hold on every task it touched, to stop an echo that couldn't happen (sync writes to the store directly and never reaches the push hook). All the hold did was drop real edits. |
@@ -55,6 +56,12 @@ in Zephyrly came from.
 - **Settings shows problems in plain words** (`src/lib/integrationNotices.js`),
   including how many changes are still waiting to reach the calendar. The
   provider's own error text stays in the log.
+- **A refused sign-in is mended in place.** The connection's row in
+  Settings shows a Reconnect button and how many changes are being kept
+  for it. Reconnect signs in to the same account again and keeps the
+  connection, so every task stays tied to its event. Disconnecting and
+  connecting again is not the same thing: disconnecting forgets which
+  event belongs to which task.
 
 ## Known limits
 
@@ -64,8 +71,6 @@ in Zephyrly came from.
   with what Zephyrly knows. Guests, alerts and a location set at an iCloud
   event are not kept; at Google they are (updates are field by field), but
   a repeating event's skipped dates are not.
-- Changes made here while a connection needs reconnecting are not sent
-  when it is reconnected.
 - Google only: an OAuth app left in "Testing" in Google Cloud has its
   sign-ins expire after seven days, so the connection asks to be
   reconnected every week. That is a setting in Google Cloud Console
@@ -80,4 +85,6 @@ that needs a real Google or iCloud sign-in. To check on the server after a
 deploy, connect a calendar, then: give an all-day task a time (the event
 should gain the time); tick a task, then move its event in the calendar
 (the task should move and stay ticked, and stay in All Tasks); delete a
-task's event in the calendar (the task should be in Recently deleted).
+task's event in the calendar (the task should be in Recently deleted); and,
+when a connection next asks to be reconnected, change a task first, press
+Reconnect, and see the change arrive at the calendar.

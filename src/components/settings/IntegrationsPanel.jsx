@@ -21,6 +21,7 @@ function ConnectedRow({
   integration,
   onDisconnect,
   onConfigure,
+  onReconnect,
   isDisconnecting,
   showDefaultControl,
   onMakeDefault,
@@ -28,6 +29,9 @@ function ConnectedRow({
   offline,
 }) {
   const notices = integrationNotices(integration);
+  // The calendar wants signing in to again. Reconnecting in place keeps
+  // which event is which task and sends what was changed here meanwhile.
+  const needsReconnect = notices.some((notice) => notice.kind === "reconnect");
   return (
     <div className="px-4 py-3">
       <div className="flex items-center gap-2">
@@ -59,16 +63,28 @@ function ConnectedRow({
             Make default
           </Button>
         )}
-        <Button
-          variant="outline"
-          size="sm"
-          className="shrink-0"
-          onClick={() => onConfigure(integration)}
-          disabled={integration.status !== "active"}
-          title="Choose which calendars to sync"
-        >
-          Configure
-        </Button>
+        {needsReconnect ? (
+          <Button
+            size="sm"
+            className="shrink-0"
+            onClick={() => onReconnect(integration.provider)}
+            disabled={offline}
+            title={`Sign in to ${providerLabel(integration.provider)} again`}
+          >
+            Reconnect
+          </Button>
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            className="shrink-0"
+            onClick={() => onConfigure(integration)}
+            disabled={integration.status !== "active"}
+            title="Choose which calendars to sync"
+          >
+            Configure
+          </Button>
+        )}
         {isDisconnecting ? (
           <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center text-ink-400 dark:text-ink-500">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -90,7 +106,12 @@ function ConnectedRow({
             <p
               key={notice.kind}
               data-testid={`integration-notice-${notice.kind}`}
-              className="flex items-start gap-1.5 text-xs leading-5 text-amber-700 dark:text-amber-300"
+              className={cn(
+                "flex items-start gap-1.5 text-xs leading-5",
+                // What is being kept is good news: said quietly, under the
+                // words of the line it belongs to.
+                notice.kind === "held" ? "pl-[18px] text-ink-600 dark:text-ink-300" : "text-amber-700 dark:text-amber-300",
+              )}
             >
               {notice.kind === "reconnect" && <AlertTriangle className="mt-1 h-3 w-3 shrink-0" />}
               <span>{notice.text}</span>
@@ -204,6 +225,7 @@ export default function IntegrationsPanel() {
             <ConnectedRow
               integration={googleRow}
               onConfigure={setConfiguring}
+              onReconnect={handleConnect}
               onDisconnect={handleDisconnect}
               isDisconnecting={disconnecting && pendingDisconnectId === googleRow.id}
               showDefaultControl={showDefaultControl}
@@ -223,6 +245,7 @@ export default function IntegrationsPanel() {
             <ConnectedRow
               integration={appleRow}
               onConfigure={setConfiguring}
+              onReconnect={handleConnect}
               onDisconnect={handleDisconnect}
               isDisconnecting={disconnecting && pendingDisconnectId === appleRow.id}
               showDefaultControl={showDefaultControl}

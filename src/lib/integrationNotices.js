@@ -19,8 +19,8 @@ export function providerLabel(provider) {
 /**
  * The lines to show, most important first. Empty when all is well.
  *
- * @param {{ provider: string, status?: string, last_error?: string | null, waiting_changes?: number }} integration
- * @returns {Array<{ kind: "reconnect" | "waiting" | "sync", text: string }>}
+ * @param {{ provider: string, status?: string, last_error?: string | null, waiting_changes?: number, held_changes?: number }} integration
+ * @returns {Array<{ kind: "reconnect" | "held" | "waiting" | "sync", text: string }>}
  */
 export function integrationNotices(integration) {
   const name = providerLabel(integration.provider);
@@ -28,15 +28,25 @@ export function integrationNotices(integration) {
   const refused = /\((401)\)|invalid_grant|rejected the credentials|no refresh token/i.test(error);
 
   if (integration.status === "needs_reauth" || refused) {
-    return [
+    // Reconnecting in place keeps everything: which event is which task,
+    // and what was changed here meanwhile. Disconnecting first would not.
+    const notices = [
       {
-        kind: "reconnect",
+        kind: /** @type {"reconnect" | "held"} */ ("reconnect"),
         text:
           integration.provider === "apple"
-            ? `${name} no longer accepts the app-specific password. Disconnect, then connect again with a new one.`
-            : `${name} no longer accepts this connection. Disconnect, then connect again to carry on syncing.`,
+            ? `${name} no longer accepts the app-specific password. Reconnect with a new one to carry on syncing.`
+            : `${name} no longer accepts this connection. Reconnect to carry on syncing.`,
       },
     ];
+    const held = Number(integration.held_changes || 0);
+    if (held > 0) {
+      notices.push({
+        kind: "held",
+        text: `${held} ${held === 1 ? "change" : "changes"} made here ${held === 1 ? "is" : "are"} kept, and will be sent to ${name} when you reconnect.`,
+      });
+    }
+    return notices;
   }
 
   const notices = [];

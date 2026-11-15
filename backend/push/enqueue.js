@@ -17,7 +17,7 @@ import {
 import { log } from "../log.js";
 import { pushOneGoogle } from "./google.js";
 import { pushOneApple } from "./apple.js";
-import { duePushes, failPush, hasCalendarToPushTo, rememberPush, settlePush } from "./outbox.js";
+import { duePushes, failPush, hasCalendarToPushTo, holdPush, isSignInRefusal, rememberPush, settlePush } from "./outbox.js";
 
 /** @typedef {import("node:sqlite").DatabaseSync} DB */
 
@@ -111,7 +111,7 @@ async function runPush(db, config, { op, appId, taskSnapshot, token, retry = fal
     db
       .prepare(
         `SELECT * FROM calendar_integrations
-         WHERE app_id = ? AND user_id = ? AND status = 'active'
+         WHERE app_id = ? AND user_id = ? AND status IN ('active', 'needs_reauth')
            AND provider IN ('google', 'apple')`
       )
       .all(appId, taskSnapshot.created_by_id || "")
@@ -152,18 +152,38 @@ async function runPush(db, config, { op, appId, taskSnapshot, token, retry = fal
 
   /** @type {{ integrationId: string, error: unknown } | null} */
   let failure = null;
+  // A calendar that has to be connected again before it can take anything.
+  /** @type {{ integrationId: string, stillConnected: boolean } | null} */
+  let held = null;
   for (const integration of eligible) {
+    if (integration.status === "needs_reauth") {
+      // Only what would really go there is kept: a task with no date and
+      // no event has nothing to send, now or after the reconnect.
+      const hasSomethingToSend =
+        mappedIntegrationIds.has(integration.id) || (op === "upsert" && !!taskSnapshot.due_date);
+      if (hasSomethingToSend) held = held || { integrationId: integration.id, stillConnected: false };
+      continue;
+    }
     try {
       await pushOne(db, config, { op, integration, taskSnapshot, retry });
     } catch (err) {
       // Marked on the connection already; the other calendars still get theirs.
-      failure = failure || { integrationId: integration.id, error: err };
+      const status = /** @type {any} */ (
+        db.prepare(`SELECT status FROM calendar_integrations WHERE id = ?`).get(integration.id)
+      )?.status;
+      if (status === "needs_reauth" || isSignInRefusal(err)) {
+        // Not a failure to count down on: it waits for the reconnect.
+        held = held || { integrationId: integration.id, stillConnected: status === "active" };
+      } else {
+        failure = failure || { integrationId: integration.id, error: err };
+      }
       log.warn(
         `[push] integration ${integration.id} task ${taskSnapshot.id}: ${err.message}`
       );
     }
   }
   if (failure) failPush(db, { taskId: taskSnapshot.id, token, ...failure });
+  else if (held) holdPush(db, { taskId: taskSnapshot.id, token, ...held });
   else settlePush(db, taskSnapshot.id, token);
 }
 

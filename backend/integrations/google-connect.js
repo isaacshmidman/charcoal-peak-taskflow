@@ -22,6 +22,7 @@ import {
 } from "../providers/google-calendar.js";
 import { ensureIntegrationsRuntimeReady } from "./runtime.js";
 import { ensureDefaultIntegration } from "./defaults.js";
+import { releaseHeldPushes } from "../push/outbox.js";
 
 /** @typedef {import("node:sqlite").DatabaseSync} DB */
 
@@ -166,6 +167,8 @@ export async function completeGoogleConnect(db, config, { user, state, code }) {
       existing.id
     );
     ensureDefaultIntegration(db, { appId: row.app_id, userId: user.id, integrationId: existing.id });
+    // Connected again: what was changed here meanwhile goes out now.
+    releaseHeldPushes(db, existing.id);
     return { integrationId: existing.id, redirectTo: row.from_url };
   }
 

@@ -10,11 +10,21 @@ describe("what Settings says under a connected calendar", () => {
 
   it("asks for a reconnect, and only that, when the calendar has stopped accepting the connection", () => {
     expect(texts({ provider: "google", status: "needs_reauth", last_error: 'Google refresh failed (400): {"error":"invalid_grant"}', waiting_changes: 3 })).toEqual([
-      "Google Calendar no longer accepts this connection. Disconnect, then connect again to carry on syncing.",
+      "Google Calendar no longer accepts this connection. Reconnect to carry on syncing.",
     ]);
     expect(texts({ provider: "apple", status: "active", last_error: "Apple Calendar rejected the credentials. Check the Apple ID and app-specific password." })).toEqual([
-      "iCloud Calendar no longer accepts the app-specific password. Disconnect, then connect again with a new one.",
+      "iCloud Calendar no longer accepts the app-specific password. Reconnect with a new one to carry on syncing.",
     ]);
+  });
+
+  it("says what is being kept for the reconnect, so nobody disconnects to start over", () => {
+    expect(texts({ provider: "google", status: "needs_reauth", last_error: "invalid_grant", held_changes: 3 })).toEqual([
+      "Google Calendar no longer accepts this connection. Reconnect to carry on syncing.",
+      "3 changes made here are kept, and will be sent to Google Calendar when you reconnect.",
+    ]);
+    expect(texts({ provider: "apple", status: "active", last_error: "Apple Calendar rejected the credentials.", held_changes: 1 })[1]).toBe(
+      "1 change made here is kept, and will be sent to iCloud Calendar when you reconnect."
+    );
   });
 
   it("counts the changes still on their way", () => {

@@ -20,6 +20,7 @@ import { HttpError } from "../http.js";
 import { decryptSecret, isEncryptionAvailable } from "../crypto.js";
 import { revokeToken as revokeGoogleToken } from "../providers/google-calendar.js";
 import { getIntegrationForUser } from "./queries.js";
+import { forgetHeldPushes } from "../push/outbox.js";
 
 /** @typedef {import("node:sqlite").DatabaseSync} DB */
 
@@ -84,6 +85,9 @@ export async function disconnectIntegration(db, { appId, userId, id }) {
          )`
     ).run(now, appId, row.provider, row.id);
 
+    // Changes kept for this calendar until it was connected again have
+    // nowhere to go now.
+    forgetHeldPushes(db, row.id);
     db.prepare(`DELETE FROM external_event_map WHERE integration_id = ?`).run(row.id);
     db.prepare(`DELETE FROM integration_calendars WHERE integration_id = ?`).run(row.id);
     db.prepare(`DELETE FROM calendar_integrations WHERE id = ?`).run(row.id);
