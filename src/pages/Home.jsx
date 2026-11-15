@@ -4,14 +4,15 @@
  * arranges themselves. A grid of blocks (components/home/blocks.jsx),
  * each a small view of something another page shows in full.
  *
- * Customize turns the page into its own editor: every block can be
- * dragged to another place (or moved earlier or later with its arrows),
- * made wider or narrower, given its own few settings, or removed, and a
- * tray lists the blocks that aren't on the page. Nothing is arranged
- * automatically and nothing moves by itself. The layout is saved to the
- * account (hooks/useHomeLayout.js).
+ * Customize turns the page into its own editor. A block is dragged by
+ * its grip to another place; its settings button holds everything else
+ * about it (how wide, its own few settings, earlier or later for the
+ * keyboard); the x removes it. A tray at the top lists the blocks that
+ * aren't on the page. Nothing is arranged automatically and nothing moves
+ * by itself. Every change is saved as it is made, to the account
+ * (hooks/useHomeLayout.js).
  */
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { DndContext, PointerSensor, TouchSensor, pointerWithin, useSensor, useSensors } from "@dnd-kit/core";
@@ -23,7 +24,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import HomeBlock, { HomeBlockOutline } from "@/components/home/HomeBlock";
 import { awaitingFirstAnswer } from "@/lib/loading";
-import { DoneBlock, MonthBlock, NotesBlock, QuickAddBlock, ScheduleBlock, TagsBlock, TaskRows, WeekBlock } from "@/components/home/blocks";
+import { DoneBlock, MonthBlock, NotesBlock, ScheduleBlock, TagsBlock, TaskRows, WeekBlock } from "@/components/home/blocks";
+import { showDeleteToast } from "@/components/tasks/DeleteToast";
 import { useTaskDialogs } from "@/components/tasks/useTaskDialogs";
 import { useCalendarOrderState } from "@/hooks/useCalendarOrder";
 import { useHomeLayout } from "@/hooks/useHomeLayout";
@@ -34,9 +36,11 @@ import {
   addBlock,
   blockName,
   blockOptions,
+  dayAgenda,
   dueToday,
+  eventDays,
+  finishedThisWeek,
   hiddenBlocks,
-  monthGrid,
   moveBlock,
   moveBlockTo,
   nextSevenDays,
@@ -71,26 +75,35 @@ const LEADS_TO = {
 
 const SETTING_LABELS = { rows: "Rows", days: "Days ahead" };
 
+/** One line of a block's settings: what it is, then the control. */
+function SettingRow({ label, children }) {
+  return (
+    <>
+      <span className="text-[12px] text-ink-500 dark:text-ink-400">{label}</span>
+      <div className="min-w-0">{children}</div>
+    </>
+  );
+}
+
 /** One of a block's settings that is a choice of a few numbers. */
 function ChoiceSetting({ block, name, value, choices, onChange }) {
   const label = SETTING_LABELS[name] || name;
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-[12px] text-ink-500 dark:text-ink-400">{label}</span>
-      <div role="group" aria-label={`${label} in ${block}`} className="ds-seg">
+    <SettingRow label={label}>
+      <div role="group" aria-label={`${label} in ${block}`} className="ds-seg w-full">
         {choices.map((choice) => (
           <button
             key={choice}
             type="button"
-            className="ds-seg-item h-6 min-w-[1.75rem] px-1.5 text-[11px] tabular-nums"
+            className="ds-seg-item h-7 flex-1 px-1.5 text-[12px] tabular-nums"
             aria-pressed={value === choice}
             onClick={() => onChange(choice)}
           >
-            {choice}
+            {choice === 0 ? "None" : choice}
           </button>
         ))}
       </div>
-    </div>
+    </SettingRow>
   );
 }
 
@@ -128,8 +141,6 @@ export default function Home() {
   const tasks = useMemo(() => excludeExternalEvents(everything), [everything]);
   const ui = useTaskDialogs(tasks);
 
-  const sortedPriorities = useMemo(() => [...priorities].sort((a, b) => (a.order ?? 99) - (b.order ?? 99)), [priorities]);
-
   // Each block's own settings (rows, days ahead, which tag), as they stand.
   const options = useMemo(() => Object.fromEntries(layout.map((block) => [block.id, blockOptions(block)])), [layout]);
   const deadlineDays = options.deadlines?.days ?? BLOCK_SETTINGS.deadlines.days.start;
@@ -141,18 +152,27 @@ export default function Home() {
     priorities.forEach((priority) => { priorityOrder[priority.id] = priority.order; });
     const open = openTasks(tasks, hiddenCalendars);
     return {
+      open,
+      priorityOrder,
       today: dueToday(open, todayStart, priorityOrder),
       overdue: overdueTasks(open, todayStart),
       deadlines: upcomingDeadlines(open, todayStart, deadlineDays),
       oneTag: tasksWithTag(open, chosenTag),
       week: nextSevenDays(open, todayStart),
       progress: weekProgress(tasks, open, todayStart, hiddenCalendars),
+      finished: finishedThisWeek(tasks, todayStart, hiddenCalendars),
       ranking: tagRanking(open),
       schedule: scheduleToday(everything, todayStart, hiddenCalendars),
-      month: monthGrid(open, todayStart),
+      eventsOn: eventDays(everything, hiddenCalendars),
       pinned: pinnedNotes(notes),
     };
   }, [everything, tasks, priorities, notes, hiddenCalendars, todayStart, deadlineDays, chosenTag]);
+
+  // What is on any one day, for the panel a day opens (the week's bars, the month's days).
+  const agendaFor = useCallback(
+    (day) => dayAgenda(data.open, everything, day, hiddenCalendars, data.priorityOrder),
+    [data.open, data.priorityOrder, everything, hiddenCalendars],
+  );
 
   // Dragging a block by its grip. A small movement first, so a press on
   // the grip that isn't a drag stays a press; on a touch screen a short
@@ -191,16 +211,13 @@ export default function Home() {
 
   /** A block's count beside its name, and its content. */
   const parts = {
-    quick: {
-      body: <QuickAddBlock priorities={sortedPriorities} savedTags={savedTags} todayStart={todayStart} onCreate={ui.createTask} />,
-    },
     today: {
       count: data.today.length,
       body: <TaskRows tasks={data.today} most={rowsOf("today")} to="/Today" empty="Nothing due today." meta="time" ui={ui} priorities={priorities} />,
     },
     schedule: {
       count: data.schedule.length || "",
-      body: <ScheduleBlock rows={data.schedule} most={rowsOf("schedule")} onEditTask={ui.edit} />,
+      body: <ScheduleBlock rows={data.schedule} most={rowsOf("schedule")} onOpen={ui.edit} />,
     },
     overdue: {
       count: data.overdue.length,
@@ -225,18 +242,17 @@ export default function Home() {
     },
     week: {
       count: plural(weekTotal, "task"),
-      body: <WeekBlock days={data.week} />,
+      body: <WeekBlock days={data.week} agendaFor={agendaFor} ui={ui} priorities={priorities} />,
     },
     tags: {
       count: "open tasks",
       body: <TagsBlock ranking={data.ranking} most={rowsOf("tags")} />,
     },
     done: {
-      body: <DoneBlock progress={data.progress} />,
+      body: <DoneBlock progress={data.progress} recent={data.finished} most={rowsOf("done")} ui={ui} priorities={priorities} />,
     },
     month: {
-      count: data.month.label,
-      body: <MonthBlock grid={data.month} />,
+      body: <MonthBlock open={data.open} todayStart={todayStart} eventsOn={data.eventsOn} agendaFor={agendaFor} ui={ui} priorities={priorities} />,
     },
     tag: {
       // Named after its tag once one is chosen, and its heading leads there.
@@ -253,12 +269,12 @@ export default function Home() {
           priorities={priorities}
         />
       ) : (
-        <p className="px-3.5 pb-4 pt-0.5 text-[13px] text-ink-400 dark:text-ink-500">Choose a tag in Customize.</p>
+        <p className="px-3 pb-4 pt-0.5 text-[13px] text-ink-400 dark:text-ink-500">Choose a tag in Customize.</p>
       ),
     },
   };
 
-  /** The controls for a block's own settings, shown while customizing. */
+  /** The controls for a block's own settings, for its settings panel while customizing. */
   const settingsFor = (block) => {
     const spec = BLOCK_SETTINGS[block.id];
     if (!spec) return null;
@@ -266,14 +282,13 @@ export default function Home() {
     return (
       <>
         {block.id === "tag" && (
-          <div className="flex items-center gap-2">
-            <span className="text-[12px] text-ink-500 dark:text-ink-400">Tag</span>
+          <SettingRow label="Tag">
             <Select
               value={chosenTag}
               // Radix's hidden native <select> can report "" as it mounts.
               onValueChange={(value) => { if (value) save(setBlockOption(layout, "tag", "tag", value)); }}
             >
-              <SelectTrigger aria-label="Which tag this block shows" className="h-7 w-auto min-w-[7rem] max-w-[11rem] gap-2 px-2 text-[12px]">
+              <SelectTrigger aria-label="Which tag this block shows" className="h-8 w-full gap-2 px-2 text-[12px]">
                 <SelectValue placeholder="Choose a tag" />
               </SelectTrigger>
               <SelectContent>
@@ -283,7 +298,7 @@ export default function Home() {
                 ))}
               </SelectContent>
             </Select>
-          </div>
+          </SettingRow>
         )}
         {Object.entries(spec)
           .filter(([, setting]) => setting.choices)
@@ -301,6 +316,14 @@ export default function Home() {
     );
   };
 
+  /** Back to the starting layout, with a way back: it is someone's own arrangement being thrown away. */
+  const reset = async () => {
+    const before = layout;
+    if (await save(null)) {
+      showDeleteToast({ label: "Home is back to its starting layout.", onUndo: () => save(before), duration: 8000 });
+    }
+  };
+
   const tray = hiddenBlocks(layout);
 
   return (
@@ -309,7 +332,7 @@ export default function Home() {
         {editing ? (
           <>
             {isCustom && (
-              <Button type="button" variant="ghost" className="h-9" onClick={() => save(null)}>
+              <Button type="button" variant="ghost" className="h-9" onClick={reset}>
                 Reset
               </Button>
             )}
@@ -330,6 +353,45 @@ export default function Home() {
           </>
         )}
       </PageHeader>
+
+      {editing && (
+        <section
+          aria-label="Add a block"
+          data-testid="home-tray"
+          className="rounded-xl border border-dashed border-ink-300 px-3.5 py-3 dark:border-ink-600"
+        >
+          <p className="text-[13px] text-ink-600 dark:text-ink-300">
+            Drag a block by its grip to move it. Its settings button changes how wide it is and what it shows. Everything is saved as you go.
+          </p>
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
+            <h2 className="mr-1 text-[13px] font-semibold text-ink-800 dark:text-ink-200">Add a block</h2>
+            {tray.length === 0 ? (
+              <p className="text-[13px] text-ink-400 dark:text-ink-500">Every block is on the page.</p>
+            ) : (
+              tray.map((block) => (
+                <Button
+                  key={block.id}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1"
+                  onClick={() => {
+                    // First on the page, right under this tray, where it can be seen and dragged from.
+                    const added = addBlock(layout, block.id, "first");
+                    // "One tag" arrives pointed at the busiest tag rather than at nothing.
+                    const busiest = data.ranking[0]?.tag;
+                    save(block.id === "tag" && busiest ? setBlockOption(added, "tag", "tag", busiest) : added);
+                  }}
+                  aria-label={`Add ${block.name}`}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  {block.name}
+                </Button>
+              ))
+            )}
+          </div>
+        </section>
+      )}
 
       {isLoading ? (
         // The page as it will be laid out, each block an outline of itself.
@@ -375,39 +437,6 @@ export default function Home() {
             ))}
           </div>
         </DndContext>
-      )}
-
-      {editing && (
-        <section
-          aria-label="Add a block"
-          data-testid="home-tray"
-          className="flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-ink-300 px-3.5 py-3 dark:border-ink-600"
-        >
-          <h2 className="mr-1 text-[13px] font-semibold text-ink-800 dark:text-ink-200">Add a block</h2>
-          {tray.length === 0 ? (
-            <p className="text-[13px] text-ink-400 dark:text-ink-500">Every block is on the page.</p>
-          ) : (
-            tray.map((block) => (
-              <Button
-                key={block.id}
-                type="button"
-                variant="outline"
-                size="sm"
-                className="gap-1"
-                onClick={() => {
-                  const added = addBlock(layout, block.id);
-                  // "One tag" arrives pointed at the busiest tag rather than at nothing.
-                  const busiest = data.ranking[0]?.tag;
-                  save(block.id === "tag" && busiest ? setBlockOption(added, "tag", "tag", busiest) : added);
-                }}
-                aria-label={`Add ${block.name}`}
-              >
-                <Plus className="h-3.5 w-3.5" />
-                {block.name}
-              </Button>
-            ))
-          )}
-        </section>
       )}
 
       {ui.dialogs}

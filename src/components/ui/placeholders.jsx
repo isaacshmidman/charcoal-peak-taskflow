@@ -71,7 +71,7 @@ export function NoteRowsPlaceholder({ rows = 4 }) {
  */
 export function BlockRowsPlaceholder({ rows = 3 }) {
   return (
-    <div className="space-y-3 px-3.5 pb-4 pt-1.5">
+    <div className="space-y-3 px-3 pb-4 pt-1.5">
       {Array.from({ length: rows }, (_, index) => (
         <div key={index} className="flex items-center gap-2.5">
           <span className={cn(bar, "h-4 w-4 shrink-0")} />

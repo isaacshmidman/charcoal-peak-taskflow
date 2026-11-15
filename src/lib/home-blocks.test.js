@@ -7,6 +7,9 @@ import {
   blockOptions,
   dueToday,
   hiddenBlocks,
+  dayAgenda,
+  eventDays,
+  finishedThisWeek,
   monthGrid,
   moveBlock,
   moveBlockTo,
@@ -47,6 +50,8 @@ describe("the Home layout", () => {
       resolveHomeLayout([
         { id: "tags", size: "full" },
         { id: "weather", size: "half" },
+        // Quick add was a block once; a layout saved then still opens.
+        { id: "quick", size: "full" },
         { id: "tags", size: "third" },
         { id: "today", size: "huge" },
         null,
@@ -74,10 +79,12 @@ describe("the Home layout", () => {
 
     expect(ids(removeBlock(layout, "tags"))).toEqual(["today", "week"]);
 
-    const added = addBlock(layout, "quick");
-    expect(added.at(-1)).toEqual({ id: "quick", size: "full" });
+    const added = addBlock(layout, "month");
+    expect(added.at(-1)).toEqual({ id: "month", size: "half" });
     // A block that isn't in the starting layout arrives narrow.
     expect(addBlock(layout, "tag").at(-1)).toEqual({ id: "tag", size: "third" });
+    // Asked for first, it goes first.
+    expect(ids(addBlock(layout, "month", "first"))).toEqual(["month", "today", "tags", "week"]);
     expect(addBlock(layout, "today")).toBe(layout);
     expect(addBlock(layout, "weather")).toBe(layout);
     expect(ids(layout)).toEqual(["today", "tags", "week"]);
@@ -85,13 +92,13 @@ describe("the Home layout", () => {
 
   it("drops a dragged block where it was let go, and the ones between move along", () => {
     const layout = [
-      { id: "quick", size: "full" },
+      { id: "schedule", size: "full" },
       { id: "today", size: "half" },
       { id: "tags", size: "half" },
       { id: "week", size: "full" },
     ];
-    expect(ids(moveBlockTo(layout, "week", "today"))).toEqual(["quick", "week", "today", "tags"]);
-    expect(ids(moveBlockTo(layout, "quick", "tags"))).toEqual(["today", "tags", "quick", "week"]);
+    expect(ids(moveBlockTo(layout, "week", "today"))).toEqual(["schedule", "week", "today", "tags"]);
+    expect(ids(moveBlockTo(layout, "schedule", "tags"))).toEqual(["today", "tags", "schedule", "week"]);
     // Onto itself, or onto something that isn't there: nothing changes.
     expect(moveBlockTo(layout, "today", "today")).toBe(layout);
     expect(moveBlockTo(layout, "today", "weather")).toBe(layout);
@@ -220,6 +227,24 @@ describe("what the Home blocks show", () => {
     expect(weekProgress(tasks, open, today, new Set(["google:work"]))).toEqual({ done: 2, left: 6, total: 8 });
     expect(weekProgress(tasks, open, today).done).toBe(3);
     expect(weekProgress([], [], today)).toEqual({ done: 0, left: 0, total: 0 });
+    // The same tasks as a list, the one finished last first.
+    expect(ids(finishedThisWeek(tasks, today, new Set(["google:work"])))).toEqual(["d2", "d1"]);
+  });
+
+  it("A day's agenda: its open tasks in the order a day is read, and the calendar's events", () => {
+    const everything = [
+      ...open,
+      { id: "standup", title: "Team check-in", due_date: "2026-11-14", task_time: "9:00AM", source_kind: "event" },
+      { id: "holiday", title: "Holiday", due_date: "2026-11-14", source_kind: "event" },
+      { id: "secret", title: "Hidden", due_date: "2026-11-14", source_kind: "event", source_provider: "google", source_calendar_id: "x" },
+      { id: "elsewhere", title: "Another day", due_date: "2026-11-15", source_kind: "event" },
+    ];
+    const hidden = new Set(["google:x"]);
+    const agenda = dayAgenda(open, everything, "2026-11-14", hidden, priorityOrder);
+    expect(ids(agenda.tasks)).toEqual(["morning", "noon", "anyHigh", "anyLow"]);
+    expect(ids(agenda.events)).toEqual(["holiday", "standup"]);
+    expect(dayAgenda(open, everything, "2026-11-16", hidden)).toEqual({ tasks: [], events: [] });
+    expect([...eventDays(everything, hidden)].sort()).toEqual(["2026-11-14", "2026-11-15"]);
   });
 
   it("Schedule: today's events and timed open tasks, all-day first, then by the clock", () => {
@@ -256,6 +281,24 @@ describe("what the Home blocks show", () => {
     const october = monthGrid([], new Date(2026, 9, 10));
     expect(october.weeks[0][0]).toMatchObject({ key: "2026-09-27", inMonth: false });
     expect(october.weeks[0][4]).toMatchObject({ key: "2026-10-01", inMonth: true });
+  });
+
+  it("Month: each day's mark says what it means, and the month can be turned", () => {
+    const flat = monthGrid(open, today, 0, new Set(["2026-11-16", "2026-11-14"])).weeks.flat();
+    const at = (key) => flat.find((day) => day.key === key);
+    // A day that has passed with a task still open is late; today is not.
+    expect(at("2026-11-12")).toMatchObject({ count: 1, late: true, hasEvent: false });
+    expect(at("2026-11-14")).toMatchObject({ count: 4, late: false, hasEvent: true });
+    expect(at("2026-11-16")).toMatchObject({ count: 0, late: false, hasEvent: true });
+    expect(at("2026-11-28")).toMatchObject({ count: 1, late: false });
+
+    expect(monthGrid(open, today).isThisMonth).toBe(true);
+    const next = monthGrid(open, today, 1);
+    expect(next).toMatchObject({ label: "December", isThisMonth: false });
+    expect(next.weeks.flat().some((day) => day.isToday)).toBe(false);
+    // Into another year, the year is said.
+    expect(monthGrid(open, today, 2).label).toBe("January 2027");
+    expect(monthGrid(open, today, -11).label).toBe("December 2025");
   });
 
   it("Pinned notes: only pinned, most recently edited first", () => {

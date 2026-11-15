@@ -91,31 +91,48 @@ its address so links and Back land where they meant.
 another page shows in full. The person arranges it; nothing arranges
 itself.
 
-- **A block** is `home/HomeBlock.jsx`: a card with a quiet heading that
-  is the link to the full page, a count beside it, and the content from
-  `home/blocks.jsx`. Six columns on a laptop (a block is a third, a half
-  or the whole row), two on a tablet, one on a phone.
+- **A block** is `home/HomeBlock.jsx`: a card whose heading row is the
+  link to the full page (name, a count, an arrow at the far end), and the
+  content from `home/blocks.jsx`. Six columns on a laptop (a block is a
+  third, a half or the whole row), two on a tablet, one on a phone.
+  Headings, rows and empty lines all start 12px in, so a heading sits
+  exactly over its rows' tick boxes.
+- **Everything in a block can be used where it is.** Task rows tick, open
+  and move to another day. An event opens. A day (a bar of Next 7 days, a
+  day of Month) opens a small panel, `DayPeek`: what is on that day, each
+  row usable, "New task" on that day, and "Open in Calendar". Done this
+  week lists the last few finished, which can be unticked there.
 - **The numbers** come from `src/lib/home-blocks.js`, plain functions
   over the tasks and notes already loaded, tested on their own. Today
   plus Overdue is exactly the Today page's list. Add a block there
   (`HOME_BLOCKS`, a function for its data) and in `Home.jsx` (`parts`).
-- **Customize** turns the page into its own editor: each block gets a
-  grip to drag it by (let go over another block and it takes that place),
-  earlier / later for the keyboard, S M L, and remove; a tray at the foot
-  lists the blocks that are off the page. Content is held still while
-  arranging. Every change is saved at once to the account
-  (`backend/home-layout.js`), so it is the same page on every device.
-  Reset forgets it.
+- **A mark always means one thing, and says so.** In Month a dot is tasks
+  due that day, red once the day has passed with any still open, and a
+  ring is a day with only calendar events; the line under the grid names
+  whichever of them the month shows. Bars are one shape: the same corners
+  all round, an empty day's included.
+- **Customize** turns the page into its own editor. A block carries three
+  controls: a grip to drag it by (let go over another block and it takes
+  that place; with the keyboard on the grip, the arrow keys move it), a
+  settings button, and remove. The settings panel holds the rest, in
+  words: Width (Narrow / Medium / Wide), the block's own settings, and
+  Earlier / Later. Nothing is added to the block itself, so the page being
+  arranged is the size it will be. A tray at the top lists the blocks that
+  are off the page, and one added from it lands first, in sight. Content
+  is held still while arranging. Every change is saved at once to the
+  account (`backend/home-layout.js`), so it is the same page on every
+  device. Reset forgets it, and offers Undo.
 - **A block's own settings** (`BLOCK_SETTINGS`): how many rows a list
   shows, how far ahead Deadlines looks, which tag "One tag" lists. Each
-  is a choice of a few, shown under the block's heading while
-  customizing. The server keeps them as small plain values and doesn't
-  know what they mean, so a new setting needs no change there.
+  is a choice of a few. The server keeps them as small plain values and
+  doesn't know what they mean, so a new setting needs no change there.
 - **Colour.** Bars and dots are ink. Sun appears where it always means
   something: today's bar and today's date (now), the progress bar (done).
-  An event's stripe in Schedule is its calendar's own colour.
-- **Quick add** reads `#tag` and `!priority` like the task form's title.
-  The day is the switch beside it. Words are never read for dates.
+  Red is an overdue day's dot. An event's stripe in Schedule is its
+  calendar's own colour.
+- **No quick-add box.** There was one; it was removed (November 2026) as
+  a second, lesser way to do what New task does. A layout saved with it
+  still opens: unknown blocks are dropped.
 
 ## Type
 

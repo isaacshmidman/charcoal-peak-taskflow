@@ -4,25 +4,28 @@
  * of something another page shows in full, and says where: its heading
  * is the link there (see pages/Home.jsx for which).
  *
+ * Everything in a block can be acted on where it is: a task ticked,
+ * opened or moved to another day, an event opened, a day on the week's
+ * bars or the month's grid opened to see what is on it (DayPeek).
+ *
  * The numbers come from lib/home-blocks.js. Nothing is worked out here.
  */
-import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { addDays } from "date-fns/addDays";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { format } from "date-fns/format";
-import { Plus, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import CompactTaskCard from "@/components/tasks/CompactTaskCard";
-import TitleTokenInput from "@/components/tasks/QuickAdd/TitleTokenInput";
 import { spacedTime } from "@/components/tasks/TaskForm/TimeInput";
-import { showDeleteToast } from "@/components/tasks/DeleteToast";
 import { taskPagePath } from "@/hooks/useTagFilter";
-import { toDateStr } from "@/lib/dates";
+import { fromDateStr } from "@/lib/dates";
+import { monthGrid } from "@/lib/home-blocks";
 import { cn } from "@/lib/utils";
 
-const quiet = "px-3.5 pb-4 pt-0.5 text-[13px] text-ink-400 dark:text-ink-500";
+const quiet = "px-3 pb-4 pt-0.5 text-[13px] text-ink-400 dark:text-ink-500";
 const moreLink =
-  "block border-t border-border-hairline px-3.5 py-2 text-[12px] text-ink-500 outline-none transition-colors hover:text-ink-900 focus-visible:underline dark:text-ink-400 dark:hover:text-ink-100";
+  "block border-t border-border-hairline px-3 py-2 text-[12px] text-ink-500 outline-none transition-colors hover:text-ink-900 focus-visible:underline dark:text-ink-400 dark:hover:text-ink-100";
 
 /** The current minute of the day, kept current, so "already over" is true as the day goes on. */
 function useMinuteOfDay() {
@@ -68,9 +71,44 @@ export function TaskRows({ tasks, most, to, empty, meta = "date", late = false, 
   );
 }
 
+const rowHover =
+  "outline-none transition-colors hover:bg-ink-50 focus-visible:bg-ink-50 dark:hover:bg-night-raised dark:focus-visible:bg-night-raised";
+
+/**
+ * One thing on the clock: when, a bar of its calendar's colour, what it
+ * is. Pressing it opens it, a task or an event alike.
+ */
+function ClockRow({ row, over = false, onOpen, testid }) {
+  const sub = row.isEvent ? row.calendar || "Calendar" : "Task";
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(row.task)}
+      data-testid={testid}
+      className={cn("flex w-full items-stretch gap-3 px-3 py-2 text-left", rowHover, over && "opacity-50")}
+    >
+      <span className="w-[4.25rem] shrink-0 pt-px text-[12px] tabular-nums text-ink-500 dark:text-ink-400">
+        {row.start == null ? "All day" : spacedTime(row.time)}
+      </span>
+      {/* The calendar's own colour for an event; plain ink for a task. */}
+      <span
+        aria-hidden="true"
+        className={cn("w-0.5 shrink-0 rounded-full", !(row.isEvent && row.color) && "bg-ink-300 dark:bg-ink-600")}
+        style={row.isEvent && row.color ? { backgroundColor: row.color } : undefined}
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[13px] font-medium text-ink-900 dark:text-ink-100">{row.title || "Untitled"}</span>
+        <span className="block truncate text-[11px] text-ink-400 dark:text-ink-500">
+          {sub}
+          {row.start != null && row.endTime ? ` · until ${spacedTime(row.endTime)}` : ""}
+        </span>
+      </span>
+    </button>
+  );
+}
+
 /** Today on the clock: events and timed tasks. */
-export function ScheduleBlock({ rows, most = 8, onEditTask }) {
-  const navigate = useNavigate();
+export function ScheduleBlock({ rows, most = 8, onOpen }) {
   const minute = useMinuteOfDay();
   if (!rows.length) return <p className={quiet}>Nothing on the clock today.</p>;
   // Short of room, what is already over goes first: the rest of the day is what matters.
@@ -80,40 +118,11 @@ export function ScheduleBlock({ rows, most = 8, onEditTask }) {
   const rest = rows.length - shown.length;
   return (
     <ul className="overflow-hidden rounded-b-xl border-t border-border-hairline">
-      {shown.map((row) => {
-        const over = row.start != null && (row.end ?? row.start) < minute;
-        const sub = row.isEvent ? row.calendar || "Calendar" : "Task";
-        return (
-          <li key={row.id} className="border-b border-border-hairline last:border-b-0">
-            <button
-              type="button"
-              onClick={() => (row.isEvent ? navigate("/Calendar") : onEditTask(row.task))}
-              data-testid={`home-schedule-${row.id}`}
-              className={cn(
-                "flex w-full items-stretch gap-3 px-3.5 py-2 text-left outline-none transition-colors hover:bg-ink-50 focus-visible:bg-ink-50 dark:hover:bg-night-raised dark:focus-visible:bg-night-raised",
-                over && "opacity-50",
-              )}
-            >
-              <span className="w-[4.25rem] shrink-0 pt-px text-[12px] tabular-nums text-ink-500 dark:text-ink-400">
-                {row.start == null ? "All day" : spacedTime(row.time)}
-              </span>
-              {/* The calendar's own colour for an event; plain ink for a task. */}
-              <span
-                aria-hidden="true"
-                className={cn("w-0.5 shrink-0 rounded-full", !(row.isEvent && row.color) && "bg-ink-300 dark:bg-ink-600")}
-                style={row.isEvent && row.color ? { backgroundColor: row.color } : undefined}
-              />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[13px] font-medium text-ink-900 dark:text-ink-100">{row.title || "Untitled"}</span>
-                <span className="block truncate text-[11px] text-ink-400 dark:text-ink-500">
-                  {sub}
-                  {row.start != null && row.endTime ? ` · until ${spacedTime(row.endTime)}` : ""}
-                </span>
-              </span>
-            </button>
-          </li>
-        );
-      })}
+      {shown.map((row) => (
+        <li key={row.id} className="border-b border-border-hairline last:border-b-0">
+          <ClockRow row={row} over={isOver(row)} onOpen={onOpen} testid={`home-schedule-${row.id}`} />
+        </li>
+      ))}
       {rest > 0 && (
         <li>
           <Link to="/Calendar" className={cn(moreLink, "border-t-0")}>
@@ -125,35 +134,108 @@ export function ScheduleBlock({ rows, most = 8, onEditTask }) {
   );
 }
 
-/** Seven bars: how many tasks fall on each of the next seven days. */
-export function WeekBlock({ days }) {
+/**
+ * What is on one day, in a small panel that opens from the day itself (a
+ * bar of the week, a day of the month): its events and open tasks, each
+ * usable where it is, a way to add a task on that day, and the way to the
+ * calendar's own view of it.
+ *
+ * `children` is the one element that opens it.
+ *
+ * @param {{ day: string, agendaFor: (day: string) => { tasks: any[], events: any[] }, ui: any, priorities: any[], children: import("react").ReactElement }} props
+ */
+export function DayPeek({ day, agendaFor, ui, priorities, children }) {
+  const [open, setOpen] = useState(false);
+  const agenda = open ? agendaFor(day) : null;
+  const nothing = agenda && agenda.tasks.length + agenda.events.length === 0;
+  // Opening a task's form takes over from the panel.
+  const openTask = (task) => { setOpen(false); ui.edit(task); };
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>{children}</PopoverTrigger>
+      <PopoverContent className="w-[19rem] max-w-[calc(100vw-2rem)] p-0" data-testid={`home-peek-${day}`}>
+        <h3 className="px-3 pb-2 pt-3 text-[13px] font-semibold text-ink-900 dark:text-ink-100">{format(fromDateStr(day), "EEEE, MMMM d")}</h3>
+        {nothing ? (
+          <p className="px-3 pb-3 text-[13px] text-ink-400 dark:text-ink-500">Nothing on this day.</p>
+        ) : (
+          agenda && (
+            <div className="max-h-64 divide-y divide-border-hairline overflow-y-auto border-t border-border-hairline">
+              {agenda.events.map((row) => (
+                <ClockRow key={row.id} row={row} onOpen={openTask} />
+              ))}
+              {agenda.tasks.map((task) => (
+                <CompactTaskCard
+                  key={task.id}
+                  task={task}
+                  priorities={priorities}
+                  onToggleDone={ui.toggleDone}
+                  onEdit={openTask}
+                  onUpdate={ui.update}
+                  meta="time"
+                />
+              ))}
+            </div>
+          )
+        )}
+        <div className="flex items-center justify-between gap-2 border-t border-border-hairline px-1.5 py-1.5">
+          <Button type="button" variant="ghost" className="h-8 gap-1.5 px-2 text-[13px]" onClick={() => { setOpen(false); ui.openNew({ due_date: day }); }}>
+            <Plus className="h-3.5 w-3.5" />
+            New task
+          </Button>
+          <Link
+            to={`/Calendar?date=${day}&view=day`}
+            className="rounded px-2 py-1 text-[12px] text-ink-500 outline-none transition-colors hover:text-ink-900 focus-visible:underline dark:text-ink-400 dark:hover:text-ink-100"
+          >
+            Open in Calendar
+          </Link>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/** Seven bars: how many tasks fall on each of the next seven days. Each opens its day. */
+export function WeekBlock({ days, agendaFor, ui, priorities }) {
   const most = Math.max(1, ...days.map((day) => day.count));
   return (
-    <div className="flex h-full min-h-[7.5rem] items-end gap-2 px-3.5 pb-3.5 pt-1" role="list" aria-label="Tasks due on each of the next seven days">
-      {days.map((day) => (
-        <div
-          key={day.key}
-          role="listitem"
-          aria-label={`${format(day.date, "EEEE")}: ${day.count} ${day.count === 1 ? "task" : "tasks"}`}
-          data-testid={`home-day-${day.key}`}
-          className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1"
-        >
-          <span className={cn("text-[11px] tabular-nums", day.count ? "text-ink-700 dark:text-ink-200" : "text-ink-300 dark:text-ink-600")}>{day.count}</span>
-          <span className="flex w-full max-w-[2.5rem] flex-1 items-end">
-            <span
-              className={cn(
-                "block w-full rounded-t-[4px] rounded-b-[2px]",
-                // Sun means "now": only today's bar is yellow.
-                day.isToday ? "bg-sun-400" : "bg-ink-200 dark:bg-ink-700",
-              )}
-              style={{ height: day.count ? `${Math.max(8, Math.round((day.count / most) * 100))}%` : "2px" }}
-            />
-          </span>
-          <span className={cn("text-[11px]", day.isToday ? "font-semibold text-ink-900 dark:text-ink-100" : "text-ink-400 dark:text-ink-500")}>
-            {day.isToday ? "Today" : day.label}
-          </span>
-        </div>
-      ))}
+    <div className="flex h-full min-h-[7.5rem] items-stretch gap-1 px-2.5 pb-2.5 pt-1" role="list" aria-label="Tasks due on each of the next seven days">
+      {days.map((day) => {
+        const says = `${format(day.date, "EEEE")}: ${day.count} ${day.count === 1 ? "task" : "tasks"}`;
+        return (
+          <div key={day.key} role="listitem" aria-label={says} data-testid={`home-day-${day.key}`} className="flex min-w-0 flex-1">
+            <DayPeek day={day.key} agendaFor={agendaFor} ui={ui} priorities={priorities}>
+              <button
+                type="button"
+                aria-label={`${says}. Show the day`}
+                className={cn(
+                  "group/day flex h-full w-full min-w-0 flex-col items-center justify-end gap-1 rounded-lg px-1 pb-1 pt-1.5 data-[state=open]:bg-ink-50 dark:data-[state=open]:bg-night-raised",
+                  rowHover,
+                )}
+              >
+                <span className={cn("text-[11px] tabular-nums", day.count ? "text-ink-700 dark:text-ink-200" : "text-ink-300 dark:text-ink-600")}>{day.count}</span>
+                <span className="flex w-full max-w-[2.5rem] flex-1 items-end">
+                  {/* Every bar is the same shape, an empty day's included: only its height and colour say anything. */}
+                  <span
+                    className={cn(
+                      "block w-full rounded-[4px]",
+                      // Sun means "now": only today's bar is yellow.
+                      day.isToday && day.count
+                        ? "bg-sun-400"
+                        : day.count
+                          ? "bg-ink-200 group-hover/day:bg-ink-300 dark:bg-ink-700 dark:group-hover/day:bg-ink-600"
+                          : "bg-ink-100 dark:bg-night-raised",
+                    )}
+                    style={{ height: day.count ? `${Math.max(10, Math.round((day.count / most) * 100))}%` : "4px" }}
+                  />
+                </span>
+                <span className={cn("text-[11px]", day.isToday ? "font-semibold text-ink-900 dark:text-ink-100" : "text-ink-400 dark:text-ink-500")}>
+                  {day.isToday ? "Today" : day.label}
+                </span>
+              </button>
+            </DayPeek>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -172,7 +254,7 @@ export function TagsBlock({ ranking, most = 8 }) {
               to={taskPagePath("/Active", row.tag)}
               aria-label={`${row.tag}: ${row.count} open ${row.count === 1 ? "task" : "tasks"}`}
               data-testid={`home-tag-${row.tag}`}
-              className="flex items-center gap-3 px-3.5 py-1.5 outline-none transition-colors hover:bg-ink-50 focus-visible:bg-ink-50 dark:hover:bg-night-raised dark:focus-visible:bg-night-raised"
+              className={cn("flex items-center gap-3 px-3 py-1.5", rowHover)}
             >
               <span className="w-24 shrink-0 truncate text-[13px] text-ink-800 dark:text-ink-200">{row.tag}</span>
               <span className="h-1.5 min-w-0 flex-1 rounded-full bg-ink-100 dark:bg-night-raised">
@@ -183,35 +265,69 @@ export function TagsBlock({ ranking, most = 8 }) {
           </li>
         ))}
       </ol>
-      {rest > 0 && <p className="px-3.5 pb-1 pt-1.5 text-[12px] text-ink-400 dark:text-ink-500">and {rest} more in the sidebar</p>}
+      {rest > 0 && <p className="px-3 pb-1 pt-1.5 text-[12px] text-ink-400 dark:text-ink-500">and {rest} more in the sidebar</p>}
     </div>
   );
 }
 
-/** How the week is going: finished, and still to do before it ends. */
-export function DoneBlock({ progress }) {
+/**
+ * How the week is going: finished, and still to do before it ends; then
+ * the last few finished, each still a task that can be opened or unticked.
+ */
+export function DoneBlock({ progress, recent = [], most = 3, ui, priorities }) {
   const { done, left, total } = progress;
   const share = total ? Math.round((done / total) * 100) : 0;
+  const shown = recent.slice(0, most);
+  const rest = recent.length - shown.length;
   return (
-    <div className="px-3.5 pb-4 pt-0.5">
-      <p className="flex items-baseline gap-2">
-        <span className="text-[1.75rem] font-[650] leading-none tracking-tight tabular-nums text-ink-900 dark:text-ink-100" data-testid="home-done-number">{done}</span>
-        <span className="text-[13px] text-ink-500 dark:text-ink-400">{done === 1 ? "task finished" : "tasks finished"}</span>
-      </p>
-      <div
-        className="mt-3 h-1.5 rounded-full bg-ink-100 dark:bg-night-raised"
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={total}
-        aria-valuenow={done}
-        aria-label="Finished this week, out of everything due by Saturday"
-      >
-        {/* Sun means "done". */}
-        <div className="h-full rounded-full bg-sun-400" style={{ width: `${share}%` }} />
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="px-3 pb-3.5 pt-0.5">
+        <p className="flex items-baseline gap-2">
+          <span className="text-[1.75rem] font-[650] leading-none tracking-tight tabular-nums text-ink-900 dark:text-ink-100" data-testid="home-done-number">{done}</span>
+          <span className="text-[13px] text-ink-500 dark:text-ink-400">{done === 1 ? "task finished" : "tasks finished"}</span>
+        </p>
+        <div
+          className="mt-3 h-1.5 overflow-hidden rounded-full bg-ink-100 dark:bg-night-raised"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={total}
+          aria-valuenow={done}
+          aria-label="Finished this week, out of everything due by Saturday"
+        >
+          {/* Sun means "done". */}
+          <div className="h-full rounded-full bg-sun-400" style={{ width: `${share}%` }} />
+        </div>
+        <p className="mt-2 text-[12px] text-ink-400 dark:text-ink-500">
+          {left === 0 ? (
+            "Nothing else due this week."
+          ) : (
+            <Link to="/Active" className="rounded outline-none transition-colors hover:text-ink-900 focus-visible:underline dark:hover:text-ink-100">
+              {left} still due by Saturday
+            </Link>
+          )}
+        </p>
       </div>
-      <p className="mt-2 text-[12px] text-ink-400 dark:text-ink-500">
-        {left === 0 ? "Nothing else due this week." : `${left} still due by Saturday.`}
-      </p>
+      {shown.length > 0 && (
+        <div className="overflow-hidden rounded-b-xl border-t border-border-hairline">
+          <div className="divide-y divide-border-hairline" data-testid="home-done-recent">
+            {shown.map((task) => (
+              <CompactTaskCard
+                key={task.id}
+                task={task}
+                priorities={priorities}
+                onToggleDone={ui.toggleDone}
+                onEdit={ui.edit}
+                onUpdate={ui.update}
+              />
+            ))}
+          </div>
+          {rest > 0 && (
+            <Link to="/Completed" className={moreLink}>
+              and {rest} more
+            </Link>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -231,7 +347,7 @@ export function NotesBlock({ notes, most = 5 }) {
               <Link
                 to={`/Notes?note=${encodeURIComponent(note.id)}`}
                 data-testid={`home-note-${note.id}`}
-                className="flex items-center gap-3 px-3.5 py-2 outline-none transition-colors hover:bg-ink-50 focus-visible:bg-ink-50 dark:hover:bg-night-raised dark:focus-visible:bg-night-raised"
+                className={cn("flex min-h-[2.5625rem] items-center gap-3 px-3 py-2", rowHover)}
               >
                 <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink-900 dark:text-ink-100">{note.title || "Untitled"}</span>
                 {edited && !Number.isNaN(edited.getTime()) && (
@@ -253,152 +369,114 @@ export function NotesBlock({ notes, most = 5 }) {
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-/** This month at a glance: today, and which days have something due. */
-export function MonthBlock({ grid }) {
-  return (
-    <div className="px-3.5 pb-3.5 pt-0.5">
-      <div className="grid grid-cols-7 text-center text-[11px] tabular-nums">
-        {WEEKDAYS.map((name) => (
-          <span key={name} aria-hidden="true" className="pb-1 text-ink-400 dark:text-ink-500">{name[0]}</span>
-        ))}
-        {grid.weeks.flat().map((day) => (
-          <span
-            key={day.key}
-            data-testid={`home-month-${day.key}`}
-            data-due={day.count || undefined}
-            aria-label={day.inMonth ? `${day.day}${day.isToday ? ", today" : ""}${day.count ? `, ${day.count} due` : ""}` : undefined}
-            aria-hidden={day.inMonth ? undefined : true}
-            className="flex h-8 flex-col items-center justify-center"
-          >
-            <span
-              className={cn(
-                "flex h-6 w-6 items-center justify-center rounded-full",
-                !day.inMonth && "text-ink-300 dark:text-ink-700",
-                day.inMonth && !day.isToday && "text-ink-700 dark:text-ink-200",
-                // Sun means "now".
-                day.isToday && "bg-sun-400 font-semibold text-ink-900",
-              )}
-            >
-              {day.day}
-            </span>
-            <span className={cn("h-1 w-1 rounded-full", day.count && day.inMonth ? "bg-ink-400 dark:bg-ink-400" : "bg-transparent")} />
-          </span>
-        ))}
-      </div>
-    </div>
-  );
+const monthArrow =
+  "inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-500 outline-none transition-colors hover:bg-selected hover:text-ink-900 focus-visible:bg-selected dark:text-ink-400 dark:hover:text-ink-100";
+
+/** What a day's mark says, for someone who can't see it. */
+function daySays(day) {
+  const parts = [format(fromDateStr(day.key), "EEEE, MMMM d")];
+  if (day.isToday) parts.push("today");
+  if (day.count) parts.push(`${day.count} ${day.count === 1 ? "task" : "tasks"} ${day.late ? "overdue" : "due"}`);
+  if (day.hasEvent) parts.push("has events");
+  return parts.join(", ");
 }
 
-const WHEN = [
-  { key: "today", label: "Today" },
-  { key: "tomorrow", label: "Tomorrow" },
-  { key: "none", label: "No date" },
-];
-
 /**
- * One line to add a task without opening the form. #tag and !priority
- * work as they do in the form's title; the day is chosen with the switch
- * beside it and never read out of the words.
+ * A month at a glance. Every day opens (DayPeek), and the arrows turn
+ * to another month.
+ *
+ * A mark under a day always means the same thing, and the line under
+ * the grid says which: a dot is tasks due that day (red once the day has
+ * passed with any still open), a ring is a day with only calendar events.
  */
-export function QuickAddBlock({ priorities, savedTags, todayStart, onCreate }) {
-  const [form, setForm] = useState({ title: "", tags: [], priority_id: "" });
-  const [when, setWhen] = useState("today");
-  const [busy, setBusy] = useState(false);
-  const wrapRef = useRef(null);
-  const title = form.title.trim();
-  const priority = priorities.find((item) => item.id === form.priority_id);
-
-  const add = async () => {
-    if (!title || busy) return;
-    const day = when === "none" ? "" : toDateStr(when === "tomorrow" ? addDays(todayStart, 1) : todayStart);
-    // No priority chosen: the middle one, as the task form starts with.
-    const fallback = priorities[Math.floor(priorities.length / 2)] || priorities[0] || null;
-    setBusy(true);
-    try {
-      await onCreate({
-        title,
-        description: "",
-        description_json: "",
-        priority_id: form.priority_id || fallback?.id || "",
-        status: "todo",
-        task_type: "one_time",
-        recurrence: "none",
-        recurrence_days: [],
-        recurrence_end_date: "",
-        due_date: day,
-        task_time: "",
-        task_end_time: "",
-        tags: form.tags,
-        reminder: "",
-      });
-      setForm({ title: "", tags: [], priority_id: "" });
-      showDeleteToast({ label: `Added “${title}”`, hideUndo: true, duration: 2500 });
-      wrapRef.current?.querySelector("[data-title-input]")?.focus();
-    } finally {
-      setBusy(false);
-    }
-  };
+export function MonthBlock({ open, todayStart, eventsOn, agendaFor, ui, priorities }) {
+  const [offset, setOffset] = useState(0);
+  const grid = useMemo(() => monthGrid(open, todayStart, offset, eventsOn), [open, todayStart, offset, eventsOn]);
+  const days = grid.weeks.flat().filter((day) => day.inMonth);
+  const legend = [
+    days.some((day) => day.count && !day.late) && { key: "due", mark: "bg-ink-400 dark:bg-ink-400", text: "Tasks due" },
+    days.some((day) => day.late) && { key: "late", mark: "bg-red-500 dark:bg-red-400", text: "Overdue" },
+    days.some((day) => day.hasEvent && !day.count) && { key: "event", mark: "border border-ink-400 dark:border-ink-400", text: "Events" },
+  ].filter(Boolean);
 
   return (
-    <div className="px-3.5 pb-3.5 pt-0.5" ref={wrapRef}>
-      <div className="flex flex-wrap items-start gap-2">
-        <div className="min-w-[12rem] flex-1 rounded-lg border border-border-strong bg-surface-page px-3 py-[0.4375rem] focus-within:border-ink-400 dark:bg-night-sunken dark:focus-within:border-ink-500">
-          <TitleTokenInput
-            form={form}
-            setForm={setForm}
-            grammar={{ tags: true, priority: true }}
-            priorities={priorities}
-            savedTags={savedTags}
-            placeholder="Add a task"
-            testid="home-quick-title"
-            inputClassName="text-base leading-5 sm:text-sm sm:leading-5"
-            onEnter={add}
-          />
-        </div>
-        <div role="group" aria-label="When" className="ds-seg h-9">
-          {WHEN.map((option) => (
-            <button
-              key={option.key}
-              type="button"
-              className="ds-seg-item px-2.5 text-[12px]"
-              aria-pressed={when === option.key}
-              onClick={() => setWhen(option.key)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-        <Button type="button" className="h-9 gap-1.5" onClick={add} disabled={!title || busy} data-testid="home-quick-add">
-          <Plus className="h-4 w-4" />
-          Add
-        </Button>
+    <div className="flex min-h-0 flex-1 flex-col px-2 pb-2.5 pt-0.5">
+      <div className="flex items-center gap-1 px-1 pb-1">
+        <p className="mr-auto text-[13px] font-medium text-ink-800 dark:text-ink-200" aria-live="polite" data-testid="home-month-label">{grid.label}</p>
+        {!grid.isThisMonth && (
+          <button
+            type="button"
+            className="mr-0.5 rounded-md px-2 py-1 text-[12px] text-ink-500 outline-none transition-colors hover:bg-selected hover:text-ink-900 focus-visible:bg-selected dark:text-ink-400 dark:hover:text-ink-100"
+            onClick={() => setOffset(0)}
+          >
+            This month
+          </button>
+        )}
+        <button type="button" className={monthArrow} aria-label="Previous month" title="Previous month" onClick={() => setOffset((value) => value - 1)}>
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <button type="button" className={monthArrow} aria-label="Next month" title="Next month" onClick={() => setOffset((value) => value + 1)}>
+          <ChevronRight className="h-4 w-4" />
+        </button>
       </div>
-      {(form.tags.length > 0 || priority) && (
-        <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-ink-500 dark:text-ink-400">
-          {priority && (
-            <span className="inline-flex items-center gap-1">
-              {priority.name}
+
+      <div className="grid grid-cols-7 text-center text-[11px] text-ink-400 dark:text-ink-500" aria-hidden="true">
+        {WEEKDAYS.map((name) => (
+          <span key={name} className="pb-1">{name.slice(0, 2)}</span>
+        ))}
+      </div>
+      <div className="grid flex-1 auto-rows-fr grid-cols-7 text-[12px] tabular-nums">
+        {grid.weeks.flat().map((day) =>
+          day.inMonth ? (
+            <DayPeek key={day.key} day={day.key} agendaFor={agendaFor} ui={ui} priorities={priorities}>
               <button
                 type="button"
-                className="rounded text-ink-300 hover:text-red-400 dark:text-ink-600 dark:hover:text-red-300"
-                aria-label={`Remove the priority ${priority.name}`}
-                onClick={() => setForm((current) => ({ ...current, priority_id: "" }))}
+                data-testid={`home-month-${day.key}`}
+                data-due={day.count || undefined}
+                data-late={day.late || undefined}
+                data-event={day.hasEvent || undefined}
+                aria-label={daySays(day)}
+                className={cn("flex min-h-[2.25rem] flex-col items-center justify-center gap-[3px] rounded-lg data-[state=open]:bg-ink-50 dark:data-[state=open]:bg-night-raised", rowHover)}
               >
-                <X className="h-3 w-3" />
+                <span
+                  className={cn(
+                    "flex h-6 w-6 items-center justify-center rounded-full",
+                    // Sun means "now".
+                    day.isToday ? "bg-sun-400 font-semibold text-ink-900" : "text-ink-700 dark:text-ink-200",
+                  )}
+                >
+                  {day.day}
+                </span>
+                <span
+                  className={cn(
+                    "h-1 w-1 rounded-full",
+                    day.late
+                      ? "bg-red-500 dark:bg-red-400"
+                      : day.count
+                        ? "bg-ink-400 dark:bg-ink-400"
+                        : day.hasEvent
+                          ? "border border-ink-400 dark:border-ink-400"
+                          : "bg-transparent",
+                  )}
+                />
               </button>
+            </DayPeek>
+          ) : (
+            // Another month's days only fill the week out: no number to press, no mark.
+            <span key={day.key} aria-hidden="true" className="flex min-h-[2.25rem] flex-col items-center justify-center gap-[3px] text-ink-300 dark:text-ink-700">
+              <span className="flex h-6 w-6 items-center justify-center">{day.day}</span>
+              <span className="h-1 w-1" />
             </span>
-          )}
-          {form.tags.map((tag) => (
-            <span key={tag} className="inline-flex items-center gap-1">
-              #{tag}
-              <button
-                type="button"
-                className="rounded text-ink-300 hover:text-red-400 dark:text-ink-600 dark:hover:text-red-300"
-                aria-label={`Remove the tag ${tag}`}
-                onClick={() => setForm((current) => ({ ...current, tags: current.tags.filter((item) => item !== tag) }))}
-              >
-                <X className="h-3 w-3" />
-              </button>
+          ),
+        )}
+      </div>
+
+      {legend.length > 0 && (
+        <p className="flex flex-wrap items-center gap-x-3.5 gap-y-1 px-1 pt-2 text-[11px] text-ink-400 dark:text-ink-500" data-testid="home-month-legend">
+          {legend.map((item) => (
+            <span key={item.key} className="inline-flex items-center gap-1.5">
+              <span className={cn("h-1.5 w-1.5 rounded-full", item.mark)} />
+              {item.text}
             </span>
           ))}
         </p>

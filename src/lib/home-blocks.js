@@ -10,6 +10,7 @@
  * Nothing is arranged for the person: what they set is what stays.
  */
 import { addDays } from "date-fns/addDays";
+import { addMonths } from "date-fns/addMonths";
 import { endOfWeek } from "date-fns/endOfWeek";
 import { format } from "date-fns/format";
 import { startOfMonth } from "date-fns/startOfMonth";
@@ -29,7 +30,6 @@ export const HOME_SIZE_LABELS = { third: "Narrow", half: "Medium", full: "Wide" 
 
 /** Every block, in the order the "add a block" tray lists them. */
 export const HOME_BLOCKS = [
-  { id: "quick", name: "Quick add" },
   { id: "today", name: "Today" },
   { id: "schedule", name: "Schedule" },
   { id: "overdue", name: "Overdue" },
@@ -45,6 +45,7 @@ export const HOME_BLOCKS = [
 /**
  * The settings a block has, with what each starts at and what it can be
  * set to. `rows` is how many rows a list shows before "and N more";
+ * (for Done this week, how many of the finished tasks are listed);
  * `days` is how far ahead Deadlines looks; `tag` is which tag the "One
  * tag" block lists (free text: any tag the person has).
  */
@@ -54,6 +55,7 @@ export const BLOCK_SETTINGS = {
   overdue: { rows: { start: 5, choices: [3, 5, 8, 12] } },
   deadlines: { rows: { start: 5, choices: [3, 5, 8, 12] }, days: { start: 14, choices: [7, 14, 30] } },
   notes: { rows: { start: 5, choices: [3, 5, 8, 12] } },
+  done: { rows: { start: 3, choices: [0, 3, 5, 8] } },
   tags: { rows: { start: 8, choices: [3, 5, 8, 12] } },
   tag: { rows: { start: 5, choices: [3, 5, 8, 12] }, tag: { start: "" } },
 };
@@ -66,7 +68,6 @@ const KNOWN = new Set(HOME_BLOCKS.map((block) => block.id));
  * the page has no half-empty boxes before anyone has touched it.
  */
 export const DEFAULT_HOME_LAYOUT = /** @type {HomeBlock[]} */ ([
-  { id: "quick", size: "full" },
   { id: "today", size: "half" },
   { id: "schedule", size: "half" },
   { id: "overdue", size: "third" },
@@ -201,15 +202,18 @@ export function removeBlock(layout, id) {
 }
 
 /**
- * A block from the tray goes to the end, at the width it starts with.
+ * Put a block on the page that isn't there: at the end, or first (where
+ * the tray it was picked from is, so it lands in sight). It arrives at
+ * the width it has in the starting layout, or narrow.
  * @param {HomeBlock[]} layout
  * @param {string} id
+ * @param {"first" | "last"} [place]
  * @returns {HomeBlock[]}
  */
-export function addBlock(layout, id) {
+export function addBlock(layout, id, place = "last") {
   if (!KNOWN.has(id) || layout.some((block) => block.id === id)) return layout;
   const size = DEFAULT_HOME_LAYOUT.find((block) => block.id === id)?.size || "third";
-  return [...layout, { id, size }];
+  return place === "first" ? [{ id, size }, ...layout] : [...layout, { id, size }];
 }
 
 // ── What the blocks show ────────────────────────────────────────────
@@ -307,9 +311,30 @@ export function nextSevenDays(open, todayStart) {
 }
 
 /**
- * This week (Sunday to Saturday, as the calendar draws it): how many
- * tasks were finished, and how many open ones are still due by the end
- * of it, overdue ones included, because they still have to be done.
+ * The tasks finished this week (Sunday to Saturday, as the calendar draws
+ * it), most recently finished first.
+ *
+ * @param {Task[]} tasks  every top-level and sub task, events left out
+ * @param {Date} todayStart
+ * @param {Set<string>} [hiddenCalendars]
+ * @returns {Task[]}
+ */
+export function finishedThisWeek(tasks, todayStart, hiddenCalendars) {
+  const weekStart = startOfWeek(todayStart, { weekStartsOn: 0 }).getTime();
+  return tasks
+    .filter((task) => {
+      if (task.parent_id || task.status !== "done" || !task.completed_at) return false;
+      if (hiddenCalendars && hiddenCalendars.has(calendarKeyForTask(/** @type {any} */ (task)))) return false;
+      const when = new Date(task.completed_at).getTime();
+      return !Number.isNaN(when) && when >= weekStart;
+    })
+    .sort((a, b) => String(b.completed_at).localeCompare(String(a.completed_at)));
+}
+
+/**
+ * This week: how many tasks were finished, and how many open ones are
+ * still due by the end of it, overdue ones included, because they still
+ * have to be done.
  *
  * @param {Task[]} tasks  every top-level and sub task, events left out
  * @param {Task[]} open   the open ones (already less hidden calendars)
@@ -318,14 +343,8 @@ export function nextSevenDays(open, todayStart) {
  * @returns {{ done: number, left: number, total: number }}
  */
 export function weekProgress(tasks, open, todayStart, hiddenCalendars) {
-  const weekStart = startOfWeek(todayStart, { weekStartsOn: 0 });
   const weekEnd = toDateStr(endOfWeek(todayStart, { weekStartsOn: 0 }));
-  const done = tasks.filter((task) => {
-    if (task.parent_id || task.status !== "done" || !task.completed_at) return false;
-    if (hiddenCalendars && hiddenCalendars.has(calendarKeyForTask(/** @type {any} */ (task)))) return false;
-    const when = new Date(task.completed_at);
-    return !Number.isNaN(when.getTime()) && when.getTime() >= weekStart.getTime();
-  }).length;
+  const done = finishedThisWeek(tasks, todayStart, hiddenCalendars).length;
   const left = open.filter((task) => task.due_date && task.due_date <= weekEnd).length;
   return { done, left, total: done + left };
 }
@@ -354,6 +373,33 @@ export function tagRanking(open) {
 }
 
 /**
+ * A task or event as a row on the clock.
+ * @param {Task} task
+ */
+function clockRow(task) {
+  return {
+    id: String(task.id),
+    isEvent: isExternalEvent(task),
+    title: titleOf(task),
+    start: parseTaskTime(task.task_time),
+    end: parseTaskTime(task.task_end_time),
+    time: String(task.task_time || ""),
+    endTime: String(task.task_end_time || ""),
+    calendar: String(task.source_calendar_name || ""),
+    color: String(task.source_color_hex || ""),
+    task,
+  };
+}
+
+/** All-day first, then in time order. */
+const byClock = (a, b) => (a.start ?? -1) - (b.start ?? -1) || a.title.localeCompare(b.title);
+
+/** @param {Task} task @param {Set<string>} [hiddenCalendars] */
+const isShownEvent = (task, hiddenCalendars) =>
+  Boolean(task.id) && !task.parent_id && isExternalEvent(task) &&
+  !(hiddenCalendars && hiddenCalendars.has(calendarKeyForTask(/** @type {any} */ (task))));
+
+/**
  * Today on the clock: calendar events dated today and open tasks due
  * today that have a time. All-day events first, then in time order.
  *
@@ -372,37 +418,65 @@ export function scheduleToday(everything, todayStart, hiddenCalendars) {
       if (isExternalEvent(task)) return true;
       return task.status !== "done" && parseTaskTime(task.task_time) != null;
     })
-    .map((task) => ({
-      id: String(task.id),
-      isEvent: isExternalEvent(task),
-      title: titleOf(task),
-      start: parseTaskTime(task.task_time),
-      end: parseTaskTime(task.task_end_time),
-      time: String(task.task_time || ""),
-      endTime: String(task.task_end_time || ""),
-      calendar: String(task.source_calendar_name || ""),
-      color: String(task.source_color_hex || ""),
-      task,
-    }))
-    .sort((a, b) => (a.start ?? -1) - (b.start ?? -1) || a.title.localeCompare(b.title));
+    .map(clockRow)
+    .sort(byClock);
 }
 
 /**
- * This month as weeks of seven days (Sunday first), each day with how
- * many open tasks are due on it. Days outside the month fill the first
- * and last weeks and are marked so.
+ * Everything on one day, for the small view a day opens on Home: the
+ * open tasks due that day (timed ones first, in time order), and the
+ * calendar's events.
+ *
+ * @param {Task[]} open        open top-level tasks
+ * @param {Task[]} everything  tasks AND calendar events, as loaded
+ * @param {string} day         yyyy-MM-dd
+ * @param {Set<string>} [hiddenCalendars]
+ * @param {Record<string, number>} [priorityOrder]
+ * @returns {{ tasks: Task[], events: ReturnType<typeof clockRow>[] }}
+ */
+export function dayAgenda(open, everything, day, hiddenCalendars, priorityOrder = {}) {
+  return {
+    tasks: open.filter((task) => task.due_date === day).sort(byTimeThenPriority(priorityOrder)),
+    events: everything.filter((task) => task.due_date === day && isShownEvent(task, hiddenCalendars)).map(clockRow).sort(byClock),
+  };
+}
+
+/**
+ * The days that have a calendar event on them.
+ * @param {Task[]} everything
+ * @param {Set<string>} [hiddenCalendars]
+ * @returns {Set<string>}  yyyy-MM-dd
+ */
+export function eventDays(everything, hiddenCalendars) {
+  const days = new Set();
+  for (const task of everything) {
+    if (task.due_date && isShownEvent(task, hiddenCalendars)) days.add(String(task.due_date));
+  }
+  return days;
+}
+
+/**
+ * A month as weeks of seven days (Sunday first). Each day says what its
+ * mark on Home means:
+ *   - `count`: open tasks due that day;
+ *   - `late`: the day has passed and some of them are still open;
+ *   - `hasEvent`: the calendar has an event that day.
+ * Days outside the month fill the first and last weeks and are marked so.
  *
  * @param {Task[]} open
  * @param {Date} todayStart
- * @returns {{ label: string, weeks: { key: string, day: number, inMonth: boolean, isToday: boolean, count: number }[][] }}
+ * @param {number} [offset]  months from this one: -1 is last month
+ * @param {Set<string>} [eventsOn]  days with a calendar event (eventDays)
+ * @returns {{ label: string, isThisMonth: boolean,
+ *   weeks: { key: string, day: number, inMonth: boolean, isToday: boolean, count: number, late: boolean, hasEvent: boolean }[][] }}
  */
-export function monthGrid(open, todayStart) {
+export function monthGrid(open, todayStart, offset = 0, eventsOn = new Set()) {
   /** @type {Map<string, number>} */
   const perDay = new Map();
   for (const task of open) {
     if (task.due_date) perDay.set(task.due_date, (perDay.get(task.due_date) || 0) + 1);
   }
-  const first = startOfMonth(todayStart);
+  const first = startOfMonth(addMonths(todayStart, offset));
   const month = first.getMonth();
   const today = toDateStr(todayStart);
   const weeks = [];
@@ -411,12 +485,23 @@ export function monthGrid(open, todayStart) {
     const week = [];
     for (let index = 0; index < 7; index += 1) {
       const key = toDateStr(cursor);
-      week.push({ key, day: cursor.getDate(), inMonth: cursor.getMonth() === month, isToday: key === today, count: perDay.get(key) || 0 });
+      const count = perDay.get(key) || 0;
+      week.push({
+        key,
+        day: cursor.getDate(),
+        inMonth: cursor.getMonth() === month,
+        isToday: key === today,
+        count,
+        late: count > 0 && key < today,
+        hasEvent: eventsOn.has(key),
+      });
       cursor = addDays(cursor, 1);
     }
     weeks.push(week);
   } while (cursor.getMonth() === month);
-  return { label: format(first, "MMMM"), weeks };
+  // The year only when it isn't this one.
+  const label = format(first, first.getFullYear() === todayStart.getFullYear() ? "MMMM" : "MMMM yyyy");
+  return { label, isThisMonth: offset === 0, weeks };
 }
 
 /**

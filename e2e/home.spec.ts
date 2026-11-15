@@ -60,7 +60,11 @@ const notes = [
 const block = (page: Page, id: string) => page.getByTestId(`home-block-${id}`);
 const order = (page: Page) =>
   page.locator('[data-testid^="home-block-"]').evaluateAll((els) => els.map((el) => el.getAttribute("data-testid")!.replace("home-block-", "")));
-const START = ["quick", "today", "schedule", "overdue", "done", "notes", "week", "tags", "deadlines", "month"];
+const START = ["today", "schedule", "overdue", "done", "notes", "week", "tags", "deadlines", "month"];
+/** A block's settings panel, opened from its settings button while customizing. */
+const openSettings = async (page: Page, name: string) => {
+  await page.getByRole("button", { name: `Settings for ${name}` }).click();
+};
 
 test("Home is where the app opens, and each block shows and acts on real data", async ({ page }) => {
   const mock = await installMockBackend(page, { tasks, priorities, notes });
@@ -111,16 +115,46 @@ test("Home is where the app opens, and each block shows and acts on real data", 
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
-  // Quick add: the day comes from the switch, a tag from #, nothing from the words.
-  const quick = block(page, "quick");
-  await quick.getByRole("button", { name: "Tomorrow" }).click();
-  await quick.getByTestId("home-quick-title").fill("Call Marta today #home ");
-  await quick.getByTestId("home-quick-title").press("End");
-  await quick.getByTestId("home-quick-title").pressSequentially(" ");
-  await quick.getByTestId("home-quick-add").click();
-  await expect(quick.getByTestId("home-quick-title")).toHaveValue("");
-  await expect.poll(async () => (await mock.getState()).tasks.find((t) => t.title?.startsWith("Call Marta"))?.due_date).toBe(day(1));
-  await expect(page.getByTestId(`home-day-${day(1)}`)).toHaveAttribute("aria-label", /: 1 task$/);
+  // Done this week lists what was finished; unticking one there puts it back.
+  await expect(page.getByTestId("home-done-recent")).toContainText("Water the plants");
+  await block(page, "done").getByRole("checkbox", { name: "Mark Water the plants not done" }).click();
+  await expect(block(page, "today").getByText("Water the plants")).toBeVisible();
+  await expect(page.getByTestId("home-done-number")).toHaveText("1");
+
+  // An event on the schedule opens, like a task does.
+  await block(page, "schedule").getByRole("button", { name: /Team check-in/ }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+
+  // A bar of the week opens its day: what is on it, usable there, and a task can be added on it.
+  await page.getByTestId(`home-day-${day(3)}`).getByRole("button").click();
+  const peek = page.getByTestId(`home-peek-${day(3)}`);
+  await expect(peek.getByText("Review the contract")).toBeVisible();
+  await expect(peek.getByRole("link", { name: "Open in Calendar" })).toHaveAttribute("href", `/Calendar?date=${day(3)}&view=day`);
+  await peek.getByRole("button", { name: "New task" }).click();
+  await expect(peek).toHaveCount(0);
+  await page.getByTestId("task-form-title").fill("Call Marta");
+  await page.getByTestId("task-form-submit").click();
+  await expect.poll(async () => (await mock.getState()).tasks.find((t) => t.title === "Call Marta")?.due_date).toBe(day(3));
+  await expect(page.getByTestId(`home-day-${day(3)}`)).toHaveAttribute("aria-label", /: 2 tasks$/);
+
+  // The month: a day's mark says what it is, the day opens, and the month turns.
+  const todayCell = page.getByTestId(`home-month-${day(0)}`);
+  await expect(todayCell).toHaveAttribute("data-event", "true");
+  await expect(todayCell).toHaveAttribute("aria-label", /today, 2 tasks due, has events$/);
+  await expect(page.getByTestId("home-month-legend")).toContainText("Tasks due");
+  await todayCell.click();
+  await expect(page.getByTestId(`home-peek-${day(0)}`).getByText("Team check-in")).toBeVisible();
+  await expect(page.getByTestId(`home-peek-${day(0)}`).getByText("Back up the laptop")).toBeVisible();
+  await page.keyboard.press("Escape");
+  const thisMonth = await page.getByTestId("home-month-label").textContent();
+  await block(page, "month").getByRole("button", { name: "Next month" }).click();
+  await expect(page.getByTestId("home-month-label")).not.toHaveText(thisMonth!);
+  await expect(todayCell).toHaveCount(0);
+  await block(page, "month").getByRole("button", { name: "This month" }).click();
+  await expect(page.getByTestId("home-month-label")).toHaveText(thisMonth!);
+  await expect(todayCell).toBeVisible();
 
   // A tag's bar leads to its tasks; a pinned note opens in Notes.
   await block(page, "tags").getByRole("link", { name: /^work:/ }).click();
@@ -149,25 +183,49 @@ test("Home: Customize moves, widens, removes and adds blocks, and the page stays
   await expect(page.getByRole("button", { name: "Reset", exact: true })).toHaveCount(0);
   // While arranging, a block's content can't be used.
   await expect(block(page, "today").getByRole("checkbox")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Move Quick add earlier" })).toBeDisabled();
-  await expect(page.getByRole("button", { name: "Move Month later" })).toBeDisabled();
+  // A block carries three controls: its grip, its settings, and remove.
+  await expect(block(page, "today").getByRole("button")).toHaveCount(3);
 
+  // Everything else about a block is in its settings panel.
+  await openSettings(page, "Today");
+  await expect(page.getByRole("button", { name: "Move Today earlier" })).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await openSettings(page, "Month");
+  await expect(page.getByRole("button", { name: "Move Month later" })).toBeDisabled();
+  await page.keyboard.press("Escape");
+
+  await openSettings(page, "Schedule");
   await page.getByRole("button", { name: "Move Schedule earlier" }).click();
   // The page redraws a moment after the press: wait for it, don't read at once.
-  await expect.poll(async () => (await order(page)).slice(0, 3)).toEqual(["quick", "schedule", "today"]);
+  await expect.poll(async () => (await order(page)).slice(0, 2)).toEqual(["schedule", "today"]);
+  await page.keyboard.press("Escape");
 
+  // With the keyboard on a grip, the arrow keys move the block. (The panel
+  // hands the keyboard back to its button as it closes: wait for that.)
+  await expect(page.getByTestId("home-settings-schedule")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Settings for Schedule" })).toBeFocused();
+  await page.getByRole("button", { name: "Drag Overdue to another place" }).focus();
+  await page.keyboard.press("ArrowRight");
+  await expect.poll(async () => (await order(page)).slice(2, 4)).toEqual(["done", "overdue"]);
+  await expect(page.getByRole("button", { name: "Drag Overdue to another place" })).toBeFocused();
+  await page.keyboard.press("ArrowLeft");
+  await expect.poll(async () => (await order(page)).slice(2, 4)).toEqual(["overdue", "done"]);
+
+  await openSettings(page, "Today");
   await page.getByRole("group", { name: "Width of Today" }).getByRole("button", { name: "Wide" }).click();
   await expect(block(page, "today")).toHaveAttribute("data-size", "full");
   await expect.poll(() => width("today")).toBeGreaterThan(half * 1.9);
   await page.getByRole("group", { name: "Width of Today" }).getByRole("button", { name: "Narrow" }).click();
   await expect.poll(() => width("today")).toBeLessThan(half * 0.75);
+  await page.keyboard.press("Escape");
 
   await page.getByRole("button", { name: "Remove By tag" }).click();
   await expect(block(page, "tags")).toHaveCount(0);
   await page.getByRole("button", { name: "Remove Month" }).click();
   await expect(page.getByTestId("home-tray").getByRole("button")).toHaveText([/By tag/, /Month/, /One tag/]);
   await page.getByRole("button", { name: "Add By tag" }).click();
-  const arranged = ["quick", "schedule", "today", "overdue", "done", "notes", "week", "deadlines", "tags"];
+  // A block from the tray goes first, right under the tray it came from.
+  const arranged = ["tags", "schedule", "today", "overdue", "done", "notes", "week", "deadlines"];
   await expect.poll(() => order(page)).toEqual(arranged);
 
   await page.getByRole("button", { name: "Done", exact: true }).click();
@@ -187,6 +245,11 @@ test("Home: Customize moves, widens, removes and adds blocks, and the page stays
   await page.getByRole("button", { name: "Reset", exact: true }).click();
   await expect.poll(() => order(page)).toEqual(START);
   await expect.poll(async () => (await mock.getState()).homeLayout).toBeNull();
+  // It was someone's own arrangement: there is a way back.
+  await expect(page.getByTestId("delete-toast")).toContainText("starting layout");
+  await page.getByTestId("delete-toast-undo").click();
+  await expect.poll(() => order(page)).toEqual(arranged);
+  await expect.poll(async () => ((await mock.getState()).homeLayout || []).map((b) => b.id)).toEqual(arranged);
 });
 
 test("Home on a phone: one column, and + opens the task form here", async ({ page }) => {
@@ -212,6 +275,7 @@ test("Home on a phone: one column, and + opens the task form here", async ({ pag
 
   // Width is a laptop's business: on a phone only order and removal are offered.
   await page.getByRole("button", { name: "Customize", exact: true }).click();
+  await openSettings(page, "Today");
   await expect(page.getByRole("button", { name: "Move Today later" })).toBeVisible();
   await expect(page.getByRole("group", { name: "Width of Today" })).toBeHidden();
 });
@@ -234,32 +298,42 @@ test("Home: drag a block to a new place, set a block's own rows and days, and gi
 
   await page.getByRole("button", { name: "Customize", exact: true }).click();
 
-  // Drag Schedule by its grip and let go over Quick add: it takes that place.
+  // Drag Schedule by its grip and let go over Today: it takes that place.
   const grip = (await page.getByRole("button", { name: "Drag Schedule to another place" }).boundingBox())!;
-  const target = (await block(page, "quick").boundingBox())!;
+  const target = (await block(page, "today").boundingBox())!;
   await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
   await page.mouse.down();
   await page.mouse.move(grip.x - 40, grip.y - 20, { steps: 4 });
   await page.mouse.move(target.x + 200, target.y + target.height / 2, { steps: 8 });
-  await expect(block(page, "quick")).toHaveAttribute("data-drop-target", "true");
+  await expect(block(page, "today")).toHaveAttribute("data-drop-target", "true");
   await page.mouse.up();
-  await expect.poll(async () => (await order(page)).slice(0, 3)).toEqual(["schedule", "quick", "today"]);
+  await expect.poll(async () => (await order(page)).slice(0, 2)).toEqual(["schedule", "today"]);
 
-  // A block's own settings.
+  // A block's own settings, in its panel. Opening the panel doesn't change the block's size.
+  const before = (await block(page, "today").boundingBox())!.height;
+  await openSettings(page, "Today");
+  expect((await block(page, "today").boundingBox())!.height).toBe(before);
   await page.getByRole("group", { name: "Rows in Today" }).getByRole("button", { name: "3", exact: true }).click();
+  await page.keyboard.press("Escape");
+  await openSettings(page, "Deadlines");
   await page.getByRole("group", { name: "Days ahead in Deadlines" }).getByRole("button", { name: "7", exact: true }).click();
   await expect(page.getByTestId("home-count-deadlines")).toHaveText("next 7 days");
-  // A block with nothing to set shows no settings row.
-  await expect(page.getByTestId("home-settings-month")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  // A block with nothing of its own to set still has its width and its place.
+  await openSettings(page, "Month");
+  await expect(page.getByTestId("home-settings-month").getByRole("group")).toHaveCount(1);
+  await page.keyboard.press("Escape");
 
   // "One tag" arrives pointed at the busiest tag, and can be pointed elsewhere.
   await page.getByRole("button", { name: "Add One tag" }).click();
   await expect(page.getByRole("region", { name: "#work" })).toBeVisible();
   await expect(page.getByTestId("home-count-tag")).toHaveText("5");
+  await openSettings(page, "#work");
   await page.getByRole("combobox", { name: "Which tag this block shows" }).click();
   await page.getByRole("option", { name: "home", exact: true }).click();
   await expect(page.getByRole("region", { name: "#home" })).toBeVisible();
   await expect(page.getByTestId("home-count-tag")).toHaveText("4");
+  await page.keyboard.press("Escape");
 
   await page.getByRole("button", { name: "Done", exact: true }).click();
 
@@ -284,7 +358,7 @@ test("Home: drag a block to a new place, set a block's own rows and days, and gi
         tag: saved.find((b) => b.id === "tag")?.options,
       };
     })
-    .toEqual({ first: "schedule", today: { rows: 3 }, deadlines: { days: 7 }, tag: { tag: "home" } });
+    .toEqual({ first: "tag", today: { rows: 3 }, deadlines: { days: 7 }, tag: { tag: "home" } });
   await page.reload();
   await expect(block(page, "today").getByRole("checkbox")).toHaveCount(3);
   await expect(page.getByTestId("home-count-deadlines")).toHaveText("next 7 days");
