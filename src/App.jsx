@@ -5,7 +5,7 @@ import { queryClientInstance } from "@/lib/query-client";
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import { ThemeProvider } from "@/lib/ThemeProvider";
 import { loadFromCache } from "@/lib/offlineCache";
-import { sanitizeNavRoute } from "@/lib/navigation";
+import { startPath } from "@/lib/navigation";
 import Layout from "@/components/Layout";
 import PageNotFound from "./lib/PageNotFound";
 import Active from "@/pages/Active";
@@ -26,8 +26,7 @@ import { PrivacyPage, TermsPage } from "@/pages/Legal.jsx";
 const LEGAL_PATHS = new Set(["/terms", "/privacy"]);
 
 function DefaultRedirect() {
-  const defaultNav = sanitizeNavRoute(localStorage.getItem("defaultNav"));
-  return <Navigate to={defaultNav} replace />;
+  return <Navigate to={startPath()} replace />;
 }
 
 const AuthenticatedApp = () => {

@@ -17,6 +17,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { placePath } from "@/lib/navigation";
 import {
   SHORTCUT_EVENTS,
   G_SEQUENCES,
@@ -83,7 +84,8 @@ export function useGlobalShortcuts() {
         const path = G_SEQUENCES[key.toLowerCase()];
         if (path) {
           e.preventDefault();
-          navigate(path);
+          // "Go to Tasks" opens Tasks the way the person set it to open.
+          navigate(placePath(path));
           return;
         }
         // Unrecognized second key: fall through (the `g` is forgotten).
@@ -101,7 +103,7 @@ export function useGlobalShortcuts() {
         const path = navPathForDigit(key);
         if (path) {
           e.preventDefault();
-          navigate(path);
+          navigate(placePath(path));
         }
         return;
       }

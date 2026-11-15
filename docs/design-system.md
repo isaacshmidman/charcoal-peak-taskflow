@@ -76,6 +76,18 @@ its address so links and Back land where they meant.
   tab bar's + is the way to add.
 - **Tags are places too.** A tag in the sidebar opens Tasks narrowed to
   it (`?tag=`), and stays chosen across List, Board and Completed.
+- **A place with views opens in the one the person chose.** Settings →
+  Appearance has "Tasks opens as" (List, Board, Completed) and "Calendar
+  opens as". Everything that says "Tasks" (the sidebar, the phone's tabs,
+  `g a`, the palette, the start page) goes through `placePath()` in
+  `navigation.js`; never link the place to `/Active` by hand. A link that
+  means the list itself (Home's "still due") may. A tag from outside
+  Tasks opens the board for someone who chose the board, otherwise the
+  list (its count is of open tasks, so never Completed).
+- **Appearance is per device** (`settings/DefaultsSection.jsx`): theme
+  as three pictures of the app, how it opens, the order of places. The
+  pictures use fixed palette colours on purpose; they are the one place
+  a light surface is drawn in dark mode.
 - **A count is the rows behind it.** The sidebar and the pages ask the
   same questions (`src/lib/task-views.js`); don't count a second way.
 - **Width.** Pages you read down (lists, Settings) are a column

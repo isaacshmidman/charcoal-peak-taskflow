@@ -27,9 +27,6 @@
  *                                or restore one)
  *   - "recentlyDeleted"       → RecentlyDeleted (renders its own
  *                                chrome; we just route to it)
- *
- * Stays as the implementation file (not a shim under settings/)
- * because it also exports NAV_OPTIONS, consumed by @/lib/navigation.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -37,7 +34,6 @@ import {
   Bell,
   Calendar,
   CheckSquare,
-  ChevronRight,
   Download,
   FolderOpen,
   LogOut,
@@ -71,14 +67,10 @@ import SessionsSection from "@/components/settings/SessionsSection";
 import DefaultsSection from "@/components/settings/DefaultsSection";
 import PrioritiesSection from "@/components/settings/PrioritiesSection";
 import TagsSection from "@/components/settings/TagsSection";
-import DefaultCalendarViewSection from "@/components/settings/DefaultCalendarViewSection";
 import CalendarOrderSection from "@/components/settings/CalendarOrderSection";
 import QuickThemeToggle from "@/components/settings/QuickThemeToggle";
 import QuickNotificationsToggle from "@/components/settings/QuickNotificationsToggle";
 import { SettingsLink, SettingsSection } from "@/components/settings/parts";
-import { NAV_LABELS, VALID_DEFAULT_ROUTES } from "@/lib/navigation";
-
-export const NAV_OPTIONS = VALID_DEFAULT_ROUTES.map((value) => ({ value, label: NAV_LABELS[value] }));
 
 // ── Tiny inline UI primitives used only inside this file ─────────
 
@@ -166,7 +158,7 @@ export default function Settings() {
   if (activeSection === "appearance") {
     return (
       <SubPage title="Appearance" onBack={returnToMain}>
-        <DefaultsSection navOptions={NAV_OPTIONS} />
+        <DefaultsSection />
       </SubPage>
     );
   }
@@ -184,7 +176,6 @@ export default function Settings() {
     return (
       <SubPage title="Calendars" onBack={returnToMain}>
         <IntegrationsPanel />
-        <DefaultCalendarViewSection />
         <CalendarOrderSection />
       </SubPage>
     );
@@ -265,7 +256,7 @@ export default function Settings() {
           <SettingsLink
             icon={Palette}
             label="Appearance"
-            subtitle="Theme, default view, navigation order"
+            subtitle="Theme, how each page opens, order of places"
             onClick={() => openSection("appearance")}
           />
           <SettingsLink
@@ -286,7 +277,7 @@ export default function Settings() {
           <SettingsLink
             icon={Calendar}
             label="Calendars"
-            subtitle="Connected calendars and display"
+            subtitle="Connected calendars and their order"
             onClick={() => openSection("calendars")}
           />
           <SettingsLink
@@ -312,7 +303,7 @@ export default function Settings() {
           />
           <SettingsLink
             icon={Trash2}
-            label="Recently Deleted"
+            label="Recently deleted"
             subtitle="Bring back or clear what you've deleted"
             onClick={() => openSection("recentlyDeleted")}
           />

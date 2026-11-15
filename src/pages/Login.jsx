@@ -4,7 +4,7 @@ import { KeyRound, Mail } from "lucide-react";
 import Logo from "@/components/Logo";
 import { apiClient } from "@/api/apiClient";
 import { useAuth } from "@/lib/AuthContext";
-import { safeInAppPath, sanitizeNavRoute } from "@/lib/navigation";
+import { safeInAppPath, startPath } from "@/lib/navigation";
 
 const SIGN_IN_ERRORS = {
   google_not_configured: "Google sign-in isn't set up on this server yet.",
@@ -27,8 +27,7 @@ export function recordLastSignIn(method) {
 }
 
 function buildDefaultReturnUrl() {
-  const defaultNav = sanitizeNavRoute(localStorage.getItem("defaultNav"));
-  return new URL(defaultNav, window.location.origin).toString();
+  return new URL(startPath(), window.location.origin).toString();
 }
 
 function normalizeNextUrl(rawValue) {
@@ -43,7 +42,7 @@ function normalizeNextUrl(rawValue) {
 
 /** Where to go once signed in: the next= page, or the default one. */
 function afterSignIn(nextUrl) {
-  return safeInAppPath(new URL(nextUrl).pathname) || sanitizeNavRoute(localStorage.getItem("defaultNav"));
+  return safeInAppPath(new URL(nextUrl).pathname) || startPath();
 }
 
 export default function Login() {

@@ -50,7 +50,7 @@ function readCollapsed() {
 export default function Layout() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const { items, defaultNav } = useNavItems();
+  const { items, defaultNav, tagsTo } = useNavItems();
   const counts = useNavCounts();
   const online = useOnlineStatus();
   useOfflineData();
@@ -75,12 +75,13 @@ export default function Layout() {
         items={items}
         counts={counts}
         defaultNav={defaultNav}
+        tagsTo={tagsTo}
         collapsed={collapsed}
         onToggleCollapsed={() => setCollapsed((value) => !value)}
         onSearch={() => setPaletteOpen(true)}
         online={online}
       />
-      <PhoneTabs items={items} counts={counts} onAdd={add} addLabel={pathname === "/Notes" ? "New note" : "New Task"} />
+      <PhoneTabs items={items} counts={counts} tagsTo={tagsTo} onAdd={add} addLabel={pathname === "/Notes" ? "New note" : "New Task"} />
       {!online && (
         <OfflineStatus
           side="top"

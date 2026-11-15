@@ -1,12 +1,9 @@
 // @ts-nocheck
 /**
- * @file Quick-toggle row for the top of Settings: appearance icon +
- * label + 3-button segmented (System / Light / Dark). One-tap theme
- * change without diving into the Appearance sub-page.
- *
- * The full picker (with the explanatory "Default Appearance" header)
- * still lives on the Appearance sub-page (DefaultsSection); this is
- * the shortcut.
+ * @file Quick-toggle row for the top of Settings: a sun or moon, the
+ * word "Theme", and System / Light / Dark as three buttons. One tap,
+ * without opening the Appearance page (which has the same choice as
+ * three pictures, in DefaultsSection).
  */
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useTheme } from "@/lib/ThemeProvider";
@@ -27,7 +24,7 @@ export default function QuickThemeToggle() {
       <div className="flex items-center gap-3 min-w-0">
         <LeadIcon className="w-5 h-5 text-ink-500 dark:text-ink-400 shrink-0" />
         <span className="text-sm font-medium text-ink-900 dark:text-ink-100">
-          Appearance
+          Theme
         </span>
       </div>
       <div className="ds-seg shrink-0">

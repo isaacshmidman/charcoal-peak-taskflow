@@ -3,11 +3,11 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { LoaderCircle } from "lucide-react";
 import { appConfig, getStoredAccessToken } from "@/lib/app-config";
 import { useAuth } from "@/lib/AuthContext";
-import { safeInAppPath, sanitizeNavRoute } from "@/lib/navigation";
+import { safeInAppPath, startPath } from "@/lib/navigation";
 import { recordLastSignIn } from "@/pages/Login";
 
 function buildFallbackRoute() {
-  return sanitizeNavRoute(localStorage.getItem("defaultNav"));
+  return startPath();
 }
 
 function resolveNextPath(rawValue) {

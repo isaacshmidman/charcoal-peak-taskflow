@@ -159,3 +159,70 @@ test("phone: tabs have words, + adds from anywhere, and More holds the rest", as
   // Going somewhere closes More.
   await expect(page.getByRole("link", { name: "Recently deleted" })).toHaveCount(0);
 });
+
+test("appearance: Tasks opens in the view chosen for it, everywhere that leads to Tasks", async ({ page }) => {
+  await installMockBackend(page, { tasks, priorities: [priority] });
+  await page.goto("/Settings");
+  await page.getByRole("button", { name: /^Appearance/ }).click();
+
+  const sidebar = page.getByTestId("sidebar");
+  const tasksLink = sidebar.getByRole("link", { name: "Tasks", exact: true });
+  await expect(tasksLink).toHaveAttribute("href", "/Active");
+
+  const choose = async (setting: string, option: string) => {
+    await page.getByRole("combobox", { name: setting }).click();
+    await page.getByRole("option", { name: option, exact: true }).click();
+    await expect(page.getByRole("combobox", { name: setting })).toHaveText(option);
+  };
+
+  // The link follows the setting at once, without a reload.
+  await choose("Tasks opens as", "Board");
+  await expect(tasksLink).toHaveAttribute("href", "/Groupings");
+  await tasksLink.click();
+  await expect(page).toHaveURL(/\/Groupings$/);
+  await expect(tasksLink).toHaveAttribute("aria-current", "page");
+
+  // So do the keyboard's "go to Tasks" and a tag in the sidebar.
+  await sidebar.getByRole("link", { name: "Today", exact: true }).click();
+  await expect(card(page, "Send the invoice")).toBeVisible();
+  await page.keyboard.press("g");
+  await page.keyboard.press("a");
+  await expect(page).toHaveURL(/\/Groupings$/);
+  await sidebar.getByRole("link", { name: "Today", exact: true }).click();
+  await sidebar.getByRole("link", { name: "Tag work" }).click();
+  await expect(page).toHaveURL(/\/Groupings\?tag=work$/);
+
+  // It is remembered, and with Tasks as the start page the app opens there.
+  await page.goto("/Settings");
+  await page.getByRole("button", { name: /^Appearance/ }).click();
+  await expect(page.getByRole("combobox", { name: "Tasks opens as" })).toHaveText("Board");
+  await choose("Start page", "Tasks");
+  await choose("Calendar opens as", "Week");
+  expect(await page.evaluate(() => window.localStorage.getItem("defaultCalendarView"))).toBe("week");
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/Groupings$/);
+
+  // The theme is three pictures; choosing one changes the app there and then.
+  await page.goto("/Settings");
+  await page.getByRole("button", { name: /^Appearance/ }).click();
+  await page.getByRole("button", { name: "Dark theme" }).click();
+  await expect(page.getByRole("button", { name: "Dark theme" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("html")).toHaveClass(/dark/);
+  await page.getByRole("button", { name: "Light theme" }).click();
+  await expect(page.locator("html")).not.toHaveClass(/dark/);
+
+  // The first three places are marked as the phone's tabs, and moving one keeps the mark on the first three.
+  const order = page.getByTestId("nav-order");
+  await expect(order.getByText("Phone tab")).toHaveCount(3);
+  await order.getByRole("button", { name: "Move Tasks up" }).click();
+  await expect(order.locator("> div").nth(2)).toContainText("Tasks");
+  await expect(order.locator("> div").nth(2)).toContainText("Phone tab");
+});
+
+test("appearance: an old start page of the board still opens the board", async ({ page }) => {
+  await page.addInitScript(() => window.localStorage.setItem("defaultNav", "/Groupings"));
+  await installMockBackend(page, { tasks, priorities: [priority] });
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/Groupings$/);
+  await expect(page.getByTestId("sidebar").getByRole("link", { name: "Tasks", exact: true })).toHaveAttribute("href", "/Groupings");
+});

@@ -27,7 +27,7 @@ const tabOn = "font-semibold text-ink-900 dark:text-ink-50";
 const tabOff = "font-medium text-ink-400 dark:text-ink-500";
 const moreRow = "flex h-10 items-center gap-3 rounded-lg px-2.5 text-sm text-ink-700 dark:text-ink-200";
 
-export default function PhoneTabs({ items, counts, onAdd, addLabel }) {
+export default function PhoneTabs({ items, counts, tagsTo = "/Active", onAdd, addLabel }) {
   const { pathname, search } = useLocation();
   const tag = useTagFilter();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -46,7 +46,7 @@ export default function PhoneTabs({ items, counts, onAdd, addLabel }) {
     return (
       <Link
         key={item.path}
-        to={item.path}
+        to={item.to}
         onClick={() => window.dispatchEvent(new Event(`navClicked:${item.path}`))}
         aria-label={item.label}
         aria-current={active ? "page" : undefined}
@@ -91,7 +91,7 @@ export default function PhoneTabs({ items, counts, onAdd, addLabel }) {
             {others.map((item) => (
               <Link
                 key={item.path}
-                to={item.path}
+                to={item.to}
                 // As with a tab: the place you're already in goes back to its top level.
                 onClick={() => window.dispatchEvent(new Event(`navClicked:${item.path}`))}
                 aria-label={item.label}
@@ -108,7 +108,7 @@ export default function PhoneTabs({ items, counts, onAdd, addLabel }) {
                 {counts.tags.slice(0, TAGS_SHOWN).map(({ tag: name, count }) => (
                   <Link
                     key={name}
-                    to={taskPagePath("/Active", name)}
+                    to={taskPagePath(tagsTo, name)}
                     aria-label={`Tag ${name}`}
                     className={cn(moreRow, onTaskPage && tag === name && "bg-selected font-medium")}
                   >

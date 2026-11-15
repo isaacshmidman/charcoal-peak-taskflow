@@ -28,6 +28,95 @@ export const TASK_VIEWS = [
   { path: "/Completed", label: "Completed" },
 ];
 
+/**
+ * Tasks opens in whichever of its views the person chose (Settings →
+ * Appearance), kept on this device like the rest of Appearance.
+ */
+export const TASKS_VIEW_KEY = "defaultTasksView";
+export const TASKS_VIEW_OPTIONS = [
+  { value: "list", label: "List", path: "/Active" },
+  { value: "board", label: "Board", path: "/Groupings" },
+  { value: "completed", label: "Completed", path: "/Completed" },
+];
+
+/** @param {unknown} value @returns {"list" | "board" | "completed"} */
+export function sanitizeTasksView(value) {
+  return /** @type {any} */ (TASKS_VIEW_OPTIONS.find((option) => option.value === value)?.value || "list");
+}
+
+/** A storage that may be missing or refuse (private windows): read as null. */
+function read(key) {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The page the app opens on, and the view Tasks opens in.
+ *
+ * The opening page used to be able to name the board or Completed
+ * directly. Now it names a place, and Tasks has its own setting; an old
+ * choice of "Tasks: board" reads as "Tasks, opening as the board" unless
+ * a view has been chosen since.
+ * @returns {{ start: string, tasksView: "list" | "board" | "completed" }}
+ */
+export function readStartSettings() {
+  const saved = sanitizeNavRoute(read("defaultNav"));
+  const start = navRouteFor(saved);
+  const chosen = read(TASKS_VIEW_KEY);
+  const fromOld = TASKS_VIEW_OPTIONS.find((option) => option.path === saved)?.value;
+  return { start, tasksView: sanitizeTasksView(chosen || fromOld) };
+}
+
+/**
+ * Keep a choice of opening page and of Tasks' view. The page is always
+ * saved as a place, so an old "Tasks: board" is tidied the first time
+ * either is changed. Tells the navigation so its links follow at once.
+ * @param {{ start?: string, tasksView?: string }} change
+ */
+export function saveStartSettings(change) {
+  const now = readStartSettings();
+  const start = navRouteFor(sanitizeNavRoute(change.start ?? now.start));
+  const tasksView = sanitizeTasksView(change.tasksView ?? now.tasksView);
+  try {
+    window.localStorage.setItem("defaultNav", start);
+    window.localStorage.setItem(TASKS_VIEW_KEY, tasksView);
+  } catch { /* storage refused: the choice lasts for this visit only */ }
+  window.dispatchEvent(new Event("navOrderChanged"));
+  return { start, tasksView };
+}
+
+/** The address of Tasks as the person set it to open. */
+export function tasksPath() {
+  const { tasksView } = readStartSettings();
+  return TASKS_VIEW_OPTIONS.find((option) => option.value === tasksView)?.path || "/Active";
+}
+
+/**
+ * Where a place in the navigation leads: itself, except Tasks, which
+ * leads to the view it is set to open in.
+ * @param {string} path
+ */
+export function placePath(path) {
+  return path === "/Active" ? tasksPath() : path;
+}
+
+/**
+ * Where a tag in the navigation leads from outside Tasks: the tag's open
+ * tasks, on the board for someone who opens Tasks as the board and on
+ * the list otherwise (a tag's count is of open tasks, so never Completed).
+ */
+export function tagsPath() {
+  return tasksPath() === "/Groupings" ? "/Groupings" : "/Active";
+}
+
+/** The address the app opens on. */
+export function startPath() {
+  return placePath(readStartSettings().start);
+}
+
 /** Pages the app may open on: every place, and the two other task views. */
 export const VALID_DEFAULT_ROUTES = [...VALID_NAV_ROUTES, "/Groupings", "/Completed"];
 

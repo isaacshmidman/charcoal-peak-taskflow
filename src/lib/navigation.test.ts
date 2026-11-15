@@ -1,4 +1,15 @@
-import { DEFAULT_NAV_ORDER, navRouteFor, sanitizeNavOrder, sanitizeNavRoute } from "./navigation";
+import {
+  DEFAULT_NAV_ORDER,
+  navRouteFor,
+  placePath,
+  readStartSettings,
+  sanitizeNavOrder,
+  sanitizeNavRoute,
+  saveStartSettings,
+  startPath,
+  tagsPath,
+  tasksPath,
+} from "./navigation";
 
 describe("navigation helpers", () => {
   it("opens on Home for someone who never chose a page, and keeps a choice", () => {
@@ -47,5 +58,64 @@ describe("navigation helpers", () => {
   it("returns the full default order when storage is empty or invalid", () => {
     expect(sanitizeNavOrder(undefined)).toEqual(DEFAULT_NAV_ORDER);
     expect(sanitizeNavOrder(null)).toEqual(DEFAULT_NAV_ORDER);
+  });
+});
+
+describe("how the app and Tasks open", () => {
+  beforeEach(() => window.localStorage.clear());
+
+  it("opens on Home with Tasks as the list for someone who chose nothing", () => {
+    expect(readStartSettings()).toEqual({ start: "/Home", tasksView: "list" });
+    expect(startPath()).toBe("/Home");
+    expect(tasksPath()).toBe("/Active");
+    expect(tagsPath()).toBe("/Active");
+  });
+
+  it("sends the Tasks link to the chosen view, and leaves other places alone", () => {
+    saveStartSettings({ tasksView: "board" });
+    expect(placePath("/Active")).toBe("/Groupings");
+    expect(placePath("/Calendar")).toBe("/Calendar");
+    expect(startPath()).toBe("/Home");
+    saveStartSettings({ tasksView: "completed" });
+    expect(placePath("/Active")).toBe("/Completed");
+  });
+
+  it("opens the app in Tasks' chosen view when Tasks is the start page", () => {
+    saveStartSettings({ start: "/Active", tasksView: "board" });
+    expect(startPath()).toBe("/Groupings");
+  });
+
+  it("leads a tag to the board for someone who opens Tasks as the board, never to Completed", () => {
+    saveStartSettings({ tasksView: "board" });
+    expect(tagsPath()).toBe("/Groupings");
+    saveStartSettings({ tasksView: "completed" });
+    expect(tagsPath()).toBe("/Active");
+  });
+
+  it("reads an old start page of the board as Tasks opening as the board", () => {
+    window.localStorage.setItem("defaultNav", "/Groupings");
+    expect(readStartSettings()).toEqual({ start: "/Active", tasksView: "board" });
+    expect(startPath()).toBe("/Groupings");
+    // Changing the start page keeps the view it implied, and tidies the old value.
+    saveStartSettings({ start: "/Today" });
+    expect(window.localStorage.getItem("defaultNav")).toBe("/Today");
+    expect(readStartSettings()).toEqual({ start: "/Today", tasksView: "board" });
+  });
+
+  it("lets a view chosen since win over the old start page", () => {
+    window.localStorage.setItem("defaultNav", "/Completed");
+    window.localStorage.setItem("defaultTasksView", "list");
+    expect(readStartSettings()).toEqual({ start: "/Active", tasksView: "list" });
+  });
+
+  it("ignores a view it does not know, and tells the navigation about a change", () => {
+    window.localStorage.setItem("defaultTasksView", "kanban");
+    expect(tasksPath()).toBe("/Active");
+    let told = 0;
+    const heard = () => { told += 1; };
+    window.addEventListener("navOrderChanged", heard);
+    saveStartSettings({ tasksView: "board" });
+    window.removeEventListener("navOrderChanged", heard);
+    expect(told).toBe(1);
   });
 });

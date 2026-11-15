@@ -27,7 +27,7 @@ const TAGS_SHOWN = 8;
 const rest = "text-ink-600 hover:bg-selected hover:text-ink-900 dark:text-ink-400 dark:hover:text-ink-100";
 const chosen = "bg-selected font-semibold text-ink-900 dark:text-ink-50";
 
-export default function Sidebar({ items, counts, defaultNav, collapsed, onToggleCollapsed, onSearch, online }) {
+export default function Sidebar({ items, counts, defaultNav, tagsTo = "/Active", collapsed, onToggleCollapsed, onSearch, online }) {
   const { pathname } = useLocation();
   const tag = useTagFilter();
   const onTaskPage = TASK_VIEWS.some((view) => view.path === pathname);
@@ -109,7 +109,7 @@ export default function Sidebar({ items, counts, defaultNav, collapsed, onToggle
             return (
               <Link
                 key={item.path}
-                to={item.path}
+                to={item.to}
                 // Clicking the place you're already in takes its page back
                 // to its top level, as it always has.
                 onClick={() => window.dispatchEvent(new Event(`navClicked:${item.path}`))}
@@ -138,7 +138,7 @@ export default function Sidebar({ items, counts, defaultNav, collapsed, onToggle
               return (
                 <Link
                   key={name}
-                  to={taskPagePath(onTaskPage ? pathname : "/Active", name)}
+                  to={taskPagePath(onTaskPage ? pathname : tagsTo, name)}
                   aria-label={`Tag ${name}`}
                   aria-current={active ? "page" : undefined}
                   className={cn(row, active ? chosen : rest)}

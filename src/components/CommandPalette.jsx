@@ -22,6 +22,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ClearButton } from "@/components/ui/clear-button";
 import { SHORTCUT_EVENTS, emitShortcut } from "@/lib/shortcuts";
 import { fuzzyFilter } from "@/lib/fuzzy";
+import { placePath } from "@/lib/navigation";
 import { excludeExternalEvents } from "@/lib/task-filters";
 import { cn } from "@/lib/utils";
 
@@ -161,7 +162,8 @@ export default function CommandPalette({ open, onOpenChange }) {
     }
     pushRecent(command.key);
     if (command.path) {
-      navigate(command.path);
+      // "Go to Tasks" opens Tasks the way the person set it to open.
+      navigate(placePath(command.path));
       return;
     }
     // Defer action events one tick so the dialog's close (and its focus

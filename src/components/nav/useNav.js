@@ -8,13 +8,14 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CalendarDays, House, ListTodo, NotebookPen, Sun } from "lucide-react";
 import { apiClient } from "@/api/apiClient";
-import { DEFAULT_NAV_ORDER, FALLBACK_ROUTE, NAV_LABELS, sanitizeNavOrder, sanitizeNavRoute } from "@/lib/navigation";
+import { DEFAULT_NAV_ORDER, NAV_LABELS, sanitizeNavOrder, startPath, tagsPath, tasksPath } from "@/lib/navigation";
 import { excludeExternalEvents } from "@/lib/task-filters";
 import { isDueByToday, openTasks, tagCounts } from "@/lib/task-views";
 import { useCalendarOrderState } from "@/hooks/useCalendarOrder";
 import { useTodayStart } from "@/hooks/useTodayStart";
 
-const NAV_ICONS = {
+/** The icon of each place, wherever a place is drawn. */
+export const NAV_ICONS = {
   "/Home": House,
   "/Today": Sun,
   "/Calendar": CalendarDays,
@@ -30,30 +31,31 @@ function readNavOrder() {
   return DEFAULT_NAV_ORDER;
 }
 
-function readDefaultNav() {
-  try {
-    return sanitizeNavRoute(localStorage.getItem("defaultNav"));
-  } catch {
-    return FALLBACK_ROUTE;
-  }
-}
-
-/** The places, in the person's order (Settings → Appearance), and the page the app opens on. */
+/**
+ * The places, in the person's order (Settings → Appearance), each with
+ * where it leads (`to`: Tasks leads to the view it is set to open in),
+ * the page the app opens on, and where a tag leads from outside Tasks.
+ */
 export function useNavItems() {
   const [order, setOrder] = useState(readNavOrder);
-  const [defaultNav, setDefaultNav] = useState(readDefaultNav);
+  const [defaultNav, setDefaultNav] = useState(startPath);
+  const [tasksTo, setTasksTo] = useState(tasksPath);
+  const [tagsTo, setTagsTo] = useState(tagsPath);
 
   useEffect(() => {
-    const onChange = () => { setOrder(readNavOrder()); setDefaultNav(readDefaultNav()); };
+    const onChange = () => { setOrder(readNavOrder()); setDefaultNav(startPath()); setTasksTo(tasksPath()); setTagsTo(tagsPath()); };
     window.addEventListener("navOrderChanged", onChange);
     return () => window.removeEventListener("navOrderChanged", onChange);
   }, []);
 
   const items = useMemo(
-    () => order.map((path) => ({ path, label: NAV_LABELS[path], icon: NAV_ICONS[path] })).filter((item) => item.icon),
-    [order],
+    () =>
+      order
+        .map((path) => ({ path, to: path === "/Active" ? tasksTo : path, label: NAV_LABELS[path], icon: NAV_ICONS[path] }))
+        .filter((item) => item.icon),
+    [order, tasksTo],
   );
-  return { items, defaultNav };
+  return { items, defaultNav, tagsTo };
 }
 
 /**
