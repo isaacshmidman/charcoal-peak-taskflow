@@ -14,6 +14,7 @@ import { purgeExpiredAiRecords } from "./ai/grants.js";
 import { purgeExpiredOAuthRecords } from "./ai/oauth.js";
 import { purgeExpiredDeletedTasks } from "./store.js";
 import { startSyncLoop } from "./sync.js";
+import { createTimings } from "./lib/timings.js";
 import { startNotificationLoop } from "./notifications.js";
 import { handleAuthRoute } from "./routes/auth.js";
 import { handleIntegrationsRoute } from "./routes/integrations.js";
@@ -261,7 +262,10 @@ export function createTaskflowServer(config = backendConfig) {
 
 export function createRequestHandler(config = backendConfig, db = getDatabase(config)) {
   const baseHeaders = securityHeaders(config);
+  // How long answers take, in the log (lib/timings.js).
+  const timings = createTimings({ slowMs: config.slowRequestMs });
   return async (request, response) => {
+    timings.watch(request, response);
     for (const [name, value] of baseHeaders) response.setHeader(name, value);
     // CORS for the app's own origin only. This used to echo back ANY
     // Origin with credentials allowed, i.e. "every website may call this

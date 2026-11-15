@@ -119,6 +119,9 @@ export const backendConfig = {
     7
   ),
   allowAnyPassword: parseBoolean(process.env.TASKFLOW_ALLOW_ANY_PASSWORD, false),
+  // An answer slower than this many milliseconds gets a [slow] line in
+  // the log (lib/timings.js).
+  slowRequestMs: parseInteger(process.env.TASKFLOW_SLOW_REQUEST_MS, 500),
   googleClientId,
   googleClientSecret,
   hasGoogleCredentials,

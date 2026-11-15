@@ -66,6 +66,30 @@ caught) are reported the same way without replacing the page. A browser
 sends at most five per visit and each error once; the server takes ten
 a minute from one address and cuts every field to one short line.
 
+## How fast the server answers
+
+Every answer is timed (`backend/lib/timings.js`) and the result goes to
+the log, nowhere else. The database is read in the same thread that
+answers, so one slow query holds up everyone; this is how to see it.
+
+```
+docker compose logs taskflow | grep -E "\[slow\]|\[timings\]"
+[zephyrly] [slow] 812 ms · GET /api/apps/:app/entities/Task · 200
+[zephyrly] [timings] last 60 min: 1204 requests · half under 3 ms · 95% under 28 ms · slowest 812 ms · 1 slow · 0 failed
+[zephyrly] [timings]   GET /api/apps/:app/entities/Task · 410× · 95% under 31 ms · slowest 812 ms
+```
+
+- **`[slow]`**: one line, at the time, for an answer that took over half a
+  second (`TASKFLOW_SLOW_REQUEST_MS`, in milliseconds, to change it). A
+  file on its way up or down, an export and a restore get ten times as
+  long: their time is the file's size and the connection's speed.
+- **`[timings]`**: once an hour, how many requests there were, how fast
+  half and 95% of them were, and the five routes that took the most time
+  in all. An hour with no requests writes nothing.
+- A route is written with its ids taken out and no `?query`, so the log
+  says nothing about who asked or for what. A request whose asker went
+  away before the answer was whole is not counted.
+
 ## Offline
 
 What is promised: after one visit, the app opens and works with no

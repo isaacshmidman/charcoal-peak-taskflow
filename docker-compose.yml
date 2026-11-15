@@ -34,6 +34,8 @@ services:
       - TASKFLOW_NOTIFICATION_POLL_MS=${TASKFLOW_NOTIFICATION_POLL_MS:-60000}
       - TASKFLOW_ALLOW_ANY_PASSWORD=${TASKFLOW_ALLOW_ANY_PASSWORD:-false}
       - TASKFLOW_DELETED_TASK_RETENTION_DAYS=${TASKFLOW_DELETED_TASK_RETENTION_DAYS:-7}
+      # An answer slower than this (milliseconds) gets a [slow] line in the log.
+      - TASKFLOW_SLOW_REQUEST_MS=${TASKFLOW_SLOW_REQUEST_MS:-500}
       - TASKFLOW_SUPPORT_EMAIL=${TASKFLOW_SUPPORT_EMAIL:-}
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/api/health').then(r=>{if(!r.ok)throw 1})"]
