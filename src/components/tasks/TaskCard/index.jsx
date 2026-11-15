@@ -149,7 +149,7 @@ const TaskCard = forwardRef(function TaskCard({
 
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3 pl-3 pr-3 py-2">
+          <div className="flex items-center gap-3 px-3 py-2 sm:py-1.5">
             {/* Completion button — the origin of the DS ink-fill Checkbox,
                 now rendered through it. onClick's stopPropagation +
                 preventDefault run BEFORE the toggle (swipe-row hygiene,

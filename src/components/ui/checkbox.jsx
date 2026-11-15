@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils"
  * suppress the toggle, because row consumers call it as part of their
  * normal click hygiene, not to cancel the check.
  *
- * Sizes: `task` = TaskCard's w-6 with a larger tap area · `default` = w-5 for
+ * Sizes: `task` = TaskCard's w-6 (w-5 from tablets up) with a larger tap area · `default` = w-5 for
  * forms and lists · `sm` = w-4 for dense calendar rows (4px radius —
  * the contract's 6px reads blobby at that box size).
  *
@@ -31,9 +31,10 @@ import { cn } from "@/lib/utils"
 const sizeClasses = {
   sm: "w-4 h-4 rounded [&_svg]:w-3 [&_svg]:h-3",
   default: "w-5 h-5 rounded-md [&_svg]:w-3.5 [&_svg]:h-3.5",
-  // Drawn at 24px; the invisible ::before keeps the area a finger can hit
-  // at 40px, so the smaller box is no harder to tap.
-  task: "relative w-6 h-6 rounded-md [&_svg]:w-4 [&_svg]:h-4 before:absolute before:-inset-2 before:content-['']",
+  // Drawn at 24px on a phone and 20px where there is a pointer; the
+  // invisible ::before keeps the area a finger can hit at 40px, so the
+  // box is no harder to tap than it looks.
+  task: "relative w-6 h-6 sm:w-5 sm:h-5 rounded-md [&_svg]:w-4 [&_svg]:h-4 sm:[&_svg]:w-3.5 sm:[&_svg]:h-3.5 before:absolute before:-inset-2 before:content-['']",
 }
 
 /** @type {import("react").ForwardRefExoticComponent<CheckboxProps & import("react").RefAttributes<HTMLButtonElement>>} */
