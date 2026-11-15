@@ -60,11 +60,13 @@ function NoteRow({ note, active, onSelect, onDelete }) {
         className={cn(
           // Plain rows, told apart by their three lines of type and the
           // space between them. The open note is a quiet tint with a bar
-          // of sun at its edge — not a black block.
+          // of sun at its edge — not a black block. Only beside the note
+          // itself: on a phone the list shows alone, no note is open, and
+          // a marked row would say one was.
           "relative z-10 w-full select-none rounded-lg px-3 py-2 text-left transition-colors",
           swiping ? "cursor-grabbing" : "cursor-pointer",
           active
-            ? "bg-ink-100 dark:bg-night-high before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-full before:bg-sun-400 before:content-['']"
+            ? "bg-surface-card max-sm:hover:bg-ink-50 sm:bg-ink-100 sm:dark:bg-night-high sm:before:absolute sm:before:inset-y-2 sm:before:left-0 sm:before:w-[3px] sm:before:rounded-full sm:before:bg-sun-400 sm:before:content-['']"
             : "bg-surface-card hover:bg-ink-50 dark:hover:bg-night-raised"
         )}
         style={
@@ -76,11 +78,11 @@ function NoteRow({ note, active, onSelect, onDelete }) {
         <p
           className={cn(
             "truncate text-[13px]",
-            active ? "font-semibold" : "font-medium",
+            active ? "font-medium sm:font-semibold" : "font-medium",
             note.title?.trim() ? "text-ink-900 dark:text-ink-100" : "text-ink-400 dark:text-ink-500"
           )}
         >
-          {note.title?.trim() || "New Note"}
+          {note.title?.trim() || "New note"}
         </p>
         <p
           className={cn(

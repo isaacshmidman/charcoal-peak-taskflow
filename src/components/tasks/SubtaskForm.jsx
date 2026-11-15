@@ -105,7 +105,7 @@ export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubm
         if (o) { onOpenChange(true); return; }
         if (isEditMode) commitAndClose(); else onOpenChange(false);
       }}
-      title={isEditMode ? "Edit Subtask" : "New Subtask"}
+      title={isEditMode ? "Edit subtask" : "New subtask"}
       testid="subtask-form-dialog"
       focusTitle={!task}
       onKeyDown={(e) => {
@@ -137,7 +137,7 @@ export default function SubtaskForm({ open, onOpenChange, task, parentId, onSubm
             Cancel
           </Button>
           <Button type="button" disabled={!isValid} onClick={commitAndClose} data-testid="subtask-form-submit">
-            {isEditMode ? "Save Changes" : "Create Subtask"}
+            {isEditMode ? "Save changes" : "Create subtask"}
           </Button>
         </>
       }

@@ -14,7 +14,7 @@ which the server answers nobody else) and sent uncompressed.
 
 | Rule | Where | What it saves |
 |---|---|---|
-| A list is worked out once per state of the database | `keptAnswer` in `backend/routes/entities.js` | Repeat asks cost under 1 ms. "State" is exact: SQLite's `total_changes()` and `data_version`, so any write by anything invalidates it. Not used for the Recently Deleted lists, whose answer depends on the clock. |
+| A list is worked out once per state of the database | `keptAnswer` in `backend/routes/entities.js` | Repeat asks cost under 1 ms. "State" is exact: SQLite's `total_changes()` and `data_version`, so any write by anything invalidates it. Not used for the Recently deleted lists, whose answer depends on the clock. |
 | An unchanged answer isn't sent again | `sendJsonText` in `backend/http.js` (ETag, `304`), `unchanged` in `src/api/apiClient.js` | The app sends the fingerprint of what it has; the server answers "same" with no body. The app hands back the *same object*, so nothing re-renders and nothing is rewritten. |
 | Everything over 1 KB goes out gzipped | `sendJsonText`, `serveStaticFile` in `backend/server.js` | The list shrinks about 25-fold on the leg between the house and Cloudflare. |
 | Every page asks for tasks the same way | `Task.list("-created_date", 5000)` | One address, so one kept answer and one fingerprint. A page that wants another order sorts it itself. |
@@ -49,7 +49,7 @@ the connection returns, once each.
   is gone). Everything else stays queued.
 - **One tab replays at a time** (`navigator.locks`).
 - **A full device says so.** A queued change that can't be stored makes
-  room by dropping the Recently Deleted copies, and if that isn't enough
+  room by dropping the Recently deleted copies, and if that isn't enough
   the person is told. A list whose copy can't be updated keeps its older
   copy and the person is told once.
 

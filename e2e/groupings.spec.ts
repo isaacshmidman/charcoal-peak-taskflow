@@ -74,7 +74,7 @@ test("an overdue task gets its own column, and its date button moves it to today
 test("a new task made on Groupings starts on today, so it can be saved straight away", async ({ page }) => {
   const api = await installMockBackend(page, { priorities: [priority], tasks: [] });
   await page.goto("/Groupings");
-  await page.getByRole("button", { name: "New Task" }).click();
+  await page.getByRole("button", { name: "New task" }).click();
   await page.getByTestId("task-form-title").fill("Water the plants");
   // It used to open with no date, leaving Create disabled until one was picked.
   await expect(page.getByTestId("task-form-submit")).toBeEnabled();

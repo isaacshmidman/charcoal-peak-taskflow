@@ -253,7 +253,7 @@ describe("a change at the calendar to a task made in Zephyrly", () => {
 });
 
 describe("an event deleted at the calendar", () => {
-  it("sends a Zephyrly-made task to Recently Deleted with its subtasks, where it can be restored (Google)", async () => {
+  it("sends a Zephyrly-made task to Recently deleted with its subtasks, where it can be restored (Google)", async () => {
     const { id } = seedIntegration("google");
     insertTask("task_mine", { title: "Plan the trip", description: "Flights, hotel" });
     insertTask("sub_1", { title: "Book flights", parent_id: "task_mine", due_date: "" });
@@ -271,7 +271,7 @@ describe("an event deleted at the calendar", () => {
     expect(mapRow("task_mine")).toBeUndefined();
   });
 
-  it("sends a Zephyrly-made task to Recently Deleted (Apple)", async () => {
+  it("sends a Zephyrly-made task to Recently deleted (Apple)", async () => {
     const { id } = seedIntegration("apple");
     const href = `${ACAL}zephyrly-task_mine.ics`;
     insertTask("task_mine", { title: "Plan the trip" });

@@ -26,7 +26,7 @@ PDFs or images). With changes allowed, it can also:
   quarterly or yearly, with an optional last day), or stop it repeating;
 - mark tasks done (a repeating task moves on, as in the app), or skip the
   next time a repeating task comes round;
-- move a task or a note to Recently Deleted;
+- move a task or a note to Recently deleted;
 - add notes, written in Markdown, and change them: title, tags, pinning,
   text added at the end, words swapped inside (keeping formatting and links
   to tasks), or all of the text replaced (which drops formatting and task
@@ -62,7 +62,7 @@ Whatever the AI app is told, Zephyrly itself never lets it:
 
 - change anything from a connected Google or Apple calendar — that would
   move or rewrite the real event;
-- delete anything for good (a task it deletes goes to Recently Deleted
+- delete anything for good (a task it deletes goes to Recently deleted
   with its files, and it can't delete a subtask or a file, because those
   deletes are permanent);
 - see another person's tasks;
@@ -72,7 +72,7 @@ Every change is logged. Undo in Settings reverses it unless what it
 changed was edited again since (files attached to a task it added count),
 in which case it says so and leaves your edit alone. Making a task from a
 note logs two entries, the task and the link in the note; undo both to put
-things back as they were. Deleted tasks and notes are restored from Recently Deleted.
+things back as they were. Deleted tasks and notes are restored from Recently deleted.
 
 Anything new Zephyrly learns to do gets an AI tool too, with the same
 rules.

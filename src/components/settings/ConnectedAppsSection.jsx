@@ -304,7 +304,7 @@ function ActivityRow({ entry, online, onUndone }) {
         {entry.undo === "undone" && <span className="shrink-0 pt-1 text-xs text-ink-400 dark:text-ink-500">Undone</span>}
         {entry.undo === "recently_deleted" && (
           <Link to="/RecentlyDeleted" className="shrink-0 pt-1 text-xs font-medium text-ink-600 underline dark:text-ink-300">
-            In Recently Deleted
+            In Recently deleted
           </Link>
         )}
       </div>

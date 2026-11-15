@@ -60,7 +60,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
   const [form, setForm] = useState(defaultTask);
   const [showEndDate, setShowEndDate] = useState(false);
   // Frozen at open: true when editing an existing task. Drives the button
-  // label so it never flips to "Create Task" during the close animation
+  // label so it never flips to "Create task" during the close animation
   // (when the parent nulls `task`, the dialog is still fading out).
   const [isEditMode, setIsEditMode] = useState(!!task);
   // Pending file attachments — only relevant when creating a NEW task
@@ -179,7 +179,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
   };
 
   // Tracks the persisted task id so autosave creates once, then updates —
-  // and so the "New Task" heading/button never flip after the first save.
+  // and so the "New task" heading/button never flip after the first save.
   const savedIdRef = useRef(task?.id || null);
 
   const payload = useMemo(() => buildData(form).data, [form, task, parentId]);
@@ -207,7 +207,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
 
     // Close FIRST. Everything below is a write that doesn't need the
     // dialog open, and awaiting it here is exactly what kept the form
-    // sitting there after Save Changes while the pending chips cleared
+    // sitting there after Save changes while the pending chips cleared
     // and each created subtask appeared behind it, one at a time.
     // Pending titles aren't cleared either — the form is gone, and the
     // reset effect empties them on the next open.
@@ -237,14 +237,14 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
   };
 
   const heading = isReadOnly
-    ? "View Event"
+    ? "View event"
     : isExternalEvent
-      ? "Edit Event"
+      ? "Edit event"
       : task
-        ? "Edit Task"
+        ? "Edit task"
         : parentId
-          ? "New Subtask"
-          : "New Task";
+          ? "New subtask"
+          : "New task";
 
   return (
     <FormDialog
@@ -296,7 +296,7 @@ export default function TaskForm({ open, onOpenChange, task, onSubmit, onDelete,
               Cancel
             </Button>
             <Button type="button" disabled={!canSubmit} onClick={commitAndClose} data-testid="task-form-submit">
-              {isEditMode ? "Save Changes" : "Create Task"}
+              {isEditMode ? "Save changes" : "Create task"}
             </Button>
           </>
         )

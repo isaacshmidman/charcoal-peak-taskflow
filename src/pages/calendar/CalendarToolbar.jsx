@@ -1,7 +1,7 @@
 // @ts-nocheck
 /**
  * @file The top of the Calendar page: the shared page header (title,
- * count, search, which calendars show, sort, New Task) with a second row
+ * count, search, which calendars show, sort, New task) with a second row
  * under it — Today, step back/forward, the range on show, sync, and the
  * view switch.
  *
@@ -22,6 +22,7 @@ export default function CalendarToolbar({
   onViewChange,
   rangeLabel,
   scopedCount,
+  scopedEvents = 0,
   search,
   setSearch,
   showSearch,
@@ -44,7 +45,7 @@ export default function CalendarToolbar({
   return (
     <PageHeader
       title="Calendar"
-      sub={<>{scopedCount} task{scopedCount !== 1 ? "s" : ""}</>}
+      sub={<>{scopedCount} task{scopedCount !== 1 ? "s" : ""}{scopedEvents > 0 ? `, ${scopedEvents} event${scopedEvents !== 1 ? "s" : ""}` : ""}</>}
       below={
         // Where you are and how you're looking at it. Left, in the order
         // every calendar uses: Today, back and forward, then the range
@@ -129,7 +130,7 @@ export default function CalendarToolbar({
         onChange={onHiddenCalendarsChange}
       />
       <MultiSortPanel sorts={sorts} onSortsChange={onSortsChange} page="calendar" />
-      <Button aria-label="New Task" onClick={onNewTask} className="hidden h-9 gap-1.5 sm:inline-flex">
+      <Button aria-label="New task" onClick={onNewTask} className="hidden h-9 gap-1.5 sm:inline-flex">
         <Plus className="h-4 w-4" />
         New task
       </Button>

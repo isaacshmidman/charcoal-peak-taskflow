@@ -25,7 +25,7 @@ in Zephyrly came from.
 | The description is only replaced when the calendar's words differ | same | The formatted description was overwritten by the plain copy the calendar had been sent. |
 | A repeat rule Zephyrly can't express doesn't replace a task's own | same | The task's repeat became "custom", which means nothing without the calendar's rule. |
 | A change made here that hasn't gone out yet wins | `pushIsWaiting` | A sync arriving between an edit and its delivery wrote the calendar's older copy over the edit. |
-| An event deleted at the calendar sends a Zephyrly-made task to Recently Deleted | `removeTaskForCalendarDelete` | The task, its subtasks and its files were removed for good. Deleting a calendar entry, or moving it to another calendar, destroyed the task. A subtask stays where it is; an event that came from the calendar is simply removed. |
+| An event deleted at the calendar sends a Zephyrly-made task to Recently deleted | `removeTaskForCalendarDelete` | The task, its subtasks and its files were removed for good. Deleting a calendar entry, or moving it to another calendar, destroyed the task. A subtask stays where it is; an event that came from the calendar is simply removed. |
 
 ## What must not get lost on the way out
 
@@ -80,4 +80,4 @@ that needs a real Google or iCloud sign-in. To check on the server after a
 deploy, connect a calendar, then: give an all-day task a time (the event
 should gain the time); tick a task, then move its event in the calendar
 (the task should move and stay ticked, and stay in All Tasks); delete a
-task's event in the calendar (the task should be in Recently Deleted).
+task's event in the calendar (the task should be in Recently deleted).

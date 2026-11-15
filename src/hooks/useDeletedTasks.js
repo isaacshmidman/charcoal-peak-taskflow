@@ -1,5 +1,5 @@
 /**
- * Hook for managing the Recently Deleted store.
+ * Hook for managing the Recently deleted store.
  * Handles creating, restoring, and permanently deleting records, with full offline support.
  */
 import { useQueryClient } from '@tanstack/react-query';
@@ -60,7 +60,7 @@ export function useDeletedTasks() {
   };
 
   /**
-   * Record a task deletion into the Recently Deleted store.
+   * Record a task deletion into the Recently deleted store.
    * Call this BEFORE actually deleting the task from the tasks cache.
    *
    * @param {TaskRecord & { id: string }} task
@@ -136,7 +136,7 @@ export function useDeletedTasks() {
   };
 
   /**
-   * Permanently remove many deleted task records from Recently Deleted.
+   * Permanently remove many deleted task records from Recently deleted.
    *
    * @param {string[]} ids
    */
@@ -178,7 +178,7 @@ export function useDeletedTasks() {
   };
 
   /**
-   * Permanently remove a deleted task record from Recently Deleted.
+   * Permanently remove a deleted task record from Recently deleted.
    *
    * @param {string} id
    */

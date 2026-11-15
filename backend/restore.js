@@ -18,8 +18,8 @@
  *   types, the per-file and per-task caps, and the storage quota all
  *   apply.
  *
- * Items in Recently Deleted come back there, with the files held for them
- * (attachments.js), so restoring one from Recently Deleted brings its
+ * Items in Recently deleted come back there, with the files held for them
+ * (attachments.js), so restoring one from Recently deleted brings its
  * files back too.
  *
  * Not restored: events and tasks from connected calendars (calendar sync
@@ -302,7 +302,7 @@ export async function restoreExport(db, config, { appId, user, data, readFile, n
   const priorityIds = new Map();
   /** @type {Map<string, string>} */
   const taskIds = new Map();
-  /** A task in Recently Deleted (not live here) → when it was deleted: its files are restored held for it. */
+  /** A task in Recently deleted (not live here) → when it was deleted: its files are restored held for it. */
   /** @type {Map<string, string>} */
   const heldTaskIds = new Map();
 
@@ -409,7 +409,7 @@ export async function restoreExport(db, config, { appId, user, data, readFile, n
       }
     }
 
-    // Recently Deleted, while it would still be there.
+    // Recently deleted, while it would still be there.
     const liveDeletedTasks = ownedValues("deleted_tasks");
     const liveDeletedNotes = ownedValues("deleted_notes");
     /** @param {any} record */
@@ -454,7 +454,7 @@ export async function restoreExport(db, config, { appId, user, data, readFile, n
   const skipFile = (/** @type {string} */ reason) => fileSkips.set(reason, (fileSkips.get(reason) || 0) + 1);
   let filesNotInUpload = 0;
   let filesAlreadyHere = 0;
-  // A file held for Recently Deleted only matches a held one, and a task's
+  // A file held for Recently deleted only matches a held one, and a task's
   // file only a live one.
   const alreadyAttached = db.prepare(
     `SELECT 1 FROM task_attachments
@@ -511,7 +511,7 @@ export async function restoreExport(db, config, { appId, user, data, readFile, n
     notes.push(`${plural(skipped.fromCalendars, "item")} from connected calendars skipped — they come back when your calendars sync.`);
   }
   if (skipped.inRecentlyDeleted) {
-    notes.push(`${plural(skipped.inRecentlyDeleted, "item is", "items are")} in Recently Deleted, so left there — restore from Recently Deleted if you want them back.`);
+    notes.push(`${plural(skipped.inRecentlyDeleted, "item is", "items are")} in Recently deleted, so left there — restore from Recently deleted if you want them back.`);
   }
   if (skipped.orphanSubtasks) notes.push(`${plural(skipped.orphanSubtasks, "subtask")} skipped because its task isn't here.`);
   if (skipped.invalid) notes.push(`${plural(skipped.invalid, "record")} couldn't be read and ${skipped.invalid === 1 ? "was" : "were"} skipped.`);

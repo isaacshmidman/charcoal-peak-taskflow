@@ -4,7 +4,7 @@
  * each had their own copy of this comparator — identical in behaviour, so
  * a fix to one would silently miss the rest. They all use this now.
  *
- * Completed (lib/completedItems.js) and Recently Deleted (lib/trash-sort.js)
+ * Completed (lib/completedItems.js) and Recently deleted (lib/trash-sort.js)
  * are NOT this: they sort differently shaped records, with their own date
  * rules (completion time, deletion time), so they keep their own.
  */

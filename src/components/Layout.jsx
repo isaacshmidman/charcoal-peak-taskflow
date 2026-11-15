@@ -81,7 +81,7 @@ export default function Layout() {
         onSearch={() => setPaletteOpen(true)}
         online={online}
       />
-      <PhoneTabs items={items} counts={counts} tagsTo={tagsTo} onAdd={add} addLabel={pathname === "/Notes" ? "New note" : "New Task"} />
+      <PhoneTabs items={items} counts={counts} tagsTo={tagsTo} onAdd={add} addLabel={pathname === "/Notes" ? "New note" : "New task"} />
       {!online && (
         <OfflineStatus
           side="top"

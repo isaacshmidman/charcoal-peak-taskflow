@@ -346,7 +346,7 @@ export default function Home() {
               <SlidersHorizontal className="h-4 w-4" />
               Customize
             </Button>
-            <Button aria-label="New Task" onClick={() => ui.openNew()} className="hidden h-9 gap-1.5 sm:inline-flex">
+            <Button aria-label="New task" onClick={() => ui.openNew()} className="hidden h-9 gap-1.5 sm:inline-flex">
               <Plus className="h-4 w-4" />
               New task
             </Button>

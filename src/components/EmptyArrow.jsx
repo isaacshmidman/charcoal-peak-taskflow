@@ -1,7 +1,7 @@
 export default function EmptyArrow({ message = "Add a task to get started!" }) {
   return (
     <div className="flex flex-col items-end pr-16 sm:pr-24 pt-2">
-      {/* Curvy arrow pointing up-right toward the New Task button */}
+      {/* Curvy arrow pointing up-right toward the New task button */}
       <svg
         width="80"
         height="70"

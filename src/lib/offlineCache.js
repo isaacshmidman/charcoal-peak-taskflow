@@ -82,7 +82,7 @@ function getLegacyStorageKey(key) {
  * queued change has to be on disk before the app says it is kept.
  *
  * The browser gives a site a few megabytes here. When a write doesn't
- * fit, room is made by dropping the copies of the two Recently Deleted
+ * fit, room is made by dropping the copies of the two Recently deleted
  * lists (the server has them; they are the cheapest thing to lose), and
  * if it still doesn't fit the app is told (STORAGE_FULL_EVENT) rather
  * than left believing the change was kept.

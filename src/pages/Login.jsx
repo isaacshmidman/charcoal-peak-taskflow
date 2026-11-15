@@ -169,7 +169,7 @@ export default function Login() {
                 disabled={isLoadingAuth}
                 className="w-full h-11 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-[var(--primary-hover)] transition-colors disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center"
               >
-                <span>{isLoadingAuth ? "Signing in..." : "Sign In"}</span>
+                <span>{isLoadingAuth ? "Signing in..." : "Sign in"}</span>
               </button>
             </form>
 
@@ -194,7 +194,7 @@ export default function Login() {
             <path fill="#FBBC05" d="M12 21.3c2.5 0 4.6-.8 6.1-2.2l-3-2.3c-.8.6-1.9 1-3.1 1-2.4 0-4.5-1.6-5.2-3.9l-3.2 2.5c1.6 3 4.7 4.9 8.4 4.9Z" />
             <path fill="#4285F4" d="M18.1 19.1c1.8-1.7 2.7-4.1 2.7-7.1 0-.6-.1-1-.1-1.4H12v3.9h5.4c-.2 1.1-.8 2.1-1.7 2.8l3 2.3Z" />
           </svg>
-          <span>Sign In with Google</span>
+          <span>Sign in with Google</span>
         </button>
 
         <div className="mt-4">

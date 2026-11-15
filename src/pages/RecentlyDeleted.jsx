@@ -232,7 +232,7 @@ export default function RecentlyDeleted({ onBack } = {}) {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Recently Deleted"
+        title="Recently deleted"
         sub={isLoading && displayedTasks.length + displayedNotes.length === 0 ? NO_COUNT_YET : <>{displayedTasks.length + displayedNotes.length} item{displayedTasks.length + displayedNotes.length !== 1 ? "s" : ""}</>}
         backLabel="Back"
         back={() => {
@@ -259,7 +259,7 @@ export default function RecentlyDeleted({ onBack } = {}) {
             </Button>
             <DialogContent className="max-w-md">
               <DialogHeader>
-                <DialogTitle>Permanently Delete everything in Recently Deleted?</DialogTitle>
+                <DialogTitle>Permanently delete everything in Recently deleted?</DialogTitle>
               </DialogHeader>
               <div className="flex flex-col gap-3 pt-2">
                 <button
@@ -301,7 +301,7 @@ export default function RecentlyDeleted({ onBack } = {}) {
         <TaskRowsPlaceholder rows={4} />
       ) : displayedTasks.length === 0 && displayedNotes.length === 0 ? (
         <div className="py-14 text-center">
-          <p className="text-xs text-ink-400 dark:text-ink-500">Nothing in Recently Deleted.</p>
+          <p className="text-xs text-ink-400 dark:text-ink-500">Nothing in Recently deleted.</p>
         </div>
       ) : (
         <>

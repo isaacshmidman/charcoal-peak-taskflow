@@ -150,7 +150,7 @@ export function buildCompletedItems({
   /** @type {CompletedTaskItem[]} */
   const completedTasks = tasks
     .filter((task) => task.status === "done" && !task.parent_id && task.id)
-    // Drop tasks belonging to user-hidden calendars (Settings → Calendar Order).
+    // Drop tasks belonging to user-hidden calendars (Settings → Calendar order).
     .filter((task) => !hiddenCalendars || !hiddenCalendars.has(calendarKeyForTask(task)))
     .map((task) => buildCompletedTaskItem(/** @type {TaskRecord & { id: string }} */ (task)));
 

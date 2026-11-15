@@ -100,7 +100,7 @@ export async function handleEntitiesRoute(request, response, { config, db, url, 
       user,
       input: body,
       config,
-      // A restore (from Recently Deleted, or an Undo) names the task it
+      // A restore (from Recently deleted, or an Undo) names the task it
       // brings back, so that task's files come back on it.
       restoresTaskId: restoredTaskId(entityName, body),
     });
@@ -138,7 +138,7 @@ export async function handleEntitiesRoute(request, response, { config, db, url, 
         // Already gone; nothing to snapshot.
       }
     }
-    // The app's delete moves a task to Recently Deleted (a subtask: behind
+    // The app's delete moves a task to Recently deleted (a subtask: behind
     // an Undo), so its files are held for the restore, not deleted.
     const result = deleteEntityRecord(db, { entityName, appId, user, id: entityId, config, holdFiles: true });
     if (entityName === "Task" && snapshot) {
@@ -172,7 +172,7 @@ export function purgeOldCreateKeys(db) {
 
 /**
  * Lists whose answer depends only on what is in the database. Not the
- * Recently Deleted ones: listing those also throws out whatever has
+ * Recently deleted ones: listing those also throws out whatever has
  * expired, so their answer depends on the clock.
  */
 const KEPT_LISTS = new Set(["Task", "Note", "Priority", "SavedTag"]);

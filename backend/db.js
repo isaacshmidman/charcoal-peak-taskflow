@@ -500,7 +500,7 @@ export function createDatabase(config = backendConfig) {
   }
   // When the file's task was deleted. Set, the file is held for Recently
   // Deleted: kept, and counted toward storage, but on no live task until
-  // the task is restored or leaves Recently Deleted (attachments.js).
+  // the task is restored or leaves Recently deleted (attachments.js).
   try {
     db.exec(`ALTER TABLE task_attachments ADD COLUMN task_deleted_at TEXT`);
   } catch {
@@ -616,7 +616,7 @@ export function createDatabase(config = backendConfig) {
   // 0000be7), users who disconnected Google or Apple were left with
   // events in their tasks table whose source calendar/integration no
   // longer existed — they showed up in /Calendar and Settings →
-  // Calendar Order with no UI path to remove them.
+  // Calendar order with no UI path to remove them.
   //
   // Self-healing query: delete any imported-event task whose
   // (source_provider, source_calendar_id) doesn't currently match a
@@ -793,7 +793,7 @@ export function createDatabase(config = backendConfig) {
     // Column already exists — ignore
   }
 
-  // Migration: snapshot the priority color onto deleted tasks so the Recently Deleted
+  // Migration: snapshot the priority color onto deleted tasks so the Recently deleted
   // card keeps its color even if the priority is later renamed or deleted in Settings.
   try {
     db.exec(`ALTER TABLE deleted_tasks ADD COLUMN priority_color TEXT NOT NULL DEFAULT ''`);

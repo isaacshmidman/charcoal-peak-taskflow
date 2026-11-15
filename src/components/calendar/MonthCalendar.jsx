@@ -14,6 +14,13 @@ import { cn } from "@/lib/utils";
 import { fromDateStr, toDateStr } from "@/lib/dates";
 import MiniMiniTaskCard from "./MiniMiniTaskCard";
 
+/**
+ * How many rows a day shows. A day with more shows one fewer and a
+ * "N more" row that opens the day, so nothing is ever out of sight
+ * without a word saying so (the cell used to scroll inside itself).
+ */
+const MOST_ROWS = 4;
+
 function DayCell({
   date,
   currentMonth,
@@ -23,6 +30,7 @@ function DayCell({
   onTaskClick,
   onToggleDone,
   onDayEmptyClick,
+  onOpenDay,
 }) {
   const dateStr = toDateStr(date);
   const { setNodeRef, isOver } = useDroppable({
@@ -44,7 +52,8 @@ function DayCell({
   // appends `compareTaskTime(...)` as the final tiebreaker after the
   // multi-sort comparators, so timed tasks within a day still come out
   // chronologically by default — we just trust that order.
-  const sortedTasks = tasks;
+  const sortedTasks = tasks.length > MOST_ROWS ? tasks.slice(0, MOST_ROWS - 1) : tasks;
+  const hiddenCount = tasks.length - sortedTasks.length;
 
   const handleEmptyClick = (e) => {
     if (e.target !== e.currentTarget) return;
@@ -67,23 +76,28 @@ function DayCell({
         className="flex items-center justify-end mb-1"
         onClick={handleEmptyClick}
       >
-        <span
+        {/* The date opens that day; the empty space around it adds a task. */}
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onOpenDay?.(dateStr); }}
+          aria-label={`Open ${format(date, "EEEE, MMMM d")}`}
+          title="Open this day"
+          data-testid={`month-day-${dateStr}`}
           className={cn(
-            "text-[11px] tabular-nums leading-none w-5 h-5 flex items-center justify-center rounded-full",
+            "text-[11px] tabular-nums leading-none w-5 h-5 flex items-center justify-center rounded-full outline-none transition-colors",
             isToday
-              ? "bg-sun-400 text-ink-900 font-semibold"
+              ? "bg-sun-400 text-ink-900 font-semibold hover:bg-sun-300 focus-visible:bg-sun-300"
               : inMonth
-              ? "text-ink-500 dark:text-ink-400"
-              : "text-ink-300 dark:text-ink-600"
+              ? "text-ink-500 hover:bg-selected hover:text-ink-900 focus-visible:bg-selected dark:text-ink-400 dark:hover:text-ink-100"
+              : "text-ink-300 hover:bg-selected hover:text-ink-700 focus-visible:bg-selected dark:text-ink-600 dark:hover:text-ink-300"
           )}
         >
           {format(date, "d")}
-        </span>
+        </button>
       </div>
       <div
         onClick={handleEmptyClick}
-        className="flex-1 space-y-0.5 overflow-y-auto"
-        style={{ maxHeight: "5rem" }}
+        className="flex-1 space-y-0.5"
       >
         {sortedTasks.map((task) => (
           <MiniMiniTaskCard
@@ -94,6 +108,18 @@ function DayCell({
             onToggleDone={onToggleDone}
           />
         ))}
+        {hiddenCount > 0 && (
+          <button
+            type="button"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); onOpenDay?.(dateStr); }}
+            data-testid={`month-more-${dateStr}`}
+            title={`Open this day to see ${hiddenCount} more`}
+            className="block h-5 w-full truncate rounded px-1.5 text-left text-[10px] font-semibold leading-5 text-ink-600 outline-none transition-colors hover:bg-selected hover:text-ink-900 focus-visible:bg-selected dark:text-ink-300 dark:hover:text-ink-100"
+          >
+            {hiddenCount} more
+          </button>
+        )}
       </div>
     </div>
   );
@@ -110,6 +136,7 @@ function DayCell({
  *   onTaskClick: (task: any) => void,
  *   onToggleDone?: (task: any) => void,
  *   onDayEmptyClick?: (dateStr: string) => void,
+ *   onOpenDay?: (dateStr: string) => void,
  * }} props
  */
 export default function MonthCalendar({
@@ -119,6 +146,7 @@ export default function MonthCalendar({
   onTaskClick,
   onToggleDone,
   onDayEmptyClick,
+  onOpenDay,
 }) {
   const currentMonth = useMemo(() => startOfMonth(anchorDate), [anchorDate]);
   const today = useMemo(() => startOfDay(new Date()), []);
@@ -176,6 +204,7 @@ export default function MonthCalendar({
               onTaskClick={onTaskClick}
               onToggleDone={onToggleDone}
               onDayEmptyClick={onDayEmptyClick}
+              onOpenDay={onOpenDay}
             />
           );
         })}

@@ -257,10 +257,11 @@ export default function Notes() {
           onClick={newNote}
           data-testid="new-note-button"
           aria-label="New note"
-          className="h-9 gap-1.5"
+          // Hidden on a phone, like "New task": the tab bar's + is the way to add.
+          className="hidden h-9 gap-1.5 sm:inline-flex"
         >
           <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">New note</span>
+          <span>New note</span>
         </Button>
       </PageHeader>
 

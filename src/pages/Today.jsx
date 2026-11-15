@@ -197,7 +197,7 @@ export default function Today() {
         )}
         <PageSearch open={showSearch} onOpenChange={setShowSearch} value={search} onChange={setSearch} />
         <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} page="today" />
-        <Button aria-label="New Task" onClick={() => { setEditingTask(null); setAddSubtaskParent(null); setShowForm(true); }} className="hidden h-9 gap-1.5 sm:inline-flex">
+        <Button aria-label="New task" onClick={() => { setEditingTask(null); setAddSubtaskParent(null); setShowForm(true); }} className="hidden h-9 gap-1.5 sm:inline-flex">
           <Plus className="w-4 h-4" />
           New task
         </Button>

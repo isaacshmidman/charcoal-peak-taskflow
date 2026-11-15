@@ -157,6 +157,18 @@ Font Licence, text beside the files).
 - Meta (dates, tags, counts): 11–12px in `ink-500`, plain text. Not chips.
 - Numbers that line up (times, dates) get `tabular-nums`.
 
+## Words
+
+- **Sentence case, everywhere**: "New task", "Save changes", "Recently
+  deleted". Only names keep their capitals (Zephyrly, Google Calendar,
+  the names of the places: Home, Today, Calendar, Tasks, Notes).
+- **One name for one thing**, in the app, in the server's messages and
+  in what an AI app is told: a place is called what the sidebar calls it.
+- **A count says what it counts.** "6 tasks, 1 event", never "7 tasks".
+- **Nothing is out of sight without a word saying so.** A day in the
+  month calendar shows four rows, or three and "4 more" (which opens
+  the day); it never scrolls inside itself.
+
 `cn()` runs classes through tailwind-merge, which reads the custom sizes
 `text-2xs` / `text-xs2` as colours and drops them when a real text colour
 follows. Inside `cn()`, write `text-[11px]` instead.

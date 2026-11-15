@@ -118,11 +118,11 @@ export function storedTask(db, appId, taskId) {
  *   - It came from the calendar: it goes too. Everything about it lives at
  *     the calendar, and there it no longer exists.
  *   - It was made in Zephyrly and only shown on the calendar: it moves to
- *     Recently Deleted with its subtasks and files, exactly as if deleted
+ *     Recently deleted with its subtasks and files, exactly as if deleted
  *     in the app, and can be restored from there. (It used to be removed
  *     for good, files and all: deleting a calendar entry, or moving it to
  *     another calendar, destroyed the task with no way back.)
- *   - It is a subtask: it stays. A subtask can't sit in Recently Deleted on
+ *   - It is a subtask: it stays. A subtask can't sit in Recently deleted on
  *     its own, and losing it for good over a calendar entry isn't right.
  *
  * The caller removes the link either way.

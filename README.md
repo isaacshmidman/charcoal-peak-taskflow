@@ -225,7 +225,7 @@ Zephyrly is designed to stay useful when the network drops. Everything the user 
 
 - Creating, editing, completing, and deleting tasks and subtasks
 - Reordering subtasks and skipping/completing recurring tasks
-- Soft-deleting into Recently Deleted and restoring from it
+- Soft-deleting into Recently deleted and restoring from it
 - Priority CRUD (create/rename/reorder/delete) from the Settings page
 - SavedTag CRUD from the Settings page
 - Reading any previously-fetched data — task lists, priorities, tags, recently-deleted history

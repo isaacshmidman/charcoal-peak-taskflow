@@ -67,13 +67,13 @@ test("a token made with changes allowed says so", async ({ page }) => {
   await expect(page.getByTestId("ai-grant-grant-1")).toContainText("Can read and change tasks");
 });
 
-test("recent changes can be undone, and a delete points to Recently Deleted", async ({ page }) => {
+test("recent changes can be undone, and a delete points to Recently deleted", async ({ page }) => {
   const at = new Date().toISOString();
   await installMockBackend(page, {
     tasks: [],
     priorities: [defaultPriority],
     aiActivity: [
-      { id: "act-2", app: "Claude Code", tool: "delete_task", summary: "Moved “Old plan” to Recently Deleted.", created_date: at, undo: "recently_deleted" },
+      { id: "act-2", app: "Claude Code", tool: "delete_task", summary: "Moved “Old plan” to Recently deleted.", created_date: at, undo: "recently_deleted" },
       { id: "act-1", app: "Claude Code", tool: "update_task", summary: "Changed “Essay”: date Thu 1 Oct → Fri 2 Oct.", created_date: at, undo: "available" },
     ],
   });
@@ -88,7 +88,7 @@ test("recent changes can be undone, and a delete points to Recently Deleted", as
 
   const deletion = page.getByTestId("ai-activity-act-2");
   await expect(deletion.getByRole("button", { name: "Undo" })).toHaveCount(0);
-  await deletion.getByRole("link", { name: "In Recently Deleted" }).click();
+  await deletion.getByRole("link", { name: "In Recently deleted" }).click();
   await expect(page).toHaveURL(/\/RecentlyDeleted$/);
 });
 

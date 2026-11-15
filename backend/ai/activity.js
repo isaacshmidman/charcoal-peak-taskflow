@@ -6,7 +6,7 @@
  * needs. Undo only acts if what it would reverse hasn't been touched
  * since (the row's updated_date is still the one the AI left); otherwise
  * it says so and leaves things alone rather than overwrite a later edit.
- * Deletes aren't undone here: they went to Recently Deleted, which
+ * Deletes aren't undone here: they went to Recently deleted, which
  * already restores them properly.
  */
 import { randomUUID } from "node:crypto";
@@ -83,7 +83,7 @@ export function undoActivity(db, config, { appId, user, activityId }) {
   const undo = row.undo_json ? JSON.parse(row.undo_json) : null;
   if (!undo) throw new HttpError(400, "That change can't be undone from here.", "not_undoable");
   if (undo.kind === "delete_task" || undo.kind === "delete_note") {
-    throw new HttpError(400, "Restore it from Recently Deleted.", "use_recently_deleted");
+    throw new HttpError(400, "Restore it from Recently deleted.", "use_recently_deleted");
   }
 
   /** @type {any} */

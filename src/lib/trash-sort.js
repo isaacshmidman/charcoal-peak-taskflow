@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * @file Comparators for the Recently Deleted page. Extracted from the page
+ * @file Comparators for the Recently deleted page. Extracted from the page
  * so the two sections' semantics are testable and explicit — they differ:
  *
  * - Tasks: "Date" = the task's DUE date (compareDueDateTime), and the

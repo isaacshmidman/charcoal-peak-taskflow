@@ -123,7 +123,7 @@ export function createE2EApiClient() {
 
   // Files, as the server keeps them (backend/attachments.js): a deleted
   // task's are held — on no task, still counted — until a Task create
-  // names it in restores_task_id, or it leaves Recently Deleted.
+  // names it in restores_task_id, or it leaves Recently deleted.
   const attachments = () => backend.state.attachments;
   const liveFiles = (taskId) => attachments().filter((a) => a.task_id === taskId && !a.task_deleted_at);
   const taskStore = createEntityStore("tasks", "taskCreates", "taskUpdates", "taskDeletes");

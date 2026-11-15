@@ -19,7 +19,7 @@
  *
  * When a task is deleted (store.js deleteEntityRecord), its files and
  * its subtasks' files go one of two ways:
- *   - Into Recently Deleted with it (the app's delete, an AI app's
+ *   - Into Recently deleted with it (the app's delete, an AI app's
  *     delete_task): the files are HELD. The rows stay, with
  *     task_deleted_at set and task_id still the deleted task's id; the
  *     bytes stay on disk and still count toward storage; no live task
@@ -27,9 +27,9 @@
  *       · restoring the task — a Task create naming it in
  *         restores_task_id — moves them onto the restored task
  *         (releaseHeldAttachments);
- *       · deleting it from Recently Deleted for good, or its time there
+ *       · deleting it from Recently deleted for good, or its time there
  *         running out, removes them (purgeHeldAttachments);
- *       · held files no Recently Deleted item stands for (a subtask
+ *       · held files no Recently deleted item stands for (a subtask
  *         deleted on its own, whose Undo can still bring them back) are
  *         removed once they've been held for the retention window
  *         (purgeStaleHeldAttachments).
@@ -468,7 +468,7 @@ export function getAttachment(db, config, { appId, user, id, thumb = false }) {
 
 /**
  * Store a file on a task. With `taskDeletedAt`, the task is one in
- * Recently Deleted (a restore from an export bringing back its files):
+ * Recently deleted (a restore from an export bringing back its files):
  * the file is stored held for it, as though it had been there when the
  * task was deleted.
  *
@@ -628,7 +628,7 @@ export function deleteAttachmentNow(db, config, { appId, userId, id }) {
 const placeholders = (ids) => ids.map(() => "?").join(", ");
 
 /**
- * Every task a Recently Deleted record stands for: the task itself and
+ * Every task a Recently deleted record stands for: the task itself and
  * the subtasks that went with it. Takes the API's shape (`subtasks`) or a
  * raw row (`subtasks_json`).
  *
@@ -650,7 +650,7 @@ export function taskIdsOfDeletedTask(record) {
 
 /**
  * The person's user id, from an owner that may only carry an email (a
- * Recently Deleted record made by the Base44 import).
+ * Recently deleted record made by the Base44 import).
  *
  * @param {any} db
  * @param {string} appId
@@ -664,7 +664,7 @@ function ownerUserId(db, appId, owner) {
 }
 
 /**
- * What the person has in Recently Deleted, by task id: each task and
+ * What the person has in Recently deleted, by task id: each task and
  * subtask id maps to the item it went in with.
  *
  * @param {any} db
@@ -728,7 +728,7 @@ function removeAttachmentRows(db, config, rows) {
 }
 
 /**
- * Tasks going into Recently Deleted — a task and its subtasks: hold
+ * Tasks going into Recently deleted — a task and its subtasks: hold
  * their files.
  *
  * @param {any} db
@@ -743,7 +743,7 @@ export function holdAttachmentsForTasks(db, { appId, taskIds }) {
 }
 
 /**
- * A task has come back — restored from Recently Deleted as a new task
+ * A task has come back — restored from Recently deleted as a new task
  * naming the one it restores, or under its old id by a restore from an
  * export — and the files held for it move onto it. Only the person's
  * own files move.
@@ -767,7 +767,7 @@ export function releaseHeldAttachments(db, { appId, userId, fromTaskIds, toTaskI
 }
 
 /**
- * Tasks deleted for good, not into Recently Deleted (calendar sync, an
+ * Tasks deleted for good, not into Recently deleted (calendar sync, an
  * AI app's Undo): their files go at once.
  *
  * @param {any} db
@@ -783,10 +783,10 @@ export function deleteAttachmentsForTasks(db, config, { appId, taskIds }) {
 }
 
 /**
- * These tasks have left the person's Recently Deleted: deleted from there
+ * These tasks have left the person's Recently deleted: deleted from there
  * for good, run out of time, or restored (and then nothing is held for
  * them any more). Whatever is still held for them goes — unless another
- * item in Recently Deleted stands for the same task.
+ * item in Recently deleted stands for the same task.
  *
  * @param {any} db
  * @param {any} config
@@ -808,9 +808,9 @@ export function purgeHeldAttachments(db, config, { appId, owner, taskIds }) {
 }
 
 /**
- * Held files no Recently Deleted item stands for — a subtask deleted on
+ * Held files no Recently deleted item stands for — a subtask deleted on
  * its own (its Undo can still bring them back), or a delete whose
- * Recently Deleted record never arrived — are kept as long as an item
+ * Recently deleted record never arrived — are kept as long as an item
  * would have been, then removed.
  *
  * @param {any} db
@@ -838,7 +838,7 @@ export function purgeStaleHeldAttachments(db, config, { appId, heldBefore }) {
 /**
  * Aggregate storage stats for the user — total bytes used plus the
  * top-N tasks by total attachment size. Drives the Settings → Storage
- * sub-page. Files held for Recently Deleted count as well, each item's
+ * sub-page. Files held for Recently deleted count as well, each item's
  * as one line (its subtasks' files included) under the title it has
  * there.
  *
@@ -889,7 +889,7 @@ export function getStorageOverview(db, { appId, user, limit = 10 }) {
  * Search the user's attachments by filename (case-insensitive
  * substring). Returns the same serialized shape as listAttachmentsForTask
  * plus the parent task's title for display. Scoped to the user — never
- * leaks another user's files. Files held for Recently Deleted aren't
+ * leaks another user's files. Files held for Recently deleted aren't
  * listed: there's no task to open them on until it's restored.
  *
  * @param {any} db

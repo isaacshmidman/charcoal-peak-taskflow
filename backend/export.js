@@ -178,12 +178,12 @@ function readme(folder, { exportedAt, counts, missingFiles }) {
     `Exported ${exportedAt}.`,
     "",
     `data.json        Everything: ${counts.tasks} tasks and subtasks, ${counts.notes} notes, your`,
-    "                 priorities and tags, Recently Deleted, notification settings and",
+    "                 priorities and tags, Recently deleted, notification settings and",
     "                 which calendars are connected. The complete copy.",
     "tasks.csv        Tasks and subtasks, for Excel, Numbers or Google Sheets.",
     `notes/           Each note as a Markdown file (${counts.notes}).`,
     `attachments/     Files attached to tasks, one folder per task (${counts.files}),`,
-    "                 tasks in Recently Deleted included.",
+    "                 tasks in Recently deleted included.",
     "",
     "Events imported from Google or Apple Calendar are included in data.json and",
     "tasks.csv; they are marked with the calendar they came from.",
@@ -229,7 +229,7 @@ export async function buildExport(db, config, { appId, user, now = new Date() })
   const exportedAt = now.toISOString();
 
   // Attachments: one folder per task, named after it. Files held for a
-  // task in Recently Deleted are included — they're still the person's,
+  // task in Recently deleted are included — they're still the person's,
   // and a restore puts them back with it.
   const root = attachmentsRoot(config);
   const attachmentRows = db

@@ -314,12 +314,12 @@ export function createRequestHandler(config = backendConfig, db = getDatabase(co
         purgeExpiredAiRecords(db);
         purgeExpiredOAuthRecords(db);
         purgeOldCreateKeys(db);
-        // Recently Deleted runs out on time, with its files, whether or not
+        // Recently deleted runs out on time, with its files, whether or not
         // anyone opens it. Housekeeping: never what decides health.
         try {
           purgeExpiredDeletedTasks(db, config.appId, config);
         } catch (error) {
-          log.warn(`[health] Recently Deleted purge failed: ${error instanceof Error ? error.message : error}`);
+          log.warn(`[health] Recently deleted purge failed: ${error instanceof Error ? error.message : error}`);
         }
         sendJson(response, 200, { ok: true, app_id: config.appId });
         return;

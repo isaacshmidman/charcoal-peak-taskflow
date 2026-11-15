@@ -274,7 +274,7 @@ export default function Groupings() {
   const topLevel = useMemo(() => {
     return tasks.filter(t => {
       if (t.parent_id || t.status === "done") return false;
-      // Hide tasks belonging to user-hidden calendars (Settings → Calendar Order).
+      // Hide tasks belonging to user-hidden calendars (Settings → Calendar order).
       if (hiddenCalendars.has(calendarKeyForTask(t))) return false;
       if (onlyTag && !hasTag(t, onlyTag)) return false;
       return taskMatchesSearch(t, search);
@@ -413,7 +413,7 @@ export default function Groupings() {
       >
         <PageSearch open={showSearch} onOpenChange={setShowSearch} value={search} onChange={setSearch} placeholder="Search title or tag" />
         <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} page="groupings" />
-        <Button aria-label="New Task" onClick={() => { setEditingTask(null); setAddSubtaskParent(null); setShowForm(true); }} className="hidden h-9 gap-1.5 sm:inline-flex">
+        <Button aria-label="New task" onClick={() => { setEditingTask(null); setAddSubtaskParent(null); setShowForm(true); }} className="hidden h-9 gap-1.5 sm:inline-flex">
           <Plus className="w-4 h-4" />
           New task
         </Button>

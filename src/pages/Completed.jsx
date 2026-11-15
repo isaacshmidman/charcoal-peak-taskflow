@@ -42,7 +42,7 @@ export default function Completed() {
   const [search, setSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
 
-  // Keyboard shortcut: "/" opens search (no New Task on this page).
+  // Keyboard shortcut: "/" opens search (no New task on this page).
   useShortcutEvent(SHORTCUT_EVENTS.search, () => setShowSearch(true));
   const [undoingItems, setUndoingItems] = useState([]);
   const undoingTimersRef = useRef(new Map());
@@ -197,7 +197,8 @@ export default function Completed() {
             <Button aria-label="Delete all completed"
               variant="ghost"
               size="icon"
-              className="h-9 w-9 text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-night-danger"
+              // Quiet until it is reached for: red is for trouble, not for a button at rest.
+              className="h-9 w-9 text-ink-500 hover:bg-red-50 hover:text-red-600 dark:text-ink-400 dark:hover:bg-night-danger dark:hover:text-red-300"
               title="Delete all completed"
               onClick={() => setShowDeleteAllDialog(true)}
             >

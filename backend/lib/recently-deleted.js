@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * @file The record that goes into Recently Deleted when a task is deleted:
+ * @file The record that goes into Recently deleted when a task is deleted:
  * the task and its subtasks, enough to put them back. The app builds the
  * same thing in src/hooks/useDeletedTasks.js (recordDeletion); the server
  * needs it wherever it deletes a task on someone's behalf and the delete

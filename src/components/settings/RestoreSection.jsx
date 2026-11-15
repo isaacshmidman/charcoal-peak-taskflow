@@ -19,7 +19,7 @@ const ADDED_LABELS = [
   ["notes", "note", "notes"],
   ["priorities", "priority", "priorities"],
   ["tags", "tag", "tags"],
-  ["recentlyDeleted", "item in Recently Deleted", "items in Recently Deleted"],
+  ["recentlyDeleted", "item in Recently deleted", "items in Recently deleted"],
   ["files", "file", "files"],
 ];
 

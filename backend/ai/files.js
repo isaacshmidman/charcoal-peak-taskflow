@@ -4,7 +4,7 @@
  * ones, and attach a text file an AI app wrote.
  *
  * Deliberately not here: deleting a file. That is permanent, and AI apps
- * never delete anything for good (a file goes to Recently Deleted only
+ * never delete anything for good (a file goes to Recently deleted only
  * with its task, via delete_task). Nor fetching a file from a URL, which
  * would let an AI app make the server call arbitrary addresses.
  */
@@ -125,7 +125,7 @@ const readFile = {
       throw error;
     }
     const held = ctx.db.prepare(`SELECT task_deleted_at FROM task_attachments WHERE id = ?`).get(args.file_id);
-    if (held?.task_deleted_at) throw new ToolError("That file's task is in Recently Deleted.");
+    if (held?.task_deleted_at) throw new ToolError("That file's task is in Recently deleted.");
     const file = found.row;
     if (!isReadableText(file)) {
       throw new ToolError(`${file.filename} is a ${file.mime_type || "binary"} file; only text files can be read here.`);

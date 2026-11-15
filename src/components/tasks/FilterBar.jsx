@@ -57,7 +57,7 @@ export default function FilterBar({ filters, onFiltersChange, priorities = [] })
               <SelectValue placeholder="Priority" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Priorities</SelectItem>
+              <SelectItem value="all">All priorities</SelectItem>
               {priorities.map((priority) => (
                 <SelectItem key={priority.id} value={priority.id}>{priority.name}</SelectItem>
               ))}
@@ -69,7 +69,7 @@ export default function FilterBar({ filters, onFiltersChange, priorities = [] })
               <SelectValue placeholder="Type" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="all">All types</SelectItem>
               <SelectItem value="one_time">One-time</SelectItem>
               <SelectItem value="recurring">Recurring</SelectItem>
             </SelectContent>

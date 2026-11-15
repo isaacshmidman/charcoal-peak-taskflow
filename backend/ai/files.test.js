@@ -79,7 +79,7 @@ describe("files", () => {
     await expect(run("read_file", { file_id: secret.id })).rejects.toThrow(`No file with id "${secret.id}".`);
 
     await run("delete_task", { task_id: trip.id });
-    await expect(run("read_file", { file_id: md.id })).rejects.toThrow(/in Recently Deleted/);
+    await expect(run("read_file", { file_id: md.id })).rejects.toThrow(/in Recently deleted/);
   });
 
   it("cuts a long file off and says so", async () => {

@@ -41,7 +41,7 @@ describe("describeRestore", () => {
       "Added 12 tasks, 1 note and 2 files."
     );
     expect(describeRestore({ tasks: 1 })).toBe("Added 1 task.");
-    expect(describeRestore({ recentlyDeleted: 3, priorities: 1 })).toBe("Added 1 priority and 3 items in Recently Deleted.");
+    expect(describeRestore({ recentlyDeleted: 3, priorities: 1 })).toBe("Added 1 priority and 3 items in Recently deleted.");
     expect(describeRestore({ tasks: 0, files: 0 })).toBe("Nothing was missing — everything in this export is already here.");
   });
 });

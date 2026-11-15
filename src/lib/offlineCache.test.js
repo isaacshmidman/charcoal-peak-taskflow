@@ -141,7 +141,7 @@ describe("the offline copy of a list", () => {
 });
 
 describe("a queue of changes on a full device", () => {
-  it("makes room by giving up the Recently Deleted copies, and keeps the change", () => {
+  it("makes room by giving up the Recently deleted copies, and keeps the change", () => {
     cache.defineCacheKeys({ deletedNotes: "taskflow_offline_deletedNotes" });
     cache.saveToCache("deletedTasks", Array.from({ length: 20 }, (_, id) => ({ id, title: "Deleted a while ago" })));
     cache.saveToCache("tasks", [{ id: 1, title: "Kept" }]);

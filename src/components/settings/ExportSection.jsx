@@ -34,7 +34,7 @@ function formatBytes(bytes) {
 }
 
 const CONTENTS = [
-  { icon: FileJson, name: "data.json", text: "Everything, complete: tasks and subtasks, notes, priorities, tags, Recently Deleted, settings and connected calendars." },
+  { icon: FileJson, name: "data.json", text: "Everything, complete: tasks and subtasks, notes, priorities, tags, Recently deleted, settings and connected calendars." },
   { icon: FileSpreadsheet, name: "tasks.csv", text: "Your tasks, ready for Excel, Numbers or Google Sheets." },
   { icon: FileText, name: "notes", text: "Each note as its own text file." },
   { icon: Paperclip, name: "attachments", text: "The files on your tasks, one folder per task." },

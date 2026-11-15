@@ -237,7 +237,7 @@ describe("complete_task", () => {
 });
 
 describe("delete_task", () => {
-  it("moves a task and its subtasks to Recently Deleted with the app's snapshot, and tells the calendar", async () => {
+  it("moves a task and its subtasks to Recently deleted with the app's snapshot, and tells the calendar", async () => {
     const t = task({ title: "Old plan", due_date: "2026-10-01", task_time: "9:00AM", task_end_time: "10:00AM", priority_id: priority("Urgent").id, tags: ["x"], reminder: "none", description_json: '{"type":"doc"}' });
     const sub = task({ title: "Step", parent_id: t.id, due_date: "2026-10-01", status: "done", completed_at: "2026-09-29T00:00:00.000Z" });
     const { data } = await run("delete_task", { task_id: t.id });
@@ -254,7 +254,7 @@ describe("delete_task", () => {
     expect(deletes.sort()).toEqual([t.id, sub.id].sort());
   });
 
-  it("refuses what would be permanent — a subtask — and a task's files go to Recently Deleted with it, to come back on restore", async () => {
+  it("refuses what would be permanent — a subtask — and a task's files go to Recently deleted with it, to come back on restore", async () => {
     const t = task({ title: "With files", due_date: "2026-10-01" });
     const sub = task({ title: "Sub", parent_id: t.id });
     await expect(run("delete_task", { task_id: sub.id })).rejects.toThrow(/Deleting a subtask is permanent/);
@@ -262,9 +262,9 @@ describe("delete_task", () => {
     const steps = await attach(sub.id, "steps.pdf", "%PDF steps");
 
     const { text, data } = await run("delete_task", { task_id: t.id });
-    expect(text).toBe("Moved “With files” and its 1 subtask to Recently Deleted. The person can restore it, with its 2 files, from there for 7 days.");
+    expect(text).toBe("Moved “With files” and its 1 subtask to Recently deleted. The person can restore it, with its 2 files, from there for 7 days.");
     expect(exists(t.id) || exists(sub.id)).toBe(false);
-    // Kept, byte for byte, until Recently Deleted lets go of the task.
+    // Kept, byte for byte, until Recently deleted lets go of the task.
     expect(readFileSync(plan.path, "utf8")).toBe("%PDF plan");
     expect(readFileSync(steps.path, "utf8")).toBe("%PDF steps");
 
@@ -364,11 +364,11 @@ describe("the activity log and Undo", () => {
     expect(get(sub.id)).toMatchObject({ status: "done", completed_at: "2026-09-30T00:00:00.000Z" });
   });
 
-  it("points a delete at Recently Deleted instead of undoing it here", async () => {
+  it("points a delete at Recently deleted instead of undoing it here", async () => {
     const t = task({ title: "Gone", due_date: "2026-10-01" });
     await run("delete_task", { task_id: t.id });
     expect(listActivity(db, { appId: APP_ID, userId: ME.id })[0].undo).toBe("recently_deleted");
-    expect(() => undoLatest()).toThrow("Restore it from Recently Deleted.");
+    expect(() => undoLatest()).toThrow("Restore it from Recently deleted.");
   });
 
   it("undoes an added note", async () => {
@@ -490,7 +490,7 @@ describe("editing notes", () => {
     expect(get(n.id, "Note")).toMatchObject({ title: "Ideas", tags: ["work"], pinned: false, content_text: "One", content_json: "" });
   });
 
-  it("delete_note moves it to Recently Deleted with the app's snapshot", async () => {
+  it("delete_note moves it to Recently deleted with the app's snapshot", async () => {
     const n = note({ title: "Old", content_text: "gone soon", tags: ["x"], pinned: true });
     const { data } = await run("delete_note", { note_id: n.id });
     expect(() => get(n.id, "Note")).toThrow(/not found/);
@@ -518,7 +518,7 @@ describe("skip_occurrence", () => {
     expect(get(t.id).due_date).toBe("2026-10-05");
   });
 
-  it("skipping the last time sends the task to Recently Deleted, as the app does", async () => {
+  it("skipping the last time sends the task to Recently deleted, as the app does", async () => {
     const t = task({ title: "Course", due_date: "2026-10-05", task_type: "recurring", recurrence: "weekly", recurrence_end_date: "2026-10-10" });
     const { data } = await run("skip_occurrence", { task_id: t.id });
     expect(exists(t.id)).toBe(false);
@@ -969,7 +969,7 @@ describe("schedules", () => {
     await expect(run("add_schedule_to_calendar", { note_id: data.id, date: "Saturday" })).rejects.toThrow('"date" must be a date written like 2026-09-28.');
   });
 
-  it("search_notes finds slot text, and delete_note keeps the schedule for Recently Deleted", async () => {
+  it("search_notes finds slot text, and delete_note keeps the schedule for Recently deleted", async () => {
     const { data } = await run("create_note", { title: "Friday", schedule: { fill: [{ start: "6pm", end: "8pm", text: "Pottery class" }] } });
     const found = await run("search_notes", { text: "pottery" });
     expect(found.data.notes).toEqual([expect.objectContaining({ id: data.id, schedule: true, snippet: "6:00 PM Pottery class" })]);

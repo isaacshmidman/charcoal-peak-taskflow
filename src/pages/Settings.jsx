@@ -17,7 +17,7 @@
  *                                navigation order)
  *   - "tasks"                 → PrioritiesSection + TagsSection
  *   - "calendars"             → IntegrationsPanel + Default Calendar
- *                                View + Calendar Order
+ *                                View + Calendar order
  *   - "notifications"         → NotificationsPanel (Advanced still
  *                                opens from inside it as a sub-sub-page)
  *   - "advancedNotifications" → AdvancedNotificationSettings; back

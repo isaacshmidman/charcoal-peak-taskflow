@@ -249,7 +249,7 @@ export function PrivacyPage() {
         <ul>
           <li>Your account and what&apos;s in it: until you delete them or ask for your account to be deleted.</li>
           <li>
-            Things you delete wait in Recently Deleted for {days} days, then they&apos;re gone.
+            Things you delete wait in Recently deleted for {days} days, then they&apos;re gone.
           </li>
           <li>Sign-in records: until you sign out or the sign-in expires.</li>
           <li>Payment records, if you buy something: as long as tax and accounting rules require.</li>

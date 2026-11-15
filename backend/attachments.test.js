@@ -207,7 +207,7 @@ describe("attachments", () => {
   it("a file still uploading when its task is deleted is held with it, not left on a task that's gone", async () => {
     const write = fsPromises.writeFile;
     vi.spyOn(fsPromises, "writeFile").mockImplementationOnce(async (...args) => {
-      // The task goes into Recently Deleted while the bytes are being written.
+      // The task goes into Recently deleted while the bytes are being written.
       db.prepare("DELETE FROM tasks WHERE id = ?").run(TASK_ID);
       holdAttachmentsForTasks(db, { appId: APP_ID, taskIds: [TASK_ID] });
       return write(...args);

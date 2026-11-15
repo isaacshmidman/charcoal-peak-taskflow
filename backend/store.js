@@ -737,7 +737,7 @@ function updateRow(db, table, id, patch, whereClause, params) {
 }
 
 /**
- * Recently Deleted's timer: expired items go, and the files held for them
+ * Recently deleted's timer: expired items go, and the files held for them
  * with them (attachments.js), as do held files no item stands for once
  * they've been held as long as an item would have been.
  *
@@ -830,7 +830,7 @@ export function getEntityRecord(db, { entityName, appId, user, id, config = back
 
 /**
  * `restoresTaskId`: a Task being restored names the deleted task it
- * brings back (from Recently Deleted, or an Undo), and the files held for
+ * brings back (from Recently deleted, or an Undo), and the files held for
  * that task move onto it. A task that comes back under its old id — a
  * restore from an export — gets its held files back the same way.
  */
@@ -886,9 +886,9 @@ export function updateEntityRecord(db, { entityName, appId, user, id, input, con
 
 /**
  * A Task goes with its subtasks, and their files with them: held for
- * Recently Deleted with `holdFiles` — the app's delete, which moves the
+ * Recently deleted with `holdFiles` — the app's delete, which moves the
  * task there — and otherwise removed for good (calendar sync, an AI
- * app's Undo). A DeletedTask leaving Recently Deleted takes whatever is
+ * app's Undo). A DeletedTask leaving Recently deleted takes whatever is
  * still held for it: nothing, when it was restored, since restoring moved
  * its files onto the restored task.
  */

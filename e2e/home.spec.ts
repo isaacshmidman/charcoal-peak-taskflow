@@ -268,7 +268,7 @@ test("Home on a phone: one column, and + opens the task form here", async ({ pag
   expect(schedule.y).toBeGreaterThan(today.y + today.height - 1);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 
-  await tabs.getByRole("button", { name: "New Task" }).click();
+  await tabs.getByRole("button", { name: "New task" }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await expect(page).toHaveURL(/\/Home$/);
   await page.keyboard.press("Escape");

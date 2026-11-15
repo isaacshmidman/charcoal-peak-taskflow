@@ -159,7 +159,7 @@ export default function Active() {
   }, [priorities]);
 
   // User-controlled per-calendar visibility + ordering, configured in
-  // Settings → Calendar Order.
+  // Settings → Calendar order.
   const { hidden: hiddenCalendars, indexByKey: calendarIndexByKey } = useCalendarOrderState();
 
   // One comparator for every task list — see lib/task-sort.js.
@@ -172,7 +172,7 @@ export default function Active() {
     const filtered = topLevelTasks.filter(t => {
       if (t.status === "done") return false;
       // Drop tasks belonging to a calendar the user has hidden in
-      // Settings → Calendar Order.
+      // Settings → Calendar order.
       if (hiddenCalendars.has(calendarKeyForTask(t))) return false;
       if (tag && !hasTag(t, tag)) return false;
       return taskMatchesSearch(t, search);
@@ -200,7 +200,7 @@ export default function Active() {
       >
         <PageSearch open={showSearch} onOpenChange={setShowSearch} value={search} onChange={setSearch} />
         <MultiSortPanel sorts={sorts} onSortsChange={handleSortsChange} page="active" />
-        <Button aria-label="New Task" onClick={() => { setEditingTask(null); setAddSubtaskParent(null); setShowForm(true); }} className="hidden h-9 gap-1.5 sm:inline-flex">
+        <Button aria-label="New task" onClick={() => { setEditingTask(null); setAddSubtaskParent(null); setShowForm(true); }} className="hidden h-9 gap-1.5 sm:inline-flex">
           <Plus className="w-4 h-4" />
           New task
         </Button>

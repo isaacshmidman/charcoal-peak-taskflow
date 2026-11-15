@@ -201,6 +201,7 @@ export default function Calendar() {
     viewRange,
     filteredTasks,
     scopedCount,
+    scopedEvents,
   } = useCalendarFilters({ tasks, view, anchorDate, search, sorts, priorityOrderMap });
 
   const {
@@ -346,6 +347,7 @@ export default function Calendar() {
         onViewChange={handleViewChange}
         rangeLabel={rangeLabel}
         scopedCount={scopedCount}
+        scopedEvents={scopedEvents}
         search={search}
         setSearch={setSearch}
         showSearch={showSearch}
@@ -411,6 +413,7 @@ export default function Calendar() {
             onTaskClick={handleTaskClick}
             onToggleDone={handleToggleDone}
             onDayEmptyClick={handleDayEmptyClick}
+            onOpenDay={handleYearDayClick}
           />
         )}
         {view === "year" && (
@@ -459,7 +462,7 @@ export default function Calendar() {
           calendar is connected — where to connect one. That used to sit in
           the header, where it pushed the buttons around as it came and went. */}
       <p className="mt-4 text-center text-xs text-ink-400 dark:text-ink-500">
-        {timezone && <>Time Zone: {timezone}</>}
+        {timezone && <>Time zone: {timezone}</>}
         {timezone && !integrationsConnected && " · "}
         {!integrationsConnected && (
           <Link

@@ -5,14 +5,14 @@
  * the AI app has been told:
  *   - nothing from a connected calendar is changed, subtasks included:
  *     editing it here would change the real event
- *   - nothing is deleted for good: deletes go to Recently Deleted, files
+ *   - nothing is deleted for good: deletes go to Recently deleted, files
  *     and all, and subtasks (whose delete is permanent) are refused
  *   - every change passes the same checks as the app's own saves, echoes to
  *     calendars the same way (enqueueTaskPush), and is logged for Undo
  *   - at most WRITES_PER_HOUR changes an hour per connection
  *
  * Where the app has its own way of doing something — completing a
- * repeating task, the Recently Deleted snapshot, a new task's default
+ * repeating task, the Recently deleted snapshot, a new task's default
  * priority and end time — these follow it field for field
  * (src/hooks/useOfflineMutation.js, src/hooks/useDeletedTasks.js,
  * src/components/tasks/TaskForm).
@@ -630,7 +630,7 @@ const completeTask = {
 };
 
 /**
- * Move a top-level task, its subtasks and their files to Recently Deleted,
+ * Move a top-level task, its subtasks and their files to Recently deleted,
  * the way the app deletes (useDeletedTasks.recordDeletion's snapshot).
  * @param {ToolContext} ctx
  * @param {any} task
@@ -656,7 +656,7 @@ function moveTaskToRecentlyDeleted(ctx, task) {
   });
   for (const gone of [task, ...subtasks]) push(ctx, "delete", gone);
   const withSubtasks = subtasks.length ? ` and its ${subtasks.length} subtask${subtasks.length === 1 ? "" : "s"}` : "";
-  const summary = `Moved ${quote(task.title)}${withSubtasks} to Recently Deleted.`;
+  const summary = `Moved ${quote(task.title)}${withSubtasks} to Recently deleted.`;
   return { deleted, summary, files };
 }
 
@@ -665,7 +665,7 @@ const deleteTask = {
   name: "delete_task",
   title: "Delete a task",
   description:
-    "Move a task, with its subtasks and attached files, to Recently Deleted, where the person can restore it for a week. " +
+    "Move a task, with its subtasks and attached files, to Recently deleted, where the person can restore it for a week. " +
     "Refused for subtasks, because deleting a subtask is permanent. Can't delete items from connected calendars.",
   inputSchema: {
     type: "object",
@@ -940,7 +940,7 @@ const updateNote = {
 const deleteNote = {
   name: "delete_note",
   title: "Delete a note",
-  description: "Move a note to Recently Deleted, where the person can restore it for a week.",
+  description: "Move a note to Recently deleted, where the person can restore it for a week.",
   inputSchema: {
     type: "object",
     properties: { note_id: { type: "string", maxLength: 200, description: "The note's id." } },
@@ -969,7 +969,7 @@ const deleteNote = {
       deleteEntityRecord(ctx.db, { entityName: "Note", appId: ctx.appId, user: ctx.user, id: note.id, config: ctx.config });
       return saved;
     });
-    const summary = `Moved the note ${note.title ? quote(note.title) : "(untitled)"} to Recently Deleted.`;
+    const summary = `Moved the note ${note.title ? quote(note.title) : "(untitled)"} to Recently deleted.`;
     logActivity(ctx, "delete_note", summary, { kind: "delete_note", deleted_id: deleted.id });
     return {
       text: `${summary} The person can restore it from there for ${ctx.config.deletedTaskRetentionDays} days.`,
@@ -984,7 +984,7 @@ const skipOccurrence = {
   title: "Skip this time",
   description:
     "Skip the next time a repeating task comes round without marking it done: it moves on to the time after. " +
-    "If that was its last time, it goes to Recently Deleted, as in the app.",
+    "If that was its last time, it goes to Recently deleted, as in the app.",
   inputSchema: {
     type: "object",
     properties: { task_id: { type: "string", maxLength: 200, description: "The repeating task's id." } },
@@ -1005,7 +1005,7 @@ const skipOccurrence = {
       const { deleted, summary, files } = moveTaskToRecentlyDeleted(ctx, task);
       logActivity(ctx, "skip_occurrence", `Skipped ${quote(task.title)}'s last time. ${summary}`, { kind: "delete_task", deleted_id: deleted.id });
       return {
-        text: `That was ${quote(task.title)}'s last time, so it moved to Recently Deleted${files ? " with its files" : ""}.`,
+        text: `That was ${quote(task.title)}'s last time, so it moved to Recently deleted${files ? " with its files" : ""}.`,
         data: { id: task.id, deleted: true, recently_deleted_id: deleted.id },
       };
     }

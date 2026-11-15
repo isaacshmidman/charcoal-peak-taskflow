@@ -148,7 +148,7 @@ export function useOfflineMutation() {
       ...deletions.flatMap((deletion) => deletion.subtasks.map((subtask) => String(subtask.id))),
     ]);
 
-    // Snapshot the live priority list at delete time so Recently Deleted keeps the card
+    // Snapshot the live priority list at delete time so Recently deleted keeps the card
     // color even if the priority is later renamed or deleted in Settings.
     const snapshotPriorities =
       /** @type {{ id: string, color?: string }[]} */ (queryClient.getQueryData(['priorities']) || []);

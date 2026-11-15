@@ -6,11 +6,11 @@
  *   - Big progress bar with the user's used / total bytes
  *   - Numeric "X MB of Y MB used" + "Z MB free"
  *   - Top 10 tasks by total attachment size — title + count + size each.
- *     A task in Recently Deleted still holds its files, and is marked so.
+ *     A task in Recently deleted still holds its files, and is marked so.
  *
  * Read-only — there's no destructive UI here. Users free up space by
  * removing attachments from individual tasks, or by deleting a task from
- * Recently Deleted.
+ * Recently deleted.
  */
 import { useQuery } from "@tanstack/react-query";
 import { Database, FileText, Loader2 } from "lucide-react";
@@ -99,7 +99,7 @@ export default function StorageSection() {
 
         <p className="text-xs leading-5 text-ink-500 dark:text-ink-400">
           Removing a file frees its space straight away. A deleted task
-          keeps its files in Recently Deleted, where they still count,
+          keeps its files in Recently deleted, where they still count,
           until it's restored or deleted for good.
         </p>
       </div>
@@ -124,7 +124,7 @@ export default function StorageSection() {
                   </p>
                   <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5">
                     {task.file_count} file{task.file_count === 1 ? "" : "s"}
-                    {task.in_recently_deleted && " · in Recently Deleted"}
+                    {task.in_recently_deleted && " · in Recently deleted"}
                   </p>
                 </div>
                 <p className="text-xs font-medium text-ink-700 dark:text-ink-200 shrink-0">

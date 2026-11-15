@@ -151,8 +151,8 @@ test("delete dialogs close when clicking outside without deleting anything", asy
 
   await page.goto("/RecentlyDeleted");
   await page.getByTitle("Empty recently deleted").click();
-  await expect(page.getByText("Permanently Delete everything in Recently Deleted?")).toBeVisible();
-  await dismissByClickingOutside(page, "Permanently Delete everything in Recently Deleted?");
+  await expect(page.getByText("Permanently delete everything in Recently deleted?")).toBeVisible();
+  await dismissByClickingOutside(page, "Permanently delete everything in Recently deleted?");
 
   const state = await api.getState();
   expect(state.tasks.find((task) => task.id === "series-1")).toBeTruthy();
@@ -503,7 +503,7 @@ test("google sign-in starts with the local auth callback target", async ({ page,
   });
 
   await page.goto("/login?next=/Today");
-  await page.getByRole("button", { name: "Sign In with Google" }).click();
+  await page.getByRole("button", { name: "Sign in with Google" }).click();
 
   const meta = await api.getMeta();
   expect(meta.lastLoginProvider).toBe("google");
@@ -688,7 +688,7 @@ test("dragging an event's bottom edge changes when it ends, and nothing else", a
 test("a task can have its own reminder", async ({ page }) => {
   const api = await installMockBackend(page, { tasks: [], priorities: [defaultPriority] });
   await page.goto("/Today");
-  await page.getByRole("button", { name: "New Task" }).click();
+  await page.getByRole("button", { name: "New task" }).click();
   await page.getByTestId("task-form-title").fill("Dentist");
   await page.getByRole("switch", { name: "Set time" }).click();
   await page.getByRole("combobox", { name: "Reminder" }).click();
@@ -704,7 +704,7 @@ test("the task form keeps what was typed: tags, a repeat, and a subtask left in 
     savedTags: [{ id: "tg1", name: "errands" }],
   });
   await page.goto("/Today");
-  await page.getByRole("button", { name: "New Task" }).click();
+  await page.getByRole("button", { name: "New task" }).click();
   // A new task opens with the caret already in its title.
   await expect(page.getByTestId("task-form-title")).toBeFocused();
   await page.keyboard.type("Water the plants");
@@ -740,7 +740,7 @@ test("a very long link in the task form wraps instead of making the form scroll 
   await page.setViewportSize({ width: 390, height: 844 });
   await installMockBackend(page, { tasks: [], priorities: [defaultPriority] });
   await page.goto("/Today");
-  await page.getByRole("button", { name: "New Task" }).click();
+  await page.getByRole("button", { name: "New task" }).click();
 
   const long = `https://example.com/a/link/with/no/spaces/${"abcdefghij".repeat(30)}`;
   const title = page.getByTestId("task-form-title");
@@ -767,7 +767,7 @@ test("a very long link in the task form wraps instead of making the form scroll 
 test("files in the task form: a mixed pick keeps the good ones, and a drop anywhere in the form attaches", async ({ page }) => {
   await installMockBackend(page, { tasks: [], priorities: [defaultPriority] });
   await page.goto("/Today");
-  await page.getByRole("button", { name: "New Task" }).click();
+  await page.getByRole("button", { name: "New task" }).click();
   const form = page.getByTestId("task-form-dialog");
   await page.getByTestId("task-form-title").fill("Trip paperwork");
 
@@ -831,7 +831,7 @@ async function humanClick(page: Page, target: Locator) {
 test("clicking the date after typing a description doesn't miss", async ({ page }) => {
   await installMockBackend(page, { tasks: [], priorities: [defaultPriority] });
   await page.goto("/Today");
-  await page.getByRole("button", { name: "New Task" }).click();
+  await page.getByRole("button", { name: "New task" }).click();
   const form = page.getByTestId("task-form-dialog");
   await page.getByTestId("task-form-title").fill("Renew passport");
   await form.locator(".tiptap-prose").click();
@@ -851,7 +851,7 @@ test("clicking the date after typing a description doesn't miss", async ({ page 
 test("a subtask or tag left in its box doesn't make the next click miss, and is still kept", async ({ page }) => {
   const api = await installMockBackend(page, { tasks: [], priorities: [defaultPriority] });
   await page.goto("/Today");
-  await page.getByRole("button", { name: "New Task" }).click();
+  await page.getByRole("button", { name: "New task" }).click();
   const form = page.getByTestId("task-form-dialog");
   await page.getByTestId("task-form-title").fill("Post the parcel");
 
@@ -875,7 +875,7 @@ test("a subtask or tag left in its box doesn't make the next click miss, and is 
 test("Escape in the link box closes the link box, not the whole form", async ({ page }) => {
   await installMockBackend(page, { tasks: [], priorities: [defaultPriority] });
   await page.goto("/Today");
-  await page.getByRole("button", { name: "New Task" }).click();
+  await page.getByRole("button", { name: "New task" }).click();
   const form = page.getByTestId("task-form-dialog");
   await page.getByTestId("task-form-title").fill("Book the venue");
   await form.locator(".tiptap-prose").click();
@@ -903,7 +903,7 @@ test("Escape in the link box closes the link box, not the whole form", async ({ 
 test("the date pop-up fills only the day you pick, and closes when you pick it", async ({ page }) => {
   await installMockBackend(page, { tasks: [], priorities: [defaultPriority] });
   await page.goto("/Today");
-  await page.getByRole("button", { name: "New Task" }).click();
+  await page.getByRole("button", { name: "New task" }).click();
   const trigger = page.getByTestId("task-form-date-trigger");
   await expect(trigger).toContainText("Today");
 
@@ -930,7 +930,7 @@ test("the date pop-up fills only the day you pick, and closes when you pick it",
   expect(await filled()).toEqual(["true"]);
 });
 
-test("a deleted task comes back from Recently Deleted with its end time, reminder and formatting", async ({ page }) => {
+test("a deleted task comes back from Recently deleted with its end time, reminder and formatting", async ({ page }) => {
   const richDoc = JSON.stringify({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Bring card", marks: [{ type: "bold" }] }] }] });
   const api = await installMockBackend(page, {
     tasks: [
@@ -953,7 +953,7 @@ test("a deleted task comes back from Recently Deleted with its end time, reminde
     .toMatchObject({ task_time: "2:00PM", task_end_time: "3:30PM", reminder: "before:60", description_json: richDoc });
 });
 
-test("a deleted task keeps its files in Recently Deleted, still counted, and they come back when it's restored", async ({ page }) => {
+test("a deleted task keeps its files in Recently deleted, still counted, and they come back when it's restored", async ({ page }) => {
   const api = await installMockBackend(page, {
     tasks: [
       recurringTask({ id: "trip", title: "Plan the trip", task_type: "one_time", recurrence: "none", attachment_count: 1 }),
@@ -977,11 +977,11 @@ test("a deleted task keeps its files in Recently Deleted, still counted, and the
   await page.getByTestId("task-form-delete").click();
   await expect.poll(async () => (await api.getState()).tasks.map((t) => t.title)).toEqual(["Other task"]);
 
-  // Held with the task in Recently Deleted: still counted, and marked where it is.
+  // Held with the task in Recently deleted: still counted, and marked where it is.
   const held = await storageLine("Plan the trip");
-  await expect(held).toContainText("1 file · in Recently Deleted");
+  await expect(held).toContainText("1 file · in Recently deleted");
   await expect(held).toContainText("180.0 KB");
-  await expect(page.getByRole("listitem").filter({ hasText: "Other task" })).not.toContainText("Recently Deleted");
+  await expect(page.getByRole("listitem").filter({ hasText: "Other task" })).not.toContainText("Recently deleted");
 
   await page.goto("/RecentlyDeleted");
   await page.getByRole("button", { name: "Restore" }).click();
@@ -995,7 +995,7 @@ test("a deleted task keeps its files in Recently Deleted, still counted, and the
 
   const back = await storageLine("Plan the trip");
   await expect(back).toContainText("1 file");
-  await expect(back).not.toContainText("Recently Deleted");
+  await expect(back).not.toContainText("Recently deleted");
 });
 
 test("undoing a delete brings the task back with its files", async ({ page }) => {
@@ -1031,7 +1031,7 @@ test("undoing a delete brings the task back with its files", async ({ page }) =>
   await expect(page.getByRole("listitem").filter({ hasText: "Taxes" })).toContainText("1 file");
   // The subtask came back with its own file too.
   await expect(page.getByRole("listitem").filter({ hasText: "Find the W-2" })).toContainText("1 file");
-  await expect(page.getByRole("listitem").filter({ hasText: "in Recently Deleted" })).toHaveCount(0);
+  await expect(page.getByRole("listitem").filter({ hasText: "in Recently deleted" })).toHaveCount(0);
 });
 
 test("groupings: the page itself never scrolls, a sideways swipe always moves the board, and d / t switch boards", async ({ page }) => {
@@ -1188,6 +1188,35 @@ test("calendar: a chip shows its tick box only under the pointer, and ticking it
   // Done, it keeps its tick showing wherever the pointer is.
   await page.mouse.move(2, 2);
   await expect(page.getByTestId("calendar-tick-chip-1").first()).toHaveCSS("opacity", "1");
+});
+
+test("calendar: a busy day in the month says how many more it holds, and its date opens the day", async ({ page }) => {
+  const today = formatDateOffset(0);
+  const busy = Array.from({ length: 6 }, (_, i) => ({
+    id: `busy-${i}`, title: `Busy ${i + 1}`, status: "todo", task_type: "one_time", recurrence: "none", due_date: today, task_time: "", tags: [], priority_id: defaultPriority.id,
+  }));
+  const event = { id: "ev-1", title: "Stand-up", status: "todo", due_date: today, task_time: "9:00AM", task_end_time: "9:30AM", source_kind: "event", source_provider: "google", source_calendar_id: "work", source_calendar_name: "Work", tags: [] };
+  await installMockBackend(page, { tasks: [...busy, event] as any, priorities: [defaultPriority] });
+  await page.addInitScript(() => window.localStorage.setItem("defaultCalendarView", "month"));
+  await page.goto("/Calendar");
+
+  // Tasks and events are counted apart: an event is not a task.
+  await expect(page.getByText("6 tasks, 1 event", { exact: true })).toBeVisible();
+
+  // Seven things on one day: three are shown, and a row says four more are behind it.
+  const more = page.getByTestId(`month-more-${today}`);
+  await expect(more).toHaveText("4 more");
+  await expect(page.locator(`[data-testid^="calendar-tick-busy-"]`)).toHaveCount(3);
+
+  // The row opens that day, where all of them are.
+  await more.click();
+  await expect(page.getByRole("button", { name: "day", exact: true })).toHaveAttribute("aria-pressed", "true");
+  for (const n of [1, 6]) await expect(page.getByTitle(`Busy ${n}`).first()).toBeVisible();
+
+  // So does the date itself.
+  await page.getByRole("button", { name: "month", exact: true }).click();
+  await page.getByTestId(`month-day-${today}`).click();
+  await expect(page.getByRole("button", { name: "day", exact: true })).toHaveAttribute("aria-pressed", "true");
 });
 
 test("while a list is on its way a page shows the outline of it, never \"nothing here\"", async ({ page }) => {

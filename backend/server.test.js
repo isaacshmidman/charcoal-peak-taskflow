@@ -634,7 +634,7 @@ describe("a note's schedule", () => {
     const stored = await invoke(`/api/apps/test-app/entities/Note/${created.body.id}`, { headers });
     expect(JSON.parse(stored.body.schedule_json)).toEqual(schedule);
 
-    // Recently Deleted keeps it too.
+    // Recently deleted keeps it too.
     const trashed = await invoke("/api/apps/test-app/entities/DeletedNote", {
       method: "POST",
       headers,
@@ -1553,7 +1553,7 @@ describe("restore from an export", () => {
     const zip = await exportOf(c);
 
     await cs("PUT", `/entities/Task/${keep.id}`, { title: "Keep me (edited)" });
-    // Deleted outright, not via Recently Deleted.
+    // Deleted outright, not via Recently deleted.
     db.prepare("DELETE FROM tasks WHERE id = ?").run(lose.id);
 
     const result = await restore(c, zip);
@@ -1564,7 +1564,7 @@ describe("restore from an export", () => {
     expect((await cs("GET", `/entities/Task/${lose.id}`)).title).toBe("Lose me");
   });
 
-  it("leaves a task that's in Recently Deleted there", async () => {
+  it("leaves a task that's in Recently deleted there", async () => {
     const d = await login("restore-trash@example.com");
     const ds = api(d);
     const task = await ds("POST", "/entities/Task", { title: "Binned", due_date: "2026-10-01" });
@@ -1574,7 +1574,7 @@ describe("restore from an export", () => {
 
     const result = await restore(d, zip);
     expect(result.body.added.tasks).toBe(0);
-    expect(result.body.notes.join(" ")).toContain("in Recently Deleted");
+    expect(result.body.notes.join(" ")).toContain("in Recently deleted");
   });
 
   it("contains a hostile file: owners, ids and oversized fields from the file don't get through", async () => {
@@ -1699,7 +1699,7 @@ describe("restore from an export", () => {
     const w2 = Buffer.from("%PDF-1.4 W-2");
     const uploaded = await uploadPdf(j, task.id, "W-2.pdf", w2);
     const zip = await exportOf(j);
-    // Deleted, and its Recently Deleted record never arrived: the file is held.
+    // Deleted, and its Recently deleted record never arrived: the file is held.
     await js("DELETE", `/entities/Task/${task.id}`);
     const held = () => db.prepare("SELECT COUNT(*) n FROM task_attachments WHERE task_id = ? AND task_deleted_at IS NOT NULL").get(task.id).n;
     expect(held()).toBe(1);
@@ -1717,7 +1717,7 @@ describe("restore from an export", () => {
     expect(bytes.body.equals(w2)).toBe(true);
   });
 
-  it("a task in Recently Deleted comes across with its files, which come back when it's restored from there", async () => {
+  it("a task in Recently deleted comes across with its files, which come back when it's restored from there", async () => {
     const k = await login("restore-trash-files@example.com");
     const ks = api(k);
     const task = await ks("POST", "/entities/Task", { title: "Old receipts", due_date: "2026-10-01" });
@@ -1732,7 +1732,7 @@ describe("restore from an export", () => {
     const m = await login("restore-trash-files-target@example.com");
     const ms = api(m);
     expect((await restore(m, zip)).body.added).toMatchObject({ tasks: 0, recentlyDeleted: 1, files: 1 });
-    // Held for the item in Recently Deleted, and counted against this account.
+    // Held for the item in Recently deleted, and counted against this account.
     expect((await ms("GET", "/attachments/usage")).biggest_tasks).toEqual([
       expect.objectContaining({ task_title: "Old receipts", file_count: 1, total_bytes: receipt.length, in_recently_deleted: true }),
     ]);
@@ -1740,7 +1740,7 @@ describe("restore from an export", () => {
     // Again: already there, file included.
     expect((await restore(m, zip)).body.added).toMatchObject({ recentlyDeleted: 0, files: 0 });
 
-    // Restored from Recently Deleted the way the app does it.
+    // Restored from Recently deleted the way the app does it.
     const [record] = await ms("GET", "/entities/DeletedTask");
     const back = await ms("POST", "/entities/Task", { title: record.title, due_date: record.due_date, restores_task_id: record.task_id });
     await ms("DELETE", `/entities/DeletedTask/${record.id}`);
@@ -1748,7 +1748,7 @@ describe("restore from an export", () => {
     expect(file.filename).toBe("receipt.pdf");
     const bytes = await invokeRaw(`/api/apps/test-app/attachments/${file.id}`, { headers: { Authorization: `Bearer ${m}` } });
     expect(bytes.body.equals(receipt)).toBe(true);
-    // The first account's copy is its own, still held in its Recently Deleted.
+    // The first account's copy is its own, still held in its Recently deleted.
     expect((await ks("GET", "/attachments/usage")).biggest_tasks).toEqual([
       expect.objectContaining({ task_title: "Old receipts", in_recently_deleted: true }),
     ]);
@@ -1787,7 +1787,7 @@ describe("a deleted task's files", () => {
 
   /**
    * The app's delete (useOfflineMutation.deleteTasks): the task and each
-   * subtask are deleted, and a snapshot goes to Recently Deleted. Online the
+   * subtask are deleted, and a snapshot goes to Recently deleted. Online the
    * requests race; offline the deletes replay first — as here.
    */
   const deleteLikeTheApp = async (as, task, subtasks = []) => {
@@ -1811,7 +1811,7 @@ describe("a deleted task's files", () => {
     return { task, subtasks };
   };
 
-  it("keeps them in Recently Deleted — on disk and counted, on no task — and a restore puts each back on its task", async () => {
+  it("keeps them in Recently deleted — on disk and counted, on no task — and a restore puts each back on its task", async () => {
     const token = await login("held-restore@example.com");
     const as = api(token);
     const me = await as("GET", "/entities/User/me");
@@ -1829,7 +1829,7 @@ describe("a deleted task's files", () => {
     expect(readFileSync(receiptPath, "utf8")).toBe("%PDF-1.4 the flight receipt, which is longer");
     const usage = await as("GET", "/attachments/usage");
     expect(usage.used_bytes).toBe(pass.size_bytes + receipt.size_bytes);
-    // …as one line for the item in Recently Deleted, the subtask's file included…
+    // …as one line for the item in Recently deleted, the subtask's file included…
     expect(usage.biggest_tasks).toEqual([
       { task_id: trip.id, task_title: "Plan the trip", total_bytes: pass.size_bytes + receipt.size_bytes, file_count: 2, in_recently_deleted: true },
     ]);
@@ -1862,7 +1862,7 @@ describe("a deleted task's files", () => {
     expect((await as("GET", "/attachments?q=pdf")).attachments.map((a) => a.task_title).sort()).toEqual(["Book flights", "Plan the trip"]);
   });
 
-  it("deleting it from Recently Deleted removes its files for good — its own, and no one else's", async () => {
+  it("deleting it from Recently deleted removes its files for good — its own, and no one else's", async () => {
     const token = await login("held-permanent@example.com");
     const as = api(token);
     const oldPlan = await as("POST", "/entities/Task", { title: "Old plan", due_date: "2026-10-01" });
@@ -1889,7 +1889,7 @@ describe("a deleted task's files", () => {
     expect(await filenames(as, task.id)).toEqual(["other.pdf"]);
   });
 
-  it("they go when the item's time in Recently Deleted runs out, whenever that's set to — even if no one opens it", async () => {
+  it("they go when the item's time in Recently deleted runs out, whenever that's set to — even if no one opens it", async () => {
     const token = await login("held-expiry@example.com");
     const as = api(token);
     const expiring = await as("POST", "/entities/Task", { title: "Expiring", due_date: "2026-10-01" });
@@ -1960,7 +1960,7 @@ describe("a deleted task's files", () => {
     const theirs = await intruder("POST", "/entities/Task", { title: "Grab it", due_date: "2026-10-01", restores_task_id: task.id });
     expect(theirs.attachment_count).toBeUndefined();
     expect(await filenames(intruder, theirs.id)).toEqual([]);
-    // Nor can the intruder's Recently Deleted let go of the owner's files.
+    // Nor can the intruder's Recently deleted let go of the owner's files.
     const decoy = await intruder("POST", "/entities/DeletedTask", { task_id: task.id, title: "Decoy" });
     await intruder("DELETE", `/entities/DeletedTask/${decoy.id}`);
 

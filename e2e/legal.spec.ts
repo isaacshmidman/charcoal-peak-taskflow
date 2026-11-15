@@ -18,7 +18,7 @@ test("signed out, the Terms and Privacy pages open, with the contact address", a
 
   await page.getByRole("link", { name: "Privacy Policy" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Privacy Policy");
-  await expect(page.getByText("wait in Recently Deleted for 7 days")).toBeVisible();
+  await expect(page.getByText("wait in Recently deleted for 7 days")).toBeVisible();
   await expect(page).toHaveURL(/\/privacy$/);
 });
 

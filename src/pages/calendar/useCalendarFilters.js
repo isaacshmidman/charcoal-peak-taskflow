@@ -6,7 +6,7 @@
  *   - viewRange memo (start/end Date for the active view)
  *   - filteredTasks memo (search + visibility + multi-sort + time
  *     tiebreaker)
- *   - scopedCount memo (count within the active viewRange)
+ *   - scopedCount / scopedEvents memo (tasks and events within the active viewRange)
  */
 import { useMemo, useState } from "react";
 import {
@@ -21,7 +21,7 @@ import { startOfWeek } from "date-fns/startOfWeek";
 import { startOfYear } from "date-fns/startOfYear";
 import { deriveCalendars } from "@/components/calendar/CalendarVisibilityDropdown";
 import { calendarKeyForTask } from "@/lib/calendar-order";
-import { taskMatchesSearch } from "@/lib/task-filters";
+import { isExternalEvent, taskMatchesSearch } from "@/lib/task-filters";
 import { compareTaskTime } from "@/lib/sort-helpers";
 import { compareTasks } from "@/lib/task-sort";
 
@@ -86,13 +86,18 @@ export function useCalendarFilters({ tasks, view, anchorDate, search, sorts, pri
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks, search, sorts, priorityOrderMap, hiddenCalendars]);
 
-  const scopedCount = useMemo(() => {
-    if (!filteredTasks?.length) return 0;
-    return filteredTasks.filter((t) => {
-      if (!t.due_date) return false;
-      const d = new Date(t.due_date + "T00:00:00");
-      return isWithinInterval(d, viewRange);
-    }).length;
+  // What the header says is in view: tasks, and events from connected
+  // calendars, counted apart (an event is not a task).
+  const { scopedCount, scopedEvents } = useMemo(() => {
+    let tasksInView = 0;
+    let eventsInView = 0;
+    for (const t of filteredTasks || []) {
+      if (!t.due_date) continue;
+      if (!isWithinInterval(new Date(t.due_date + "T00:00:00"), viewRange)) continue;
+      if (isExternalEvent(t)) eventsInView += 1;
+      else tasksInView += 1;
+    }
+    return { scopedCount: tasksInView, scopedEvents: eventsInView };
   }, [filteredTasks, viewRange]);
 
   return {
@@ -102,5 +107,6 @@ export function useCalendarFilters({ tasks, view, anchorDate, search, sorts, pri
     viewRange,
     filteredTasks,
     scopedCount,
+    scopedEvents,
   };
 }

@@ -130,7 +130,7 @@ test("phone: tabs have words, + adds from anywhere, and More holds the rest", as
   await expect(tabs.getByRole("link", { name: "Today", exact: true })).toHaveAttribute("aria-current", "page");
 
   // + opens the page's own form…
-  await tabs.getByRole("button", { name: "New Task" }).click();
+  await tabs.getByRole("button", { name: "New task" }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -139,7 +139,7 @@ test("phone: tabs have words, + adds from anywhere, and More holds the rest", as
   await tabs.getByRole("button", { name: "More" }).click();
   await page.getByRole("link", { name: "Settings", exact: true }).click();
   await expect(page).toHaveURL(/\/Settings$/);
-  await tabs.getByRole("button", { name: "New Task" }).click();
+  await tabs.getByRole("button", { name: "New task" }).click();
   await expect(page).toHaveURL(/\/Today$/);
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.keyboard.press("Escape");

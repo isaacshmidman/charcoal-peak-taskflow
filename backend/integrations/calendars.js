@@ -177,7 +177,7 @@ export async function refreshIntegrationCalendars(db, config, integrationRow) {
  *
  *   1. Imported events (source_kind='event') from the now-disabled
  *      calendar lingered in the local DB indefinitely. They kept
- *      showing up in the Calendar nav and the Calendar Order section
+ *      showing up in the Calendar nav and the Calendar order section
  *      of Settings even though the user had explicitly hidden the
  *      source.
  *   2. Re-enabling later didn't pull a fresh import because the per-

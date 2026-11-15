@@ -4,7 +4,7 @@
  * Calendar-imported "events" (Holidays, Birthdays, calendar appointments,
  * etc.) carry `source_kind === "event"`. They should be visible only in the
  * Calendar view — never in Today, Active (All Tasks), Groupings, Completed,
- * or Recently Deleted.
+ * or Recently deleted.
  */
 
 /** @typedef {import("@/types/tasks").TaskRecord & { source_kind?: string | null }} TaskRecord */

@@ -1,6 +1,6 @@
 // @ts-nocheck
 /**
- * @file Calendar Order — auto-discovers calendars from the task list,
+ * @file Calendar order — auto-discovers calendars from the task list,
  * merges with the user's saved order (newcomers appended
  * alphabetically), and exposes per-calendar reorder + visibility-on-
  * non-calendar-pages.
@@ -10,7 +10,7 @@
  *
  * The two settings owned here:
  *   - calendar order: localStorage `calendarOrder` (sort key on non-
- *     Calendar pages when user picks "Calendar Order" in MultiSort)
+ *     Calendar pages when user picks "Calendar order" in MultiSort)
  *   - per-calendar visibility on non-Calendar pages (Today, Active,
  *     Completed, Groupings). The Calendar page itself has its own
  *     visibility dropdown — untouched here.
