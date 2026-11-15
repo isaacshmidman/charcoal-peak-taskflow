@@ -1,11 +1,10 @@
 import { forwardRef, useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Checkbox } from "@/components/ui/checkbox";
-import { format } from "date-fns/format";
 import { cn } from "@/lib/utils";
 import { colorCheck } from "@/lib/colors";
 import { CalendarDays, Repeat } from "lucide-react";
-import { fromDateStr } from "@/lib/dates";
+import { dayLabel } from "@/lib/dates";
 import { DatePopover } from "@/components/tasks/TaskForm/parts";
 import { spacedTime } from "@/components/tasks/TaskForm/TimeInput";
 
@@ -52,7 +51,7 @@ const CompactTaskCard = forwardRef(function CompactTaskCard(
   // Priority is the colour of the tick box, as in the full task rows.
   const checkTone = priority ? colorCheck[priority.color] || colorCheck.slate : undefined;
 
-  const dateText = task.due_date ? format(fromDateStr(task.due_date), "MMM d") : "";
+  const dateText = dayLabel(task.due_date);
   const metaText = meta === "time" ? (task.task_time ? spacedTime(task.task_time) : "") : dateText;
 
   return (

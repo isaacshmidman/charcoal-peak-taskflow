@@ -18,7 +18,7 @@
 // uses the automatic runtime and doesn't need it).
 import React, { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { format } from "date-fns/format";
+import { dayTimeLabel } from "@/lib/dates";
 import {
   ArrowDown,
   ArrowUp,
@@ -192,7 +192,7 @@ export default function SubtaskList({
                     </span>
                     {sub.due_date && (
                       <span className={cn("text-[10px] shrink-0", subOverdue ? "text-red-400" : "text-ink-400 dark:text-ink-500")}>
-                        {format(new Date(sub.due_date + "T00:00:00"), "MMM d")}{sub.task_time ? `, ${sub.task_time}` : ""}
+                        {dayTimeLabel(sub.due_date, sub.task_time)}
                       </span>
                     )}
                     <button aria-label={`Delete subtask ${sub.title}`}

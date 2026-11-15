@@ -13,10 +13,9 @@ import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AlignLeft, Calendar, Paperclip, Repeat, Trash2 } from "lucide-react";
-import { format } from "date-fns/format";
 import { cn } from "@/lib/utils";
 import { colorCheck } from "@/lib/colors";
-import { fromDateStr, toDateStr } from "@/lib/dates";
+import { dayTimeLabel, fromDateStr, toDateStr } from "@/lib/dates";
 import TagsRow from "./TagsRow.jsx";
 import SubtaskList from "./SubtaskList.jsx";
 
@@ -98,13 +97,8 @@ const TaskCard = forwardRef(function TaskCard({
   const isOverdue = !isDone && task.due_date && parseDateLocal(task.due_date) < new Date(new Date().setHours(0,0,0,0));
 
   // Date display: show time if task has task_time
-  const dateDisplay = (() => {
-    if (!task.due_date) return null;
-    if (task.task_time) {
-      return `${format(parseDateLocal(task.due_date), "MMM d")}, ${task.task_time}`;
-    }
-    return format(parseDateLocal(task.due_date), "MMM d");
-  })();
+  // The day as a person would say it (Today, Tomorrow, Wed, Nov 23), then the time.
+  const dateDisplay = dayTimeLabel(task.due_date, task.task_time) || null;
 
   return (
     <motion.div
