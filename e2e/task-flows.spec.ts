@@ -1159,3 +1159,33 @@ test("search: an x appears once something is typed, and empties the box without 
   await expect(taskCardByTitle(page, "Water the plants")).toBeVisible();
   await expect(page.getByRole("button", { name: "Clear search" })).toBeVisible();
 });
+
+test("calendar: a chip shows its tick box only under the pointer, and ticking it there marks the task done", async ({ page }) => {
+  const mock = await installMockBackend(page, {
+    tasks: [
+      { id: "chip-1", title: "Order printer ink", status: "todo", task_type: "one_time", recurrence: "none", due_date: formatDateOffset(0), task_time: "", tags: [], priority_id: defaultPriority.id },
+    ],
+    priorities: [defaultPriority],
+  });
+  await page.addInitScript(() => window.localStorage.setItem("defaultCalendarView", "month"));
+  await page.goto("/Calendar");
+
+  const chip = page.getByTitle("Order printer ink").first();
+  const tick = page.getByTestId("calendar-tick-chip-1").first();
+  await expect(chip).toBeVisible();
+  await page.mouse.move(2, 2);
+  await expect(tick).toHaveCSS("opacity", "0");
+
+  // The title sits still when the box appears: it lies over the chip's end.
+  const title = chip.getByText("Order printer ink");
+  const before = await title.boundingBox();
+  await chip.hover();
+  await expect(tick).toHaveCSS("opacity", "1");
+  expect((await title.boundingBox())!.x).toBe(before!.x);
+
+  await tick.click();
+  await expect.poll(async () => (await mock.getState()).tasks.find((task: any) => task.id === "chip-1")?.status).toBe("done");
+  // Done, it keeps its tick showing wherever the pointer is.
+  await page.mouse.move(2, 2);
+  await expect(page.getByTestId("calendar-tick-chip-1").first()).toHaveCSS("opacity", "1");
+});

@@ -91,6 +91,38 @@ export const colorBg = {
 };
 
 /**
+ * The left edge of a chip on the calendar: the priority's colour at full
+ * strength, a couple of pixels wide, so a day of chips can be read by
+ * colour down its left side without every chip shouting.
+ *
+ * Each says its colour twice, once for the dark: the tints above set the
+ * whole border in the dark, which would otherwise take the edge with it.
+ */
+/** @type {Record<string, string>} */
+export const colorEdge = {
+  red: "border-l-red-400 dark:border-l-red-400",
+  orange: "border-l-orange-400 dark:border-l-orange-400",
+  yellow: "border-l-yellow-400 dark:border-l-yellow-400",
+  green: "border-l-green-400 dark:border-l-green-400",
+  blue: "border-l-blue-400 dark:border-l-blue-400",
+  violet: "border-l-violet-400 dark:border-l-violet-400",
+  pink: "border-l-pink-400 dark:border-l-pink-400",
+  teal: "border-l-teal-400 dark:border-l-teal-400",
+  cyan: "border-l-cyan-400 dark:border-l-cyan-400",
+  rose: "border-l-rose-400 dark:border-l-rose-400",
+  slate: "border-l-ink-400 dark:border-l-ink-500",
+  black: "border-l-ink-900 dark:border-l-ink-100",
+  white: "border-l-ink-300 dark:border-l-ink-500",
+  brown: "border-l-amber-700 dark:border-l-amber-700",
+  red_alt: "border-l-red-600 dark:border-l-red-600",
+  orange_alt: "border-l-orange-600 dark:border-l-orange-600",
+  yellow_alt: "border-l-yellow-600 dark:border-l-yellow-600",
+  green_alt: "border-l-green-700 dark:border-l-green-700",
+  blue_alt: "border-l-blue-700 dark:border-l-blue-700",
+  violet_alt: "border-l-violet-700 dark:border-l-violet-700",
+};
+
+/**
  * The tick box of a task that isn't done yet, in its priority's colour: a
  * ring of it, and a breath of it inside. This is how a list shows priority.
  */

@@ -36,7 +36,14 @@ Rules:
 - **Red is for trouble only**: overdue, delete, errors.
 - **Priority colours** belong to the person (they pick them in Settings). In
   a list they colour the tick box (`colorCheck`); on the calendar they tint
-  the chip (`colorBg`). Rows and columns themselves stay plain.
+  the chip (`colorBg`) and run at full strength down its left edge
+  (`colorEdge`). Rows and columns themselves stay plain.
+- **A chip on the calendar has no tick box at rest.** A month of boxes reads
+  as a form. The box shows where it can be used: under the pointer, on the
+  chip the keyboard is on, and on a task already done. It lies over the
+  chip's right end, so nothing moves when it appears. A screen with no
+  pointer to hover with keeps the box showing, because there is no other
+  way to reach it there.
 
 ## The page
 
