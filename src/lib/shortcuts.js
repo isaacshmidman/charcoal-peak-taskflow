@@ -99,12 +99,48 @@ export function navPathForDigit(digit, order) {
 }
 
 /**
+ * A request made a moment before anyone was there to hear it: pages load
+ * their code on first use, so "+" can be pressed while the page is still
+ * arriving. It waits here, briefly, for that page and no other.
+ * @type {{ name: string, detail: any, path: string, at: number } | null}
+ */
+let waiting = null;
+// Long enough for a page's code to arrive on a slow connection. It is
+// only ever handed to the page it was pressed on, so waiting is safe.
+const WAIT_MS = 15000;
+/** Requests worth keeping: the ones a person would press again. */
+const KEPT = new Set(["shortcut:new-task"]);
+/** @type {Map<string, number>} */
+const listening = new Map();
+
+/**
  * Dispatch a semantic shortcut event.
  * @param {string} name  one of SHORTCUT_EVENTS
  * @param {any} [detail]
  */
 export function emitShortcut(name, detail) {
+  if (KEPT.has(name) && !listening.get(name)) {
+    waiting = { name, detail, path: window.location.pathname, at: Date.now() };
+    return;
+  }
   window.dispatchEvent(new CustomEvent(name, { detail }));
+}
+
+/**
+ * A page saying it now hears an event (hooks/useShortcutEvent.js). Returns
+ * what to call when it stops. A request that was waiting for this page is
+ * handed over.
+ * @param {string} name
+ * @param {(detail: any) => void} deliver
+ */
+export function hearShortcut(name, deliver) {
+  listening.set(name, (listening.get(name) || 0) + 1);
+  const kept = waiting;
+  if (kept && kept.name === name) {
+    waiting = null;
+    if (Date.now() - kept.at <= WAIT_MS && kept.path === window.location.pathname) deliver(kept.detail);
+  }
+  return () => listening.set(name, Math.max(0, (listening.get(name) || 0) - 1));
 }
 
 /** True on Apple platforms — used by the help overlay's ⌘/Ctrl labels. */

@@ -88,6 +88,12 @@ export default defineConfig(({ mode }) => {
     // every page a test had open, in the middle of the test.
     server: mode === "e2e" ? { ...shared.server, watch: null, hmr: false } : shared.server,
     optimizeDeps: { force: true },
+    // When this build was made, so an error report (src/lib/report-error.js)
+    // says which build it came from.
+    define: {
+      ...(shared.define || {}),
+      "import.meta.env.VITE_BUILD_ID": JSON.stringify(mode === "production" ? new Date().toISOString().slice(0, 16) : mode),
+    },
     build: {
       rollupOptions: {
         output: {

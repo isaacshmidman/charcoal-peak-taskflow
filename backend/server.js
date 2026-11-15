@@ -20,6 +20,7 @@ import { handleIntegrationsRoute } from "./routes/integrations.js";
 import { handleNotificationsRoute } from "./routes/notifications.js";
 import { handleScheduleDefaultsRoute } from "./routes/schedule-defaults.js";
 import { handleHomeLayoutRoute } from "./routes/home-layout.js";
+import { handleClientErrorsRoute } from "./routes/client-errors.js";
 import { handleSessionsRoute } from "./routes/sessions.js";
 import { handleAttachmentsRoute } from "./routes/attachments.js";
 import { handleEntitiesRoute, purgeOldCreateKeys } from "./routes/entities.js";
@@ -344,6 +345,8 @@ export function createRequestHandler(config = backendConfig, db = getDatabase(co
       // Per-route dispatch. Each handler returns true if it matched.
       // Order matters: auth first (some routes are unauthenticated),
       // then per-feature handlers under /api/apps/:appId/*.
+      // The app reporting that it broke: open to the signed-out too.
+      if (await handleClientErrorsRoute(request, response, ctx)) return;
       if (await handleAuthRoute(request, response, ctx)) return;
       if (await handleIntegrationsRoute(request, response, ctx)) return;
       if (await handleNotificationsRoute(request, response, ctx)) return;

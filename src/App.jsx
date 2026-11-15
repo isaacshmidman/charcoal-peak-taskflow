@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter as Router, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { queryClientInstance } from "@/lib/query-client";
@@ -6,21 +6,75 @@ import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import { ThemeProvider } from "@/lib/ThemeProvider";
 import { loadFromCache } from "@/lib/offlineCache";
 import { startPath } from "@/lib/navigation";
+import { lazyPage } from "@/lib/lazy-page";
 import Layout from "@/components/Layout";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import PageNotFound from "./lib/PageNotFound";
-import Active from "@/pages/Active";
-import AuthCallback from "@/pages/AuthCallback.jsx";
-import Today from "@/pages/Today.jsx";
-import Home from "@/pages/Home.jsx";
-import Completed from "@/pages/Completed.jsx";
-import Groupings from "@/pages/Groupings.jsx";
-import Calendar from "@/pages/Calendar.jsx";
-import Login from "@/pages/Login.jsx";
-import Settings from "@/pages/Settings.jsx";
-import RecentlyDeleted from "@/pages/RecentlyDeleted.jsx";
-import Notes from "@/pages/Notes.jsx";
-import Connect from "@/pages/Connect.jsx";
-import { PrivacyPage, TermsPage } from "@/pages/Legal.jsx";
+
+// Each page's code is fetched when the page is first opened (lib/lazy-page.js),
+// so the app's first screen doesn't wait for the other nine.
+const Home = lazyPage(() => import("@/pages/Home.jsx"));
+const Today = lazyPage(() => import("@/pages/Today.jsx"));
+const Active = lazyPage(() => import("@/pages/Active"));
+const Groupings = lazyPage(() => import("@/pages/Groupings.jsx"));
+const Completed = lazyPage(() => import("@/pages/Completed.jsx"));
+const Calendar = lazyPage(() => import("@/pages/Calendar.jsx"));
+const Notes = lazyPage(() => import("@/pages/Notes.jsx"));
+const Settings = lazyPage(() => import("@/pages/Settings.jsx"));
+const RecentlyDeleted = lazyPage(() => import("@/pages/RecentlyDeleted.jsx"));
+const Login = lazyPage(() => import("@/pages/Login.jsx"));
+const AuthCallback = lazyPage(() => import("@/pages/AuthCallback.jsx"));
+const Connect = lazyPage(() => import("@/pages/Connect.jsx"));
+const TermsPage = lazyPage(() => import("@/pages/Legal.jsx").then((m) => ({ default: m.TermsPage })));
+const PrivacyPage = lazyPage(() => import("@/pages/Legal.jsx").then((m) => ({ default: m.PrivacyPage })));
+
+/** The app's own pages, by address. */
+const PAGES = {
+  "/Home": Home,
+  "/Today": Today,
+  "/Active": Active,
+  "/Groupings": Groupings,
+  "/Completed": Completed,
+  "/Calendar": Calendar,
+  "/Notes": Notes,
+  "/Settings": Settings,
+  "/RecentlyDeleted": RecentlyDeleted,
+};
+
+// The page being opened starts downloading now, beside the sign-in check,
+// not after it.
+try {
+  const first = window.location.pathname === "/" ? startPath() : window.location.pathname;
+  PAGES[first]?.preload();
+} catch { /* it loads when it is drawn */ }
+
+/**
+ * Once the first page is up and the browser has a quiet moment, fetch
+ * the rest, so going anywhere afterwards is instant (and works offline
+ * even before the service worker has kept its copy).
+ */
+function usePagesFetchedAhead() {
+  useEffect(() => {
+    const fetchRest = () => Object.values(PAGES).forEach((page) => page.preload());
+    // A moment after the first page, so its own data isn't competing with
+    // code nobody has asked for yet, and then only when the browser is idle.
+    let idle = 0;
+    const timer = window.setTimeout(() => {
+      if (typeof window.requestIdleCallback === "function") idle = window.requestIdleCallback(fetchRest, { timeout: 4000 });
+      else fetchRest();
+    }, 1500);
+    return () => {
+      window.clearTimeout(timer);
+      if (idle) window.cancelIdleCallback?.(idle);
+    };
+  }, []);
+}
+
+const spinner = (
+  <div className="fixed inset-0 flex items-center justify-center">
+    <div className="w-8 h-8 border-4 border-ink-200 border-t-ink-800 rounded-full animate-spin" />
+  </div>
+);
 
 /** Pages anyone can read, signed in or not (Stripe links to them). */
 const LEGAL_PATHS = new Set(["/terms", "/privacy"]);
@@ -32,6 +86,7 @@ function DefaultRedirect() {
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, checkAppState } = useAuth();
   const location = useLocation();
+  usePagesFetchedAhead();
 
   const hasCachedData = Boolean(
     (loadFromCache("tasks") || []).length ||
@@ -51,11 +106,7 @@ const AuthenticatedApp = () => {
   }, [authError, isAuthRoute, isOffline, navigateToLogin]);
 
   if ((isLoadingPublicSettings || isLoadingAuth) && !(isOffline && hasCachedData) && !isLegalRoute) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-ink-200 border-t-ink-800 rounded-full animate-spin" />
-      </div>
-    );
+    return spinner;
   }
 
   if (authError && !isLegalRoute) {
@@ -79,6 +130,9 @@ const AuthenticatedApp = () => {
   }
 
   return (
+    // Pages inside the app's frame wait behind Layout's own outline; this
+    // one is for the pages outside it (sign-in, Terms, an AI app connecting).
+    <Suspense fallback={spinner}>
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
@@ -100,19 +154,23 @@ const AuthenticatedApp = () => {
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
+    </Suspense>
   );
 };
 
 function App() {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <QueryClientProvider client={queryClientInstance}>
-          <Router>
-            <AuthenticatedApp />
-          </Router>
-        </QueryClientProvider>
-      </AuthProvider>
+      {/* The last line of defence: a break in the frame itself. */}
+      <ErrorBoundary full>
+        <AuthProvider>
+          <QueryClientProvider client={queryClientInstance}>
+            <Router>
+              <AuthenticatedApp />
+            </Router>
+          </QueryClientProvider>
+        </AuthProvider>
+      </ErrorBoundary>
     </ThemeProvider>
   );
 }

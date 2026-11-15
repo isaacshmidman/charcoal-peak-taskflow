@@ -98,3 +98,43 @@ describe("shortcuts core", () => {
     });
   });
 });
+
+describe("a request made before its page was listening", () => {
+  it("waits for that page, and is handed over once", async () => {
+    const { emitShortcut, hearShortcut, SHORTCUT_EVENTS } = await import("./shortcuts");
+    window.history.replaceState({}, "", "/Today");
+    emitShortcut(SHORTCUT_EVENTS.newTask, { from: "plus" });
+    const got = [];
+    const stop = hearShortcut(SHORTCUT_EVENTS.newTask, (detail) => got.push(detail));
+    expect(got).toEqual([{ from: "plus" }]);
+    // Not again for a second listener, and with someone listening it is sent the ordinary way.
+    const stopSecond = hearShortcut(SHORTCUT_EVENTS.newTask, (detail) => got.push(detail));
+    expect(got).toHaveLength(1);
+    let heard = 0;
+    const onEvent = () => { heard += 1; };
+    window.addEventListener(SHORTCUT_EVENTS.newTask, onEvent);
+    emitShortcut(SHORTCUT_EVENTS.newTask);
+    window.removeEventListener(SHORTCUT_EVENTS.newTask, onEvent);
+    expect(heard).toBe(1);
+    stop();
+    stopSecond();
+  });
+
+  it("is dropped if the person has gone to another page meanwhile", async () => {
+    const { emitShortcut, hearShortcut, SHORTCUT_EVENTS } = await import("./shortcuts");
+    window.history.replaceState({}, "", "/Completed");
+    emitShortcut(SHORTCUT_EVENTS.newTask);
+    window.history.replaceState({}, "", "/Today");
+    const got = [];
+    hearShortcut(SHORTCUT_EVENTS.newTask, (detail) => got.push(detail))();
+    expect(got).toEqual([]);
+  });
+
+  it("only keeps requests a person would press again: a search key is not kept", async () => {
+    const { emitShortcut, hearShortcut, SHORTCUT_EVENTS } = await import("./shortcuts");
+    emitShortcut(SHORTCUT_EVENTS.search);
+    const got = [];
+    hearShortcut(SHORTCUT_EVENTS.search, (detail) => got.push(detail))();
+    expect(got).toEqual([]);
+  });
+});

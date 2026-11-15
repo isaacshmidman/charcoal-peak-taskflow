@@ -3,6 +3,9 @@ import ReactDOM from 'react-dom/client'
 import App from '@/App.jsx'
 import '@/styles/zephyrly.css'
 import '@/index.css'
+import { listenForErrors } from '@/lib/report-error'
+
+listenForErrors();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

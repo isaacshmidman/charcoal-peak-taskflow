@@ -226,3 +226,33 @@ test("appearance: an old start page of the board still opens the board", async (
   await expect(page).toHaveURL(/\/Groupings$/);
   await expect(page.getByTestId("sidebar").getByRole("link", { name: "Tasks", exact: true })).toHaveAttribute("href", "/Groupings");
 });
+
+test("a page whose code can't be fetched says so, keeps the sidebar, and loads on Try again", async ({ page }) => {
+  await installMockBackend(page, { tasks, priorities: [priority] });
+  const reports: any[] = [];
+  await page.route("**/api/apps/*/client-errors", async (route) => {
+    reports.push(route.request().postDataJSON());
+    await route.fulfill({ status: 202, contentType: "application/json", body: '{"ok":true}' });
+  });
+  // The Calendar page's code is out of reach, as it would be with no connection.
+  let blocked = true;
+  await page.route(/\/src\/pages\/Calendar\.jsx/, (route) => (blocked ? route.abort() : route.continue()));
+
+  await page.goto("/Today");
+  await expect(card(page, "Send the invoice")).toBeVisible();
+  const sidebar = page.getByTestId("sidebar");
+  await sidebar.getByRole("link", { name: "Calendar", exact: true }).click();
+
+  // It tries a reload once (a new build may be out), then says what is wrong.
+  const broke = page.getByTestId("page-broke");
+  await expect(broke).toContainText("This page couldn't be loaded");
+  await expect(sidebar).toBeVisible();
+  await expect.poll(() => reports.some((report) => report.kind === "chunk" && report.page === "/Calendar")).toBe(true);
+
+  // Another page is one click away, and coming back with the code in reach works.
+  await sidebar.getByRole("link", { name: "Today", exact: true }).click();
+  await expect(card(page, "Send the invoice")).toBeVisible();
+  blocked = false;
+  await sidebar.getByRole("link", { name: "Calendar", exact: true }).click();
+  await expect(page.getByRole("button", { name: "month", exact: true })).toBeVisible();
+});

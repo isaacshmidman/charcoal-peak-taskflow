@@ -7,7 +7,7 @@
  * Nothing sits across the top. A page begins with its own header
  * (PageHeader.jsx), which stays put while the page scrolls.
  */
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useOfflineData } from "@/hooks/useOfflineData";
@@ -15,6 +15,8 @@ import { useAttachmentQueue } from "@/hooks/useAttachmentQueue";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useGlobalShortcuts } from "@/hooks/useGlobalShortcuts";
 import DeleteToast from "@/components/tasks/DeleteToast";
+import ErrorBoundary from "@/components/ErrorBoundary";
+import { PagePlaceholder } from "@/components/ui/placeholders";
 import ShortcutsHelp from "@/components/ShortcutsHelp";
 import CommandPalette from "@/components/CommandPalette";
 import Sidebar from "@/components/nav/Sidebar";
@@ -92,7 +94,13 @@ export default function Layout() {
       {/* The left padding is the sidebar's width (nav/Sidebar.jsx). */}
       <main className={cn("min-w-0 pb-28 sm:pb-10 sm:pl-16", !collapsed && "lg:pl-60")}>
         <div className={cn("mx-auto w-full px-4 sm:px-6", PAGE_WIDTH[pathname] || "max-w-4xl")}>
-          <Outlet />
+          {/* A page that breaks shows a way out, with the sidebar still
+              there; a page whose code is still arriving shows its outline. */}
+          <ErrorBoundary resetKey={pathname}>
+            <Suspense fallback={<PagePlaceholder />}>
+              <Outlet />
+            </Suspense>
+          </ErrorBoundary>
         </div>
       </main>
 

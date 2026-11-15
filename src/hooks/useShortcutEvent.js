@@ -8,6 +8,7 @@
  * without re-binding the window listener every render.
  */
 import { useEffect, useRef } from "react";
+import { hearShortcut } from "@/lib/shortcuts";
 
 /**
  * @param {string} eventName  one of SHORTCUT_EVENTS
@@ -23,6 +24,11 @@ export function useShortcutEvent(eventName, handler) {
       handlerRef.current(/** @type {CustomEvent} */ (e).detail);
     };
     window.addEventListener(eventName, onEvent);
-    return () => window.removeEventListener(eventName, onEvent);
+    // A request made just before this page arrived (lib/shortcuts.js).
+    const stopHearing = hearShortcut(eventName, (detail) => handlerRef.current(detail));
+    return () => {
+      window.removeEventListener(eventName, onEvent);
+      stopHearing();
+    };
   }, [eventName]);
 }
