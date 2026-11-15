@@ -2,7 +2,7 @@
 /**
  * @file GET/PUT /api/apps/:appId/home-layout — how a person arranged
  * their Home page (backend/home-layout.js). `layout` is a list of
- * `{ id, size }`, or null when they never arranged it. A PUT replaces it;
+ * `{ id, size, options? }`, or null when they never arranged it. A PUT replaces it;
  * `{ "layout": null }` forgets it. Signed-in only.
  */
 import { readJsonBody, sendJson } from "../http.js";

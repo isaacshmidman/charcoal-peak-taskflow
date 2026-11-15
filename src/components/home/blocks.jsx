@@ -69,13 +69,18 @@ export function TaskRows({ tasks, most, to, empty, meta = "date", late = false, 
 }
 
 /** Today on the clock: events and timed tasks. */
-export function ScheduleBlock({ rows, onEditTask }) {
+export function ScheduleBlock({ rows, most = 8, onEditTask }) {
   const navigate = useNavigate();
   const minute = useMinuteOfDay();
   if (!rows.length) return <p className={quiet}>Nothing on the clock today.</p>;
+  // Short of room, what is already over goes first: the rest of the day is what matters.
+  const isOver = (row) => row.start != null && (row.end ?? row.start) < minute;
+  const ahead = rows.filter((row) => !isOver(row));
+  const shown = rows.length <= most ? rows : (ahead.length >= most ? ahead : rows.slice(rows.length - most)).slice(0, most);
+  const rest = rows.length - shown.length;
   return (
     <ul className="overflow-hidden rounded-b-xl border-t border-border-hairline">
-      {rows.map((row) => {
+      {shown.map((row) => {
         const over = row.start != null && (row.end ?? row.start) < minute;
         const sub = row.isEvent ? row.calendar || "Calendar" : "Task";
         return (
@@ -109,6 +114,13 @@ export function ScheduleBlock({ rows, onEditTask }) {
           </li>
         );
       })}
+      {rest > 0 && (
+        <li>
+          <Link to="/Calendar" className={cn(moreLink, "border-t-0")}>
+            and {rest} more
+          </Link>
+        </li>
+      )}
     </ul>
   );
 }

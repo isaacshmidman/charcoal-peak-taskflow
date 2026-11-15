@@ -693,8 +693,8 @@ describe("the Home page's layout", () => {
       headers,
       body: {
         layout: [
-          { id: "today", size: "half" },
-          { id: "tags", size: "enormous" },
+          { id: "today", size: "half", options: { rows: 5, tag: "work", shown: true, html: { a: 1 }, "bad name": 1, long: "x".repeat(81), nan: Number.NaN } },
+          { id: "tags", size: "enormous", options: "lots" },
           { id: "today", size: "full" },
           { id: "<script>", size: "half" },
           "week",
@@ -703,8 +703,9 @@ describe("the Home page's layout", () => {
       },
     });
     expect(saved.statusCode).toBe(200);
+    // A block's own settings survive only as small plain values.
     const kept = [
-      { id: "today", size: "half" },
+      { id: "today", size: "half", options: { rows: 5, tag: "work", shown: true } },
       { id: "tags", size: "third" },
       { id: "week", size: "full" },
     ];

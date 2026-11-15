@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
+  BLOCK_SETTINGS,
   DEFAULT_HOME_LAYOUT,
   HOME_BLOCKS,
   addBlock,
+  blockOptions,
   dueToday,
   hiddenBlocks,
   monthGrid,
   moveBlock,
+  moveBlockTo,
   nextSevenDays,
   overdueTasks,
   pinnedNotes,
@@ -14,7 +17,9 @@ import {
   resizeBlock,
   resolveHomeLayout,
   scheduleToday,
+  setBlockOption,
   tagRanking,
+  tasksWithTag,
   upcomingDeadlines,
   weekProgress,
 } from "./home-blocks";
@@ -23,8 +28,8 @@ const today = new Date(2026, 10, 14); // Sat 14 Nov 2026, midnight
 const ids = (rows) => rows.map((row) => row.id);
 
 describe("the Home layout", () => {
-  it("starts with every block, each row adding up to the full width", () => {
-    expect(ids(DEFAULT_HOME_LAYOUT).sort()).toEqual(ids(HOME_BLOCKS).sort());
+  it("starts with every block but the one that needs a tag chosen, each row adding up to the full width", () => {
+    expect(ids(DEFAULT_HOME_LAYOUT).sort()).toEqual(ids(HOME_BLOCKS).filter((id) => id !== "tag").sort());
     const width = { third: 2, half: 3, full: 6 };
     const columns = DEFAULT_HOME_LAYOUT.reduce((sum, block) => sum + width[block.size], 0);
     expect(columns % 6).toBe(0);
@@ -71,13 +76,71 @@ describe("the Home layout", () => {
 
     const added = addBlock(layout, "quick");
     expect(added.at(-1)).toEqual({ id: "quick", size: "full" });
+    // A block that isn't in the starting layout arrives narrow.
+    expect(addBlock(layout, "tag").at(-1)).toEqual({ id: "tag", size: "third" });
     expect(addBlock(layout, "today")).toBe(layout);
     expect(addBlock(layout, "weather")).toBe(layout);
     expect(ids(layout)).toEqual(["today", "tags", "week"]);
   });
 
+  it("drops a dragged block where it was let go, and the ones between move along", () => {
+    const layout = [
+      { id: "quick", size: "full" },
+      { id: "today", size: "half" },
+      { id: "tags", size: "half" },
+      { id: "week", size: "full" },
+    ];
+    expect(ids(moveBlockTo(layout, "week", "today"))).toEqual(["quick", "week", "today", "tags"]);
+    expect(ids(moveBlockTo(layout, "quick", "tags"))).toEqual(["today", "tags", "quick", "week"]);
+    // Onto itself, or onto something that isn't there: nothing changes.
+    expect(moveBlockTo(layout, "today", "today")).toBe(layout);
+    expect(moveBlockTo(layout, "today", "weather")).toBe(layout);
+    expect(moveBlockTo(layout, "weather", "today")).toBe(layout);
+    // Widths and settings travel with the block.
+    expect(moveBlockTo([{ id: "a", size: "half", options: { rows: 3 } }, { id: "b", size: "third" }], "a", "b")[1]).toEqual({ id: "a", size: "half", options: { rows: 3 } });
+  });
+
+  it("gives each block its own settings, falling back when a saved one no longer fits", () => {
+    expect(blockOptions({ id: "today", size: "half" })).toEqual({ rows: 8 });
+    expect(blockOptions({ id: "today", size: "half", options: { rows: 3 } })).toEqual({ rows: 3 });
+    // Not a choice on offer, or the wrong kind of value: the starting one.
+    expect(blockOptions({ id: "today", size: "half", options: { rows: 4 } })).toEqual({ rows: 8 });
+    expect(blockOptions({ id: "deadlines", size: "half", options: { rows: "many", days: 30 } })).toEqual({ rows: 5, days: 30 });
+    expect(blockOptions({ id: "tag", size: "third", options: { tag: "work" } })).toEqual({ rows: 5, tag: "work" });
+    expect(blockOptions({ id: "tag", size: "third", options: { tag: 7 } })).toEqual({ rows: 5, tag: "" });
+    // A block with nothing to set.
+    expect(blockOptions({ id: "month", size: "half", options: { rows: 3 } })).toEqual({});
+    // Every starting value is one of its own choices.
+    for (const spec of Object.values(BLOCK_SETTINGS)) {
+      for (const setting of Object.values(spec)) {
+        if (setting.choices) expect(setting.choices).toContain(setting.start);
+      }
+    }
+  });
+
+  it("changes one setting of one block, and refuses what the block doesn't offer", () => {
+    const layout = [
+      { id: "today", size: "half" },
+      { id: "deadlines", size: "half", options: { rows: 3 } },
+    ];
+    expect(setBlockOption(layout, "deadlines", "days", 30)[1]).toEqual({ id: "deadlines", size: "half", options: { rows: 3, days: 30 } });
+    expect(setBlockOption(layout, "today", "rows", 12)[0]).toEqual({ id: "today", size: "half", options: { rows: 12 } });
+    expect(setBlockOption(layout, "today", "rows", 4)).toBe(layout);
+    expect(setBlockOption(layout, "today", "days", 7)).toBe(layout);
+    expect(setBlockOption(layout, "month", "rows", 3)).toBe(layout);
+    expect(setBlockOption([{ id: "tag", size: "third" }], "tag", "tag", "work")[0].options).toEqual({ tag: "work" });
+    expect(setBlockOption([{ id: "tag", size: "third" }], "tag", "tag", 3)[0].options).toBeUndefined();
+  });
+
+  it("keeps a block's settings through a save and a load", () => {
+    expect(resolveHomeLayout([{ id: "today", size: "half", options: { rows: 3 } }, { id: "tags", size: "third", options: "x" }])).toEqual([
+      { id: "today", size: "half", options: { rows: 3 } },
+      { id: "tags", size: "third" },
+    ]);
+  });
+
   it("lists the blocks that aren't on the page", () => {
-    expect(hiddenBlocks(DEFAULT_HOME_LAYOUT)).toEqual([]);
+    expect(ids(hiddenBlocks(DEFAULT_HOME_LAYOUT))).toEqual(["tag"]);
     expect(ids(hiddenBlocks([{ id: "today", size: "half" }]))).not.toContain("today");
     expect(hiddenBlocks([]).length).toBe(HOME_BLOCKS.length);
   });
@@ -121,6 +184,15 @@ describe("what the Home blocks show", () => {
     expect(days.map((day) => day.count)).toEqual([4, 1, 0, 0, 0, 0, 0]);
     expect(days.map((day) => day.label)[0]).toBe("Sat");
     expect(days.filter((day) => day.isToday).map((day) => day.key)).toEqual(["2026-11-14"]);
+  });
+
+  it("One tag: that tag's open tasks, dated ones soonest first, then the undated by name", () => {
+    expect(ids(tasksWithTag(open, "work"))).toEqual(["fortnight", "far"]);
+    expect(ids(tasksWithTag([...open, { id: "z", title: "Zip", tags: ["home"] }, { id: "a", title: "Air", tags: ["home"] }], "home"))).toEqual([
+      "morning", "anyHigh", "anyLow", "tomorrow", "a", "z",
+    ]);
+    expect(tasksWithTag(open, "")).toEqual([]);
+    expect(tasksWithTag(open, "nothing")).toEqual([]);
   });
 
   it("By tag: busiest first, a tie by name, bars measured against the busiest", () => {

@@ -1,7 +1,8 @@
 // @ts-check
 /**
  * @file How a person arranged their Home page: which blocks show, in
- * what order, and how wide each is. Kept with their other preferences on
+ * what order, how wide each is, and each block's own few settings (how
+ * many rows, which tag). Kept with their other preferences on
  * the user row, so the page they set up on a laptop is the page they get
  * on a phone.
  *
@@ -15,6 +16,31 @@ export const HOME_SIZES = ["third", "half", "full"];
 
 const BLOCK_ID = /^[a-z][a-z0-9-]{0,31}$/;
 const MOST_BLOCKS = 24;
+const OPTION_NAME = /^[a-z][a-zA-Z]{0,15}$/;
+const MOST_OPTIONS = 6;
+const LONGEST_TEXT = 80;
+
+/**
+ * A block's own settings, kept only as small plain values: a few named
+ * numbers, short strings or yes/no. What they mean is the app's business.
+ * @param {unknown} raw
+ * @returns {Record<string, string | number | boolean> | null}  null when there are none
+ */
+function cleanOptions(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  /** @type {Record<string, string | number | boolean>} */
+  const kept = {};
+  let count = 0;
+  for (const [name, value] of Object.entries(raw)) {
+    if (count >= MOST_OPTIONS) break;
+    if (!OPTION_NAME.test(name)) continue;
+    if (typeof value === "boolean" || (typeof value === "number" && Number.isFinite(value))) kept[name] = value;
+    else if (typeof value === "string" && value.length <= LONGEST_TEXT) kept[name] = value;
+    else continue;
+    count += 1;
+  }
+  return count ? kept : null;
+}
 
 /**
  * @param {string | null | undefined} raw
@@ -36,11 +62,11 @@ function parsePreferences(raw) {
  * (An empty list is a layout too: someone removed every block.)
  *
  * @param {unknown} raw
- * @returns {{ id: string, size: string }[] | null}
+ * @returns {{ id: string, size: string, options?: Record<string, string | number | boolean> }[] | null}
  */
 export function cleanHomeLayout(raw) {
   if (!Array.isArray(raw)) return null;
-  /** @type {{ id: string, size: string }[]} */
+  /** @type {{ id: string, size: string, options?: Record<string, string | number | boolean> }[]} */
   const blocks = [];
   const seen = new Set();
   for (const entry of raw) {
@@ -49,7 +75,8 @@ export function cleanHomeLayout(raw) {
     if (typeof id !== "string" || !BLOCK_ID.test(id) || seen.has(id)) continue;
     seen.add(id);
     const size = /** @type {any} */ (entry).size;
-    blocks.push({ id, size: HOME_SIZES.includes(size) ? size : "third" });
+    const options = cleanOptions(/** @type {any} */ (entry).options);
+    blocks.push({ id, size: HOME_SIZES.includes(size) ? size : "third", ...(options ? { options } : {}) });
   }
   return blocks;
 }

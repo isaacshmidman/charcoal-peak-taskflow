@@ -2,11 +2,17 @@
 /**
  * @file The frame of one block on Home: a quiet label, a count, the
  * block's content. While the page is being customized the same frame
- * carries the block's controls (earlier, later, how wide, remove) and its
- * content is held still, so arranging the page can't tick a task.
+ * carries the block's controls (a grip to drag it by, earlier, later, how
+ * wide, remove), then the block's own settings, and its content is held
+ * still, so arranging the page can't tick a task.
+ *
+ * Dragging: the grip picks the block up, and letting go over another
+ * block puts it in that block's place (pages/Home.jsx does the moving).
+ * The arrows do the same job from the keyboard, one place at a time.
  */
 import { Link } from "react-router-dom";
-import { ArrowLeft, ArrowRight, ChevronRight, X } from "lucide-react";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
+import { ArrowLeft, ArrowRight, ChevronRight, GripVertical, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HOME_SIZES, HOME_SIZE_LABELS } from "@/lib/home-blocks";
 
@@ -28,20 +34,33 @@ const tool =
 /**
  * @param {{
  *   id: string, name: string, size: string, count?: import("react").ReactNode, to?: string,
- *   editing?: boolean, first?: boolean, last?: boolean,
+ *   editing?: boolean, first?: boolean, last?: boolean, settings?: import("react").ReactNode,
  *   onMove?: (step: -1 | 1) => void, onResize?: (size: string) => void, onRemove?: () => void,
  *   children: import("react").ReactNode,
  * }} props
  */
-export default function HomeBlock({ id, name, size, count, to, editing = false, first, last, onMove, onResize, onRemove, children }) {
+export default function HomeBlock({ id, name, size, count, to, editing = false, first, last, settings, onMove, onResize, onRemove, children }) {
+  const drag = useDraggable({ id, disabled: !editing });
+  const drop = useDroppable({ id, disabled: !editing });
+  const setRefs = (element) => { drag.setNodeRef(element); drop.setNodeRef(element); };
+  const lifted = drag.isDragging;
+  const target = editing && drop.isOver && !lifted;
+
   return (
     <section
+      ref={setRefs}
       aria-label={name}
       data-testid={`home-block-${id}`}
       data-size={size}
+      data-drop-target={target || undefined}
+      style={lifted && drag.transform ? { transform: `translate3d(${drag.transform.x}px, ${drag.transform.y}px, 0)` } : undefined}
       className={cn(
         "flex min-w-0 flex-col rounded-xl border bg-surface-card",
         editing ? "border-dashed border-ink-300 dark:border-ink-600" : "border-border-hairline",
+        // In the hand it floats above the page (the one time a block has a shadow).
+        lifted && "relative z-40 opacity-90 shadow-pop",
+        // Where it would land.
+        target && "border-solid border-ink-900 dark:border-sun-400",
         SPAN[size] || SPAN.third,
       )}
     >
@@ -65,6 +84,15 @@ export default function HomeBlock({ id, name, size, count, to, editing = false, 
 
         {editing && (
           <div className="ml-auto flex items-center gap-0.5">
+            <button
+              type="button"
+              className={cn(tool, "cursor-grab touch-none active:cursor-grabbing")}
+              aria-label={`Drag ${name} to another place`}
+              title="Drag to move"
+              {...drag.listeners}
+            >
+              <GripVertical className="h-3.5 w-3.5" />
+            </button>
             <button type="button" className={tool} disabled={first} onClick={() => onMove?.(-1)} aria-label={`Move ${name} earlier`} title="Move earlier">
               <ArrowLeft className="h-3.5 w-3.5" />
             </button>
@@ -99,6 +127,12 @@ export default function HomeBlock({ id, name, size, count, to, editing = false, 
           </div>
         )}
       </header>
+
+      {editing && settings && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-3.5 pb-2 pt-0.5" data-testid={`home-settings-${id}`}>
+          {settings}
+        </div>
+      )}
 
       <div
         className={cn("flex min-h-0 flex-1 flex-col", editing && "pointer-events-none select-none opacity-50")}

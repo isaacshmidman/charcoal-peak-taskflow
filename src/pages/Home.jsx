@@ -4,20 +4,23 @@
  * arranges themselves. A grid of blocks (components/home/blocks.jsx),
  * each a small view of something another page shows in full.
  *
- * Customize turns the page into its own editor: every block grows
- * controls to move it earlier or later, set its width, or remove it, and
- * a tray lists the blocks that aren't on the page. Nothing is arranged
+ * Customize turns the page into its own editor: every block can be
+ * dragged to another place (or moved earlier or later with its arrows),
+ * made wider or narrower, given its own few settings, or removed, and a
+ * tray lists the blocks that aren't on the page. Nothing is arranged
  * automatically and nothing moves by itself. The layout is saved to the
  * account (hooks/useHomeLayout.js).
  */
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { DndContext, PointerSensor, TouchSensor, pointerWithin, useSensor, useSensors } from "@dnd-kit/core";
 import { format } from "date-fns/format";
 import { Plus, SlidersHorizontal } from "lucide-react";
 import { apiClient } from "@/api/apiClient";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import HomeBlock from "@/components/home/HomeBlock";
 import { DoneBlock, MonthBlock, NotesBlock, QuickAddBlock, ScheduleBlock, TagsBlock, TaskRows, WeekBlock } from "@/components/home/blocks";
 import { useTaskDialogs } from "@/components/tasks/useTaskDialogs";
@@ -26,25 +29,31 @@ import { useHomeLayout } from "@/hooks/useHomeLayout";
 import { useShortcutEvent } from "@/hooks/useShortcutEvent";
 import { useTodayStart } from "@/hooks/useTodayStart";
 import {
+  BLOCK_SETTINGS,
   addBlock,
   blockName,
+  blockOptions,
   dueToday,
   hiddenBlocks,
   monthGrid,
   moveBlock,
+  moveBlockTo,
   nextSevenDays,
   overdueTasks,
   pinnedNotes,
   removeBlock,
   resizeBlock,
   scheduleToday,
+  setBlockOption,
   tagRanking,
+  tasksWithTag,
   upcomingDeadlines,
   weekProgress,
 } from "@/lib/home-blocks";
 import { SHORTCUT_EVENTS } from "@/lib/shortcuts";
 import { excludeExternalEvents } from "@/lib/task-filters";
 import { openTasks } from "@/lib/task-views";
+import { taskPagePath } from "@/hooks/useTagFilter";
 
 /** Where a block's heading leads: the page that shows the same thing in full. */
 const LEADS_TO = {
@@ -58,6 +67,31 @@ const LEADS_TO = {
   done: "/Completed",
   month: "/Calendar",
 };
+
+const SETTING_LABELS = { rows: "Rows", days: "Days ahead" };
+
+/** One of a block's settings that is a choice of a few numbers. */
+function ChoiceSetting({ block, name, value, choices, onChange }) {
+  const label = SETTING_LABELS[name] || name;
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-[12px] text-ink-500 dark:text-ink-400">{label}</span>
+      <div role="group" aria-label={`${label} in ${block}`} className="ds-seg">
+        {choices.map((choice) => (
+          <button
+            key={choice}
+            type="button"
+            className="ds-seg-item h-6 min-w-[1.75rem] px-1.5 text-[11px] tabular-nums"
+            aria-pressed={value === choice}
+            onClick={() => onChange(choice)}
+          >
+            {choice}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function Home() {
   const [editing, setEditing] = useState(false);
@@ -88,6 +122,11 @@ export default function Home() {
 
   const sortedPriorities = useMemo(() => [...priorities].sort((a, b) => (a.order ?? 99) - (b.order ?? 99)), [priorities]);
 
+  // Each block's own settings (rows, days ahead, which tag), as they stand.
+  const options = useMemo(() => Object.fromEntries(layout.map((block) => [block.id, blockOptions(block)])), [layout]);
+  const deadlineDays = options.deadlines?.days ?? BLOCK_SETTINGS.deadlines.days.start;
+  const chosenTag = options.tag?.tag || "";
+
   // Each block's content, worked out once per change to the data.
   const data = useMemo(() => {
     const priorityOrder = {};
@@ -96,7 +135,8 @@ export default function Home() {
     return {
       today: dueToday(open, todayStart, priorityOrder),
       overdue: overdueTasks(open, todayStart),
-      deadlines: upcomingDeadlines(open, todayStart),
+      deadlines: upcomingDeadlines(open, todayStart, deadlineDays),
+      oneTag: tasksWithTag(open, chosenTag),
       week: nextSevenDays(open, todayStart),
       progress: weekProgress(tasks, open, todayStart, hiddenCalendars),
       ranking: tagRanking(open),
@@ -104,7 +144,20 @@ export default function Home() {
       month: monthGrid(open, todayStart),
       pinned: pinnedNotes(notes),
     };
-  }, [everything, tasks, priorities, notes, hiddenCalendars, todayStart]);
+  }, [everything, tasks, priorities, notes, hiddenCalendars, todayStart, deadlineDays, chosenTag]);
+
+  // Dragging a block by its grip. A small movement first, so a press on
+  // the grip that isn't a drag stays a press; on a touch screen a short
+  // hold, so the page can still be scrolled past the grips.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
+  );
+  const onDragEnd = ({ active, over }) => {
+    if (!over || active.id === over.id) return;
+    const next = moveBlockTo(layout, String(active.id), String(over.id));
+    if (next !== layout) save(next);
+  };
 
   // "n", the palette's New task, and the phone's + button.
   useShortcutEvent(SHORTCUT_EVENTS.newTask, () => ui.openNew());
@@ -121,6 +174,13 @@ export default function Home() {
   const weekTotal = data.week.reduce((sum, day) => sum + day.count, 0);
   const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
 
+  const rowsOf = (id) => options[id]?.rows ?? BLOCK_SETTINGS[id]?.rows?.start;
+  // The tags someone can point the "One tag" block at: every tag in use or saved.
+  const tagChoices = useMemo(
+    () => [...new Set([...savedTags.map((tag) => tag.name), ...data.ranking.map((row) => row.tag)])].filter(Boolean).sort((a, b) => a.localeCompare(b)),
+    [savedTags, data.ranking],
+  );
+
   /** A block's count beside its name, and its content. */
   const parts = {
     quick: {
@@ -128,23 +188,32 @@ export default function Home() {
     },
     today: {
       count: data.today.length,
-      body: <TaskRows tasks={data.today} most={8} to="/Today" empty="Nothing due today." meta="time" ui={ui} priorities={priorities} />,
+      body: <TaskRows tasks={data.today} most={rowsOf("today")} to="/Today" empty="Nothing due today." meta="time" ui={ui} priorities={priorities} />,
     },
     schedule: {
       count: data.schedule.length || "",
-      body: <ScheduleBlock rows={data.schedule} onEditTask={ui.edit} />,
+      body: <ScheduleBlock rows={data.schedule} most={rowsOf("schedule")} onEditTask={ui.edit} />,
     },
     overdue: {
       count: data.overdue.length,
-      body: <TaskRows tasks={data.overdue} most={5} to="/Today" empty="Nothing overdue." late ui={ui} priorities={priorities} />,
+      body: <TaskRows tasks={data.overdue} most={rowsOf("overdue")} to="/Today" empty="Nothing overdue." late ui={ui} priorities={priorities} />,
     },
     deadlines: {
-      count: "next 14 days",
-      body: <TaskRows tasks={data.deadlines} most={6} to="/Active" empty="Nothing due in the next two weeks." ui={ui} priorities={priorities} />,
+      count: `next ${deadlineDays} days`,
+      body: (
+        <TaskRows
+          tasks={data.deadlines}
+          most={rowsOf("deadlines")}
+          to="/Active"
+          empty={`Nothing due in the next ${deadlineDays} days.`}
+          ui={ui}
+          priorities={priorities}
+        />
+      ),
     },
     notes: {
       count: data.pinned.length || "",
-      body: <NotesBlock notes={data.pinned} />,
+      body: <NotesBlock notes={data.pinned} most={rowsOf("notes")} />,
     },
     week: {
       count: plural(weekTotal, "task"),
@@ -152,7 +221,7 @@ export default function Home() {
     },
     tags: {
       count: "open tasks",
-      body: <TagsBlock ranking={data.ranking} />,
+      body: <TagsBlock ranking={data.ranking} most={rowsOf("tags")} />,
     },
     done: {
       body: <DoneBlock progress={data.progress} />,
@@ -161,6 +230,67 @@ export default function Home() {
       count: data.month.label,
       body: <MonthBlock grid={data.month} />,
     },
+    tag: {
+      // Named after its tag once one is chosen, and its heading leads there.
+      name: chosenTag ? `#${chosenTag}` : undefined,
+      to: chosenTag ? taskPagePath("/Active", chosenTag) : undefined,
+      count: chosenTag ? data.oneTag.length : "",
+      body: chosenTag ? (
+        <TaskRows
+          tasks={data.oneTag}
+          most={rowsOf("tag")}
+          to={taskPagePath("/Active", chosenTag)}
+          empty="Nothing open with this tag."
+          ui={ui}
+          priorities={priorities}
+        />
+      ) : (
+        <p className="px-3.5 pb-4 pt-0.5 text-[13px] text-ink-400 dark:text-ink-500">Choose a tag in Customize.</p>
+      ),
+    },
+  };
+
+  /** The controls for a block's own settings, shown while customizing. */
+  const settingsFor = (block) => {
+    const spec = BLOCK_SETTINGS[block.id];
+    if (!spec) return null;
+    const name = blockName(block.id);
+    return (
+      <>
+        {block.id === "tag" && (
+          <div className="flex items-center gap-2">
+            <span className="text-[12px] text-ink-500 dark:text-ink-400">Tag</span>
+            <Select
+              value={chosenTag}
+              // Radix's hidden native <select> can report "" as it mounts.
+              onValueChange={(value) => { if (value) save(setBlockOption(layout, "tag", "tag", value)); }}
+            >
+              <SelectTrigger aria-label="Which tag this block shows" className="h-7 w-auto min-w-[7rem] max-w-[11rem] gap-2 px-2 text-[12px]">
+                <SelectValue placeholder="Choose a tag" />
+              </SelectTrigger>
+              <SelectContent>
+                {/* A tag chosen earlier and since removed from every task stays listed, so it isn't silently swapped. */}
+                {[...new Set([...(chosenTag ? [chosenTag] : []), ...tagChoices])].map((tag) => (
+                  <SelectItem key={tag} value={tag}>{tag}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        {Object.entries(spec)
+          .filter(([, setting]) => setting.choices)
+          .map(([key, setting]) => (
+            <ChoiceSetting
+              key={key}
+              block={name}
+              name={key}
+              value={options[block.id]?.[key]}
+              choices={setting.choices}
+              onChange={(value) => save(setBlockOption(layout, block.id, key, value))}
+            />
+          ))}
+      </>
+    );
   };
 
   const tray = hiddenBlocks(layout);
@@ -207,26 +337,29 @@ export default function Home() {
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2 xl:grid-cols-6">
-          {layout.map((block, index) => (
-            <HomeBlock
-              key={block.id}
-              id={block.id}
-              name={blockName(block.id)}
-              size={block.size}
-              count={parts[block.id]?.count}
-              to={LEADS_TO[block.id]}
-              editing={editing}
-              first={index === 0}
-              last={index === layout.length - 1}
-              onMove={(step) => save(moveBlock(layout, block.id, step))}
-              onResize={(size) => save(resizeBlock(layout, block.id, size))}
-              onRemove={() => save(removeBlock(layout, block.id))}
-            >
-              {parts[block.id]?.body}
-            </HomeBlock>
-          ))}
-        </div>
+        <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragEnd={onDragEnd}>
+          <div className="grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2 xl:grid-cols-6">
+            {layout.map((block, index) => (
+              <HomeBlock
+                key={block.id}
+                id={block.id}
+                name={parts[block.id]?.name || blockName(block.id)}
+                size={block.size}
+                count={parts[block.id]?.count}
+                to={parts[block.id]?.to || LEADS_TO[block.id]}
+                editing={editing}
+                first={index === 0}
+                last={index === layout.length - 1}
+                settings={settingsFor(block)}
+                onMove={(step) => save(moveBlock(layout, block.id, step))}
+                onResize={(size) => save(resizeBlock(layout, block.id, size))}
+                onRemove={() => save(removeBlock(layout, block.id))}
+              >
+                {parts[block.id]?.body}
+              </HomeBlock>
+            ))}
+          </div>
+        </DndContext>
       )}
 
       {editing && (
@@ -246,7 +379,12 @@ export default function Home() {
                 variant="outline"
                 size="sm"
                 className="gap-1"
-                onClick={() => save(addBlock(layout, block.id))}
+                onClick={() => {
+                  const added = addBlock(layout, block.id);
+                  // "One tag" arrives pointed at the busiest tag rather than at nothing.
+                  const busiest = data.ranking[0]?.tag;
+                  save(block.id === "tag" && busiest ? setBlockOption(added, "tag", "tag", busiest) : added);
+                }}
                 aria-label={`Add ${block.name}`}
               >
                 <Plus className="h-3.5 w-3.5" />

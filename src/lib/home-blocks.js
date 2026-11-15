@@ -6,8 +6,8 @@
  * as the list it links to (lib/task-views.js) and all of it can be
  * tested without drawing anything.
  *
- * A layout is a list of `{ id, size }` in reading order. Nothing is
- * arranged for the person: what they set is what stays.
+ * A layout is a list of `{ id, size, options? }` in reading order.
+ * Nothing is arranged for the person: what they set is what stays.
  */
 import { addDays } from "date-fns/addDays";
 import { endOfWeek } from "date-fns/endOfWeek";
@@ -19,7 +19,7 @@ import { toDateStr } from "@/lib/dates";
 import { compareTaskTime, parseTaskTime } from "@/lib/sort-helpers";
 import { isExternalEvent } from "@/lib/task-filters";
 
-/** @typedef {{ id: string, size: string }} HomeBlock  size is one of HOME_SIZES */
+/** @typedef {{ id: string, size: string, options?: Record<string, any> }} HomeBlock  size is one of HOME_SIZES */
 /** @typedef {Record<string, any>} Task */
 
 export const HOME_SIZES = ["third", "half", "full"];
@@ -39,7 +39,24 @@ export const HOME_BLOCKS = [
   { id: "tags", name: "By tag" },
   { id: "done", name: "Done this week" },
   { id: "month", name: "Month" },
+  { id: "tag", name: "One tag" },
 ];
+
+/**
+ * The settings a block has, with what each starts at and what it can be
+ * set to. `rows` is how many rows a list shows before "and N more";
+ * `days` is how far ahead Deadlines looks; `tag` is which tag the "One
+ * tag" block lists (free text: any tag the person has).
+ */
+export const BLOCK_SETTINGS = {
+  today: { rows: { start: 8, choices: [3, 5, 8, 12] } },
+  schedule: { rows: { start: 8, choices: [3, 5, 8, 12] } },
+  overdue: { rows: { start: 5, choices: [3, 5, 8, 12] } },
+  deadlines: { rows: { start: 5, choices: [3, 5, 8, 12] }, days: { start: 14, choices: [7, 14, 30] } },
+  notes: { rows: { start: 5, choices: [3, 5, 8, 12] } },
+  tags: { rows: { start: 8, choices: [3, 5, 8, 12] } },
+  tag: { rows: { start: 5, choices: [3, 5, 8, 12] }, tag: { start: "" } },
+};
 
 const KNOWN = new Set(HOME_BLOCKS.map((block) => block.id));
 
@@ -82,9 +99,43 @@ export function resolveHomeLayout(saved) {
     const id = entry?.id;
     if (!KNOWN.has(id) || seen.has(id)) continue;
     seen.add(id);
-    blocks.push({ id, size: HOME_SIZES.includes(entry.size) ? entry.size : "third" });
+    const options = entry.options && typeof entry.options === "object" && !Array.isArray(entry.options) ? entry.options : null;
+    blocks.push({ id, size: HOME_SIZES.includes(entry.size) ? entry.size : "third", ...(options ? { options } : {}) });
   }
   return blocks;
+}
+
+/**
+ * A block's settings as they stand: what was saved where that is still
+ * something the block offers, and what it starts at otherwise. So a
+ * choice a later build withdraws falls back instead of breaking.
+ * @param {HomeBlock} block
+ * @returns {Record<string, any>}
+ */
+export function blockOptions(block) {
+  const spec = BLOCK_SETTINGS[block.id] || {};
+  /** @type {Record<string, any>} */
+  const options = {};
+  for (const [name, setting] of Object.entries(spec)) {
+    const saved = block.options?.[name];
+    const allowed = setting.choices ? setting.choices.includes(saved) : typeof saved === typeof setting.start;
+    options[name] = allowed ? saved : setting.start;
+  }
+  return options;
+}
+
+/**
+ * @param {HomeBlock[]} layout
+ * @param {string} id
+ * @param {string} name   which setting
+ * @param {any} value
+ * @returns {HomeBlock[]}
+ */
+export function setBlockOption(layout, id, name, value) {
+  const setting = BLOCK_SETTINGS[id]?.[name];
+  if (!setting) return layout;
+  if (setting.choices ? !setting.choices.includes(value) : typeof value !== typeof setting.start) return layout;
+  return layout.map((block) => (block.id === id ? { ...block, options: { ...(block.options || {}), [name]: value } } : block));
 }
 
 /**
@@ -108,6 +159,24 @@ export function moveBlock(layout, id, step) {
   if (from < 0 || to < 0 || to >= layout.length) return layout;
   const next = [...layout];
   [next[from], next[to]] = [next[to], next[from]];
+  return next;
+}
+
+/**
+ * Dragged onto another block: it takes that block's place, and the
+ * blocks between shuffle along by one.
+ * @param {HomeBlock[]} layout
+ * @param {string} id      the block that was dragged
+ * @param {string} overId  the block it was dropped on
+ * @returns {HomeBlock[]}
+ */
+export function moveBlockTo(layout, id, overId) {
+  const from = layout.findIndex((block) => block.id === id);
+  const to = layout.findIndex((block) => block.id === overId);
+  if (from < 0 || to < 0 || from === to) return layout;
+  const next = [...layout];
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
   return next;
 }
 
@@ -199,6 +268,22 @@ export function upcomingDeadlines(open, todayStart, days = 14) {
   const today = toDateStr(todayStart);
   const last = toDateStr(addDays(todayStart, days));
   return open.filter((task) => task.due_date && task.due_date > today && task.due_date <= last).sort(byDateThenTime);
+}
+
+/**
+ * Open tasks carrying one tag: dated ones soonest first, then the rest
+ * by name.
+ * @param {Task[]} open
+ * @param {string} tag
+ */
+export function tasksWithTag(open, tag) {
+  if (!tag) return [];
+  return open
+    .filter((task) => Array.isArray(task.tags) && task.tags.includes(tag))
+    .sort((a, b) => {
+      if (!a.due_date !== !b.due_date) return a.due_date ? -1 : 1;
+      return a.due_date ? byDateThenTime(a, b) : titleOf(a).localeCompare(titleOf(b));
+    });
 }
 
 /**

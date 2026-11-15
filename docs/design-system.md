@@ -92,11 +92,18 @@ itself.
   over the tasks and notes already loaded, tested on their own. Today
   plus Overdue is exactly the Today page's list. Add a block there
   (`HOME_BLOCKS`, a function for its data) and in `Home.jsx` (`parts`).
-- **Customize** turns the page into its own editor: each block gets
-  earlier / later, S M L, and remove; a tray at the foot lists the blocks
-  that are off the page. Content is held still while arranging. Every
-  change is saved at once to the account (`backend/home-layout.js`), so
-  it is the same page on every device. Reset forgets it.
+- **Customize** turns the page into its own editor: each block gets a
+  grip to drag it by (let go over another block and it takes that place),
+  earlier / later for the keyboard, S M L, and remove; a tray at the foot
+  lists the blocks that are off the page. Content is held still while
+  arranging. Every change is saved at once to the account
+  (`backend/home-layout.js`), so it is the same page on every device.
+  Reset forgets it.
+- **A block's own settings** (`BLOCK_SETTINGS`): how many rows a list
+  shows, how far ahead Deadlines looks, which tag "One tag" lists. Each
+  is a choice of a few, shown under the block's heading while
+  customizing. The server keeps them as small plain values and doesn't
+  know what they mean, so a new setting needs no change there.
 - **Colour.** Bars and dots are ink. Sun appears where it always means
   something: today's bar and today's date (now), the progress bar (done).
   An event's stripe in Schedule is its calendar's own colour.

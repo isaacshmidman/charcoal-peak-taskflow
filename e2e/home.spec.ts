@@ -143,7 +143,8 @@ test("Home: Customize moves, widens, removes and adds blocks, and the page stays
   const half = await width("today");
 
   await page.getByRole("button", { name: "Customize", exact: true }).click();
-  await expect(page.getByTestId("home-tray")).toContainText("Every block is on the page.");
+  // The one block not on the starting page is the one that needs a tag chosen.
+  await expect(page.getByTestId("home-tray").getByRole("button")).toHaveText([/One tag/]);
   // Nothing to put back yet.
   await expect(page.getByRole("button", { name: "Reset", exact: true })).toHaveCount(0);
   // While arranging, a block's content can't be used.
@@ -164,7 +165,7 @@ test("Home: Customize moves, widens, removes and adds blocks, and the page stays
   await page.getByRole("button", { name: "Remove By tag" }).click();
   await expect(block(page, "tags")).toHaveCount(0);
   await page.getByRole("button", { name: "Remove Month" }).click();
-  await expect(page.getByTestId("home-tray").getByRole("button")).toHaveText([/By tag/, /Month/]);
+  await expect(page.getByTestId("home-tray").getByRole("button")).toHaveText([/By tag/, /Month/, /One tag/]);
   await page.getByRole("button", { name: "Add By tag" }).click();
   const arranged = ["quick", "schedule", "today", "overdue", "done", "notes", "week", "deadlines", "tags"];
   await expect.poll(() => order(page)).toEqual(arranged);
@@ -213,4 +214,79 @@ test("Home on a phone: one column, and + opens the task form here", async ({ pag
   await page.getByRole("button", { name: "Customize", exact: true }).click();
   await expect(page.getByRole("button", { name: "Move Today later" })).toBeVisible();
   await expect(page.getByRole("group", { name: "Width of Today" })).toBeHidden();
+});
+
+test("Home: drag a block to a new place, set a block's own rows and days, and give a tag its own block", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const many = [
+    ...tasks,
+    task("g1", "Call the bank", { tags: ["work"] }),
+    task("g2", "Renew the passport", { tags: ["work"] }),
+    task("g3", "Book the dentist", { tags: ["home"] }),
+    task("far", "Plan the trip", { due_date: day(10), tags: ["home"] }),
+  ];
+  const mock = await installMockBackend(page, { tasks: many, priorities, notes });
+  await page.goto("/Home");
+  await expect(block(page, "today")).toBeVisible();
+  // Five are due today; all fit in the block's eight rows.
+  await expect(block(page, "today").getByRole("checkbox")).toHaveCount(5);
+  await expect(block(page, "deadlines").getByText("Plan the trip")).toBeVisible();
+
+  await page.getByRole("button", { name: "Customize", exact: true }).click();
+
+  // Drag Schedule by its grip and let go over Quick add: it takes that place.
+  const grip = (await page.getByRole("button", { name: "Drag Schedule to another place" }).boundingBox())!;
+  const target = (await block(page, "quick").boundingBox())!;
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(grip.x - 40, grip.y - 20, { steps: 4 });
+  await page.mouse.move(target.x + 200, target.y + target.height / 2, { steps: 8 });
+  await expect(block(page, "quick")).toHaveAttribute("data-drop-target", "true");
+  await page.mouse.up();
+  await expect.poll(async () => (await order(page)).slice(0, 3)).toEqual(["schedule", "quick", "today"]);
+
+  // A block's own settings.
+  await page.getByRole("group", { name: "Rows in Today" }).getByRole("button", { name: "3", exact: true }).click();
+  await page.getByRole("group", { name: "Days ahead in Deadlines" }).getByRole("button", { name: "7", exact: true }).click();
+  await expect(page.getByTestId("home-count-deadlines")).toHaveText("next 7 days");
+  // A block with nothing to set shows no settings row.
+  await expect(page.getByTestId("home-settings-month")).toHaveCount(0);
+
+  // "One tag" arrives pointed at the busiest tag, and can be pointed elsewhere.
+  await page.getByRole("button", { name: "Add One tag" }).click();
+  await expect(page.getByRole("region", { name: "#work" })).toBeVisible();
+  await expect(page.getByTestId("home-count-tag")).toHaveText("5");
+  await page.getByRole("combobox", { name: "Which tag this block shows" }).click();
+  await page.getByRole("option", { name: "home", exact: true }).click();
+  await expect(page.getByRole("region", { name: "#home" })).toBeVisible();
+  await expect(page.getByTestId("home-count-tag")).toHaveText("4");
+
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+
+  // Three rows and a link to the rest; ten days out is past the week Deadlines now looks.
+  await expect(block(page, "today").getByRole("checkbox")).toHaveCount(3);
+  await expect(block(page, "today").getByRole("link", { name: "and 2 more" })).toHaveAttribute("href", "/Today");
+  await expect(block(page, "deadlines").getByText("Plan the trip")).toHaveCount(0);
+  await expect(block(page, "deadlines").getByText("Review the contract")).toBeVisible();
+  // The tag's block lists its tasks, dated ones first, and its heading leads to the tag.
+  await expect(block(page, "tag").getByText("Water the plants")).toBeVisible();
+  await expect(block(page, "tag").getByText("Sort the garage")).toBeVisible();
+  await expect(block(page, "tag").getByRole("link", { name: "#home" })).toHaveAttribute("href", "/Active?tag=home");
+
+  // All of it is kept on the account.
+  await expect
+    .poll(async () => {
+      const saved = (await mock.getState()).homeLayout || [];
+      return {
+        first: saved[0]?.id,
+        today: saved.find((b) => b.id === "today")?.options,
+        deadlines: saved.find((b) => b.id === "deadlines")?.options,
+        tag: saved.find((b) => b.id === "tag")?.options,
+      };
+    })
+    .toEqual({ first: "schedule", today: { rows: 3 }, deadlines: { days: 7 }, tag: { tag: "home" } });
+  await page.reload();
+  await expect(block(page, "today").getByRole("checkbox")).toHaveCount(3);
+  await expect(page.getByTestId("home-count-deadlines")).toHaveText("next 7 days");
+  await expect(page.getByRole("region", { name: "#home" })).toBeVisible();
 });
