@@ -391,6 +391,84 @@ test("offline task creation is replayed and survives a reload when connectivity 
   await context.close();
 });
 
+/** What IndexedDB holds for the offline copy of a list, parsed (the first key with this prefix). */
+const listOnDisk = (page: Page, prefix: string) =>
+  page.evaluate(
+    (wanted) =>
+      new Promise((resolve) => {
+        const opening = indexedDB.open("zephyrly-offline-copy");
+        opening.onerror = () => resolve(null);
+        opening.onsuccess = () => {
+          const db = opening.result;
+          if (!db.objectStoreNames.contains("lists")) {
+            db.close();
+            resolve(null);
+            return;
+          }
+          const store = db.transaction("lists", "readonly").objectStore("lists");
+          const keys = store.getAllKeys();
+          keys.onsuccess = () => {
+            const key = keys.result.map(String).find((entry) => entry.startsWith(wanted));
+            if (!key) {
+              db.close();
+              resolve(null);
+              return;
+            }
+            const value = store.get(key);
+            value.onsuccess = () => {
+              db.close();
+              resolve(JSON.parse(value.result));
+            };
+          };
+        };
+      }),
+    prefix
+  );
+
+const listKeysInLocalStorage = (page: Page) =>
+  page.evaluate(() => Object.keys(localStorage).filter((entry) => entry.startsWith("taskflow_offline_")));
+
+test("offline copy: the lists are kept in IndexedDB, and open the app before the server has answered", async ({ page }) => {
+  await installMockBackend(page, {
+    tasks: [recurringTask({ id: "task-kept", title: "Kept on this device", task_type: "one_time", recurrence: "none" })],
+    priorities: [defaultPriority],
+  });
+  await page.goto("/Today");
+  await expect(taskCardByTitle(page, "Kept on this device")).toBeVisible();
+
+  // On the disk, in IndexedDB, and not in localStorage's few megabytes.
+  await expect
+    .poll(async () => ((await listOnDisk(page, "taskflow_offline_tasks")) as any[] | null)?.map((task) => task.title))
+    .toEqual(["Kept on this device"]);
+  expect(await listKeysInLocalStorage(page)).toEqual([]);
+
+  // Opened again with a server that takes a minute to answer: the first
+  // screen is drawn from the device's copy, not left waiting.
+  await page.addInitScript(() => {
+    (window as any).__TASKFLOW_E2E_LIST_DELAY__ = 60_000;
+  });
+  await page.reload();
+  await expect(taskCardByTitle(page, "Kept on this device")).toBeVisible();
+});
+
+test("offline copy: lists an earlier version left in localStorage are moved to IndexedDB and still shown", async ({ page }) => {
+  await installMockBackend(page, { tasks: [], priorities: [defaultPriority] });
+  await page.addInitScript((task) => {
+    // The device as the version before left it, once.
+    if (!sessionStorage.getItem("seeded")) {
+      sessionStorage.setItem("seeded", "1");
+      localStorage.setItem("taskflow_offline_tasks", JSON.stringify([task]));
+    }
+    (window as any).__TASKFLOW_E2E_LIST_DELAY__ = 60_000;
+  }, recurringTask({ id: "task-old", title: "From an older version", task_type: "one_time", recurrence: "none" }));
+
+  await page.goto("/Today");
+  await expect(taskCardByTitle(page, "From an older version")).toBeVisible();
+
+  await expect.poll(async () => listKeysInLocalStorage(page)).toEqual([]);
+  expect(((await listOnDisk(page, "taskflow_offline_tasks")) as any[]).map((task) => task.title)).toEqual(["From an older version"]);
+});
+
 test("offline priority edits queue under the legacy key and replay when connectivity returns", async ({ browser }) => {
   // Priority is the first legacy entity migrated onto offlineEntityRegistry.
   // This pins the round trip end-to-end: the queue must still live under

@@ -119,11 +119,36 @@ the connection returns, once each.
   the person is told. A list whose copy can't be updated keeps its older
   copy and the person is told once.
 
-Known limits: the lists live in `localStorage` (about 5 MB per site), so
-beyond roughly 5,000 to 10,000 tasks the offline copy stops updating
-(with a notice). Moving them to IndexedDB removes the limit but makes
-start-up asynchronous. Deleting an offline-made record during the instant
-its create is in flight can bring it back on the next refresh.
+- **The lists are kept in IndexedDB, the queues in localStorage**
+  (`src/lib/offlineCache.js`, `src/lib/offlineListStore.js`). A browser
+  gives a site about 5 MB of localStorage in all. The lists used to share
+  it with the queues of changes made offline, and a few thousand tasks
+  filled it: the copy stopped updating and a change made offline had
+  nowhere to go. Now the lists (tasks, notes, priorities, tags, both
+  Recently deleted lists) are in IndexedDB, whose share is a slice of the
+  disk, and localStorage holds only the queues and small settings.
+  - IndexedDB answers a moment later, and the app reads its lists at
+    once. So they are also held in memory: `hydrateOfflineCopy()` reads
+    them in before the app first draws (`src/main.jsx`), and after that a
+    list changes in memory first and the disk follows.
+  - A queued change still goes to localStorage, which writes at once: it
+    has to be on the device before the app says it is kept.
+  - Lists a previous version left in localStorage are moved across the
+    first time the app opens, and removed from localStorage only once
+    they are safely in IndexedDB.
+  - Another tab's newer list reaches this tab through a
+    `BroadcastChannel`, as reading localStorage used to give every tab
+    the newest copy.
+  - A browser with no usable IndexedDB (or one that doesn't answer within
+    a second and a half) keeps its lists in localStorage as before, and
+    the old limit applies to it.
+
+Known limits: deleting an offline-made record during the instant its
+create is in flight can bring it back on the next refresh. A list changed
+in the last moment before a tab is closed may not reach the disk (the
+write is started as the page is hidden, and the browser usually lets it
+finish); the change itself is in the queue either way, and the list is
+fetched again when the app next opens with a connection.
 
 ## Checking it for real
 

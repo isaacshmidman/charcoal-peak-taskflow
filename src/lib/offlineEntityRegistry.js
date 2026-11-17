@@ -92,7 +92,7 @@ export function registerOfflineEntity(def) {
   defineCacheKeys({
     [def.cacheKey]: def.storageKeys?.cache || `taskflow_offline_${def.cacheKey}`,
     [def.queueKey]: def.storageKeys?.queue || `taskflow_pending_${def.cacheKey}_mutations`,
-  });
+  }, { lists: [def.cacheKey] });
 
   const normalize = def.normalizeEntry || ((entry) => entry);
   const getPending = () => (loadFromCache(def.queueKey) || []).map(normalize);
