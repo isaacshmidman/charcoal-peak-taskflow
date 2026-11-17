@@ -117,6 +117,19 @@ test("sidebar: folding it to icons is remembered, and the page takes the room", 
   await expect.poll(width).toBe(240);
 });
 
+/**
+ * Close the open dialog with Escape. A dialog starts hearing keys a moment
+ * after it is drawn, so on a slow machine (CI) a key pressed the instant it
+ * appears is lost: nobody types that fast, but a test does. Pressing again
+ * still fails if Escape ever stops closing it.
+ */
+async function closeDialogWithEscape(page: Page) {
+  await expect(async () => {
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toHaveCount(0, { timeout: 1000 });
+  }).toPass({ timeout: 15_000 });
+}
+
 test("phone: tabs have words, + adds from anywhere, and More holds the rest", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await installMockBackend(page, { tasks, priorities: [priority] });
@@ -132,8 +145,7 @@ test("phone: tabs have words, + adds from anywhere, and More holds the rest", as
   // + opens the page's own form…
   await tabs.getByRole("button", { name: "New task" }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await closeDialogWithEscape(page);
 
   // …and from a page without one, it goes to Today and opens there, once.
   await tabs.getByRole("button", { name: "More" }).click();
@@ -142,8 +154,7 @@ test("phone: tabs have words, + adds from anywhere, and More holds the rest", as
   await tabs.getByRole("button", { name: "New task" }).click();
   await expect(page).toHaveURL(/\/Today$/);
   await expect(page.getByRole("dialog")).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await closeDialogWithEscape(page);
   await page.reload();
   await expect(card(page, "Send the invoice")).toBeVisible();
   await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -229,6 +240,10 @@ test("appearance: an old start page of the board still opens the board", async (
 
 test("a page whose code can't be fetched says so, keeps the sidebar, and loads on Try again", async ({ page }) => {
   await installMockBackend(page, { tasks, priorities: [priority] });
+  // Which app this is: set here, so the test doesn't lean on a settings
+  // file this machine happens to have (CI has none, and an app that
+  // doesn't know its id rightly reports nothing).
+  await page.addInitScript(() => window.localStorage.setItem("taskflow_app_id", "e2e-app"));
   const reports: any[] = [];
   await page.route("**/api/apps/*/client-errors", async (route) => {
     reports.push(route.request().postDataJSON());
