@@ -81,17 +81,17 @@ jobs:
 
       - name: Photos convert without any system image library
         run: |
-          docker exec zephyrly-check node --input-type=module -e '
-            import { readFileSync } from "node:fs";
-            import sharp from "sharp";
-            const { heicToJpeg } = await import("/app/backend/lib/heic.js");
-            const jpeg = await heicToJpeg(readFileSync("/app/backend/test-support/fixtures/portrait.heic"));
-            const meta = await sharp(jpeg).metadata();
-            if (meta.format !== "jpeg" || !meta.width) throw new Error("HEIC did not convert: " + JSON.stringify(meta));
-            const thumb = await sharp(jpeg).resize(64).webp().toBuffer();
-            console.log("HEIC to JPEG", meta.width + "x" + meta.height, "and a", thumb.length, "byte thumbnail");
-            process.exit(0);
-          '
+          docker exec -i zephyrly-check node --input-type=module <<'JS'
+          import { readFileSync } from "node:fs";
+          import sharp from "sharp";
+          const { heicToJpeg } = await import("/app/backend/lib/heic.js");
+          const jpeg = await heicToJpeg(readFileSync("/app/backend/test-support/fixtures/portrait.heic"));
+          const meta = await sharp(jpeg).metadata();
+          if (meta.format !== "jpeg" || !meta.width) throw new Error("HEIC did not convert: " + JSON.stringify(meta));
+          const thumb = await sharp(jpeg).resize(64).webp().toBuffer();
+          console.log("HEIC to JPEG", meta.width + "x" + meta.height, "and a", thumb.length, "byte thumbnail");
+          process.exit(0);
+          JS
 
       - name: Build again with the network switched off
         run: |
