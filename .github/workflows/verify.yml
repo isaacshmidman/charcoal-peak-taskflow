@@ -49,3 +49,58 @@ jobs:
 
       - name: Run Playwright
         run: npm run test:e2e
+
+  # The image the server runs: it builds, starts, converts an iPhone photo,
+  # and builds again with no network at all from the packages kept by the
+  # first build, which is what lets a deploy survive the box losing its
+  # internet for a minute (Dockerfile).
+  docker:
+    runs-on: ubuntu-24.04
+    needs: verify
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build the image
+        run: docker build --no-cache -t zephyrly-check .
+
+      - name: Start it and ask it if it is healthy
+        run: |
+          mkdir -p "$RUNNER_TEMP/data"
+          docker run -d --name zephyrly-check -p 8787:8787 \
+            -v "$RUNNER_TEMP/data:/app/backend/data" \
+            -e NODE_ENV=production -e TASKFLOW_APP_ID=ci-app -e TASKFLOW_PUBLIC_APP_URL=http://127.0.0.1:8787 \
+            -e TASKFLOW_INTEGRATIONS_ENABLED=false -e TASKFLOW_BACKUPS=false \
+            zephyrly-check
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8787/api/health; then echo; exit 0; fi
+            sleep 1
+          done
+          docker logs zephyrly-check
+          exit 1
+
+      - name: Photos convert without any system image library
+        run: |
+          docker exec zephyrly-check node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            import sharp from "sharp";
+            const { heicToJpeg } = await import("/app/backend/lib/heic.js");
+            const jpeg = await heicToJpeg(readFileSync("/app/backend/test-support/fixtures/portrait.heic"));
+            const meta = await sharp(jpeg).metadata();
+            if (meta.format !== "jpeg" || !meta.width) throw new Error("HEIC did not convert: " + JSON.stringify(meta));
+            const thumb = await sharp(jpeg).resize(64).webp().toBuffer();
+            console.log("HEIC to JPEG", meta.width + "x" + meta.height, "and a", thumb.length, "byte thumbnail");
+            process.exit(0);
+          '
+
+      - name: Build again with the network switched off
+        run: |
+          docker rm -f zephyrly-check
+          # Docker Hub, npm and Debian made unreachable for the whole machine
+          # (the build's own steps have no network at all on top of that),
+          # as the box is when its internet drops.
+          echo "0.0.0.0 registry-1.docker.io auth.docker.io production.cloudflare.docker.com index.docker.io registry.npmjs.org deb.debian.org" | sudo tee -a /etc/hosts
+          if curl -s -m 5 -o /dev/null https://registry.npmjs.org/; then echo "npm is still reachable: this check would prove nothing"; exit 1; fi
+          echo "// a source change, as a deploy has" >> src/main.jsx
+          docker build --no-cache --network=none -t zephyrly-check-offline .
+          echo "Rebuilt with no network: dependencies came from the packages kept by the first build."
