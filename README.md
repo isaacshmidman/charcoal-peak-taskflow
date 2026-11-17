@@ -315,6 +315,8 @@ git pull
 docker compose up -d --build
 ```
 
+Don't add `--no-cache` to the build: it throws away the installed packages Docker would otherwise reuse, so every deploy has to download them again and fails whenever the internet drops for a minute. Nothing goes stale without it; every step after `COPY . .` in the `Dockerfile` is rebuilt whenever any file changes.
+
 ### Importing Base44 Data
 
 To import CSV exports from Base44 into the production database:

@@ -51,9 +51,8 @@ jobs:
         run: npm run test:e2e
 
   # The image the server runs: it builds, starts, converts an iPhone photo,
-  # and builds again with no network at all from the packages kept by the
-  # first build, which is what lets a deploy survive the box losing its
-  # internet for a minute (Dockerfile).
+  # and builds again after a source change with no network at all, which
+  # is what lets a deploy survive the box losing its internet (Dockerfile).
   docker:
     runs-on: ubuntu-24.04
     needs: verify
@@ -104,5 +103,7 @@ jobs:
           echo "0.0.0.0 registry-1.docker.io auth.docker.io production.cloudflare.docker.com index.docker.io registry.npmjs.org deb.debian.org" | sudo tee -a /etc/hosts
           if curl -s -m 5 -o /dev/null https://registry.npmjs.org/; then echo "npm is still reachable: this check would prove nothing"; exit 1; fi
           echo "// a source change, as a deploy has" >> src/main.jsx
-          docker build --no-cache --network=none -t zephyrly-check-offline .
-          echo "Rebuilt with no network: dependencies came from the packages kept by the first build."
+          # As the deploy command builds: without --no-cache, so the install
+          # step is reused while the lockfile is unchanged.
+          docker build --network=none -t zephyrly-check-offline .
+          echo "Rebuilt with no network: the dependencies were reused from the first build, the app itself was rebuilt."

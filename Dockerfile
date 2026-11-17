@@ -2,26 +2,29 @@
 # A deploy used to download every package twice (and Debian's packages
 # once) on every build, so a minute without internet at the box stopped
 # the deploy (2026-11-17: `npm ci` failed with ETIMEDOUT). Now:
-#   - downloaded packages are kept on the box between builds (the
-#     `--mount=type=cache` lines; `docker compose build --no-cache` does
-#     not empty them), and npm uses them before asking the internet, so a
-#     deploy that changes no dependency needs no internet at all;
-#   - when it does need the internet, npm retries for about two minutes
-#     before giving up, instead of one short try;
+#   - the packages are installed in a step that depends only on
+#     package.json and package-lock.json, so Docker reuses it from the
+#     last build until a dependency changes: a deploy that changes no
+#     dependency needs no internet at all. This needs the build to be run
+#     WITHOUT `--no-cache` (which throws that reuse away). Nothing goes
+#     stale: every step after `COPY . .` is rebuilt whenever any file
+#     changes.
+#   - when it does need the internet, npm tries 5 times over about three
+#     minutes instead of once, and reuses what it downloaded before;
 #   - nothing is installed from Debian: the app never used those
 #     packages (see backend/lib/heic.js).
-# CI rebuilds this image with the network switched off to prove the
-# first point (.github/workflows/verify.yml, job "docker").
+# CI builds this image twice, the second time with no network at all,
+# to prove the first point (.github/workflows/verify.yml, job "docker").
 
 # ── Build stage ──────────────────────────────────────────────
 FROM node:22.14.0-slim AS build
 
 ARG VITE_APP_ID=69b71a4b57ba76a74090fc6e
 ENV VITE_APP_ID=$VITE_APP_ID
-# How npm waits for a slow or dropped connection: 5 tries, up to 2 minutes apart.
+# How npm waits for a slow or dropped connection: 5 tries, up to a minute apart.
 ENV npm_config_fetch_retries=5 \
     npm_config_fetch_retry_mintimeout=10000 \
-    npm_config_fetch_retry_maxtimeout=120000 \
+    npm_config_fetch_retry_maxtimeout=60000 \
     npm_config_audit=false \
     npm_config_fund=false \
     npm_config_update_notifier=false
@@ -42,7 +45,7 @@ FROM node:22.14.0-slim
 
 ENV npm_config_fetch_retries=5 \
     npm_config_fetch_retry_mintimeout=10000 \
-    npm_config_fetch_retry_maxtimeout=120000 \
+    npm_config_fetch_retry_maxtimeout=60000 \
     npm_config_audit=false \
     npm_config_fund=false \
     npm_config_update_notifier=false

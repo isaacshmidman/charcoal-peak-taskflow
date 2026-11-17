@@ -10,7 +10,7 @@ to tell it is done. Delete an item when it ships.
 
 | What | How | Why it matters |
 |---|---|---|
-| Deploy | `cd /media/Isaac_Zima_Storage/taskflow && sudo git pull origin codex/taskflow-hardening && sudo HOME=/media/Isaac_Zima_Storage docker compose build --no-cache taskflow && sudo HOME=/media/Isaac_Zima_Storage docker compose up -d taskflow` | Nothing below is live until then. |
+| Deploy | `cd /media/Isaac_Zima_Storage/taskflow && sudo git pull origin codex/taskflow-hardening && sudo HOME=/media/Isaac_Zima_Storage docker compose build taskflow && sudo HOME=/media/Isaac_Zima_Storage docker compose up -d taskflow` | Nothing below is live until then. No `--no-cache` any more: without it, a deploy that changes no dependency needs no internet (see the top of `Dockerfile`). |
 | See the first backup | Two minutes after the deploy: `sudo HOME=/media/Isaac_Zima_Storage docker compose logs taskflow \| grep backup` should show `[backup] made …`. Then `… docker compose exec taskflow node backend/scripts/backup.js rehearse`. | The backup code has only ever run on test data and a scratch server, never on the real box or its drive. |
 | Look at `manifest.json` in that backup | `files.linked` against `files.copied` | If the drive can't hard-link, every backup holds its own copy of every attachment: 14 backups, 14 times the space. Then set `TASKFLOW_BACKUP_KEEP` lower in `.env`. |
 | Keep `.env` somewhere else | A password manager | A restored server without the same `.env` has everyone's tasks but every calendar must be connected again. |
