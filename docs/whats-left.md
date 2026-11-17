@@ -159,10 +159,28 @@ only if they do.
 one task, measured on the real-server check, and a test proves a task
 deleted on another device disappears here.
 
-## 8. Decisions that are Isaac's, not work to start
+## 8. A task once showed twice in Recently deleted, in CI only
 
-- **Zephyrly Plus** ($9 once) is finished on the branch
-  `claude/elegant-euclid-23b0a1` and not on the main branch. Shipping it
-  needs Stripe set up on the server and his say-so.
+**What happened:** on 2026-11-17 the browser test "a deleted task keeps
+its files in Recently deleted…" (`e2e/task-flows.spec.ts`) failed once in
+CI: Recently deleted had two Restore buttons for one deleted task. A
+re-run passed. It could not be made to happen here: 44 runs, some with the
+browser slowed six times, some leaving the page 0 to 400 ms after the
+delete, all showed one record in the test backend, one on disk, one on
+screen.
+
+**Where to look next time:** the test backend (`src/lib/mockBackend.js`)
+ignores the create key the real server uses to refuse a second create
+(`created_once`), so a create sent twice makes two records there but not
+on the real server. If it fails again, have the e2e job keep
+`test-results/` (item 5) and read whether the backend held two records or
+the page drew one twice.
+
+## 9. Decisions that are Isaac's, not work to start
+
+- **Selling Plus.** Plus is in the app since 2026-11-17 (tax off), but
+  nothing can be bought until the live Stripe account is set up and its
+  three values are in `.env` on the box: `docs/plus.md`, "Setting up
+  Stripe".
 - **Lowering `TASKFLOW_SLOW_REQUEST_MS`** from 500 once a week of
   `[timings]` lines shows what normal is on the box.
