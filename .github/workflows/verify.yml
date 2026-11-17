@@ -81,7 +81,7 @@ jobs:
 
       - name: Photos convert without any system image library
         run: |
-          docker exec -i zephyrly-check node --input-type=module <<'JS'
+          cat > "$RUNNER_TEMP/photo-check.mjs" <<'JS'
           import { readFileSync } from "node:fs";
           import sharp from "sharp";
           const { heicToJpeg } = await import("/app/backend/lib/heic.js");
@@ -92,6 +92,8 @@ jobs:
           console.log("HEIC to JPEG", meta.width + "x" + meta.height, "and a", thumb.length, "byte thumbnail");
           process.exit(0);
           JS
+          docker cp "$RUNNER_TEMP/photo-check.mjs" zephyrly-check:/app/photo-check.mjs
+          docker exec zephyrly-check node /app/photo-check.mjs
 
       - name: Build again with the network switched off
         run: |
